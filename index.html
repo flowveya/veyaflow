@@ -717,16 +717,17 @@ function getVisibleNav(){
 const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular"};
 
 function buildNav(){
-  const visibleNav = getVisibleNav();
-  const nav=document.getElementById('sidebar-nav');
-  const stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
-  const currentStage = brand&&brand.stage?brand.stage:'trading';
-  let html='';
+  var visibleNav = getVisibleNav();
+  var nav=document.getElementById('sidebar-nav');
+  var stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
+  var stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
+  var currentStage = brand&&brand.stage?brand.stage:'trading';
+  var html='';
   if(brand){
-    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+(stageLabels[currentStage]||'Trading')+' · '+(brand.category||'')+'</div>';
+    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+(stageLabels[currentStage]||'Trading')+' · '+(brand.category||'')+'</div>';
   }
   visibleNav.forEach(function(n){
-    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(\''+n.id+'\')">';
+    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
     html+='<span class="nav-icon">'+n.icon+'</span>';
     html+='<span class="nav-label">'+n.label+'</span>';
     if(n.badge) html+='<span style="font-family:var(--mono);font-size:.48rem;background:var(--gold);color:var(--navy);padding:.1rem .3rem;letter-spacing:.04em;font-weight:700">'+n.badge+'</span>';
@@ -736,11 +737,11 @@ function buildNav(){
   });
   nav.innerHTML=html;
 
-  const mobnav=document.getElementById('mobile-nav-inner');
+  var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
-    let mobHtml='';
+    var mobHtml='';
     visibleNav.slice(0,5).forEach(function(n){
-      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(\''+n.id+'\')">';
+      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
       if(n.id==='suppliers') mobHtml+='<span class="mob-badge">2</span>';
       mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
@@ -877,7 +878,7 @@ function renderOnboardStep(){
         <button class="btn-primary" style="flex:1" onclick="onboardStep=3;renderPage('home')">Continue →</button>
       </div>
     `;
-  } else {
+  } else if(onboardStep===3){
     inner.innerHTML=`
       <div class="onboard-title">Sustainability priorities</div>
       <div class="onboard-sub">VeyaFlow uses these to filter manufacturers by certification match, flag retailer requirements in reports, and surface compliance gaps in your supply chain before they become problems.</div>
@@ -1776,7 +1777,7 @@ function renderBizCase(el){
         ${[
           {icon:'📊',label:'From aesthetic to evidence',desc:'Clinical data, certifications, proof your product works'},
           {icon:'💆',label:'From product to protocol',desc:'How your brand fits the consumer routine and amplifies existing sales'},
-          {icon:'📈',label:'From vendor to volume',desc:'Why stocking you increases the retailer's total category revenue'},
+          {icon:'📈',label:'From vendor to volume',desc:'Why stocking you increases the retailer\u2019s total category revenue'},
         ].map(f=>`
           <div style="background:var(--navy);padding:.85rem;text-align:center">
             <div style="font-size:1.2rem;margin-bottom:.3rem">${f.icon}</div>
@@ -1891,7 +1892,7 @@ Size and growth of the ${brand.category} category in ${bizCaseState.market}. Whe
 How ${brand.name} fits into the consumer's ${brand.category} routine. Which products already on ${bizCaseState.retailer}'s shelves does it complement? Why does a customer who buys ${brand.name} also buy more of ${bizCaseState.retailer}'s existing range? ${brand.basketImpact?'Use this data: '+brand.basketImpact:'Generate a credible basket correlation argument based on category behaviour.'} Answer: "How does this brand make our other products sell better?"
 
 ## THE VOLUME ARGUMENT
-The commercial case in numbers. ${proofPoints.length>0?'Use the brand's actual data: '+proofPoints.slice(0,4).join(', '):
+The commercial case in numbers. ${proofPoints.length>0?'Use the brand\u2019s actual data: '+proofPoints.slice(0,4).join(', '):
 'Build from category benchmarks — what does a typical '+brand.category+' brand at this stage generate in retail?'} 
 Include: estimated first-year retail revenue potential for ${bizCaseState.retailer}, recommended price positioning vs competitors, expected sell-through rate, margin profile. Answer: "What does listing this brand do to our P&L?"
 
@@ -2107,7 +2108,7 @@ Generate a Brand Pack with these SEVEN sections. Be specific, commercial, and ta
 FORMAT (use these exact headers):
 
 ## BRAND OVERVIEW
-One compelling paragraph introducing ${brand.name} to a ${brandPackState.retailer} buyer. Reference the brand's positioning, category, and why this is the right moment to list.
+One compelling paragraph introducing ${brand.name} to a ${brandPackState.retailer} buyer. Reference the brand’s positioning, category, and why this is the right moment to list.
 
 ## PRODUCT HIGHLIGHTS
 3 hero product bullets — each with: product name | key benefit | retail price point | why it fits ${brandPackState.retailer}'s customer. Format: **[Product]** — [benefit] — [price] — [retailer fit]
@@ -2313,7 +2314,7 @@ Practical notes: ${rd?.minOrderNote||''}
 Write the email in ${langName}. ${rd?.language!=='en'?'Include an English translation below.':''}
 
 The email must:
-1. Have a compelling subject line that doesn't sound like a mass pitch
+1. Have a compelling subject line that doesn’t sound like a mass pitch
 2. Open with a specific reference to ${pitchForm.retailer} — show the brand has done their homework
 3. Introduce the brand in 2–3 sentences — Nordic origin, what makes it different
 4. Explain specifically why this brand fits ${pitchForm.retailer}'s range
