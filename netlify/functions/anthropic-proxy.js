@@ -6,7 +6,11 @@ exports.handler = async (event) => {
   if (!KEY) return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:'No API key'})};
   try {
     const b = JSON.parse(event.body);
-    const rb = JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1024,messages:b.messages});
+    const rb = JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: b.max_tokens || 2000,
+      messages: b.messages,
+    });
     const result = await new Promise((resolve,reject) => {
       const req = https.request({hostname:'api.anthropic.com',path:'/v1/messages',method:'POST',headers:{'Content-Type':'application/json','x-api-key':KEY,'anthropic-version':'2023-06-01','Content-Length':Buffer.byteLength(rb)}},(res) => {
         let d=''; res.on('data',(c)=>{d+=c;}); res.on('end',()=>{resolve({statusCode:res.statusCode,body:d});});
