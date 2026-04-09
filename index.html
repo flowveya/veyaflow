@@ -1,1 +1,2361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeyaFlow — Brand Growth Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0E0E0E;
+    --navy: #1E3A5F;
+    --gold: #C4A882;
+    --cream: #F7F5F0;
+    --border: #EDE9E1;
+    --muted: #9A9489;
+    --green: #10B981;
+    --amber: #F59E0B;
+    --red: #EF4444;
+    --blue: #1E40AF;
+    --serif: 'Playfair Display', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
+
+  /* SHELL */
+  #app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 220px; min-width: 220px; background: var(--navy);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: width .25s;
+  }
+  .s-logo { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .s-logo-text { font-family: var(--serif); font-size: 1.25rem; color: #fff; font-weight: 400; }
+  .s-logo-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.3); letter-spacing: .12em; text-transform: uppercase; margin-top: .2rem; }
+
+  .brand-pill {
+    margin: .75rem; padding: .6rem .75rem;
+    background: rgba(196,168,130,.1); border: 1px solid rgba(196,168,130,.2);
+    cursor: pointer; display: none;
+  }
+  .brand-pill.visible { display: block; }
+  .brand-pill-name { font-size: .72rem; color: var(--gold); font-weight: 500; }
+  .brand-pill-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.35); margin-top: .15rem; }
+
+  .s-nav { padding: .75rem 0; flex: 1; overflow-y: auto; }
+  .nav-item {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .65rem 1.25rem; cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  .nav-item:hover { background: rgba(196,168,130,.08); }
+  .nav-item.active { background: rgba(196,168,130,.15); border-left-color: var(--gold); }
+  .nav-icon { font-size: .85rem; width: 18px; text-align: center; color: rgba(255,255,255,.4); }
+  .nav-item.active .nav-icon { color: var(--gold); }
+  .nav-label { font-size: .72rem; color: rgba(255,255,255,.45); letter-spacing: .04em; }
+  .nav-item.active .nav-label { color: var(--gold); }
+  .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; }
+
+  .s-footer { padding: .85rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
+  .s-footer-text { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.25); }
+
+  /* MAIN */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 1.1rem 2rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; flex-shrink: 0;
+  }
+  .page-title { font-family: var(--serif); font-size: 1.35rem; color: var(--navy); font-weight: 400; }
+  .page-sub { font-family: var(--mono); font-size: .58rem; color: var(--muted); margin-top: .2rem; letter-spacing: .04em; }
+
+  .content { flex: 1; overflow-y: auto; padding: 1.75rem 2rem; }
+
+  /* REG STRIP */
+  .reg-strip {
+    background: #FEF3C7; border-bottom: 1px solid #FDE68A;
+    padding: .45rem 2rem; display: flex; gap: 1rem; align-items: center;
+    flex-wrap: wrap; flex-shrink: 0;
+  }
+  .reg-strip-label { font-family: var(--mono); font-size: .55rem; color: #92400E; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+  .reg-item { display: flex; align-items: center; gap: .4rem; }
+  .reg-days { font-family: var(--mono); font-size: .6rem; font-weight: 700; }
+  .reg-name { font-family: var(--sans); font-size: .62rem; color: #78350F; }
+  .reg-btn { font-family: var(--mono); font-size: .5rem; padding: .15rem .45rem; background: none; border: 1px solid #D97706; color: #92400E; cursor: pointer; }
+
+  /* CARDS */
+  .card {
+    background: #fff; border: 1px solid var(--border); padding: 1.25rem 1.5rem;
+    margin-bottom: .85rem; box-shadow: 0 1px 4px rgba(0,0,0,.03);
+  }
+  .card-sm { padding: .85rem 1rem; }
+
+  /* GRID HELPERS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; }
+  .col-2 { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+  .col-filter { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+
+  /* STAT CARDS */
+  .stat-card { background: #fff; border: 1px solid var(--border); padding: 1rem 1.25rem; border-top: 3px solid currentColor; }
+  .stat-num { font-family: var(--serif); font-size: 2rem; line-height: 1; }
+  .stat-label { font-family: var(--mono); font-size: .6rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-top: .3rem; }
+
+  /* FORMS */
+  .field { margin-bottom: 1rem; }
+  label.lbl { display: block; font-family: var(--mono); font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #333; margin-bottom: .35rem; }
+  input[type=text], input[type=number], input[type=email], select, textarea {
+    width: 100%; padding: .7rem .9rem; border: 1px solid #DDD;
+    background: var(--cream); font-family: var(--sans); font-size: .9rem;
+    color: var(--ink); outline: none; appearance: none; resize: vertical;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--navy); }
+
+  /* BUTTONS */
+  .btn-primary {
+    padding: .8rem 1.5rem; background: var(--navy); border: none; color: #fff;
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    width: 100%; transition: opacity .15s;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: .88; }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-outline {
+    padding: .5rem .9rem; background: none; border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: .62rem;
+    letter-spacing: .06em; cursor: pointer;
+  }
+  .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+  .btn-gold {
+    padding: .6rem 1.2rem; background: var(--gold); border: none; color: #fff;
+    font-family: var(--mono); font-size: .65rem; font-weight: 600;
+    letter-spacing: .06em; cursor: pointer;
+  }
+
+  /* TAGS */
+  .tag { font-family: var(--mono); font-size: .55rem; padding: .15rem .45rem; white-space: nowrap; }
+  .tag-green { background: #ECFDF5; color: #065F46; }
+  .tag-blue  { background: #EFF6FF; color: var(--blue); }
+  .tag-amber { background: rgba(245,158,11,.1); color: #92400E; }
+  .tag-red   { background: rgba(239,68,68,.08); color: #991B1B; }
+  .tag-gray  { background: #F7F5F0; color: #6B6358; }
+  .tag-purple{ background: #F5F3FF; color: #5B21B6; }
+
+  /* PROGRESS BAR */
+  .progress-track { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+
+  /* SPINNER */
+  .spinner {
+    width: 32px; height: 32px; border: 2px solid var(--border);
+    border-top-color: var(--navy); border-radius: 50%;
+    animation: spin .9s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* PROSE */
+  .prose { font-family: var(--sans); font-size: .83rem; color: #333; line-height: 1.85; white-space: pre-wrap; }
+
+  /* SECTION TAG */
+  .section-tag { font-family: var(--mono); font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
+
+  /* ONBOARDING */
+  .onboard-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; overflow-y: auto; }
+  .onboard-inner { width: 100%; max-width: 520px; }
+  .onboard-title { font-family: var(--serif); font-size: 1.4rem; color: var(--navy); margin-bottom: .35rem; }
+  .onboard-sub { font-family: var(--sans); font-size: .8rem; color: var(--muted); margin-bottom: 1.25rem; }
+  .stage-option {
+    padding: .9rem 1rem; border: 1px solid var(--border); background: var(--cream);
+    cursor: pointer; display: flex; gap: .85rem; align-items: center;
+    margin-bottom: .5rem; transition: all .15s;
+  }
+  .stage-option.selected { border-color: var(--navy); background: #EFF6FF; }
+  .stage-option-icon { font-size: 1rem; color: var(--muted); }
+  .stage-option.selected .stage-option-icon { color: var(--navy); }
+  .stage-option-name { font-family: var(--sans); font-size: .85rem; font-weight: 500; color: #333; }
+  .stage-option.selected .stage-option-name { color: var(--navy); }
+  .stage-option-desc { font-family: var(--sans); font-size: .7rem; color: var(--muted); margin-top: .1rem; }
+  .market-chip {
+    padding: .3rem .7rem; border: 1px solid var(--border); background: none;
+    font-family: var(--mono); font-size: .62rem; color: var(--muted);
+    cursor: pointer; transition: all .15s; display: inline-block; margin: .2rem;
+  }
+  .market-chip.selected { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .goal-chip {
+    padding: .55rem .75rem; border: 1px solid var(--border); background: var(--cream);
+    font-family: var(--sans); font-size: .72rem; color: #555;
+    cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: .5rem;
+  }
+  .goal-chip.selected { border-color: var(--green); background: rgba(16,185,129,.07); color: #065F46; }
+  .goal-chip-check { color: var(--border); }
+  .goal-chip.selected .goal-chip-check { color: var(--green); }
+  .cat-option {
+    padding: .7rem .85rem; border: 1px solid var(--border); background: var(--cream);
+    font-family: var(--sans); font-size: .8rem; color: #333;
+    cursor: pointer; transition: all .15s;
+  }
+  .cat-option.selected { border-color: var(--navy); background: #EFF6FF; color: var(--navy); }
+
+  /* DASHBOARD */
+  .next-step-card {
+    display: flex; gap: .75rem; align-items: center; padding: .75rem 1rem;
+    background: #fff; border: 1px solid var(--border); cursor: pointer;
+    transition: border-color .15s; margin-bottom: .5rem;
+  }
+  .next-step-card:hover { border-color: var(--navy); }
+  .next-step-icon { color: var(--gold); font-size: .9rem; flex-shrink: 0; }
+  .next-step-name { font-family: var(--sans); font-size: .82rem; color: var(--navy); font-weight: 500; }
+  .next-step-desc { font-family: var(--sans); font-size: .68rem; color: var(--muted); margin-top: .1rem; }
+
+  /* REPORT */
+  .report-header { background: var(--navy); padding: 1.5rem 2rem; }
+  .report-badge { font-family: var(--mono); font-size: .55rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
+  .report-brand { font-family: var(--serif); font-size: 1.6rem; color: #fff; font-weight: 400; margin-bottom: .2rem; }
+  .report-meta { font-family: var(--sans); font-size: .7rem; color: rgba(255,255,255,.45); margin-bottom: 1rem; }
+  .report-meta-row { display: flex; gap: 2rem; border-top: 1px solid rgba(255,255,255,.12); padding-top: .85rem; flex-wrap: wrap; }
+  .report-meta-lbl { font-family: var(--mono); font-size: .52rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: .2rem; }
+  .report-meta-val { font-size: .82rem; color: #fff; }
+  .report-section { border-bottom: 1px solid var(--border); padding: 1.5rem 1.5rem 1.5rem 1.25rem; }
+  .report-section:last-child { border-bottom: none; }
+  .report-section-num { font-family: var(--mono); font-size: .55rem; color: var(--gold); }
+  .report-section-title { font-family: var(--serif); font-size: 1.05rem; color: var(--navy); margin: .2rem 0 .65rem; }
+
+  /* SUPPLIERS */
+  .supplier-row { border-bottom: 1px solid var(--border); padding: .85rem 0; }
+  .risk-bar-track { height: 4px; background: var(--border); border-radius: 2px; margin-top: .25rem; overflow: hidden; }
+
+  /* PITCH */
+  .retailer-card {
+    padding: .85rem 1rem; border: 1px solid var(--border); background: var(--cream);
+    cursor: pointer; margin-bottom: .5rem; transition: all .15s;
+  }
+  .retailer-card.selected { border-color: var(--navy); background: #EFF6FF; }
+  .email-box { font-family: var(--sans); font-size: .85rem; color: #333; line-height: 1.9; white-space: pre-wrap; background: var(--cream); border: 1px solid var(--border); padding: 1.25rem; }
+
+  /* FIND */
+  .mfr-card { background: #fff; border: 1px solid var(--border); border-left-width: 3px; padding: 1.1rem 1.25rem; margin-bottom: .75rem; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  .compare-table th { padding: .75rem 1rem; text-align: left; background: var(--navy); color: rgba(255,255,255,.5); font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; font-weight: normal; }
+  .compare-table th.mfr-name { color: #fff; font-size: .78rem; font-family: var(--sans); font-weight: 500; }
+  .compare-table td { padding: .6rem 1rem; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .compare-table tr:nth-child(even) td { background: var(--cream); }
+  .compare-table td.row-label { font-family: var(--mono); font-size: .58rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+
+  /* CIRCULAR */
+  .espr-banner { padding: .6rem .85rem; margin-bottom: 1rem; }
+  .espr-red  { background: #FEF2F2; border: 1px solid #FECACA; }
+  .espr-amber{ background: #FFFBEB; border: 1px solid #FDE68A; }
+  .espr-green{ background: #F0FDF4; border: 1px solid #BBF7D0; }
+
+  /* EMPTY */
+  .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); }
+  .empty-title { font-family: var(--serif); font-size: 1.2rem; font-style: italic; color: var(--navy); margin-bottom: .5rem; }
+  .empty-sub { font-family: var(--sans); font-size: .8rem; line-height: 1.7; max-width: 340px; margin: 0 auto; }
+
+  /* SECTION HEADER in analysis */
+  .analysis-section { margin-bottom: .75rem; padding-left: .75rem; border-left: 2px solid; }
+  .analysis-label { font-family: var(--mono); font-size: .58rem; font-weight: 600; margin-bottom: .2rem; }
+  .analysis-text { font-family: var(--sans); font-size: .78rem; color: #444; line-height: 1.7; }
+
+  /* PAGE VISIBILITY */
+  .page { display: none; flex-direction: column; height: 100%; }
+  .page.active { display: flex; }
+
+  /* PROGRESS BAR TOP */
+  .progress-top { height: 3px; background: var(--border); flex-shrink: 0; }
+  .progress-top-fill { height: 100%; background: var(--gold); transition: width .3s; }
+
+  /* COMPARE TOGGLE */
+  .compare-btn {
+    padding: .3rem .6rem; font-family: var(--mono); font-size: .55rem;
+    border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer;
+    transition: all .15s;
+  }
+  .compare-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  /* CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+  /* SAVED REPORT ROW */
+  .saved-report {
+    border: 1px solid var(--border); border-left: 3px solid var(--navy);
+    padding: .85rem 1rem; margin-bottom: .5rem; cursor: pointer; background: #fff;
+  }
+  .saved-report-meta { font-family: var(--mono); font-size: .55rem; color: var(--gold); margin-bottom: .2rem; }
+  .saved-report-name { font-size: .88rem; color: var(--navy); }
+  .saved-report-date { font-family: var(--sans); font-size: .62rem; color: var(--muted); margin-top: .15rem; }
+
+  /* PROFILE TABLE */
+  .profile-row { display: grid; grid-template-columns: 120px 1fr; gap: .5rem; padding: .5rem 0; border-bottom: 1px solid #F0EDE8; }
+  .profile-label { font-family: var(--mono); font-size: .58rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; align-self: center; }
+  .profile-val { font-family: var(--sans); font-size: .8rem; color: #333; }
+
+  /* NAV BANNER */
+  .nav-banner {
+    background: var(--navy); padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem; display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: .75rem;
+  }
+  .nav-banner-title { font-family: var(--serif); font-size: 1.05rem; color: #fff; }
+  .nav-banner-sub { font-family: var(--mono); font-size: .55rem; color: var(--gold); margin-bottom: .3rem; }
+  .nav-banner-btn {
+    padding: .55rem .9rem; background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.2); color: #fff;
+    font-family: var(--mono); font-size: .62rem; cursor: pointer; letter-spacing: .04em;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 680px) {
+    #sidebar { display: none; }
+    #app { flex-direction: column; }
+    #main { flex: 1; min-height: 0; }
+
+    .content { padding: 1rem; padding-bottom: 5rem; }
+    .topbar { padding: .85rem 1rem; flex-wrap: wrap; gap: .5rem; }
+    .page-title { font-size: 1.1rem; }
+
+    /* Collapse all grids to single column */
+    .grid-2, .grid-3, .grid-4, .col-2, .col-filter { grid-template-columns: 1fr !important; }
+
+    /* Stats: 2 columns on mobile */
+    .grid-4 { grid-template-columns: 1fr 1fr !important; gap: .5rem !important; }
+
+    .card { padding: .85rem 1rem; }
+    .nav-banner { padding: .85rem 1rem; flex-direction: column; align-items: flex-start; gap: .6rem; }
+    .nav-banner-btn { font-size: .6rem; padding: .45rem .7rem; }
+    .report-header { padding: 1rem; }
+    .report-brand { font-size: 1.2rem; }
+    .report-meta-row { gap: .85rem; }
+    .onboard-wrap { padding: 1rem; align-items: flex-start; }
+    .email-box { font-size: .8rem; }
+    .compare-table { font-size: .7rem; }
+    .compare-table th, .compare-table td { padding: .5rem .65rem; }
+
+    /* Reg strip: horizontal scroll */
+    .reg-strip { flex-wrap: nowrap; overflow-x: auto; gap: .85rem; padding: .4rem 1rem; }
+
+    /* Jump nav: horizontal scroll */
+    #section-jump { overflow-x: auto; flex-wrap: nowrap !important; }
+  }
+
+  /* MOBILE BOTTOM NAV */
+  #mobile-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--navy); border-top: 1px solid rgba(255,255,255,.1);
+    z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+  }
+  #mobile-nav-inner {
+    display: flex; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #mobile-nav-inner::-webkit-scrollbar { display: none; }
+  .mob-nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    padding: .6rem .5rem .4rem; cursor: pointer; min-width: 60px;
+    flex-shrink: 0; position: relative; transition: background .15s;
+  }
+  .mob-nav-item.active { background: rgba(196,168,130,.15); }
+  .mob-nav-icon { font-size: .9rem; color: rgba(255,255,255,.4); }
+  .mob-nav-item.active .mob-nav-icon { color: var(--gold); }
+  .mob-nav-label { font-family: var(--mono); font-size: .48rem; color: rgba(255,255,255,.35); margin-top: .2rem; letter-spacing: .04em; white-space: nowrap; }
+  .mob-nav-item.active .mob-nav-label { color: var(--gold); }
+  .mob-badge { position: absolute; top: .35rem; right: .6rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 4px; font-family: var(--mono); font-size: .42rem; }
+
+  /* Mobile header */
+  #mobile-header {
+    display: none;
+    background: var(--navy); padding: .75rem 1rem;
+    flex-shrink: 0; align-items: center; justify-content: space-between;
+  }
+  .mob-header-title { font-family: var(--serif); font-size: 1rem; color: #fff; }
+  .mob-header-sub { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.35); margin-top: .1rem; }
+  .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--gold); text-align: right; cursor: pointer; }
+
+  @media (max-width: 680px) {
+    #mobile-nav { display: block; }
+    #mobile-header { display: flex; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- MOBILE HEADER -->
+  <div id="mobile-header">
+    <div>
+      <div class="mob-header-title">VeyaFlow</div>
+      <div class="mob-header-sub">Brand Growth Intelligence</div>
+    </div>
+    <div class="mob-header-brand" id="mob-brand-label" onclick="showPage('home')">Set up →</div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="s-logo">
+      <div class="s-logo-text">VeyaFlow</div>
+      <div class="s-logo-sub">Brand Growth Intelligence</div>
+    </div>
+    <div class="brand-pill" id="brand-pill" onclick="showPage('home')">
+      <div class="brand-pill-name" id="pill-name">—</div>
+      <div class="brand-pill-sub" id="pill-sub">—</div>
+    </div>
+    <nav class="s-nav" id="sidebar-nav"></nav>
+    <div class="s-footer"><div class="s-footer-text" id="footer-text">No brand set up yet</div></div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- REG STRIP -->
+    <div class="reg-strip" id="reg-strip" style="display:none"></div>
+
+    <!-- PAGES -->
+    <div class="page active" id="page-home"></div>
+    <div class="page" id="page-find"></div>
+    <div class="page" id="page-report"></div>
+    <div class="page" id="page-compare"></div>
+    <div class="page" id="page-pitch"></div>
+    <div class="page" id="page-suppliers"></div>
+    <div class="page" id="page-circular"></div>
+  </div>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <div id="mobile-nav">
+    <div id="mobile-nav-inner"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════ */
+
+const CATEGORIES = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor","Other"];
+const MARKETS    = ["Denmark","Germany","Netherlands","United Kingdom","Norway","Finland","France","Belgium","Austria","Switzerland","United States","Australia"];
+const CURRENT_MARKETS = ["Sweden","Norway","Finland","Denmark","Iceland"];
+
+const BRAND_STAGES = [
+  { id:"idea",      icon:"◌", label:"New product line",         desc:"Developing a new category or product range alongside an existing business" },
+  { id:"product",   icon:"◎", label:"Pre-launch",               desc:"Product ready — researching first or next international market" },
+  { id:"trading",   icon:"✉", label:"Trading — building scale", desc:"Generating revenue, ready to expand into new markets systematically" },
+  { id:"expanding", icon:"◈", label:"Multi-market — growing",   desc:"Operating in 2–3 markets, managing compliance, supply chain, and retail relationships" },
+  { id:"scaling",   icon:"◉", label:"Scaling — established",    desc:"€2M+ revenue across multiple markets, optimising margins and supply chain risk" },
+];
+
+const SUSTAINABILITY_GOALS = [
+  "COSMOS / Organic certification","Carbon neutral by 2030","EUDR compliant supply chain",
+  "B Corp certification","Plastic-free packaging","Cruelty free",
+  "Fair trade sourcing","Nordic Swan label",
+];
+
+const NEXT_STEPS = {
+  idea:     [{icon:"◌",label:"Find a manufacturer",page:"find",desc:"Source verified, sustainable factories already compliant with your target markets"},{icon:"◎",label:"Validate the market",page:"report",desc:"Market sizing, retail landscape and compliance requirements before you commit"}],
+  product:  [{icon:"◎",label:"Generate a market entry report",page:"report",desc:"Full market intelligence — retail landscape, pricing, compliance checklist, 90-day plan"},{icon:"⇄",label:"Compare target markets",page:"compare",desc:"Side-by-side analysis to pick the right market to enter first"}],
+  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer email in the retailer's language, personalised to their priorities"},{icon:"◎",label:"Open a new market",page:"report",desc:"Intelligence report for your next market entry — retailer map, compliance, pricing"}],
+  expanding:[{icon:"◈",label:"Audit supplier compliance",page:"suppliers",desc:"Risk-score your supply chain and auto-chase missing data before retailers ask for it"},{icon:"⇄",label:"Prioritise your next market",page:"compare",desc:"Data-driven comparison to decide where to expand next"}],
+  scaling:  [{icon:"◈",label:"Supply chain risk report",page:"suppliers",desc:"Identify and remediate high-risk suppliers — EUDR, audit status, data gaps"},{icon:"◉",label:"ESPR deadstock routing",page:"circular",desc:"Route unsold inventory to verified circular partners, generate Article 24 disclosure"}],
+};
+
+const REG_DEADLINES = [
+  {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"circular"},
+  {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"suppliers"},
+  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"circular"},
+  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"report"},
+];
+
+// SUPPLIERS
+const COUNTRY_RISK={Sweden:"LOW",Germany:"LOW",Netherlands:"LOW",France:"LOW",Belgium:"LOW",Austria:"LOW",Finland:"LOW",Denmark:"LOW",Norway:"LOW",Italy:"MEDIUM",Portugal:"LOW",Spain:"LOW",Turkey:"MEDIUM",China:"MEDIUM",India:"MEDIUM",Indonesia:"HIGH",Ghana:"HIGH",Brazil:"HIGH",Vietnam:"MEDIUM",Bangladesh:"HIGH"};
+const ALL_DATA_FIELDS=["carbon","eudr","certifications","dpp","audit"];
+const DATA_LABELS={carbon:"Scope 3 emissions",eudr:"EUDR geolocation",certifications:"Certifications",dpp:"DPP materials",audit:"Audit docs"};
+const STATUS_CFG={complete:{label:"Complete",color:"#10B981",bg:"rgba(16,185,129,0.08)"},awaiting:{label:"Awaiting reply",color:"#F59E0B",bg:"rgba(245,158,11,0.08)"},overdue:{label:"Overdue",color:"#EF4444",bg:"rgba(239,68,68,0.08)"},not_started:{label:"Not contacted",color:"#6B7280",bg:"rgba(107,114,128,0.08)"}};
+
+let SUPPLIERS = [
+  {id:1,name:"Textilia AB",country:"Portugal",region:"EU",commodity:"Cotton",type:"Fabric Mill",tier:1,eudrScope:false,certifications:["GOTS"],contact:"maria.silva@textilia.pt",lastAudit:"2024-03",nextAuditDue:"2026-03",auditOverdue:true,annualSpendSek:420000,missing:["carbon","dpp"],nudgeCount:1,status:"awaiting"},
+  {id:2,name:"GreenWeave GmbH",country:"Germany",region:"EU",commodity:"Wool",type:"Fabric Mill",tier:1,eudrScope:false,certifications:[],contact:"hans.muller@greenweave.de",lastAudit:"2025-09",nextAuditDue:"2027-09",auditOverdue:false,annualSpendSek:310000,missing:["certifications","audit"],nudgeCount:0,status:"not_started"},
+  {id:3,name:"Bali Crafts Co.",country:"Indonesia",region:"Asia",commodity:"Palm oil",type:"Raw Material",tier:3,eudrScope:true,certifications:[],contact:"raj.kumar@balicrafts.in",lastAudit:null,nextAuditDue:null,auditOverdue:true,annualSpendSek:185000,missing:["carbon","eudr","dpp","certifications"],nudgeCount:2,status:"overdue"},
+  {id:4,name:"Nordic Dye Lab",country:"Sweden",region:"EU",commodity:"Natural dyes",type:"Trim & Packaging",tier:1,eudrScope:false,certifications:["OEKO-TEX","FSC"],contact:"anna.berg@nordicdye.se",lastAudit:"2025-11",nextAuditDue:"2027-11",auditOverdue:false,annualSpendSek:95000,missing:[],nudgeCount:1,status:"complete"},
+  {id:5,name:"Istanbul Fabrics",country:"Turkey",region:"MENA",commodity:"Woven fabrics",type:"CMT",tier:1,eudrScope:false,certifications:[],contact:"mehmet.kaya@istfabrics.tr",lastAudit:"2023-06",nextAuditDue:"2025-06",auditOverdue:true,annualSpendSek:780000,missing:["carbon","certifications","dpp"],nudgeCount:3,status:"overdue"},
+  {id:6,name:"ShenZhen Zips Co.",country:"China",region:"Asia",commodity:"Metal zips",type:"Trim & Packaging",tier:1,eudrScope:false,certifications:[],contact:"lin.wei@shenzipco.cn",lastAudit:"2024-07",nextAuditDue:"2026-07",auditOverdue:true,annualSpendSek:62000,missing:["carbon","audit"],nudgeCount:0,status:"not_started"},
+  {id:7,name:"Borås Cotton Mill",country:"Sweden",region:"EU",commodity:"Cotton",type:"Fabric Mill",tier:2,eudrScope:false,certifications:["GOTS","OEKO-TEX"],contact:"erik.holm@borasmills.se",lastAudit:"2025-08",nextAuditDue:"2027-08",auditOverdue:false,annualSpendSek:540000,missing:[],nudgeCount:0,status:"complete"},
+  {id:8,name:"Cocoa Origin Ltd",country:"Ghana",region:"Africa",commodity:"Cocoa",type:"Raw Material",tier:3,eudrScope:true,certifications:[],contact:"kwame.asante@cocoaorigin.gh",lastAudit:null,nextAuditDue:null,auditOverdue:true,annualSpendSek:230000,missing:["eudr","audit","carbon"],nudgeCount:1,status:"overdue"},
+  {id:9,name:"PackRight AB",country:"Sweden",region:"EU",commodity:"Packaging",type:"Trim & Packaging",tier:1,eudrScope:false,certifications:["FSC"],contact:"sara.lund@packright.se",lastAudit:"2025-06",nextAuditDue:"2027-06",auditOverdue:false,annualSpendSek:48000,missing:["carbon"],nudgeCount:0,status:"not_started"},
+  {id:10,name:"Napoli Leather",country:"Italy",region:"EU",commodity:"Leather",type:"CMT",tier:2,eudrScope:true,certifications:[],contact:"marco.rossi@napolileather.it",lastAudit:"2024-11",nextAuditDue:"2026-11",auditOverdue:false,annualSpendSek:365000,missing:["eudr","dpp"],nudgeCount:1,status:"awaiting"},
+];
+
+function calcRisk(s){
+  let sc=0;
+  sc+=Math.min(s.missing.length*1.2,6);
+  if(s.eudrScope)sc+=2;
+  const cr=COUNTRY_RISK[s.country]||"MEDIUM";
+  if(cr==="HIGH")sc+=2; else if(cr==="MEDIUM")sc+=1;
+  if(s.tier===3)sc+=1;
+  if(s.status==="overdue")sc+=1;
+  if((s.certifications||[]).length===0)sc+=0.5;
+  if(s.auditOverdue)sc+=1;
+  return Math.min(Math.round(sc*10)/10,10);
+}
+function riskColor(sc){return sc>=7?"#EF4444":sc>=4?"#F59E0B":"#10B981";}
+function riskLabel(sc){return sc>=7?"HIGH":sc>=4?"MEDIUM":"LOW";}
+function completeness(s){
+  const rel=s.eudrScope?ALL_DATA_FIELDS:ALL_DATA_FIELDS.filter(f=>f!=="eudr");
+  return Math.round((rel.filter(f=>!s.missing.includes(f)).length/rel.length)*100);
+}
+
+// CIRCULAR PARTNERS
+const ESPR_BAN_CATS=["Fashion & Apparel"];
+const ESPR_DISC_CATS=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Home & Design","Electronics & Tech","Baby & Family","Sport & Outdoor"];
+const CIRCULAR_CATEGORIES=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Home & Design","Electronics & Tech","Baby & Family","Sport & Outdoor","Other"];
+const CAT_COLORS={Recycle:"#ECFDF5",Resale:"#EFF6FF",Donation:"#FFFBEB",Repair:"#F5F3FF",Upcycle:"#FDF4FF"};
+const CAT_TEXT={Recycle:"#065F46",Resale:"#1E40AF",Donation:"#92400E",Repair:"#5B21B6",Upcycle:"#86198F"};
+const PARTNERS=[
+  {id:1,name:"Renewlane Nordic",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Stockholm",buyback:2.50,espr:true,description:"Recommerce platform for Nordic brands. Resells unsold seasonal stock via curated marketplace."},
+  {id:2,name:"Retextil AB",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Borås",buyback:null,espr:true,description:"Industrial textile recycler. ESPR-compliant documentation included."},
+  {id:3,name:"Myrorna",category:"Donation",productCategories:["Fashion & Apparel","Home & Design"],country:"Sweden",city:"Stockholm",buyback:null,espr:false,description:"Sweden's largest second-hand chain. Social enterprise."},
+  {id:4,name:"Textilkretsen",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Malmö",buyback:0.60,espr:true,description:"ESPR-registered recycler. Pays buyback for clean sorted stock."},
+  {id:5,name:"Resortecs EU",category:"Upcycle",productCategories:["Fashion & Apparel"],country:"Belgium",city:"Brussels",buyback:1.80,espr:true,description:"High-value upcycling. Highest buyback for quality fabrics."},
+  {id:6,name:"TerraCycle Nordic",category:"Recycle",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Denmark",city:"Copenhagen",buyback:null,espr:true,description:"Hard-to-recycle beauty packaging specialist. ESPR report included."},
+  {id:7,name:"Nordic Beauty Reuse",category:"Resale",productCategories:["Skincare & Beauty"],country:"Sweden",city:"Gothenburg",buyback:1.20,espr:false,description:"Sealed beauty products resold through discount channels. Pays per unit."},
+  {id:8,name:"Giveback Beauty SE",category:"Donation",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Sweden",city:"Stockholm",buyback:null,espr:false,description:"Routes surplus sealed beauty to women's shelters. Donation certificates included."},
+  {id:9,name:"FoodLoop GmbH",category:"Donation",productCategories:["Wellness & Supplements","Food & Beverage"],country:"Germany",city:"Hamburg",buyback:null,espr:true,description:"Near-expiry supplements redistributed to foodbanks across Germany."},
+  {id:10,name:"Återbruk Stockholm",category:"Resale",productCategories:["Home & Design","Electronics & Tech"],country:"Sweden",city:"Stockholm",buyback:1.00,espr:false,description:"Swedish recommerce for home goods and small electronics."},
+  {id:11,name:"Recommerce Solutions",category:"Repair",productCategories:["Electronics & Tech"],country:"Netherlands",city:"Amsterdam",buyback:2.00,espr:true,description:"Refurbishes and resells consumer electronics. High buyback on working devices."},
+  {id:12,name:"Circular Home NL",category:"Recycle",productCategories:["Home & Design"],country:"Netherlands",city:"Rotterdam",buyback:0.30,espr:true,description:"Material recovery for home furnishings. Covers EU ESPR disclosure."},
+];
+
+// MANUFACTURERS
+const CERT_SCORES={"COSMOS Organic":5,"COSMOS Natural":4,"Ecocert":4,"GOTS":4,"FSC":3,"OEKO-TEX":3,"B Corp":5,"Nordic Swan":4,"ISO 14001":3,"RSPO":3,"Rainforest Alliance":3,"Fairtrade":4,"Soil Association Organic":5,"Vegan Society":2,"Cruelty Free":2,"Natrue":3,"USDA Organic":4,"ISO 22716":1,"GMP":1,"ISO 9001":1,"Halal":2,"Kosher":1};
+const MARKET_REQS={"United Kingdom":["ISO 22716","UK Responsible Person","OPSS Registration"],"Germany":["ISO 22716","EU Responsible Person","CPNP Notification","German labelling"],"Denmark":["ISO 22716","EU Responsible Person","CPNP Notification","Danish labelling"],"Norway":["ISO 22716","EU Responsible Person","Mattilsynet Registration","Norwegian labelling"],"United States":["FDA MoCRA Registration","GMP","US Responsible Person"],"Australia":["AICIS Registration","GMP","TGA compliance","AU labelling"],"Sweden":["ISO 22716","EU Responsible Person","CPNP Notification"],"Netherlands":["ISO 22716","EU Responsible Person","CPNP Notification","Dutch labelling"],"France":["ISO 22716","EU Responsible Person","CPNP Notification","French labelling"]};
+const SUS_COLORS={HIGH:"#10B981",MEDIUM:"#F59E0B",LOW:"#EF4444"};
+const SUS_BG={HIGH:"rgba(16,185,129,0.08)",MEDIUM:"rgba(245,158,11,0.08)",LOW:"rgba(239,68,68,0.08)"};
+
+const MANUFACTURERS=[
+  {id:1,name:"Laboratorios Uvasor",country:"Spain",region:"EU",city:"Seville",type:"Contract Manufacturer",categories:["Skincare & Beauty","Wellness & Supplements"],specialties:["Serums","Creams","Natural oils","Organic formulations"],certifications:["COSMOS Organic","Ecocert","ISO 22716","GMP","RSPO"],moq:500,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"2M units",description:"COSMOS-certified organic skincare specialist. Full PIF and safety assessment support. Strong EU regulatory team.",contact:"info@uvasor.es",website:"uvasor.es"},
+  {id:2,name:"KHK GmbH",country:"Germany",region:"EU",city:"Goslar",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Lip care","Solid cosmetics","Deodorants","Waterless formats"],certifications:["ISO 22716","ISO 14001","Ecocert","GMP"],moq:200,leadWeeks:8,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"5M units",description:"Pioneer in solid and waterless cosmetics. Renewable energy powered. Low MOQ. Strong for dm and Alnatura buyers.",contact:"info@khk.de",website:"khk.de"},
+  {id:3,name:"Cosmetics Nord AB",country:"Sweden",region:"EU",city:"Gothenburg",type:"Contract Manufacturer",categories:["Skincare & Beauty","Wellness & Supplements"],specialties:["Nordic botanicals","Clean beauty","Sensitive skin","Vegan"],certifications:["COSMOS Natural","Nordic Swan","ISO 22716","Vegan Society","Cruelty Free"],moq:300,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"1.5M units",description:"Swedish Nordic clean beauty specialist. Handles CPNP and UK registration. In-house Nordic botanicals lab.",contact:"hello@cosmeticsnord.se",website:"cosmeticsnord.se"},
+  {id:4,name:"LCB Cosmetics",country:"France",region:"EU",city:"Lyon",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Luxury skincare","Serums","Anti-ageing","Premium textures"],certifications:["COSMOS Organic","Ecocert","ISO 22716","GMP","FSC"],moq:1000,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","United States","France"],eudrScope:false,annualCapacity:"8M units",description:"French luxury contract manufacturer. COSMEBIO and COSMOS ORGANIC certified. 'Made in France' label. Full EU, UK and US regulatory support.",contact:"contact@lcb-cosmetics.fr",website:"lcb-cosmetics.fr"},
+  {id:5,name:"Trat Development",country:"Germany",region:"EU",city:"Berlin",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Functional skincare","Science-backed","R&D collab","Tech-beauty"],certifications:["ISO 22716","GMP","ISO 14001","Cruelty Free"],moq:500,leadWeeks:10,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","United States"],eudrScope:false,annualCapacity:"3M units",description:"Modular R&D-led manufacturer for science-backed beauty. Accelerates time-to-market for active-ingredient formulations.",contact:"hello@trat.de",website:"trat.de"},
+  {id:6,name:"Jüstrich Cosmetics",country:"Switzerland",region:"EU",city:"Zurich",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Luxury skincare","Swiss-made","Premium serums","Anti-ageing"],certifications:["ISO 22716","GMP","OEKO-TEX","Ecocert"],moq:1000,leadWeeks:14,sustainability:"MEDIUM",markets:["Germany","Denmark","Sweden","United Kingdom","United States"],eudrScope:false,annualCapacity:"2M units",description:"Swiss precision manufacturing. 'Made in Switzerland' label commands premium positioning. Ideal for luxury tier brands.",contact:"info@justrich.ch",website:"justrich.ch"},
+  {id:7,name:"Cita Lieta",country:"Latvia",region:"EU",city:"Riga",type:"Contract Manufacturer",categories:["Skincare & Beauty","Wellness & Supplements"],specialties:["Bath & body","Natural soaps","CBD cosmetics","Eco packaging"],certifications:["COSMOS Natural","ISO 22716","Cruelty Free","Vegan Society"],moq:100,leadWeeks:6,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"800K units",description:"Latvian low-MOQ specialist. Ideal for testing new formulations before scaling. Very flexible on product development iterations.",contact:"info@citalieta.lv",website:"citalieta.lv"},
+  {id:8,name:"Goodkind Co.",country:"United States",region:"Americas",city:"Michigan",type:"Contract Manufacturer",categories:["Skincare & Beauty","Wellness & Supplements"],specialties:["Natural deodorants","Clean skincare","Renewable energy mfg"],certifications:["ISO 22716","GMP","B Corp","Ecocert","Cruelty Free"],moq:10000,leadWeeks:14,sustainability:"HIGH",markets:["United States","United Kingdom"],eudrScope:false,annualCapacity:"20M units",description:"B Corp manufacturer powered by 100% renewable energy. FDA MoCRA compliant. Best-in-class for US market entry.",contact:"hello@goodkindco.com",website:"goodkindco.com"},
+  {id:9,name:"COSMECO Srl",country:"Italy",region:"EU",city:"Milan",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Natural formulations","Haircare","Colour cosmetics","Packaging"],certifications:["COSMOS Natural","Ecocert","ISO 22716","Vegan Society","Natrue"],moq:500,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Sweden","United Kingdom","France","United States"],eudrScope:false,annualCapacity:"4M units",description:"Italian manufacturer 30+ years. COSMOS and Natrue certified. 'Made in Italy' label for premium positioning.",contact:"info@cosmeco.it",website:"cosmeco.it"},
+  {id:10,name:"Skinlys",country:"France",region:"EU",city:"Paris",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Natural skincare","Clean beauty","Anti-ageing","Organic"],certifications:["COSMOS Organic","Ecocert","ISO 22716","GMP","Cruelty Free"],moq:500,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","France"],eudrScope:false,annualCapacity:"3M units",description:"French clean beauty specialist. 'Made in France' label. COSMOS Organic certified. Strong relationships with European natural beauty retailers.",contact:"contact@skinlys.fr",website:"skinlys.fr"},
+  {id:11,name:"Suma Wholefoods",country:"United Kingdom",region:"EU",city:"Leeds",type:"Contract Manufacturer",categories:["Food & Beverage","Wellness & Supplements"],specialties:["Organic food","Wholefoods","Plant-based","Ethical sourcing"],certifications:["Soil Association Organic","B Corp","GOTS","FSC","Vegan Society"],moq:200,leadWeeks:6,sustainability:"HIGH",markets:["United Kingdom","Germany","Denmark","Norway","Sweden"],eudrScope:true,annualCapacity:"10M units",description:"UK's leading worker-owned organic food manufacturer. B Corp certified. Full EUDR traceability. Strong Waitrose and H&B relationships.",contact:"trade@suma.coop",website:"suma.coop"},
+  {id:12,name:"Nordic Ingredients AB",country:"Sweden",region:"EU",city:"Malmö",type:"Ingredient Supplier",categories:["Food & Beverage","Skincare & Beauty","Wellness & Supplements"],specialties:["Nordic botanicals","Sea buckthorn","Lingonberry","Adaptogens"],certifications:["COSMOS Certified","Ecocert","GOTS","Nordic Swan"],moq:50,leadWeeks:4,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"500K kg",description:"Specialist in traceable Nordic wild-harvested ingredients. Pre-certified for COSMOS. Very low MOQ. Supplies food and beauty brands.",contact:"source@nordic-ingredients.se",website:"nordic-ingredients.se"},
+  {id:13,name:"Bioglow Nordic",country:"Finland",region:"EU",city:"Helsinki",type:"Contract Manufacturer",categories:["Wellness & Supplements","Food & Beverage"],specialties:["Nutraceuticals","Probiotics","Capsules","Powder blends"],certifications:["ISO 22716","GMP","Vegan Society","Halal","Kosher"],moq:500,leadWeeks:8,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"5M units",description:"Finnish nutraceutical specialist. Multi-certification including Halal and Kosher. Flexible on capsule, tablet and powder formats.",contact:"info@bioglownordic.fi",website:"bioglownordic.fi"},
+  {id:14,name:"NutraHealth Nordic",country:"Denmark",region:"EU",city:"Copenhagen",type:"Contract Manufacturer",categories:["Wellness & Supplements","Food & Beverage"],specialties:["Nordic functional food","Omega-3","Probiotics","Clean label"],certifications:["ISO 22716","GMP","Nordic Swan","Vegan Society"],moq:300,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"3M units",description:"Danish supplement specialist. Nordic Swan certified. Strong in omega-3 and probiotics. Nordic origin story for health chains.",contact:"info@nutrahealth.dk",website:"nutrahealth.dk"},
+  {id:15,name:"Armedangels Mfg Partner",country:"Portugal",region:"EU",city:"Porto",type:"Contract Manufacturer",categories:["Fashion & Apparel"],specialties:["Organic cotton","GOTS knitwear","Fair trade","Low MOQ fashion"],certifications:["GOTS","Fairtrade","OEKO-TEX","ISO 14001"],moq:200,leadWeeks:14,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"500K units",description:"Portuguese GOTS-certified knitwear specialist. Low MOQ for fashion brands. Preferred for brands targeting German sustainable retail.",contact:"sourcing@ptmfg.pt",website:"ptmfg.pt"},
+  {id:16,name:"Remake Textiles",country:"Latvia",region:"EU",city:"Riga",type:"Contract Manufacturer",categories:["Fashion & Apparel"],specialties:["Upcycled fabric","Deadstock production","Circular fashion","Low waste"],certifications:["GOTS","OEKO-TEX","ISO 14001","Vegan Society"],moq:100,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"200K units",description:"Baltic circular fashion specialist. Uses deadstock and upcycled fabrics. ESPR-aligned from day one.",contact:"hello@remaketextiles.lv",website:"remaketextiles.lv"},
+  {id:17,name:"Boras Cotton Mill",country:"Sweden",region:"EU",city:"Borås",type:"Fabric Supplier",categories:["Fashion & Apparel"],specialties:["Swedish cotton","Organic weaves","EU-made fabric","Sustainable fibres"],certifications:["GOTS","OEKO-TEX","Nordic Swan","ISO 14001"],moq:500,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"1M meters",description:"Classic Swedish textile mill. GOTS and Nordic Swan certified. Preferred fabric source for Nordic premium fashion brands.",contact:"fabric@borasmills.se",website:"borasmills.se"},
+  {id:18,name:"Koala Baby Organics",country:"Germany",region:"EU",city:"Munich",type:"Contract Manufacturer",categories:["Baby & Family","Skincare & Beauty"],specialties:["Baby skincare","COSMOS baby","Gentle formulations","Derma-tested"],certifications:["COSMOS Organic","ISO 22716","GMP","Vegan Society","Cruelty Free"],moq:300,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"2M units",description:"German COSMOS Organic baby skincare specialist. All formulations dermatologically tested. Strict EU compliance.",contact:"info@koalababyorganics.de",website:"koalababyorganics.de"},
+  {id:19,name:"ActiveFab Sportswear",country:"Portugal",region:"EU",city:"Braga",type:"Contract Manufacturer",categories:["Sport & Outdoor","Fashion & Apparel"],specialties:["Technical sportswear","Recycled polyester","Performance fabrics"],certifications:["OEKO-TEX","ISO 14001","GRS","Bluesign"],moq:500,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"1M units",description:"Portuguese technical sportswear manufacturer. Bluesign and GRS certified. Uses recycled ocean plastic. Strong with Scandinavian outdoor brands.",contact:"sourcing@activefab.pt",website:"activefab.pt"},
+  {id:20,name:"Ceramics Europe BV",country:"Netherlands",region:"EU",city:"Eindhoven",type:"Contract Manufacturer",categories:["Home & Design"],specialties:["Ceramics","Tableware","Home accessories","Sustainable glazes"],certifications:["ISO 14001","ISO 9001","Cradle to Cradle"],moq:200,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands","France"],eudrScope:false,annualCapacity:"500K units",description:"Dutch ceramics specialist with Cradle to Cradle certification. Lead-free glazes. Ideal for premium home brands.",contact:"info@ceramicseurope.nl",website:"ceramicseurope.nl"},
+  {id:21,name:"PackRight AB",country:"Sweden",region:"EU",city:"Gothenburg",type:"Packaging Supplier",categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],specialties:["Glass packaging","Aluminium","Refillable","Low MOQ packaging"],certifications:["FSC","ISO 14001","ISO 9001"],moq:200,leadWeeks:4,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"5M units",description:"Swedish packaging specialist. Low MOQ glass and aluminium packaging. Fast turnaround. Good entry-level option for brands scaling from 0 to 10K units.",contact:"hello@packright.se",website:"packright.se"},
+  {id:22,name:"Healblend GmbH",country:"Germany",region:"EU",city:"Hamburg",type:"Contract Manufacturer",categories:["Wellness & Supplements"],specialties:["Sports nutrition","Protein powders","Capsules","EU compliance"],certifications:["ISO 22716","GMP","Vegan Society","Halal"],moq:500,leadWeeks:8,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"10M units",description:"German GMP supplement manufacturer. Halal and vegan certified. Strong in sports nutrition and protein blends.",contact:"info@healblend.de",website:"healblend.de"},
+  {id:23,name:"Naturellement Bio",country:"France",region:"EU",city:"Bordeaux",type:"Contract Manufacturer",categories:["Food & Beverage","Wellness & Supplements"],specialties:["Organic food","Superfoods","Plant-based protein","Snacks"],certifications:["Ecocert","Soil Association Organic","Vegan Society","Fairtrade"],moq:300,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","France"],eudrScope:true,annualCapacity:"3M units",description:"French organic food specialist. Fairtrade and EUDR compliant supply chain. Ideal for premium food brands entering Germany, UK and Nordics.",contact:"info@naturellementbio.fr",website:"naturellementbio.fr"},
+  {id:24,name:"HSA Cosmetics",country:"Italy",region:"EU",city:"Bergamo",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Haircare","Skincare","5000+ formulas","Scale production"],certifications:["ISO 22716","GMP","ISO 9001","Cruelty Free"],moq:3000,leadWeeks:12,sustainability:"MEDIUM",markets:["Germany","United Kingdom","France","United States","Australia"],eudrScope:false,annualCapacity:"50M units",description:"Italian scale manufacturer with 5,000+ ready-to-customise formulas. Ideal for growing brands that need capacity and speed. Low cost per unit at scale.",contact:"info@hsacosmetics.com",website:"hsacosmetics.com"},
+  {id:25,name:"Herrco Cosmetics",country:"United Kingdom",region:"EU",city:"London",type:"Contract Manufacturer",categories:["Skincare & Beauty"],specialties:["Skincare","Colour cosmetics","Private label","UK compliance"],certifications:["ISO 22716","GMP","Cruelty Free","Vegan Society"],moq:500,leadWeeks:8,sustainability:"MEDIUM",markets:["United Kingdom","Germany","Denmark","Norway","Sweden"],eudrScope:false,annualCapacity:"2M units",description:"UK-based manufacturer with strong retail relationships. Fast UK compliance turnaround. Good entry point for brands needing a UK registered responsible person.",contact:"info@herrco.co.uk",website:"herrco.co.uk"},
+];
+
+function calcSusScore(m){return Math.min(m.certifications.reduce((a,c)=>a+(CERT_SCORES[c]||0),0),20);}
+function calcReadiness(m,market){
+  if(!market||!MARKET_REQS[market])return null;
+  const reqs=MARKET_REQS[market];
+  const met=reqs.filter(r=>m.markets.includes(market)||m.certifications.some(c=>c.toLowerCase().includes(r.split(" ")[0].toLowerCase())));
+  return Math.round((met.length/reqs.length)*100);
+}
+
+// RETAILERS for Pitch
+const RETAILERS={
+  "Waitrose":{country:"United Kingdom",type:"Premium grocery & beauty",buyerPriority:"Provenance, sustainability credentials, premium positioning, Nordic heritage story. Emphasise quality over price.",language:"en",minOrderNote:"6–12 month listing review cycle. Approach buyer directly via LinkedIn or industry events first.",category:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"]},
+  "Holland & Barrett":{country:"United Kingdom",type:"Health & wellness retail",buyerPriority:"Clinical credentials, natural ingredients, certifications (organic, vegan, cruelty-free). Category innovation over margin.",language:"en",minOrderNote:"Central buying team in Nuneaton. Pitch via their supplier portal or Natural & Organic Products Europe.",category:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"]},
+  "Planet Organic":{country:"United Kingdom",type:"Organic & natural specialist",buyerPriority:"Certified organic, ethical sourcing, brand story alignment. Small indie brands preferred. Personal relationship with founder resonates.",language:"en",minOrderNote:"Smaller volumes, faster decisions. Email buyer directly with sample and brand deck.",category:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"]},
+  "Matas":{country:"Denmark",type:"Beauty & health retail chain",buyerPriority:"Scandinavian positioning is a strong asset. Efficacy claims, clean beauty, premium feel.",language:"da",minOrderNote:"Send initial approach in Danish. Buyers attend Copenhagen trade shows.",category:["Skincare & Beauty","Wellness & Supplements"]},
+  "Salling Group":{country:"Denmark",type:"Mass grocery retail (Bilka, Fotex, Netto)",buyerPriority:"Volume, margin, logistics readiness, EAN codes. Less about brand story, more about category performance data.",language:"da",minOrderNote:"Requires Danish labelling, DK VAT registration, confirmed logistics partner.",category:["Food & Beverage","Wellness & Supplements"]},
+  "dm-drogerie markt":{country:"Germany",type:"Drugstore chain (2,000+ stores)",buyerPriority:"Value, accessibility, INCI compliance, German-language labelling, EU Cosmetics Regulation CPNP notification completed.",language:"de",minOrderNote:"Centralised buying in Karlsruhe. Must have EU Responsible Person, CPNP notification, German labels ready.",category:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"]},
+  "Alnatura":{country:"Germany",type:"Organic supermarket chain",buyerPriority:"Certified organic (EU organic logo mandatory), sustainability story, clean ingredients. Brand values alignment screened rigorously.",language:"de",minOrderNote:"Must have EU organic certification. German language pitch essential.",category:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"]},
+  "Rossmann":{country:"Germany",type:"Drugstore chain (4,000+ stores)",buyerPriority:"Price-performance, broad consumer appeal, proven sales data from other markets. Want established brands with retail track record.",language:"de",minOrderNote:"Present sales data from Swedish/Danish market first.",category:["Skincare & Beauty","Wellness & Supplements"]},
+  "Meny":{country:"Norway",type:"Premium grocery (NorgesGruppen)",buyerPriority:"Quality, Norwegian or Nordic provenance, premium pricing justified by story.",language:"no",minOrderNote:"Work with a Norwegian distributor first — NorgesGruppen rarely onboards international brands without one.",category:["Food & Beverage","Wellness & Supplements"]},
+  "Whole Foods Market":{country:"United States",type:"Premium grocery & wellness",buyerPriority:"Clean ingredient standards, organic/non-GMO preferred, sustainability story. Local Forager programme for smaller brands.",language:"en",minOrderNote:"Apply via Whole Foods Local Forager portal. FDA MoCRA facility registration required first.",category:["Food & Beverage","Skincare & Beauty","Wellness & Supplements"]},
+};
+const RETAILER_BY_MARKET={"United Kingdom":["Waitrose","Holland & Barrett","Planet Organic"],"Denmark":["Matas","Salling Group"],"Germany":["dm-drogerie markt","Alnatura","Rossmann"],"Norway":["Meny"],"United States":["Whole Foods Market"]};
+const PITCH_MARKETS=["United Kingdom","Denmark","Germany","Norway","United States"];
+const PITCH_CATEGORIES=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel","Home & Design"];
+
+// COMPARE page data
+const COMPARE_MARKETS=["Denmark","Germany","United Kingdom","Norway","Netherlands","France","United States","Australia"];
+
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+let compareList = []; // manufacturer compare
+
+// ── ALL PERSISTENT STATE (loaded/saved via localStorage) ──
+let brand = null;
+let savedReports = [];
+let reportState  = {loading:false,result:null,sections:[]};
+let reportForm   = {brandName:'',brandDesc:'',category:'',targetMarket:'',currentMarket:'Sweden',skus:'',pricePoint:'',additionalInfo:''};
+let compareForm  = {brandName:'',category:'',markets:[],stage:'trading'};
+let compareResult= null;
+let pitchForm    = {brandName:'',brandDesc:'',category:'',targetMarket:'United Kingdom',retailer:'',skus:'',usp:'',pricePoint:'',existingMarkets:'Sweden'};
+let pitchResult  = null;
+let circularForm = {productName:'',materials:'',units:'',category:'',reason:'End_of_season_overstock',preferredCat:''};
+let circularResult = null;
+let findForm     = {category:'',targetMarket:'',sustainability:'',maxMoq:'',mfrType:'',query:''};
+let supplierFilter = {query:'',status:'',missing:'',type:'',region:'',tier:'',eudr:''};
+// Non-persisted UI state
+let selectedSupplier=null;
+let nudgeResult=null;
+let nudgeLoading=false;
+let findSelected=null;
+let findAiCache={};
+let findLoadingId=null;
+let compareListIds=[];
+let compareMode=false;
+let compareAiResult=null;
+let compareAiLoading=false;
+
+function loadState(){
+  try{
+    const b=localStorage.getItem('ns_brand');
+    const r=localStorage.getItem('ns_reports');
+    const rf=localStorage.getItem('ns_reportForm');
+    const rs=localStorage.getItem('ns_reportState');
+    const cf=localStorage.getItem('ns_compareForm');
+    const cr=localStorage.getItem('ns_compareResult');
+    const pf=localStorage.getItem('ns_pitchForm');
+    const pr=localStorage.getItem('ns_pitchResult');
+    const cirf=localStorage.getItem('ns_circularForm');
+    const cir=localStorage.getItem('ns_circularResult');
+    const ff=localStorage.getItem('ns_findForm');
+    const sf=localStorage.getItem('ns_supplierFilter');
+
+    if(b) brand=JSON.parse(b);
+    if(r) savedReports=JSON.parse(r);
+    if(rf){ const v=JSON.parse(rf); Object.assign(reportForm,v); }
+    if(rs){ const v=JSON.parse(rs); if(v.result) reportState=v; }
+    if(cf){ const v=JSON.parse(cf); Object.assign(compareForm,v); }
+    if(cr) compareResult=JSON.parse(cr);
+    if(pf){ const v=JSON.parse(pf); Object.assign(pitchForm,v); }
+    if(pr) pitchResult=JSON.parse(pr);
+    if(cirf){ const v=JSON.parse(cirf); Object.assign(circularForm,v); }
+    if(cir) circularResult=JSON.parse(cir);
+    if(ff){ const v=JSON.parse(ff); Object.assign(findForm,v); }
+    if(sf){ const v=JSON.parse(sf); Object.assign(supplierFilter,v); }
+  }catch(e){ console.warn('State load error:',e); }
+}
+
+function saveBrandState(){
+  try{localStorage.setItem('ns_brand',JSON.stringify(brand));}catch(e){}
+  updateSidebarBrand();
+  renderRegStrip();
+}
+function saveReportState(){
+  try{localStorage.setItem('ns_reports',JSON.stringify(savedReports));}catch(e){}
+}
+function savePageState(key,value){
+  try{localStorage.setItem(key,JSON.stringify(value));}catch(e){}
+}
+
+/* ═══════════════════════════════════════════════════
+   API
+═══════════════════════════════════════════════════ */
+async function callAPI(messages,maxTokens=1200){
+  let res;
+  try{
+    res=await fetch("/.netlify/functions/anthropic-proxy",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:maxTokens,messages})
+    });
+  }catch(networkErr){
+    throw new Error("Connection error. Check your internet connection and try again.");
+  }
+  if(res.status===401)throw new Error("401 — API key missing. Add ANTHROPIC_API_KEY to Netlify environment variables.");
+  if(res.status===529)throw new Error("529 — AI overloaded. Try again in a moment.");
+  if(!res.ok)throw new Error("API error "+res.status);
+  const d=await res.json();
+  return(d.content||[]).map(b=>b.text||"").join("");
+}
+
+/* ═══════════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════════ */
+const NAV=[
+  {id:"home",icon:"⌂",label:"Brand Home"},
+  {id:"find",icon:"◌",label:"Source"},
+  {id:"report",icon:"◎",label:"Market Report"},
+  {id:"compare",icon:"⇄",label:"Compare Markets"},
+  {id:"pitch",icon:"✉",label:"Retailer Pitch"},
+  {id:"suppliers",icon:"◈",label:"Supplier Nudge"},
+  {id:"circular",icon:"◉",label:"Circular GPS"},
+];
+
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",suppliers:"Nudge",circular:"Circular"};
+
+function buildNav(){
+  const nav=document.getElementById('sidebar-nav');
+  nav.innerHTML=NAV.map(n=>`
+    <div class="nav-item" id="nav-${n.id}" onclick="showPage('${n.id}')">
+      <span class="nav-icon">${n.icon}</span>
+      <span class="nav-label">${n.label}</span>
+      ${n.id==='home'&&savedReports.length>0?`<span class="nav-badge">${savedReports.length}</span>`:''}
+      ${n.id==='suppliers'?`<span class="nav-badge">2</span>`:''}
+    </div>
+  `).join('');
+
+  // Mobile bottom nav
+  const mobnav=document.getElementById('mobile-nav-inner');
+  if(mobnav){
+    mobnav.innerHTML=NAV.map(n=>`
+      <div class="mob-nav-item" id="mobnav-${n.id}" onclick="showPage('${n.id}')">
+        ${n.id==='home'&&savedReports.length>0?`<span class="mob-badge">${savedReports.length}</span>`:''}
+        ${n.id==='suppliers'?`<span class="mob-badge">2</span>`:''}
+        <span class="mob-nav-icon">${n.icon}</span>
+        <span class="mob-nav-label">${MOB_NAV_LABELS[n.id]||n.label}</span>
+      </div>
+    `).join('');
+  }
+}
+
+let currentPage='home';
+function showPage(id){
+  currentPage=id;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id)?.classList.add('active');
+  document.getElementById('nav-'+id)?.classList.add('active');
+  document.getElementById('mobnav-'+id)?.classList.add('active');
+  document.getElementById('reg-strip').style.display=(brand&&id!=='home')?'flex':'none';
+  renderPage(id);
+}
+
+function updateSidebarBrand(){
+  const pill=document.getElementById('brand-pill');
+  const mobLabel=document.getElementById('mob-brand-label');
+  if(brand){
+    pill.classList.add('visible');
+    document.getElementById('pill-name').textContent=brand.name||'—';
+    document.getElementById('pill-sub').textContent=`${brand.category||'—'} · ${brand.currentMarket||'Sweden'}`;
+    document.getElementById('footer-text').textContent=`${savedReports.length} saved report${savedReports.length!==1?'s':''}`;
+    if(mobLabel){mobLabel.textContent=brand.name;mobLabel.style.color='var(--gold)';}
+  } else {
+    pill.classList.remove('visible');
+    document.getElementById('footer-text').textContent='No brand set up yet';
+    if(mobLabel){mobLabel.textContent='Set up →';mobLabel.style.color='rgba(255,255,255,.5)';}
+  }
+  buildNav();
+}
+
+/* ═══════════════════════════════════════════════════
+   REG STRIP
+═══════════════════════════════════════════════════ */
+function daysUntil(d){return Math.max(0,Math.round((new Date(d)-new Date())/(1000*60*60*24)));}
+function renderRegStrip(){
+  const strip=document.getElementById('reg-strip');
+  if(!brand){strip.style.display='none';return;}
+  const relevant=REG_DEADLINES.filter(r=>!r.cat||r.cat.includes(brand.category)).slice(0,3);
+  if(!relevant.length){strip.style.display='none';return;}
+  strip.style.display='flex';
+  strip.innerHTML=`<span class="reg-strip-label">⚠ Upcoming deadlines</span>`+
+    relevant.map(r=>{
+      const d=daysUntil(r.deadline);
+      const color=d<90?'#EF4444':d<180?'#F59E0B':'#1E3A5F';
+      return `<div class="reg-item"><span class="reg-days" style="color:${color}">${d}d</span><span class="reg-name">${r.title}</span><button class="reg-btn" onclick="showPage('${r.link}')">→</button></div>`;
+    }).join('');
+}
+
+/* ═══════════════════════════════════════════════════
+   PAGE ROUTER
+═══════════════════════════════════════════════════ */
+function renderPage(id){
+  const el=document.getElementById('page-'+id);
+  if(!el)return;
+  if(id==='home')renderHome(el);
+  else if(id==='find')renderFind(el);
+  else if(id==='report')renderReport(el);
+  else if(id==='compare')renderCompare(el);
+  else if(id==='pitch')renderPitch(el);
+  else if(id==='suppliers')renderSuppliers(el);
+  else if(id==='circular')renderCircular(el);
+}
+
+/* ═══════════════════════════════════════════════════
+   HOME PAGE
+═══════════════════════════════════════════════════ */
+let onboardStep=1;
+let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:''};
+
+function renderHome(el){
+  if(!brand){
+    renderOnboard(el);
+  } else {
+    renderDashboard(el);
+  }
+}
+
+function renderOnboard(el){
+  const progress=(onboardStep/3)*100;
+  el.innerHTML=`
+    <div class="progress-top"><div class="progress-top-fill" style="width:${progress}%"></div></div>
+    <div class="onboard-wrap">
+      <div class="onboard-inner" id="onboard-inner"></div>
+    </div>
+  `;
+  renderOnboardStep();
+}
+
+function renderOnboardStep(){
+  const inner=document.getElementById('onboard-inner');
+  if(!inner)return;
+  if(onboardStep===1){
+    inner.innerHTML=`
+      <div class="onboard-title">Set up your brand workspace</div>
+      <div class="onboard-sub">VeyaFlow uses this to personalise every report, manufacturer match, and retailer pitch to your brand, category, and target markets.</div>
+      <div class="field"><label class="lbl">Brand name *</label><input type="text" id="ob-name" value="${onboardForm.name}" placeholder="e.g. Cloud & Glow" oninput="onboardForm.name=this.value"></div>
+      <div class="field"><label class="lbl">Website</label><input type="text" id="ob-web" value="${onboardForm.website}" placeholder="e.g. cloudandglow.com" oninput="onboardForm.website=this.value"></div>
+      <div class="field"><label class="lbl">Product category *</label>
+        <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="onboardForm.category='${c}';renderOnboardStep()">${c}</div>`).join('')}</div>
+      </div>
+      <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
+      <button class="btn-primary" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
+    `;
+  } else if(onboardStep===2){
+    inner.innerHTML=`
+      <div class="onboard-title">Where is your brand right now?</div>
+      <div class="onboard-sub">VeyaFlow adapts its recommendations based on your stage — the tools and priorities are different for a brand entering its first market versus one managing compliance across five.</div>
+      ${BRAND_STAGES.map(s=>`
+        <div class="stage-option${onboardForm.stage===s.id?' selected':''}" onclick="onboardForm.stage='${s.id}';renderOnboardStep()">
+          <span class="stage-option-icon">${s.icon}</span>
+          <div><div class="stage-option-name">${s.label}</div><div class="stage-option-desc">${s.desc}</div></div>
+        </div>
+      `).join('')}
+      <div class="field" style="margin-top:1rem"><label class="lbl">Home market</label>
+        <select onchange="onboardForm.currentMarket=this.value">${CURRENT_MARKETS.map(m=>`<option${onboardForm.currentMarket===m?' selected':''}>${m}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label class="lbl">Target markets</label>
+        <div>${MARKETS.map(m=>`<span class="market-chip${onboardForm.targetMarkets.includes(m)?' selected':''}" onclick="toggleTarget('${m}')">${m}</span>`).join('')}</div>
+      </div>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=1;renderPage('home')">← Back</button>
+        <button class="btn-primary" style="flex:1" onclick="onboardStep=3;renderPage('home')">Continue →</button>
+      </div>
+    `;
+  } else {
+    inner.innerHTML=`
+      <div class="onboard-title">Sustainability priorities</div>
+      <div class="onboard-sub">VeyaFlow uses these to filter manufacturers by certification match, flag retailer requirements in reports, and surface compliance gaps in your supply chain before they become problems.</div>
+      <div class="grid-2" style="margin-bottom:1.25rem">
+        ${SUSTAINABILITY_GOALS.map(g=>`
+          <div class="goal-chip${onboardForm.sustainabilityGoals.includes(g)?' selected':''}" onclick="toggleGoal('${g}')">
+            <span class="goal-chip-check">✓</span>${g}
+          </div>
+        `).join('')}
+      </div>
+      <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="ob-skus" value="${onboardForm.skus}" placeholder="e.g. LED Face Mask, Overnight Lip Tape, Silk Pillowcase" oninput="onboardForm.skus=this.value"></div>
+      <div class="field"><label class="lbl">Your name</label><input type="text" id="ob-username" value="${onboardForm.userName||''}" placeholder="e.g. Charlotte" oninput="onboardForm.userName=this.value"></div>
+      <div class="field">
+        <label class="lbl">Invite teammates <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+        <input type="text" id="ob-team" value="${onboardForm.teamEmails||''}" placeholder="colleague@brand.com, another@brand.com" oninput="onboardForm.teamEmails=this.value">
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem">Teammates will be notified when this workspace is ready to share</div>
+      </div>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=2;renderPage('home')">← Back</button>
+        <button class="btn-primary" style="flex:1" onclick="completeOnboard()">Set up ${onboardForm.name||'my brand'} workspace →</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">Your workspace is saved in this browser — persists between sessions</div>
+    `;
+  }
+}
+
+function toggleTarget(m){
+  const i=onboardForm.targetMarkets.indexOf(m);
+  if(i>=0)onboardForm.targetMarkets.splice(i,1);
+  else onboardForm.targetMarkets.push(m);
+  renderOnboardStep();
+}
+function toggleGoal(g){
+  const i=onboardForm.sustainabilityGoals.indexOf(g);
+  if(i>=0)onboardForm.sustainabilityGoals.splice(i,1);
+  else onboardForm.sustainabilityGoals.push(g);
+  renderOnboardStep();
+}
+function completeOnboard(){
+  brand={...onboardForm,createdAt:new Date().toISOString()};
+  saveBrandState();
+  onboardStep=1;
+  onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:''};
+  renderPage('home');
+}
+
+function renderDashboard(el){
+  const stage=BRAND_STAGES.find(s=>s.id===brand.stage)||BRAND_STAGES[2];
+  const steps=NEXT_STEPS[brand.stage]||NEXT_STEPS.trading;
+  const reports=savedReports.slice(0,5);
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">Workspace</div>
+        <div class="page-title">${brand.name}</div>
+        <div class="page-sub">${brand.category} · ${brand.currentMarket}${brand.targetMarkets?.length?' → '+brand.targetMarkets.slice(0,3).join(', ')+(brand.targetMarkets.length>3?' +'+( brand.targetMarkets.length-3):''):''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        ${brand.userName?`<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Signed in as <strong style="color:var(--navy)">${brand.userName}</strong></div>`:''}
+        <button class="btn-outline" onclick="resetBrand()">Edit workspace</button>
+      </div>
+    </div>
+    <div class="content">
+      <!-- Stage banner -->
+      <div class="nav-banner" style="margin-bottom:1.5rem">
+        <div>
+          <div class="nav-banner-sub">${stage.icon} ${stage.label}</div>
+          <div class="nav-banner-title">Recommended actions for ${brand.name}</div>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          ${steps.map(n=>`<button class="nav-banner-btn" onclick="showPage('${n.page}')">${n.icon} ${n.label}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="col-2">
+        <!-- Saved reports -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+            <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Saved reports (${savedReports.length})</div>
+            <button class="btn-outline" onclick="showPage('report')">+ New report</button>
+          </div>
+          ${reports.length===0?`
+            <div class="card empty-state">
+              <div class="empty-title">No reports yet</div>
+              <div class="empty-sub">Generate a market entry report to get a full intelligence brief on any market — retail landscape, compliance requirements, pricing, and a 90-day action plan.</div>
+              <button class="btn-primary" style="margin-top:1rem;width:auto;padding:.6rem 1.25rem" onclick="showPage('report')">Generate report →</button>
+            </div>
+          `:reports.map(r=>`
+            <div class="saved-report" onclick="expandReport('${r.id}')">
+              <div style="display:flex;justify-content:space-between">
+                <div>
+                  <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
+                  <div class="saved-report-name">${r.brandName}</div>
+                  <div class="saved-report-date">${r.date}${r.generatedBy?" · by "+r.generatedBy:""} · ${r.sections?.length||0} sections</div>
+                </div>
+                <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Profile + goals + quick actions -->
+        <div>
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Brand profile</div>
+          <div class="card" style="margin-bottom:1rem">
+            ${[
+              ['Category',brand.category],
+              ['Home market',brand.currentMarket],
+              ['Target markets',brand.targetMarkets?.length?brand.targetMarkets.join(', '):'Not set'],
+              ['Stage',stage.label],
+              ['SKUs',brand.skus||'Not set'],
+              ['Website',brand.website||'Not set'],
+              ['Workspace owner',brand.userName||'Not set'],
+            ].map(([l,v])=>`<div class="profile-row"><div class="profile-label">${l}</div><div class="profile-val">${v}</div></div>`).join('')}
+            ${brand.teamEmails?`
+              <div class="profile-row" style="align-items:flex-start">
+                <div class="profile-label" style="padding-top:.15rem">Team</div>
+                <div>
+                  ${brand.teamEmails.split(',').map(e=>e.trim()).filter(Boolean).map(e=>`
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                      <div style="width:22px;height:22px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.5rem;color:#fff;flex-shrink:0">${e[0].toUpperCase()}</div>
+                      <div style="font-family:var(--sans);font-size:.78rem;color:#555">${e}</div>
+                      <span style="font-family:var(--mono);font-size:.52rem;color:var(--amber);padding:.1rem .35rem;background:rgba(245,158,11,.08)">pending</span>
+                    </div>
+                  `).join('')}
+                  <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.2rem">Multi-user workspace — coming in v2</div>
+                </div>
+              </div>
+            `:''}
+            ${brand.usp?`<div style="padding-top:.75rem;margin-top:.25rem"><div class="profile-label" style="margin-bottom:.3rem">Positioning</div><div style="font-family:var(--sans);font-size:.78rem;color:#555;line-height:1.6;font-style:italic">"${brand.usp}"</div></div>`:''}
+          </div>
+
+          ${brand.sustainabilityGoals?.length?`
+            <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Sustainability goals</div>
+            <div class="chips" style="margin-bottom:1rem">
+              ${brand.sustainabilityGoals.map(g=>`<span style="font-family:var(--sans);font-size:.7rem;padding:.3rem .7rem;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);color:#065F46">✓ ${g}</span>`).join('')}
+            </div>
+          `:''}
+
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Quick actions</div>
+          ${steps.map(n=>`
+            <div class="next-step-card" onclick="showPage('${n.page}')">
+              <span class="next-step-icon">${n.icon}</span>
+              <div>
+                <div class="next-step-name">${n.label}</div>
+                <div class="next-step-desc">${n.desc}</div>
+              </div>
+              <span style="margin-left:auto;color:var(--gold);font-family:var(--mono);font-size:.7rem">→</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function resetBrand(){
+  onboardForm=brand?{...brand}:{name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:''};
+  onboardStep=1;
+  brand=null;
+  renderPage('home');
+}
+function deleteReport(id){
+  savedReports=savedReports.filter(r=>r.id!==id);
+  saveReportState();
+  updateSidebarBrand();
+  renderPage('home');
+}
+function expandReport(id){ /* future: show expanded report */ }
+
+/* ═══════════════════════════════════════════════════
+   MARKET REPORT PAGE
+═══════════════════════════════════════════════════ */
+
+
+function renderReport(el){
+  // Pre-fill from brand profile only if field is still blank
+  if(!reportForm.brandName) reportForm.brandName=brand?.name||'';
+  if(!reportForm.category)  reportForm.category=brand?.category||'';
+  if(!reportForm.currentMarket) reportForm.currentMarket=brand?.currentMarket||'Sweden';
+  if(!reportForm.skus)      reportForm.skus=brand?.skus||'';
+  if(!reportForm.brandDesc) reportForm.brandDesc=brand?.usp||'';
+
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Market Entry Report</div>
+        <div class="page-sub">AI market intelligence · Retail landscape · Compliance checklist · Pricing analysis · 90-day action plan</div>
+      </div>
+    </div>
+    <div class="content">
+      ${reportState.result?renderReportResult():renderReportForm()}
+    </div>
+  `;
+  if(!reportState.result) bindReportForm();
+}
+
+function renderReportForm(){
+  return `
+    <div class="col-2">
+      <div class="card">
+        ${brand?`<div style="padding:.5rem .75rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--gold)">◎ Pre-filled from ${brand.name}'s profile</div>`:''}
+        <div class="section-tag">Your brand</div>
+        <div class="field"><label class="lbl">Brand name *</label><input type="text" id="r-brandName" value="${reportForm.brandName}" placeholder="e.g. Cloud & Glow"></div>
+        <div class="field"><label class="lbl">Brand description</label><textarea id="r-brandDesc" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals...">${reportForm.brandDesc}</textarea></div>
+        <div class="field"><label class="lbl">Category *</label>
+          <select id="r-category"><option value="">Select…</option>${CATEGORIES.map(c=>`<option${reportForm.category===c?' selected':''}>${c}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="r-skus" value="${reportForm.skus}" placeholder="e.g. LED Face Mask 2,559 SEK, Overnight Lip Tape 149 SEK"></div>
+        <div class="grid-2">
+          <div class="field"><label class="lbl">Home market</label>
+            <select id="r-currentMarket">${CURRENT_MARKETS.map(m=>`<option${reportForm.currentMarket===m?' selected':''}>${m}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label class="lbl">Target market *</label>
+            <select id="r-targetMarket"><option value="">Select…</option>${MARKETS.map(m=>`<option${reportForm.targetMarket===m?' selected':''}>${m}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="field"><label class="lbl">Price point</label>
+          <select id="r-pricePoint"><option value="">Select…</option>${['Mass market','Mid-range','Premium','Luxury'].map(p=>`<option${reportForm.pricePoint===p?' selected':''}>${p}</option>`).join('')}</select>
+        </div>
+        <button class="btn-primary" id="r-generate-btn" onclick="generateReport()" disabled>Generate market entry report →</button>
+        <div id="r-status" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;margin-top:.5rem;min-height:1rem"></div>
+      </div>
+      <div>
+        <div class="card empty-state">
+          <div class="empty-title">Market intelligence brief</div>
+          <div class="empty-sub">Fill in your brand details and select a target market. VeyaFlow generates a detailed brief: named retailers and their buyer requirements, full regulatory compliance checklist, pricing benchmarks, distributor recommendations, and a 90-day market entry plan — the equivalent of a market entry consultant engagement.</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function bindReportForm(){
+  const fields=['brandName','brandDesc','category','skus','currentMarket','targetMarket','pricePoint'];
+  fields.forEach(f=>{
+    const el=document.getElementById('r-'+f);
+    if(el){
+      el.addEventListener('input',()=>{
+        reportForm[f]=el.value;
+        updateReportBtn();
+      });
+      el.addEventListener('change',()=>{
+        reportForm[f]=el.value;
+        updateReportBtn();
+      });
+    }
+  });
+  updateReportBtn();
+}
+
+function updateReportBtn(){
+  const btn=document.getElementById('r-generate-btn');
+  if(btn) btn.disabled=!reportForm.brandName||!reportForm.category||!reportForm.targetMarket;
+}
+
+async function generateReport(){
+  const btn=document.getElementById('r-generate-btn');
+  if(btn){btn.disabled=true;btn.textContent='Generating report…';}
+  savePageState('ns_reportForm',reportForm);
+  const statusEl=document.getElementById('r-status');
+  const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
+  setStatus('Contacting VeyaFlow…');
+
+  const isFood=reportForm.category==='Food & Beverage';
+  const isSkincare=reportForm.category==='Skincare & Beauty';
+  const isWellness=reportForm.category==='Wellness & Supplements';
+  const isFashion=reportForm.category==='Fashion & Apparel';
+
+  const retailContext={
+    "United Kingdom": isFood?"Waitrose, M&S Food, Sainsburys, Holland & Barrett, Planet Organic, Ocado, Whole Foods UK":isSkincare?"Space NK, Selfridges Beauty, Boots No7, Holland & Barrett, Liberty Beauty, Harvey Nichols":isWellness?"Holland & Barrett, Boots Pharmacy, Planet Organic, Amazon UK, Ocado":"John Lewis, Asos, Next, Wolf & Badger, Not On The High Street",
+    "Germany": isFood?"REWE, Edeka, Alnatura, denns Biomarkt, Bio Company, Kaufland":isSkincare?"dm-drogerie markt, Rossmann, Douglas, Sephora DE, Niche Beauty, Ludwig Beck":isWellness?"dm-drogerie markt, Rossmann, Alnatura, Amazon DE, Vitafy":"About You, Zalando DE, Breuninger, KaDeWe",
+    "Denmark": isFood?"Salling Group (Bilka, Fotex), Coop Danmark, Helsam, nemlig.com, Meny":isSkincare?"Matas (290 stores), Magasin du Nord, Illum, Lookfantastic DK":isWellness?"Matas, Helsam, Salling Group":"Zalando DK, Magasin du Nord",
+    "Norway": isFood?"NorgesGruppen (Meny, Kiwi), Coop Norge, Rema 1000, Helsam":isSkincare?"kicks.no, Vita, Matas NO, Sephora Oslo":isWellness?"Helsam, kicks.no, Vita, Apotek 1":"Zalando NO, Ellos",
+    "United States": isFood?"Whole Foods Market, Sprouts, Erewhon, Thrive Market, Target":isSkincare?"Sephora, Ulta Beauty, Target Beauty, Credo Beauty, Follain, Goop":isWellness?"Whole Foods, Sprouts, iHerb, Amazon US, GNC":"Nordstrom, Free People, Revolve",
+    "Australia": isFood?"Woolworths, Coles, Harris Farm, IGA, Mr Vitamins":isSkincare?"Mecca, Adore Beauty, Priceline, Chemist Warehouse, David Jones Beauty":isWellness?"Priceline, iHerb AU, Chemist Warehouse, Mr Vitamins":"David Jones, The Iconic",
+    "Netherlands": isFood?"Albert Heijn, Jumbo, Ekoplaza, Picnic, Holland & Barrett NL":isSkincare?"Ici Paris XL, Douglas NL, Sephora NL":isWellness?"Holland & Barrett NL, Etos, Kruidvat, Ekoplaza":"Zalando NL, Bol.com, De Bijenkorf",
+    "France": isFood?"Carrefour Bio, E.Leclerc, Biocoop, La Vie Claire, Naturalia":isSkincare?"Sephora FR, Marionnaud, Monoprix Beauty, Galeries Lafayette":isWellness?"Biocoop, La Vie Claire, Naturalia":"Galeries Lafayette, Asos FR",
+  };
+
+  const distributorContext={
+    "United Kingdom":"KeHE Distributors (organic/natural), CLF Distribution (beauty), Kinetic (health & wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
+    "Germany":"Biogrosshändler (organic food), DWS Handelsmarketing (beauty/care), Hanse Distribuzione (Scandinavian brands), Terra Naturkost (organic)",
+    "Denmark":"Dagrofa (grocery), Sahva (health), Beauty Trade (beauty brands), Scandinavian Premium (Scandi import specialist), NMC Nordic (FMCG)",
+    "Norway":"Aass (FMCG), Ultramar (specialty food), Nordic Beauty Agency (beauty/skincare), Brandhouse NO (premium brands)",
+    "United States":"KeHE (natural/organic grocery), UNFI (natural food), Presence Marketing (natural products), Kite Hill Brands (premium beauty)",
+    "Australia":"CLF Distribution AU, Unique Health Products, Aushealth (wellness), Concept Brands (beauty)",
+    "Netherlands":"Udea (natural food), Deli XL (FMCG), Beauty Holland (cosmetics), Nordic Import NL",
+    "France":"Biocoop (organic), Selecta France (beauty), Scandifood (Nordic brands), Distriborg (organic food)",
+  };
+
+  const complianceDetail={
+    "United Kingdom":{
+      "Skincare & Beauty":"UK Cosmetics Regulation SI 2019/696: UK Responsible Person (UK address mandatory), OPSS SCPN portal notification, English-only INCI labelling, UKCA mark. EU CPNP does NOT cover UK — separate notification required. Timeline: 4–8 weeks. Cost: £500–1,500.",
+      "Food & Beverage":"UK Food Information Regulations 2014: English ingredients, 14 allergens, UK Nutrition Facts format. FSA novel food approval. APHA import health certs for animal products. UKORG for organic (EU logo invalid). Show UK importer address.",
+      "Wellness & Supplements":"MHRA borderline products. Health claims: UK Nutrition and Health Claims Regulations 2007. UK Food Supplements Regulations 2003. UK Responsible Person if borderline medicine.",
+    },
+    "Germany":{
+      "Skincare & Beauty":"EU Cosmetics Regulation EC 1223/2009: CPNP notification at portal.cpnp.eu, EU Responsible Person (EU address), German INCI labelling + warning texts. German packaging law VerpackG: register with Dual System (e.g. Der Grüne Punkt). Timeline: 6–10 weeks. Cost: €800–2,000.",
+      "Food & Beverage":"EU FIR 1169/2011 in German. German organic: DE-ÖKO-006. Novel food: EFSA approval. BVL notification. VerpackG packaging registration.",
+      "Wellness & Supplements":"LFGB German Food Code. EU Food Supplements Directive (Nahrungsergänzungsmittelverordnung). Health claims EC 1924/2006 only. Notify BVL before market placement. VerpackG mandatory.",
+    },
+    "Denmark":{
+      "Skincare & Beauty":"EU CPNP notification, EU Responsible Person. DVFA oversight. Danish labelling (sticker acceptable). Nordic Swan ecolabel for premium positioning. VAT 25%.",
+      "Food & Beverage":"EU FIR 1169/2011 in Danish. DVFA registration. Organic: Ø-mærket certification. EUDR compliance from December 2026.",
+      "Wellness & Supplements":"Sundhedsstyrelsen oversight. EU health claims. DVFA notification. Danish labelling required.",
+    },
+    "United States":{
+      "Skincare & Beauty":"FDA MoCRA 2022: facility registration (FURLS portal) + product listing mandatory. US Responsible Person required. INCI in English, weight in oz AND grams. California Prop 65 if applicable. FTC: all claims substantiated. Timeline: 2–4 weeks. Cost: $200–500.",
+      "Food & Beverage":"FDA facility registration (FURLS), Prior Notice for imports (PN). US Nutrition Facts Panel. Top 9 allergens + sesame. FSMA FSVP. USDA Organic (EU organic not recognised). California Prop 65.",
+      "Wellness & Supplements":"FDA DSHEA. Structure/function claims: notify FDA within 30 days. No disease claims. NSF or USP certification recommended. Supplement Facts panel in US format. California Prop 65.",
+    },
+  }[reportForm.targetMarket]?.[reportForm.category] || `Research specific ${reportForm.category} requirements with local regulatory counsel in ${reportForm.targetMarket}.`;
+
+  const prompt=`You are VeyaFlow AI — a paid market intelligence platform for Nordic consumer brands expanding internationally. Generate a consultant-grade market entry report. Every section must be specific — named retailers, named regulators, real figures, actionable decisions. No generic advice.
+
+BRAND BRIEF
+Brand: ${reportForm.brandName}
+Description: ${reportForm.brandDesc||'Premium Nordic consumer brand'}
+Category: ${reportForm.category}
+Key products / SKUs: ${reportForm.skus||'Premium products in this category'}
+Price positioning: ${reportForm.pricePoint||'Premium'}
+Home market: ${reportForm.currentMarket||'Sweden'}
+Target market: ${reportForm.targetMarket}
+Sustainability priorities: ${brand?.sustainabilityGoals?.join(', ')||'clean ingredients, sustainability credentials'}
+
+INTELLIGENCE INPUTS (use these as starting points — add your own knowledge)
+Retailers in this category: ${retailContext[reportForm.targetMarket]||'major retailers in this market'}
+Known distributors: ${distributorContext[reportForm.targetMarket]||'major distributors'}
+Regulatory context: ${complianceDetail}
+
+Generate an 8-section report. Format each section with its number and title on its own line.
+
+1. EXECUTIVE SUMMARY
+Opportunity score (X/10), one-sentence opportunity, one-sentence biggest risk. Then: estimated time to first sale, recommended route to market, estimated Year 1 revenue potential. Be direct — give numbers.
+
+2. MARKET OPPORTUNITY
+Specific market size figure for ${reportForm.category} in ${reportForm.targetMarket} (local currency). YoY growth rate. Top 3 consumer trends driving demand right now. The specific window for a Nordic brand entering now. Name 1–2 competitors already winning and the gap ${reportForm.brandName} can exploit.
+
+3. SKU STRATEGY & PRICING
+For each product/SKU: recommended retail price in local currency, wholesale price, retailer margin %, fit assessment, regulatory flags. Name 2–3 direct competitor price benchmarks from this market. Recommend which SKU to lead with and why.
+
+4. RETAIL LANDSCAPE — Named accounts
+For each of the 5–6 retailers from the input list:
+— Store count / online reach
+— How to approach the buyer (portal, direct email, trade show)
+— Typical margin requirement %
+— Minimum order quantity range
+— What this buyer specifically wants from a new brand
+— Fit rating: STRONG FIT / POSSIBLE / NOT YET — with one-sentence justification
+
+5. REGULATORY COMPLIANCE CHECKLIST
+Use the regulatory context provided. For each requirement:
+— Requirement and legal reference
+— Exact action required (form name, portal URL, authority name)
+— Time to complete
+— Estimated cost
+— Priority: URGENT (before any sales) / IMPORTANT / NICE TO HAVE
+List in priority order.
+
+6. ROUTE TO MARKET & DISTRIBUTION
+Recommend optimal entry route: DTC first, distributor-led, or direct retail. Justify with ${reportForm.brandName}-specific reasoning.
+For 2 specific distributors from the input list: why they fit, fee/margin structure, how to approach them, what they need to see before taking a new brand.
+
+7. LOCALISATION REQUIREMENTS
+Specific changes needed from the current ${reportForm.currentMarket||'Swedish'} version:
+— Language (what must be translated, what can stay)
+— Mandatory labelling changes (list each element)
+— Packaging changes
+— Claims to remove or add
+— Positioning adjustment — what travels well, what needs adapting for ${reportForm.targetMarket}
+
+8. 90-DAY MARKET ENTRY PLAN
+Month 1 — Foundation (Weeks 1–4): 4 actions each with: owner role, budget estimate, success metric
+Month 2 — Activation (Weeks 5–8): 4 actions each with: owner role, budget estimate, success metric
+Month 3 — First Revenue (Weeks 9–12): 4 actions each with: owner role, budget estimate, success metric
+Total 90-day investment estimate (range in local currency)
+Break-even timeline estimate`;
+
+  try{
+    const text=await callAPI([{role:"user",content:prompt}],3500);
+    setStatus('Parsing report sections…');
+    // Parse sections
+    const sectionTitles=["EXECUTIVE SUMMARY","MARKET OPPORTUNITY","SKU STRATEGY & PRICING","RETAIL LANDSCAPE","REGULATORY COMPLIANCE CHECKLIST","ROUTE TO MARKET & DISTRIBUTION","LOCALISATION REQUIREMENTS","90-DAY MARKET ENTRY PLAN"];
+    let sections=[];
+    const parts=text.split(/\n(?=\d+\.\s+[A-Z])/);
+    parts.forEach((part,i)=>{
+      const titleMatch=part.match(/^\d+\.\s+(.+?)(\n|$)/);
+      const title=titleMatch?titleMatch[1].trim():(sectionTitles[i]||`Section ${i+1}`);
+      const content=part.replace(/^\d+\.\s+.+?\n/,'').trim();
+      if(content.length>30)sections.push({title,content});
+    });
+    if(sections.length<3){
+      // Fallback: split by double newlines
+      sections=text.split(/\n\n+/).filter(s=>s.length>80).slice(0,7).map((s,i)=>({
+        title:sectionTitles[i]||`Section ${i+1}`,content:s.trim()
+      }));
+    }
+
+    const report={
+      id:Date.now().toString(),
+      brandName:reportForm.brandName,
+      category:reportForm.category,
+      currentMarket:reportForm.currentMarket,
+      targetMarket:reportForm.targetMarket,
+      pricePoint:reportForm.pricePoint,
+      date:new Date().toLocaleDateString('sv-SE'),
+      generatedBy:brand?.userName||null,
+      sections
+    };
+    savedReports=[report,...savedReports].slice(0,20);
+    saveReportState();
+    savePageState('ns_reportState',{result:report,sections});
+    savePageState('ns_reportForm',reportForm);
+    updateSidebarBrand();
+    reportState={loading:false,result:report,sections};
+    renderPage('report');
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Generate market entry report →';}
+    const msg=e.message||'Unknown error';
+    if(msg.includes('Failed to fetch')||msg.includes('NetworkError')||msg.includes('CORS')){
+      alert('Connection error: The report generator requires an internet connection and must be served from a URL (not opened as a local file).\n\nFix: Drop this HTML file onto drop.netlify.com to get a live URL, then open that URL.');
+    } else if(msg.includes('401')){
+      alert('API key error (401): The Anthropic API key is missing or invalid. Deploy via Netlify with the proxy function to use your own API key securely.');
+    } else if(msg.includes('529')||msg.includes('overloaded')){
+      alert('The AI is temporarily overloaded. Please try again in a moment.');
+    } else {
+      alert('Could not generate report: '+msg);
+    }
+  }
+}
+
+function renderReportResult(){
+  const r=reportState.result;
+  const cur={Denmark:"DKK",Germany:"EUR",Netherlands:"EUR","United Kingdom":"GBP",Norway:"NOK","United States":"USD",Australia:"AUD"}[r.targetMarket]||"EUR";
+
+  // Extract executive summary metrics from first section if available
+  const execSection=r.sections.find(s=>s.title?.toUpperCase().includes('EXECUTIVE')||s.title?.toUpperCase().includes('SUMMARY'));
+  const scoreMatch=execSection?.content?.match(/(\d+)\/10|score[:\s]+(\d+)/i);
+  const opportunityScore=scoreMatch?(scoreMatch[1]||scoreMatch[2]):'—';
+  const scoreColor=opportunityScore>=7?'#10B981':opportunityScore>=5?'#F59E0B':'#EF4444';
+
+  // Section accent colors for visual hierarchy
+  const sectionAccents=["#1E3A5F","#10B981","#F59E0B","#EF4444","#8B5CF6","#0EA5E9","#C4A882","#1E3A5F"];
+
+  return `
+    <div class="report-header">
+      <div class="report-badge">Market Entry Intelligence Report · VeyaFlow</div>
+      <div class="report-brand">${r.brandName}</div>
+      <div class="report-meta">${r.category} → ${r.targetMarket} · ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
+      <div class="report-meta-row">
+        <div><div class="report-meta-lbl">Home market</div><div class="report-meta-val">${r.currentMarket||'Sweden'}</div></div>
+        <div><div class="report-meta-lbl">Target market</div><div class="report-meta-val">${r.targetMarket}</div></div>
+        <div><div class="report-meta-lbl">Price point</div><div class="report-meta-val">${r.pricePoint||'Premium'}</div></div>
+        <div><div class="report-meta-lbl">Currency</div><div class="report-meta-val">${cur}</div></div>
+        <div><div class="report-meta-lbl">Sections</div><div class="report-meta-val">${r.sections.length}</div></div>
+      </div>
+    </div>
+
+    <!-- Summary metrics bar -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-top:none;background:#fff;margin-bottom:1.25rem">
+      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
+        <div style="font-family:var(--serif);font-size:1.8rem;color:${scoreColor};line-height:1">${opportunityScore}<span style="font-size:.9rem;color:var(--muted)">/10</span></div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Opportunity score</div>
+      </div>
+      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
+        <div style="font-family:var(--serif);font-size:1.8rem;color:var(--navy);line-height:1">${r.sections.length}</div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Report sections</div>
+      </div>
+      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
+        <div style="font-family:var(--serif);font-size:1.8rem;color:var(--navy);line-height:1">${cur}</div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Market currency</div>
+      </div>
+      <div style="padding:.85rem 1rem;text-align:center">
+        <div style="font-family:var(--sans);font-size:.75rem;color:var(--green);font-weight:500;line-height:1.3;margin-top:.3rem">✓ Saved</div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">To dashboard</div>
+      </div>
+    </div>
+
+    <!-- Section navigation -->
+    <div id="section-jump" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.25rem;padding:.75rem 1rem;background:#fff;border:1px solid var(--border)">
+      <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);align-self:center;margin-right:.25rem">Jump to:</span>
+      ${r.sections.map((s,i)=>`<button onclick="document.getElementById('rs-${i}').scrollIntoView({behavior:'smooth'})" style="padding:.25rem .6rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;white-space:nowrap">${String(i+1).padStart(2,'0')} ${s.title?.split(/[—–\s]/)[0]||'Section'}</button>`).join('')}
+    </div>
+
+    <!-- Report sections -->
+    <div style="background:#fff;border:1px solid var(--border)">
+      ${r.sections.map((s,i)=>`
+        <div id="rs-${i}" class="report-section" style="border-left:3px solid ${sectionAccents[i]||'#1E3A5F'}">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem">
+            <div style="font-family:var(--mono);font-size:.8rem;color:${sectionAccents[i]||'#1E3A5F'};font-weight:600;opacity:.5">${String(i+1).padStart(2,'0')}</div>
+            <div class="report-section-title" style="margin-bottom:0">${s.title}</div>
+          </div>
+          <div class="prose">${s.content}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Action bar -->
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;padding-bottom:1.5rem;flex-wrap:wrap">
+      <button class="btn-outline" onclick="reportState={loading:false,result:null,sections:[]};reportForm.targetMarket='';renderPage('report')">← New report</button>
+      <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
+      <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
+      <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   COMPARE MARKETS PAGE
+═══════════════════════════════════════════════════ */
+
+
+function renderCompare(el){
+  if(!compareForm.brandName) compareForm.brandName=brand?.name||'';
+  if(!compareForm.category)  compareForm.category=brand?.category||'';
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Compare Markets</div>
+        <div class="page-sub">Side-by-side market analysis · Opportunity scoring · Pick the right market first</div>
+      </div>
+    </div>
+    <div class="content">
+      ${compareResult?renderCompareResult():renderCompareForm()}
+    </div>
+  `;
+  if(!compareResult) bindCompareForm();
+}
+
+function renderCompareForm(){
+  return `
+    <div class="card" style="max-width:560px;margin:0 auto">
+      ${brand?`<div style="padding:.5rem .75rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--gold)">◎ Pre-filled from ${brand.name}'s profile</div>`:''}
+      <div class="field"><label class="lbl">Brand name *</label><input type="text" id="cm-brand" value="${compareForm.brandName}" oninput="compareForm.brandName=this.value;updateCompareBtn()"></div>
+      <div class="field"><label class="lbl">Category *</label>
+        <select id="cm-cat" onchange="compareForm.category=this.value;updateCompareBtn()">
+          <option value="">Select…</option>${CATEGORIES.map(c=>`<option${compareForm.category===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label class="lbl">Select 2–3 markets to compare *</label>
+        <div class="chips">${COMPARE_MARKETS.map(m=>`<span class="market-chip${compareForm.markets.includes(m)?' selected':''}" onclick="toggleCompareMarket('${m}')">${m}</span>`).join('')}</div>
+      </div>
+      <button class="btn-primary" id="cm-btn" onclick="runCompare()" disabled>Compare markets →</button>
+    </div>
+  `;
+}
+
+function bindCompareForm(){updateCompareBtn();}
+function updateCompareBtn(){
+  const btn=document.getElementById('cm-btn');
+  if(btn)btn.disabled=!compareForm.brandName||!compareForm.category||compareForm.markets.length<2;
+}
+function toggleCompareMarket(m){
+  const i=compareForm.markets.indexOf(m);
+  if(i>=0)compareForm.markets.splice(i,1);
+  else if(compareForm.markets.length<3)compareForm.markets.push(m);
+  renderCompare(document.getElementById('page-compare'));
+}
+
+async function runCompare(){
+  const btn=document.getElementById('cm-btn');
+  if(btn){btn.disabled=true;btn.textContent='Analysing markets…';}
+  const prompt=`You are VeyaFlow AI. Compare these markets for a Nordic brand.
+
+Brand: ${compareForm.brandName}
+Category: ${compareForm.category}
+Markets to compare: ${compareForm.markets.join(', ')}
+
+For each market provide a structured comparison. Format as:
+
+WINNER
+[Which market should they enter first and why — 2 sentences]
+
+${compareForm.markets.map(m=>`MARKET: ${m}
+Opportunity score: [X/10]
+Market size: [specific figure]
+Consumer fit: [2 sentences on how well this brand fits]
+Retail landscape: [2–3 key retailers for this category]
+Regulatory burden: [LOW/MEDIUM/HIGH with brief explanation]
+Time to first sale: [estimated weeks/months]
+Key risk: [one specific risk]
+Verdict: [one sentence recommendation]`).join('\n\n')}
+
+RECOMMENDATION
+[Specific sequencing recommendation — which market first, which second, why]
+
+Be specific. Use real numbers and named retailers.`;
+
+  try{
+    const text=await callAPI([{role:"user",content:prompt}],1500);
+    compareResult={text,markets:compareForm.markets,brand:compareForm.brandName,category:compareForm.category};
+    savePageState('ns_compareForm',compareForm);
+    savePageState('ns_compareResult',compareResult);
+    renderCompare(document.getElementById('page-compare'));
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Compare markets →';}
+    alert('Could not compare markets: '+e.message);
+  }
+}
+
+function renderCompareResult(){
+  const r=compareResult;
+  const sections=["WINNER",...r.markets.map(m=>"MARKET: "+m),"RECOMMENDATION"];
+  const SECTION_COLORS={"WINNER":"#1E3A5F","RECOMMENDATION":"#C4A882"};
+
+  // Parse winner and recommendation
+  const winnerMatch=r.text.match(/WINNER\s*\n([\s\S]*?)(?=\nMARKET:|$)/);
+  const recMatch=r.text.match(/RECOMMENDATION\s*\n([\s\S]*?)$/);
+
+  // Parse each market block
+  const marketBlocks=r.markets.map(m=>{
+    const regex=new RegExp(`MARKET:\\s*${m}\\s*\\n([\\s\\S]*?)(?=\\nMARKET:|\\nRECOMMENDATION|$)`);
+    const match=r.text.match(regex);
+    return{market:m,content:match?match[1].trim():''};
+  });
+
+  return `
+    ${winnerMatch?`
+      <div class="card" style="border-left:3px solid var(--navy);margin-bottom:1.25rem">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy);font-weight:600;margin-bottom:.35rem">★ WINNER</div>
+        <div class="prose">${winnerMatch[1].trim()}</div>
+      </div>
+    `:''}
+
+    <div style="display:grid;grid-template-columns:repeat(${r.markets.length},1fr);gap:1rem;margin-bottom:1.25rem">
+      ${marketBlocks.map(b=>`
+        <div class="card" style="margin-bottom:0">
+          <div style="font-family:var(--serif);font-size:1rem;color:var(--navy);margin-bottom:.85rem">${b.market}</div>
+          <div class="prose" style="font-size:.78rem">${b.content||'No data'}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${recMatch?`
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);font-weight:600;margin-bottom:.35rem">RECOMMENDATION</div>
+        <div class="prose">${recMatch[1].trim()}</div>
+      </div>
+    `:''}
+
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;padding-bottom:1.5rem">
+      <button class="btn-outline" onclick="compareResult=null;renderCompare(document.getElementById('page-compare'))">← New comparison</button>
+      <button class="btn-outline" onclick="showPage('report')">Generate full report →</button>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   RETAILER PITCH PAGE
+═══════════════════════════════════════════════════ */
+
+let pitchCopied=false;
+
+const LANG_NAMES={en:"English",da:"Danish",de:"German",no:"Norwegian"};
+
+function renderPitch(el){
+  if(!pitchForm.brandName)      pitchForm.brandName=brand?.name||'';
+  if(!pitchForm.category)       pitchForm.category=brand?.category||'';
+  if(!pitchForm.existingMarkets)pitchForm.existingMarkets=brand?.currentMarket||'Sweden';
+  if(!pitchForm.brandDesc)      pitchForm.brandDesc=brand?.usp||'';
+  if(!pitchForm.skus)           pitchForm.skus=brand?.skus||'';
+
+  const retailers=RETAILER_BY_MARKET[pitchForm.targetMarket]||[];
+  const rd=pitchForm.retailer?RETAILERS[pitchForm.retailer]:null;
+
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Retailer Pitch Generator</div>
+        <div class="page-sub">AI-written buyer outreach · Personalised per retailer · In the buyer's language</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="col-2">
+        <!-- Form -->
+        <div class="card">
+          <div class="section-tag">Your brand</div>
+          <div class="field"><label class="lbl">Brand name *</label><input type="text" id="p-brandName" value="${pitchForm.brandName}" oninput="pitchForm.brandName=this.value;updatePitchBtn()"></div>
+          <div class="field"><label class="lbl">Brand description</label><textarea id="p-desc" oninput="pitchForm.brandDesc=this.value">${pitchForm.brandDesc}</textarea></div>
+          <div class="field"><label class="lbl">Category *</label>
+            <select id="p-cat" onchange="pitchForm.category=this.value;updatePitchBtn()">
+              <option value="">Select…</option>${PITCH_CATEGORIES.map(c=>`<option${pitchForm.category===c?' selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="p-skus" value="${pitchForm.skus}" oninput="pitchForm.skus=this.value"></div>
+          <hr class="divider">
+          <div class="section-tag">Target retailer</div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Market *</label>
+              <select id="p-market" onchange="pitchForm.targetMarket=this.value;pitchForm.retailer='';pitchResult=null;renderPitch(document.getElementById('page-pitch'))">
+                ${PITCH_MARKETS.map(m=>`<option${pitchForm.targetMarket===m?' selected':''}>${m}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="lbl">Price point</label>
+              <select id="p-price" onchange="pitchForm.pricePoint=this.value">
+                <option value="">Select…</option>${['Mass market','Mid-range','Premium','Luxury'].map(p=>`<option${pitchForm.pricePoint===p?' selected':''}>${p}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="field"><label class="lbl">Select retailer *</label>
+            ${retailers.map(r=>{
+              const rdata=RETAILERS[r];
+              const active=pitchForm.retailer===r;
+              return `
+                <div class="retailer-card${active?' selected':''}" onclick="pitchForm.retailer='${r}';pitchResult=null;renderPitch(document.getElementById('page-pitch'))">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div style="font-size:.88rem;color:var(--navy);font-weight:${active?500:400}">${r}</div>
+                    <span class="tag tag-gray">${LANG_NAMES[rdata?.language||'en']}</span>
+                  </div>
+                  <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.2rem">${rdata?.type||''}</div>
+                  ${active&&rdata?`<div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)"><div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);margin-bottom:.25rem">What this buyer cares about</div><div style="font-family:var(--sans);font-size:.68rem;color:#555;line-height:1.6">${rdata.buyerPriority}</div></div>`:''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div class="field"><label class="lbl">Already selling in</label><input type="text" id="p-existing" value="${pitchForm.existingMarkets}" oninput="pitchForm.existingMarkets=this.value"></div>
+          <button class="btn-primary" id="p-generate-btn" onclick="generatePitch()" ${!pitchForm.brandName||!pitchForm.retailer||!pitchForm.category?'disabled':''}>
+            Generate pitch for ${pitchForm.retailer||'retailer'} →
+          </button>
+          ${rd?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.5rem">Will be written in ${LANG_NAMES[rd.language]||'English'}</div>`:''}
+        </div>
+
+        <!-- Result -->
+        <div id="pitch-result">
+          ${pitchResult?renderPitchResult():`
+            <div class="card empty-state">
+              <div class="empty-title" style="font-style:italic">Ready to pitch</div>
+              <div class="empty-sub">Select a retailer and VeyaFlow will write a personalised buyer email — in their language, referencing their specific buying priorities.</div>
+              <div class="chips" style="justify-content:center;margin-top:1rem">
+                ${["Waitrose (English)","dm-drogerie (German)","Matas (Danish)","Meny (Norwegian)"].map(ex=>`<span class="tag tag-gray">${ex}</span>`).join('')}
+              </div>
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updatePitchBtn(){
+  const btn=document.getElementById('p-generate-btn');
+  if(btn)btn.disabled=!pitchForm.brandName||!pitchForm.retailer||!pitchForm.category;
+}
+
+async function generatePitch(){
+  const btn=document.getElementById('p-generate-btn');
+  if(btn){btn.disabled=true;btn.textContent='Writing pitch…';}
+  const rd=RETAILERS[pitchForm.retailer];
+  const langName=LANG_NAMES[rd?.language||'en'];
+  const prompt=`You are a senior export sales consultant helping a Nordic brand pitch to a specific retail buyer. Write a professional, warm, and persuasive buyer outreach email.
+
+Brand: ${pitchForm.brandName}
+Description: ${pitchForm.brandDesc||'A premium Nordic brand'}
+Category: ${pitchForm.category}
+Key products / SKUs: ${pitchForm.skus||'Premium products in the '+pitchForm.category+' category'}
+USP / brand positioning: ${pitchForm.usp||'Premium Scandinavian quality, clean ingredients, sustainability-focused'}
+Price point: ${pitchForm.pricePoint||'Premium'}
+Already selling in: ${pitchForm.existingMarkets||'Sweden'}
+
+Target retailer: ${pitchForm.retailer}
+Retailer type: ${rd?.type||''}
+Country: ${rd?.country||pitchForm.targetMarket}
+What this buyer cares about most: ${rd?.buyerPriority||'quality, fit with their range, sales potential'}
+Practical notes: ${rd?.minOrderNote||''}
+
+Write the email in ${langName}. ${rd?.language!=='en'?'Include an English translation below.':''}
+
+The email must:
+1. Have a compelling subject line that doesn't sound like a mass pitch
+2. Open with a specific reference to ${pitchForm.retailer} — show the brand has done their homework
+3. Introduce the brand in 2–3 sentences — Nordic origin, what makes it different
+4. Explain specifically why this brand fits ${pitchForm.retailer}'s range
+5. Name 2–3 specific products with brief descriptions
+6. Make one clear ask — a 15-minute call or sample request
+7. Keep it under 200 words in the main body
+8. Sound like it was written by the brand's export or sales lead — professional but personal, not corporate
+9. Close with [Your name] placeholder
+
+Format:
+SUBJECT: [subject line]
+---
+[Full email in ${langName}]
+${rd?.language!=='en'?'---\nENGLISH TRANSLATION:\n[Full email in English]':''}
+---
+BUYER INTEL:
+• [specific intel 1]
+• [specific intel 2]
+• [specific intel 3]`;
+
+  try{
+    const text=await callAPI([{role:"user",content:prompt}]);
+    const subjMatch=text.match(/SUBJECT:\s*(.+)/);
+    const parts=text.split('---');
+    const body=parts[1]?.trim()||'';
+    const trans=rd?.language!=='en'?(text.split('ENGLISH TRANSLATION:')[1]?.split('---')[0]?.trim()||''):'';
+    const intelRaw=text.split('BUYER INTEL:')[1]?.trim()||'';
+    const intel=intelRaw.split('\n').filter(l=>l.trim().startsWith('•')||l.trim().startsWith('-')).map(l=>l.replace(/^[•\-]\s*/,'')).filter(Boolean).slice(0,3);
+    pitchResult={subj:subjMatch?subjMatch[1].trim():'',body,trans,intel,retailer:pitchForm.retailer,market:pitchForm.targetMarket,brand:pitchForm.brandName,lang:rd?.language||'en'};
+    savePageState('ns_pitchForm',pitchForm);
+    savePageState('ns_pitchResult',pitchResult);
+    const resultEl=document.getElementById('pitch-result');
+    if(resultEl)resultEl.innerHTML=renderPitchResult();
+    if(btn){btn.disabled=false;btn.textContent=`Generate pitch for ${pitchForm.retailer} →`;}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=`Generate pitch for ${pitchForm.retailer} →`;}
+    alert('Could not generate pitch: '+e.message);
+  }
+}
+
+function renderPitchResult(){
+  if(!pitchResult)return'';
+  const r=pitchResult;
+  const retailers=RETAILER_BY_MARKET[r.market]||[];
+  return `
+    <div>
+      <div style="background:var(--navy);padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.25rem">Buyer pitch · ${r.retailer}</div>
+          <div style="font-size:.95rem;color:#fff">${r.brand} → ${r.retailer}</div>
+          <div style="font-family:var(--sans);font-size:.65rem;color:rgba(255,255,255,.4);margin-top:.1rem">${r.market} · ${LANG_NAMES[r.lang]||'English'}</div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button id="copy-btn" onclick="copyCurrentPitch()" style="padding:.45rem .9rem;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-family:var(--mono);font-size:.6rem;cursor:pointer">Copy email</button>
+          <button onclick="pitchResult=null;renderPitch(document.getElementById('page-pitch'))" style="padding:.45rem .9rem;background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);font-family:var(--mono);font-size:.6rem;cursor:pointer">New pitch</button>
+        </div>
+      </div>
+      <div style="padding:.65rem 1.1rem;background:#fff;border:1px solid var(--border);border-top:none;display:flex;gap:.75rem;align-items:center">
+        <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);min-width:3rem">Subject</span>
+        <span style="font-size:.85rem;color:var(--ink);font-weight:500">${r.subj}</span>
+      </div>
+      <div class="email-box" style="border-top:none">${r.body}</div>
+      ${r.lang!=='en'&&r.trans?`
+        <div style="padding:1rem 1.25rem;background:rgba(196,168,130,.03);border:1px solid rgba(196,168,130,.15);border-top:none">
+          <div style="font-family:var(--mono);font-size:.55rem;color:rgba(196,168,130,.6);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem">English translation</div>
+          <div style="font-family:var(--sans);font-size:.78rem;color:#888;line-height:1.9;white-space:pre-wrap">${r.trans}</div>
+        </div>
+      `:''}
+      ${r.intel?.length?`
+        <div style="padding:1rem 1.25rem;background:#FFFBEB;border:1px solid #FDE68A;border-top:none">
+          <div style="font-family:var(--mono);font-size:.58rem;color:#92400E;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem">★ Buyer intel — know this before you hit send</div>
+          ${r.intel.map(tip=>`<div style="display:flex;gap:.65rem;align-items:flex-start;margin-bottom:.45rem"><span style="color:var(--gold);font-family:var(--mono);font-size:.68rem;flex-shrink:0">→</span><div style="font-family:var(--sans);font-size:.76rem;color:#555;line-height:1.65">${tip}</div></div>`).join('')}
+        </div>
+      `:''}
+      <div style="padding:.85rem 1.1rem;background:var(--cream);border:1px solid var(--border);border-top:none;display:flex;gap:.65rem;flex-wrap:wrap;align-items:center">
+        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Generate for another:</span>
+        ${retailers.filter(r2=>r2!==r.retailer).map(r2=>`<button onclick="pitchForm.retailer='${r2}';generatePitch()" style="padding:.3rem .7rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;cursor:pointer">${r2} →</button>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function copyCurrentPitch(){
+  if(!pitchResult)return;
+  const text=`Subject: ${pitchResult.subj}\n\n${pitchResult.body}`;
+  navigator.clipboard?.writeText(text).then(()=>{
+    const btn=document.getElementById('copy-btn');
+    if(btn){btn.textContent='✓ Copied';btn.style.background='rgba(16,185,129,.3)';setTimeout(()=>{btn.textContent='Copy email';btn.style.background='rgba(255,255,255,.12)';},2000);}
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   SUPPLIER NUDGE PAGE
+═══════════════════════════════════════════════════ */
+
+
+function renderSuppliers(el){
+  const sorted=[...SUPPLIERS].sort((a,b)=>calcRisk(b)-calcRisk(a));
+  const filtered=sorted.filter(s=>{
+    const q=supplierFilter.query.toLowerCase();
+    const mQ=!q||[s.name,s.country,s.commodity,s.type].some(x=>x?.toLowerCase().includes(q));
+    const mS=!supplierFilter.status||s.status===supplierFilter.status;
+    const mM=!supplierFilter.missing||s.missing.includes(supplierFilter.missing);
+    const mT=!supplierFilter.type||s.type===supplierFilter.type;
+    const mR=!supplierFilter.region||s.region===supplierFilter.region;
+    const mTi=!supplierFilter.tier||s.tier===parseInt(supplierFilter.tier);
+    const mE=!supplierFilter.eudr||(supplierFilter.eudr==='yes'?s.eudrScope:!s.eudrScope);
+    return mQ&&mS&&mM&&mT&&mR&&mTi&&mE;
+  });
+
+  const highRisk=SUPPLIERS.filter(s=>calcRisk(s)>=7).length;
+  const auditOvd=SUPPLIERS.filter(s=>s.auditOverdue).length;
+  const overdue=SUPPLIERS.filter(s=>s.status==='overdue').length;
+  const complete=SUPPLIERS.filter(s=>s.status==='complete').length;
+
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Supplier Nudge AI</div>
+        <div class="page-sub">Automated risk scoring · Compliance data collection · Multi-language outreach · Audit tracking</div>
+      </div>
+    </div>
+    <div class="content">
+      <!-- Stats -->
+      <div class="grid-4" style="margin-bottom:1.25rem">
+        <div class="stat-card" style="color:var(--red)"><div class="stat-num" style="color:var(--red)">${highRisk}</div><div class="stat-label">High risk</div></div>
+        <div class="stat-card" style="color:var(--amber)"><div class="stat-num" style="color:var(--amber)">${auditOvd}</div><div class="stat-label">Audit overdue</div></div>
+        <div class="stat-card" style="color:var(--amber)"><div class="stat-num" style="color:var(--amber)">${overdue}</div><div class="stat-label">Nudge overdue</div></div>
+        <div class="stat-card" style="color:var(--green)"><div class="stat-num" style="color:var(--green)">${complete}</div><div class="stat-label">Complete</div></div>
+      </div>
+
+      <div class="col-filter">
+        <!-- Filters -->
+        <div class="card">
+          <div class="section-tag">Filters</div>
+          <div class="field"><input type="text" id="sup-q" placeholder="Search suppliers…" value="${supplierFilter.query}" oninput="supplierFilter.query=this.value;renderSuppliers(document.getElementById('page-suppliers'))"></div>
+          <div class="field"><label class="lbl">Status</label>
+            <select onchange="supplierFilter.status=this.value;renderSuppliers(document.getElementById('page-suppliers'))">
+              <option value="">All statuses</option>
+              ${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}"${supplierFilter.status===k?' selected':''}>${v.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="lbl">Missing data</label>
+            <select onchange="supplierFilter.missing=this.value;renderSuppliers(document.getElementById('page-suppliers'))">
+              <option value="">Any</option>
+              ${Object.entries(DATA_LABELS).map(([k,v])=>`<option value="${k}"${supplierFilter.missing===k?' selected':''}>${v}</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Region</label>
+              <select onchange="supplierFilter.region=this.value;renderSuppliers(document.getElementById('page-suppliers'))">
+                <option value="">All</option>
+                ${["EU","Asia","MENA","Africa","Americas"].map(r=>`<option${supplierFilter.region===r?' selected':''}>${r}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="lbl">Tier</label>
+              <select onchange="supplierFilter.tier=this.value;renderSuppliers(document.getElementById('page-suppliers'))">
+                <option value="">All</option>
+                ${[1,2,3].map(t=>`<option value="${t}"${supplierFilter.tier==t?' selected':''}>Tier ${t}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="field"><label class="lbl">EUDR in scope</label>
+            <select onchange="supplierFilter.eudr=this.value;renderSuppliers(document.getElementById('page-suppliers'))">
+              <option value="">All</option>
+              <option value="yes"${supplierFilter.eudr==='yes'?' selected':''}>Yes — EUDR scope</option>
+              <option value="no"${supplierFilter.eudr==='no'?' selected':''}>No</option>
+            </select>
+          </div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${filtered.length} of ${SUPPLIERS.length} suppliers · sorted by risk</div>
+        </div>
+
+        <!-- Supplier list -->
+        <div>
+          ${filtered.map(s=>{
+            const risk=calcRisk(s);
+            const pct=completeness(s);
+            const cfg=STATUS_CFG[s.status]||STATUS_CFG.not_started;
+            const cr=COUNTRY_RISK[s.country]||"MEDIUM";
+            const isSel=selectedSupplier?.id===s.id;
+            return `
+              <div style="border:1px solid var(--border);border-left:3px solid ${riskColor(risk)};background:${isSel?'#EFF6FF':'#fff'};padding:1rem 1.1rem;margin-bottom:.65rem;cursor:pointer${s.status==='complete'?';opacity:.55':''}" onclick="${s.status!=='complete'?`selectSupplier(${s.id})`:''}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem">
+                  <div>
+                    <div style="font-size:.9rem;color:var(--navy);font-weight:500">${s.name}</div>
+                    <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.1rem">${s.country} · ${s.region} · Tier ${s.tier} · ${s.type}</div>
+                  </div>
+                  <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+                    <div style="display:flex;align-items:center;gap:.3rem;padding:.25rem .55rem;background:${SUS_BG[risk>=7?'LOW':risk>=4?'MEDIUM':'HIGH']||'rgba(16,185,129,.08)'}">
+                      <span style="font-family:var(--serif);font-size:1.1rem;color:${riskColor(risk)};line-height:1">${risk}</span>
+                      <div><div style="font-family:var(--mono);font-size:.5rem;color:${riskColor(risk)};font-weight:700">${riskLabel(risk)}</div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted)">risk</div></div>
+                    </div>
+                    <span style="font-family:var(--mono);font-size:.55rem;padding:.2rem .5rem;background:${cfg.bg};color:${cfg.color}">${cfg.label}</span>
+                  </div>
+                </div>
+
+                <!-- Completeness bar -->
+                <div style="margin-bottom:.5rem">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+                    <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Data completeness</span>
+                    <span style="font-family:var(--mono);font-size:.55rem;font-weight:700;color:${pct===100?'#10B981':pct>=60?'#F59E0B':'#EF4444'}">${pct}%</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${pct===100?'#10B981':pct>=60?'#F59E0B':'#EF4444'}"></div></div>
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
+                  ${s.eudrScope?`<span class="tag tag-amber">⚠ EUDR</span>`:''}
+                  ${s.auditOverdue?`<span class="tag tag-red">Audit overdue</span>`:''}
+                  ${(s.certifications||[]).map(c=>`<span class="tag tag-green">${c}</span>`).join('')}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+                  ${s.missing.length===0?`<span style="font-family:var(--mono);font-size:.58rem;color:var(--green)">✓ All data received</span>`:s.missing.map(m=>`<span class="tag tag-red">${DATA_LABELS[m]||m}</span>`).join('')}
+                </div>
+
+                ${isSel?`<div id="nudge-panel-${s.id}" style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border)">${renderNudgePanel(s)}</div>`:''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectSupplier(id){
+  const s=SUPPLIERS.find(x=>x.id===id);
+  if(!s||s.status==='complete')return;
+  if(selectedSupplier?.id===id){selectedSupplier=null;nudgeResult=null;}
+  else{selectedSupplier=s;nudgeResult=null;generateNudge(s);}
+  renderSuppliers(document.getElementById('page-suppliers'));
+}
+
+function renderNudgePanel(s){
+  if(nudgeLoading) return `<div style="text-align:center;padding:1.5rem"><div class="spinner"></div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Writing nudge for ${s.name}…</div></div>`;
+  if(!nudgeResult) return `<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Generating nudge email…</div>`;
+  return `
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem">★ Nudge email</div>
+    <div class="email-box" style="font-size:.78rem;margin-bottom:.75rem">${nudgeResult}</div>
+    <div style="display:flex;gap:.65rem;flex-wrap:wrap">
+      <a href="mailto:${s.contact}?subject=Compliance+data+request&body=${encodeURIComponent(nudgeResult)}" style="padding:.45rem .9rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">Open in email →</a>
+      <button onclick="generateNudge(SUPPLIERS.find(x=>x.id===${s.id}))" style="padding:.45rem .9rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;cursor:pointer">Regenerate</button>
+    </div>
+  `;
+}
+
+async function generateNudge(s){
+  nudgeLoading=true;
+  nudgeResult=null;
+  const langMap={Portugal:"Portuguese",Germany:"German",Sweden:"Swedish",Indonesia:"Indonesian",Turkey:"Turkish",China:"Mandarin Chinese",Ghana:"English",Italy:"Italian",Sweden:"Swedish"};
+  const lang=langMap[s.country]||"English";
+  const prompt=`Write a professional, friendly supplier nudge email in ${lang} (with English translation if not English) requesting missing compliance data.
+
+Supplier: ${s.name}, ${s.country}
+Commodity: ${s.commodity}
+Missing data: ${s.missing.map(m=>DATA_LABELS[m]||m).join(", ")}
+Previous nudges sent: ${s.nudgeCount}
+Status: ${s.status}
+EUDR in scope: ${s.eudrScope?"Yes — urgent":"No"}
+
+Write a concise, professional email that:
+1. Addresses the supplier by company name
+2. Explains why this data is needed (EU regulatory compliance by December 2026)
+3. Lists exactly what is missing
+4. Gives a clear deadline (14 days)
+5. Offers help if they have questions
+6. Is warm but firm — not aggressive
+
+Keep it under 150 words. ${lang!=="English"?"Then provide an English translation.":""}`;
+  try{
+    const text=await callAPI([{role:"user",content:prompt}],800);
+    nudgeResult=text;
+  }catch(e){
+    nudgeResult="Could not generate nudge. Check connection.";
+  }
+  nudgeLoading=false;
+  const panel=document.getElementById(`nudge-panel-${s.id}`);
+  if(panel)panel.innerHTML=renderNudgePanel(s);
+}
+
+/* ═══════════════════════════════════════════════════
+   CIRCULAR GPS PAGE
+═══════════════════════════════════════════════════ */
+
+let circularLoading=false;
+
+function renderCircular(el){
+  const isBan=ESPR_BAN_CATS.includes(circularForm.category);
+  const isDisc=ESPR_DISC_CATS.includes(circularForm.category);
+  const relPartners=PARTNERS.filter(p=>!circularForm.category||p.productCategories.includes(circularForm.category)||p.productCategories.includes("Other"));
+
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Circular GPS</div>
+        <div class="page-sub">Route unsold stock across all product categories · ESPR Article 24 disclosure</div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="col-2">
+        <!-- Form -->
+        <div class="card">
+          <div class="section-tag">Route unsold stock</div>
+          <div class="field"><label class="lbl">Product name *</label><input type="text" id="c-prod" value="${circularForm.productName}" placeholder="e.g. Autumn serum, LED face masks…" oninput="circularForm.productName=this.value"></div>
+          <div class="field"><label class="lbl">Product category *</label>
+            <select id="c-cat" onchange="circularForm.category=this.value;renderCircular(document.getElementById('page-circular'))">
+              <option value="">Select category…</option>${CIRCULAR_CATEGORIES.map(c=>`<option${circularForm.category===c?' selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          ${circularForm.category?`
+            <div class="espr-banner ${isBan?'espr-red':isDisc?'espr-amber':'espr-green'}" style="margin-bottom:1rem">
+              <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${isBan?'#991B1B':isDisc?'#92400E':'#065F46'};margin-bottom:.2rem">
+                ${isBan?'⚠ Destruction ban — July 19, 2026':isDisc?'◎ ESPR disclosure required':'✓ No hard ban — circular routing recommended'}
+              </div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:${isBan?'#7F1D1D':isDisc?'#78350F':'#14532D'};line-height:1.5">
+                ${isBan?'Large companies may not destroy unsold apparel/footwear. Routing is legally mandatory.':isDisc?'You must disclose how unsold products in this category are handled annually under ESPR Article 24.':'Circular routing supports your brand sustainability positioning.'}
+              </div>
+            </div>
+          `:''}
+          <div class="field"><label class="lbl">Materials / contents</label><input type="text" id="c-mat" value="${circularForm.materials}" placeholder="e.g. Glass bottles, hyaluronic acid, plastic pumps" oninput="circularForm.materials=this.value"></div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Units *</label><input type="number" id="c-units" value="${circularForm.units}" placeholder="e.g. 200" oninput="circularForm.units=this.value"></div>
+            <div class="field"><label class="lbl">Preferred route</label>
+              <select id="c-pref" onchange="circularForm.preferredCat=this.value">
+                <option value="">Any</option>${["Recycle","Resale","Donation","Repair","Upcycle"].map(c=>`<option${circularForm.preferredCat===c?' selected':''}>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="field"><label class="lbl">Discard reason (ESPR Article 24)</label>
+            <select onchange="circularForm.reason=this.value">
+              ${["End_of_season_overstock","Customer_returns","Quality_defect_minor","Quality_defect_major","Regulatory_non_compliance","Packaging_damage","Labelling_update_required","Sample_or_testing_stock","Near_expiry_date","Reformulation_or_discontinuation","Other"].map(r=>`<option value="${r}"${circularForm.reason===r?' selected':''}>${r.replace(/_/g,' ')}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-primary" id="c-btn" onclick="generateCircularRoutes()" ${!circularForm.productName||!circularForm.units||!circularForm.category?'disabled':''}>Find circular routes →</button>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.5rem">${relPartners.length} verified partners for ${circularForm.category||'your category'}</div>
+        </div>
+
+        <!-- Results -->
+        <div id="circular-results">
+          ${circularResult?renderCircularResults():`
+            <div class="card empty-state">
+              <div class="empty-title">Works for every product branch</div>
+              <div class="empty-sub">From unsold skincare serums to end-of-season apparel to surplus supplements — route any unsold stock and generate your ESPR disclosure.</div>
+              <div class="chips" style="justify-content:center;margin-top:1rem">
+                ${["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Electronics & Tech","Home & Design"].map(c=>`<span class="market-chip" onclick="circularForm.category='${c}';renderCircular(document.getElementById('page-circular'))">${c}</span>`).join('')}
+              </div>
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function generateCircularRoutes(){
+  const btn=document.getElementById('c-btn');
+  if(btn){btn.disabled=true;btn.textContent='Finding routes…';}
+  circularLoading=true;
+
+  const isBan=ESPR_BAN_CATS.includes(circularForm.category);
+  const isDisc=ESPR_DISC_CATS.includes(circularForm.category);
+  const relPartners=PARTNERS.filter(p=>!circularForm.category||p.productCategories.includes(circularForm.category));
+
+  const prompt=`You are the VeyaFlow Circular GPS. Route ${circularForm.units} units of "${circularForm.productName}" (category: ${circularForm.category}, materials: ${circularForm.materials||'unspecified'}) to circular partners.
+
+${isBan?'CRITICAL: This product is subject to the EU July 2026 Textile Destruction Ban — routing is legally mandatory.':isDisc?'Note: ESPR Article 24 disclosure is required for this product category.':'Note: Circular routing is best practice for sustainability positioning.'}
+
+Discard reason: ${circularForm.reason?.replace(/_/g,' ')}
+Preferred route: ${circularForm.preferredCat||'Any'}
+
+Available partners:
+${relPartners.map(p=>`- ${p.name} (${p.city}, ${p.country}): ${p.category}, ESPR registered: ${p.espr}, buyback: ${p.buyback?'€'+p.buyback+'/unit':'none'}. ${p.description}`).join('\n')}
+
+Recommend top 3 partners. For each:
+1. Why it is the best fit for this specific product
+2. Estimated carbon saved vs landfill (kg CO2e — use 2.1kg/unit baseline)
+3. ESPR compliance documentation they provide
+4. Routing recommendation: LEAD, SECONDARY, or HOLD
+
+Format as 3 numbered recommendations.`;
+
+  try{
+    const text=await callAPI([{role:"user",content:prompt}]);
+    const parts=text.split(/\n(?=\d+\.\s)/g).filter(s=>s.trim().length>20).slice(0,3);
+    const routes=parts.map((p,i)=>{
+      const partner=relPartners[i]||relPartners[0]||PARTNERS[0];
+      return{partner,analysis:p.replace(/^\d+\.\s/,'').trim(),carbonSaved:Math.round(parseInt(circularForm.units||100)*(1.8+i*0.3)*10)/10,recommendation:["LEAD","SECONDARY","HOLD"][i]};
+    });
+    circularResult={routes,units:circularForm.units,category:circularForm.category,isBan,isDisc};
+    savePageState('ns_circularForm',circularForm);
+    savePageState('ns_circularResult',circularResult);
+  }catch(e){
+    circularResult=null;
+    alert('Could not find routes: '+e.message);
+  }
+  circularLoading=false;
+  if(btn){btn.disabled=false;btn.textContent='Find circular routes →';}
+  const resEl=document.getElementById('circular-results');
+  if(resEl)resEl.innerHTML=circularResult?renderCircularResults():'';
+}
+
+function renderCircularResults(){
+  if(!circularResult)return'';
+  const r=circularResult;
+  const REC_COLORS={LEAD:"#10B981",SECONDARY:"#F59E0B",HOLD:"#9A9489"};
+  const totalCO2=r.routes.reduce((a,x)=>a+x.carbonSaved,0).toFixed(1);
+  let selectedRoute=null;
+
+  return `
+    <div class="grid-3" style="margin-bottom:1rem">
+      <div class="stat-card" style="color:var(--navy)"><div class="stat-num" style="color:var(--navy)">${r.units}</div><div class="stat-label">Units routed</div></div>
+      <div class="stat-card" style="color:var(--green)"><div class="stat-num" style="color:var(--green)">${totalCO2}kg</div><div class="stat-label">CO₂ saved</div></div>
+      <div class="stat-card" style="color:var(--green)"><div class="stat-num" style="color:var(--green)" style="font-size:1.2rem">${r.isBan?'Ban ✓':r.isDisc?'Disc ✓':'Best ✓'}</div><div class="stat-label">ESPR status</div></div>
+    </div>
+    ${r.routes.map((rt,i)=>`
+      <div style="border:1px solid var(--border);border-left:3px solid ${REC_COLORS[rt.recommendation]};background:#fff;padding:1rem 1.1rem;margin-bottom:.65rem;cursor:pointer" onclick="this.querySelector('.route-detail').style.display=this.querySelector('.route-detail').style.display==='none'?'block':'none'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span class="tag" style="background:${CAT_COLORS[rt.partner.category]||'#EDE9E1'};color:${CAT_TEXT[rt.partner.category]||'#333'}">${rt.partner.category}</span>
+            <span style="font-size:.9rem;color:var(--navy)">${rt.partner.name}</span>
+          </div>
+          <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap">
+            ${rt.partner.buyback?`<span class="tag tag-green">+€${rt.partner.buyback}/unit</span>`:''}
+            ${rt.partner.espr?`<span class="tag tag-blue">ESPR ✓</span>`:''}
+            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${REC_COLORS[rt.recommendation]}">${rt.recommendation}</span>
+          </div>
+        </div>
+        <div style="font-family:var(--sans);font-size:.72rem;color:#666;line-height:1.6;margin-bottom:.4rem">${rt.partner.description}</div>
+        <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted)">${rt.partner.city}, ${rt.partner.country} · ${rt.carbonSaved} kg CO₂e saved</div>
+        <div class="route-detail" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">
+          <div class="prose" style="font-size:.78rem">${rt.analysis}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);margin-top:.5rem">Click for full analysis →</div>
+      </div>
+    `).join('')}
+    <button class="btn-outline" onclick="circularResult=null;renderCircular(document.getElementById('page-circular'))">← New route</button>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   MANUFACTURER FINDER PAGE
+═══════════════════════════════════════════════════ */
+
+
+const MFR_TYPES=["Contract Manufacturer","Ingredient Supplier","Fabric Supplier","Packaging Supplier"];
+const MFR_MARKETS_LIST=["Sweden","Denmark","Germany","Norway","United Kingdom","Netherlands","France","United States","Australia"];
+const MFR_CATS=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor"];
+
+function getFilteredMfrs(){
+  savePageState('ns_findForm',findForm);
+  return MANUFACTURERS.filter(m=>{
+    const q=findForm.query.toLowerCase();
+    const mQ=!q||[m.name,m.country,m.city,m.type,...m.specialties,...m.certifications].some(x=>x.toLowerCase().includes(q));
+    const mC=!findForm.category||m.categories.includes(findForm.category);
+    const mM=!findForm.targetMarket||m.markets.includes(findForm.targetMarket);
+    const mS=!findForm.sustainability||m.sustainability===findForm.sustainability;
+    const mMoq=!findForm.maxMoq||m.moq<=parseInt(findForm.maxMoq);
+    const mT=!findForm.mfrType||m.type===findForm.mfrType;
+    return mQ&&mC&&mM&&mS&&mMoq&&mT;
+  }).sort((a,b)=>calcSusScore(b)-calcSusScore(a));
+}
+
+function renderFind(el){
+  findForm.category=findForm.category||brand?.category||'';
+  findForm.targetMarket=findForm.targetMarket||brand?.targetMarkets?.[0]||'';
+
+  const filtered=getFilteredMfrs();
+  const compareItems=compareListIds.map(id=>MANUFACTURERS.find(m=>m.id===id)).filter(Boolean);
+
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Manufacturer Finder</div>
+        <div class="page-sub">${MANUFACTURERS.length} verified manufacturers · Sustainability scored · Market-readiness matched</div>
+      </div>
+      ${compareListIds.length>=2?`<button class="btn-${compareMode?'outline':'gold'}" onclick="compareMode=!compareMode;renderFind(document.getElementById('page-find'))">${compareMode?'← Back to list':`Compare ${compareListIds.length} selected →`}</button>`:''}
+    </div>
+    <div class="content">
+      ${compareMode&&compareItems.length>=2?renderCompareTable(compareItems):renderFindList(filtered,compareItems)}
+    </div>
+  `;
+}
+
+function renderFindList(filtered,compareItems){
+  return `
+    <div class="col-filter">
+      <!-- Filters -->
+      <div>
+        <div class="card">
+          ${brand?`<div style="padding:.5rem .75rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--gold)">◎ Pre-filled from ${brand.name}'s profile</div>`:''}
+          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.85rem">Filter ${MANUFACTURERS.length} manufacturers</div>
+          <div style="position:relative;margin-bottom:.85rem">
+            <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">⌕</span>
+            <input type="text" value="${findForm.query}" placeholder="Name, country, certification…" style="padding-left:2.1rem" oninput="findForm.query=this.value;renderFind(document.getElementById('page-find'))">
+          </div>
+          <div class="field"><label class="lbl">Category</label>
+            <select onchange="findForm.category=this.value;renderFind(document.getElementById('page-find'))">
+              <option value="">All categories</option>${MFR_CATS.map(c=>`<option${findForm.category===c?' selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="lbl">Type</label>
+            <select onchange="findForm.mfrType=this.value;renderFind(document.getElementById('page-find'))">
+              <option value="">All types</option>${MFR_TYPES.map(t=>`<option${findForm.mfrType===t?' selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label class="lbl">Target market</label>
+            <select onchange="findForm.targetMarket=this.value;renderFind(document.getElementById('page-find'))">
+              <option value="">Any market</option>${MFR_MARKETS_LIST.map(m=>`<option${findForm.targetMarket===m?' selected':''}>${m}</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Sustainability</label>
+              <select onchange="findForm.sustainability=this.value;renderFind(document.getElementById('page-find'))">
+                <option value="">Any</option><option value="HIGH"${findForm.sustainability==='HIGH'?' selected':''}>High only</option><option value="MEDIUM"${findForm.sustainability==='MEDIUM'?' selected':''}>Medium+</option>
+              </select>
+            </div>
+            <div class="field"><label class="lbl">Max MOQ</label>
+              <select onchange="findForm.maxMoq=this.value;renderFind(document.getElementById('page-find'))">
+                <option value="">Any</option>
+                ${[100,300,500,1000,5000].map(n=>`<option value="${n}"${findForm.maxMoq==n?' selected':''}>≤ ${n.toLocaleString()}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);padding-top:.75rem;border-top:1px solid var(--border)">${filtered.length} of ${MANUFACTURERS.length} · sorted by sustainability</div>
+        </div>
+
+        ${compareListIds.length>0?`
+          <div class="card" style="background:#EFF6FF;border-color:#BFDBFE">
+            <div style="font-family:var(--mono);font-size:.58rem;color:var(--blue);margin-bottom:.5rem">Comparing ${compareListIds.length}/3 selected</div>
+            ${compareItems.map(m=>`<div style="font-family:var(--sans);font-size:.7rem;color:var(--navy)">· ${m.name}</div>`).join('')}
+            ${compareListIds.length>=2?`<button class="btn-primary" style="margin-top:.65rem;font-size:.6rem;padding:.5rem .75rem" onclick="compareMode=true;renderFind(document.getElementById('page-find'))">Compare now →</button>`:''}
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.35rem">Select up to 3 manufacturers</div>
+          </div>
+        `:''}
+      </div>
+
+      <!-- Results -->
+      <div>
+        ${filtered.length===0?`<div class="card empty-state"><div class="empty-title">No matches</div><div class="empty-sub">Try broadening your filters</div></div>`:''}
+        ${filtered.map(mfr=>{
+          const score=calcSusScore(mfr);
+          const readiness=calcReadiness(mfr,findForm.targetMarket);
+          const isSel=findSelected===mfr.id;
+          const inCmp=compareListIds.includes(mfr.id);
+          return `
+            <div class="mfr-card" style="border-left-color:${SUS_COLORS[mfr.sustainability]}${isSel?';background:#EFF6FF':''}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.55rem;flex-wrap:wrap;gap:.4rem">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:.92rem;color:var(--navy);font-weight:500">${mfr.name}</div>
+                  <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.1rem">${mfr.city}, ${mfr.country} · ${mfr.type}</div>
+                </div>
+                <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;flex-shrink:0">
+                  <div style="display:flex;align-items:center;gap:.3rem;padding:.25rem .55rem;background:${SUS_BG[mfr.sustainability]}">
+                    <span style="font-family:var(--serif);font-size:1rem;color:${SUS_COLORS[mfr.sustainability]};line-height:1">${score}</span>
+                    <div><div style="font-family:var(--mono);font-size:.5rem;color:${SUS_COLORS[mfr.sustainability]};font-weight:700">${mfr.sustainability}</div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted)">sus.</div></div>
+                  </div>
+                  ${readiness!==null?`<div style="padding:.25rem .55rem;background:#EFF6FF;border:1px solid #BFDBFE"><div style="font-family:var(--mono);font-size:.5rem;color:var(--blue);font-weight:700">${readiness}% ready</div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted)">${findForm.targetMarket}</div></div>`:''}
+                  <button class="compare-btn${inCmp?' active':''}" onclick="event.stopPropagation();toggleFindCompare(${mfr.id})">${inCmp?'✓ Comparing':'+ Compare'}</button>
+                </div>
+              </div>
+              <div style="font-family:var(--sans);font-size:.75rem;color:#555;line-height:1.65;margin-bottom:.55rem">${mfr.description}</div>
+              <div class="chips" style="margin-bottom:.5rem">
+                ${mfr.certifications.map(c=>`<span class="tag ${CERT_SCORES[c]>=4?'tag-green':CERT_SCORES[c]>=3?'tag-blue':'tag-gray'}">${c}</span>`).join('')}
+                ${mfr.eudrScope?`<span class="tag tag-amber">⚠ EUDR scope</span>`:''}
+              </div>
+              <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:.5rem">
+                ${[['MOQ',mfr.moq.toLocaleString()+' units'],['Lead time',mfr.leadWeeks+' weeks'],['Capacity',mfr.annualCapacity],['Markets',mfr.markets.slice(0,3).join(', ')+(mfr.markets.length>3?' +'+( mfr.markets.length-3):'')]].map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${l}</div><div style="font-family:var(--sans);font-size:.7rem;color:#333">${v}</div></div>`).join('')}
+              </div>
+              <div style="display:flex;gap:.65rem;align-items:center;flex-wrap:wrap">
+                <button class="btn-outline" style="font-size:.58rem;padding:.35rem .7rem" onclick="toggleFindAi(${mfr.id})">${isSel&&findAiCache[mfr.id]?'Hide assessment':findLoadingId===mfr.id?'Loading…':'AI assessment →'}</button>
+                <a href="https://${mfr.website}" target="_blank" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-decoration:none">↗ ${mfr.website}</a>
+                <a href="mailto:${mfr.contact}?subject=${encodeURIComponent('Partnership enquiry — ' + (brand?.name||'Our brand') + ' x ' + mfr.name)}&body=${encodeURIComponent('Dear ' + mfr.name + ' team,\n\nMy name is ' + (brand?.userName||'[Your name]') + ' from ' + (brand?.name||'[Brand name]') + ' (' + (brand?.website||'[website]') + '), a ' + (brand?.category||'consumer brand') + ' based in ' + (brand?.currentMarket||'Sweden') + '.\n\nWe are currently exploring manufacturing partners for our product range and your company came up as a strong fit based on your sustainability credentials and market experience.\n\nWe would love to learn more about:\n- Current MOQ and lead times\n- Certifications and compliance documentation\n- Sampling process and costs\n- Experience with brands entering ' + (brand?.targetMarkets?.[0]||'European') + ' markets\n\nWould you be available for a brief call this week or next?\n\nBest regards,\n' + (brand?.userName||'[Your name]') + '\n' + (brand?.name||'[Brand name]'))}" style="font-family:var(--mono);font-size:.58rem;color:var(--gold);text-decoration:none">✉ Contact</a>
+              </div>
+              ${isSel?`<div id="ai-panel-${mfr.id}" style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border)">${renderMfrAiPanel(mfr)}</div>`:''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function toggleFindCompare(id){
+  const i=compareListIds.indexOf(id);
+  if(i>=0)compareListIds.splice(i,1);
+  else if(compareListIds.length<3)compareListIds.push(id);
+  renderFind(document.getElementById('page-find'));
+}
+
+async function toggleFindAi(id){
+  if(findSelected===id&&findAiCache[id]){findSelected=null;}
+  else{
+    findSelected=id;
+    if(!findAiCache[id]){
+      findLoadingId=id;
+      renderFind(document.getElementById('page-find'));
+      const mfr=MANUFACTURERS.find(m=>m.id===id);
+      if(!mfr)return;
+      try{
+        const text=await callAPI([{role:"user",content:`You are a Nordic brand export consultant. Assess this manufacturer.
+Manufacturer: ${mfr.name}, ${mfr.city}, ${mfr.country}
+Type: ${mfr.type} | Specialties: ${mfr.specialties.join(', ')}
+Certifications: ${mfr.certifications.join(', ')}
+MOQ: ${mfr.moq} | Lead time: ${mfr.leadWeeks} weeks | Capacity: ${mfr.annualCapacity}
+Brand category: ${findForm.category||brand?.category||'Skincare & Beauty'}
+Target market: ${findForm.targetMarket||brand?.targetMarkets?.[0]||'EU'}
+Brand sustainability goals: ${brand?.sustainabilityGoals?.join(', ')||'sustainability-focused'}
+
+Write assessment with these EXACT headers on their own line:
+SUSTAINABILITY FIT — 2-3 sentences
+MARKET READINESS — 2-3 sentences  
+WHAT TO ASK FIRST — 3 specific questions
+RED FLAGS — concerns or none
+VERDICT — one sentence`}]);
+        findAiCache[id]=text;
+      }catch(e){findAiCache[id]='Could not load assessment.';}
+      findLoadingId=null;
+    }
+  }
+  renderFind(document.getElementById('page-find'));
+}
+
+function renderMfrAiPanel(mfr){
+  if(findLoadingId===mfr.id)return`<div style="text-align:center;padding:1.5rem"><div class="spinner"></div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Analysing ${mfr.name}…</div></div>`;
+  if(!findAiCache[mfr.id])return'';
+  const text=findAiCache[mfr.id];
+  const sections=["SUSTAINABILITY FIT","MARKET READINESS","WHAT TO ASK FIRST","RED FLAGS","VERDICT"];
+  const colors={"SUSTAINABILITY FIT":"#10B981","MARKET READINESS":var_navy,"WHAT TO ASK FIRST":"#C4A882","RED FLAGS":"#EF4444","VERDICT":"#1E3A5F"};
+  let html=`<div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">★ AI assessment — ${mfr.name}</div>`;
+  sections.forEach(s=>{
+    const parts=text.split(new RegExp(s+"[^\\n]*\\n","i"));
+    const content=parts[1]?.split(/\n[A-Z ]{4,}[—:\-]/)[0]?.trim();
+    if(content&&content.length>5){
+      html+=`<div class="analysis-section" style="border-left-color:${colors[s]||'#EDE9E1'};margin-bottom:.65rem"><div class="analysis-label" style="color:${colors[s]||'var(--muted)'}">${s}</div><div class="analysis-text">${content}</div></div>`;
+    }
+  });
+  return html;
+}
+
+
+function renderCompareTable(items){
+  const rows=[
+    {label:"Type",fn:m=>m.type},
+    {label:"Sustainability",fn:m=>`<span style="color:${SUS_COLORS[m.sustainability]};font-weight:700">${m.sustainability} (${calcSusScore(m)}/20)</span>`},
+    {label:"MOQ",fn:m=>m.moq.toLocaleString()+' units'},
+    {label:"Lead time",fn:m=>m.leadWeeks+' weeks'},
+    {label:"Capacity",fn:m=>m.annualCapacity},
+    {label:"Market readiness",fn:m=>{const r=calcReadiness(m,findForm.targetMarket);return r!==null?`<span style="color:${r>=75?'#10B981':r>=50?'#F59E0B':'#EF4444'};font-weight:700">${r}%${findForm.targetMarket?' ('+findForm.targetMarket+')':''}</span>`:'—';}},
+    {label:"Key certifications",fn:m=>m.certifications.slice(0,4).map(c=>`<span class="tag ${CERT_SCORES[c]>=4?'tag-green':'tag-blue'}" style="margin-right:.2rem">${c}</span>`).join('')},
+    {label:"EUDR scope",fn:m=>m.eudrScope?`<span style="color:#F59E0B">⚠ Yes</span>`:`<span style="color:#10B981">✓ No</span>`},
+    {label:"Specialties",fn:m=>m.specialties.slice(0,3).join(', ')},
+  ];
+
+  return `
+    <div style="overflow-x:auto;margin-bottom:1.25rem">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>ATTRIBUTE</th>
+            ${items.map(m=>`<th class="mfr-name">${m.name}<div style="font-family:var(--mono);font-size:.52rem;color:rgba(255,255,255,.4);margin-top:.15rem;font-weight:normal">${m.city}, ${m.country}</div></th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row=>`
+            <tr>
+              <td class="row-label">${row.label}</td>
+              ${items.map(m=>`<td>${row.fn(m)}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${!compareAiResult&&!compareAiLoading?`
+      <button class="btn-primary" style="max-width:400px" onclick="runMfrCompareAi()">Generate AI comparison of ${items.map(m=>m.name).join(' vs ')} →</button>
+    `:''}
+    ${compareAiLoading?`<div style="text-align:center;padding:2rem"><div class="spinner"></div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Comparing manufacturers…</div></div>`:''}
+    ${compareAiResult?`
+      <div class="card">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.85rem">★ AI Comparison — ${items.map(m=>m.name).join(' vs ')}</div>
+        <div class="prose">${compareAiResult}</div>
+        <div style="display:flex;gap:.65rem;margin-top:1rem;flex-wrap:wrap">
+          ${items.map(m=>`<a href="mailto:${m.contact}?subject=${encodeURIComponent('Partnership enquiry — ' + (brand?.name||'Our brand') + ' x ' + m.name)}&body=${encodeURIComponent('Dear ' + m.name + ' team,\n\nI am reaching out from ' + (brand?.name||'[Brand name]') + ' regarding a potential manufacturing partnership.\n\nWe would love to learn more about your capabilities, MOQ, and process for onboarding new brands.\n\nBest regards,\n' + (brand?.userName||'[Your name]'))}" style="padding:.45rem .9rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;text-decoration:none">Email ${m.name.split(' ')[0]} →</a>`).join('')}
+        </div>
+      </div>
+    `:''}
+    <div style="margin-top:1rem"><button class="btn-outline" onclick="compareMode=false;compareAiResult=null;renderFind(document.getElementById('page-find'))">← Back to list</button></div>
+  `;
+}
+
+async function runMfrCompareAi(){
+  compareAiLoading=true;
+  renderFind(document.getElementById('page-find'));
+  const items=compareListIds.map(id=>MANUFACTURERS.find(m=>m.id===id)).filter(Boolean);
+  const prompt=`Compare these manufacturers for a Nordic brand.
+Brand category: ${findForm.category||brand?.category||'Skincare & Beauty'}
+Target market: ${findForm.targetMarket||brand?.targetMarkets?.[0]||'EU'}
+Brand sustainability goals: ${brand?.sustainabilityGoals?.join(', ')||'sustainability-focused'}
+
+Manufacturers:
+${items.map((m,i)=>`${i+1}. ${m.name} (${m.city}, ${m.country}) — ${m.type}
+   Certs: ${m.certifications.join(', ')} | MOQ: ${m.moq} | Lead: ${m.leadWeeks}w | Sus: ${m.sustainability}`).join('\n')}
+
+Provide:
+WINNER: Which manufacturer wins overall and why (2 sentences)
+SUSTAINABILITY: Rank by sustainability fit (2-3 sentences)  
+MARKET READINESS: Most ready for ${findForm.targetMarket||'target market'} (2 sentences)
+COST & SPEED: Compare MOQ, lead time, value (2 sentences)
+RECOMMENDATION: Contact order — first, second, third and why (3 bullets)
+
+Use manufacturer names throughout. Be direct.`;
+  try{
+    const text=await callAPI([{role:"user",content:prompt}],1200);
+    compareAiResult=text;
+  }catch(e){compareAiResult='Could not generate comparison.';}
+  compareAiLoading=false;
+  renderFind(document.getElementById('page-find'));
+}
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+function init(){
+  loadState();
+  buildNav();
+  updateSidebarBrand();
+  renderRegStrip();
+  showPage('home');
+}
+
+init();
+</script>
+</body>
+</html>
