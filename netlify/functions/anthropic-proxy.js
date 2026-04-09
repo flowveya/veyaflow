@@ -1,4 +1,3 @@
-// netlify/functions/anthropic-proxy.js
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -17,17 +16,23 @@ exports.handler = async (event) => {
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
   if (!ANTHROPIC_API_KEY) {
     return {
       statusCode: 500,
       headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: 'API key not configured. Add ANTHROPIC_API_KEY to Netlify environment variables.' })
+      body: JSON.stringify({ error: 'API key not configured' })
     };
   }
 
   try {
     const body = JSON.parse(event.body);
+
+    // Force shorter responses to stay within Netlify free tier 10s timeout
+    const requestBody = {
+      ...body,
+      max_tokens: Math.min(body.max_tokens || 1024, 1024),
+      model: 'claude-haiku-4-5-20251001',  // Fastest model
+    };
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -36,7 +41,7 @@ exports.handler = async (event) => {
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
