@@ -719,37 +719,35 @@ const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare
 function buildNav(){
   const visibleNav = getVisibleNav();
   const nav=document.getElementById('sidebar-nav');
-
-  // Stage label
   const stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
-  const stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
-  const currentStage = brand?.stage||'trading';
+  const currentStage = brand&&brand.stage?brand.stage:'trading';
+  let html='';
+  if(brand){
+    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+(stageLabels[currentStage]||'Trading')+' · '+(brand.category||'')+'</div>';
+  }
+  visibleNav.forEach(function(n){
+    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(''+n.id+'')">';
+    html+='<span class="nav-icon">'+n.icon+'</span>';
+    html+='<span class="nav-label">'+n.label+'</span>';
+    if(n.badge) html+='<span style="font-family:var(--mono);font-size:.48rem;background:var(--gold);color:var(--navy);padding:.1rem .3rem;letter-spacing:.04em;font-weight:700">'+n.badge+'</span>';
+    if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
+    if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+    html+='</div>';
+  });
+  nav.innerHTML=html;
 
-  nav.innerHTML=`
-    ${brand?`<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:${stageColors[currentStage]||'var(--muted)'};border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">${stageLabels[currentStage]||'Trading'} · ${brand.category||''}</div>`:''}
-    ${visibleNav.map(n=>`
-      <div class="nav-item" id="nav-${n.id}" onclick="showPage('${n.id}')">
-        <span class="nav-icon">${n.icon}</span>
-        <span class="nav-label">${n.label}</span>
-        ${n.badge?`<span style="font-family:var(--mono);font-size:.48rem;background:var(--gold);color:var(--navy);padding:.1rem .3rem;letter-spacing:.04em;font-weight:700">${n.badge}</span>`:''}
-        ${n.id==='home'&&savedReports.length>0?`<span class="nav-badge">${savedReports.length}</span>`:''}
-        ${n.id==='suppliers'?`<span class="nav-badge">2</span>`:''}
-      </div>
-    `).join('')}
-  `;
-
-  // Mobile bottom nav — show max 5 most relevant items
   const mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
-    const mobItems = visibleNav.slice(0,5);
-    mobnav.innerHTML=mobItems.map(n=>`
-      <div class="mob-nav-item" id="mobnav-${n.id}" onclick="showPage('${n.id}')">
-        ${n.id==='home'&&savedReports.length>0?`<span class="mob-badge">${savedReports.length}</span>`:''}
-        ${n.id==='suppliers'?`<span class="mob-badge">2</span>`:''}
-        <span class="mob-nav-icon">${n.icon}</span>
-        <span class="mob-nav-label">${MOB_NAV_LABELS[n.id]||n.label}</span>
-      </div>
-    `).join('');
+    let mobHtml='';
+    visibleNav.slice(0,5).forEach(function(n){
+      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(''+n.id+'')">';
+      if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
+      if(n.id==='suppliers') mobHtml+='<span class="mob-badge">2</span>';
+      mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
+      mobHtml+='<span class="mob-nav-label">'+(MOB_NAV_LABELS[n.id]||n.label)+'</span>';
+      mobHtml+='</div>';
+    });
+    mobnav.innerHTML=mobHtml;
   }
 }
 
@@ -1917,7 +1915,7 @@ function renderBizCaseResult(){
   if(isError) return `<div style="color:var(--red);padding:1rem;background:#FEF2F2;font-family:var(--sans);font-size:.82rem">${bizCaseState.result.replace('ERROR:','')}</div>`;
 
   const sections = bizCaseState.result.split(/^##\s/m).filter(s=>s.trim());
-  const sectionColors = [BLUE_LT||'#EFF6FF','#ECFDF5','#FFFBEB','#F5F3FF','#EFF6FF'];
+  const sectionColors = ['#EFF6FF','#ECFDF5','#FFFBEB','#F5F3FF','#EFF6FF'];
   const sectionIcons = ['🔬','📊','💆','📈','🎯'];
 
   return `
