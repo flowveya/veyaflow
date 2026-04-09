@@ -726,7 +726,7 @@ function buildNav(){
     html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+(stageLabels[currentStage]||'Trading')+' · '+(brand.category||'')+'</div>';
   }
   visibleNav.forEach(function(n){
-    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(''+n.id+'')">';
+    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(\''+n.id+'\')">';
     html+='<span class="nav-icon">'+n.icon+'</span>';
     html+='<span class="nav-label">'+n.label+'</span>';
     if(n.badge) html+='<span style="font-family:var(--mono);font-size:.48rem;background:var(--gold);color:var(--navy);padding:.1rem .3rem;letter-spacing:.04em;font-weight:700">'+n.badge+'</span>';
@@ -740,7 +740,7 @@ function buildNav(){
   if(mobnav){
     let mobHtml='';
     visibleNav.slice(0,5).forEach(function(n){
-      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(''+n.id+'')">';
+      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(\''+n.id+'\')">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
       if(n.id==='suppliers') mobHtml+='<span class="mob-badge">2</span>';
       mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
