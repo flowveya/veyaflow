@@ -7,8 +7,8 @@ exports.handler = async (event) => {
   try {
     const b = JSON.parse(event.body);
     const rb = JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: b.max_tokens || 2000,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: Math.min(b.max_tokens || 1500, 1500),
       messages: b.messages,
     });
     const result = await new Promise((resolve,reject) => {
