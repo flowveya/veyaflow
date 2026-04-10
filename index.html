@@ -164,7 +164,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* PROSE */
-  .prose { font-family: var(--sans); font-size: .83rem; color: #333; line-height: 1.85; white-space: pre-wrap; }
+  .prose { font-family: var(--sans); font-size: .83rem; color: #333; line-height: 1.85; }
 
   /* SECTION TAG */
   .section-tag { font-family: var(--mono); font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
@@ -1708,7 +1708,7 @@ Key risk to plan: [most likely obstacle and mitigation]`
         partial.innerHTML = completedSections.map(s=>`
           <div style="margin-bottom:1.5rem;padding:1rem;background:#fff;border:1px solid var(--border);border-left:3px solid var(--gold)">
             <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);font-weight:700;margin-bottom:.6rem">${s.title} \u2714</div>
-            <div style="font-family:var(--sans);font-size:.8rem;line-height:1.75;color:#333;white-space:pre-wrap">${s.content.slice(0,400)}${s.content.length>400?'...':''}</div>
+            <div style="font-family:var(--sans);font-size:.8rem;line-height:1.75;color:#333"><p style="margin:.5rem 0">${parseMarkdown(s.content.slice(0,600))}${s.content.length>600?'<span style="color:var(--muted)">...</span>':''}</p></div>
           </div>
         `).join('');
       }
@@ -1743,6 +1743,49 @@ Key risk to plan: [most likely obstacle and mitigation]`
   updateSidebarBrand();
   reportState={loading:false,result:report,sections:completedSections};
   renderPage('report');
+}
+
+
+
+function parseMarkdown(text){
+  if(!text) return '';
+  var t = text;
+  // Headers
+  t = t.replace(/^#### (.+)$/gm,'<h4 style="font-family:var(--sans);font-size:.82rem;font-weight:700;color:var(--navy);margin:1rem 0 .3rem">$1</h4>');
+  t = t.replace(/^### (.+)$/gm,'<h3 style="font-family:var(--sans);font-size:.88rem;font-weight:700;color:var(--navy);margin:1.1rem 0 .35rem">$1</h3>');
+  t = t.replace(/^## (.+)$/gm,'<h2 style="font-family:var(--serif);font-size:1rem;font-weight:400;color:var(--navy);margin:1.25rem 0 .4rem;padding-bottom:.25rem;border-bottom:1px solid var(--border)">$1</h2>');
+  t = t.replace(/^# (.+)$/gm,'<h2 style="font-family:var(--serif);font-size:1.05rem;font-weight:400;color:var(--navy);margin:1.25rem 0 .4rem">$1</h2>');
+  // Bold and italic
+  t = t.replace(/\*\*([^*]+?)\*\*/g,'<strong style="color:var(--navy)">$1</strong>');
+  t = t.replace(/\*([^*]+?)\*/g,'<em>$1</em>');
+  // Horizontal rules
+  t = t.replace(/^---+$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:.75rem 0">');
+  // Status badges
+  t = t.replace(/\bSTRONG FIT\b/g,'<span style="display:inline-block;background:#ECFDF5;color:#065F46;font-family:var(--mono);font-size:.65rem;font-weight:700;padding:.1rem .5rem;border:1px solid #A7F3D0">STRONG FIT</span>');
+  t = t.replace(/\bPOSSIBLE FIT\b/g,'<span style="display:inline-block;background:#FFFBEB;color:#92400E;font-family:var(--mono);font-size:.65rem;font-weight:700;padding:.1rem .5rem;border:1px solid #FCD34D">POSSIBLE FIT</span>');
+  t = t.replace(/\bNOT YET\b/g,'<span style="display:inline-block;background:#FEF2F2;color:#991B1B;font-family:var(--mono);font-size:.65rem;font-weight:700;padding:.1rem .5rem;border:1px solid #FCA5A5">NOT YET</span>');
+  t = t.replace(/\bSTRONG FIT\b/g,'<span style="display:inline-block;background:#ECFDF5;color:#065F46;font-family:var(--mono);font-size:.65rem;font-weight:700;padding:.1rem .5rem">STRONG FIT</span>');
+  t = t.replace(/\bCRITICAL\b/g,'<span style="display:inline-block;background:#FEF2F2;color:#991B1B;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">CRITICAL</span>');
+  t = t.replace(/\bIMPORTANT\b/g,'<span style="display:inline-block;background:#FFFBEB;color:#92400E;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">IMPORTANT</span>');
+  // Score badges
+  t = t.replace(/(\d+)\/10/g,'<span style="display:inline-block;background:var(--navy);color:var(--gold);font-family:var(--mono);font-size:.85rem;font-weight:700;padding:.1rem .4rem">$1/10</span>');
+  // Bullet points
+  t = t.replace(/^[-*] (.+)$/gm,'<div style="display:flex;gap:.5rem;padding:.2rem 0"><span style="color:var(--gold);flex-shrink:0;font-weight:700">&#8211;</span><span>$1</span></div>');
+  // Numbered list items
+  t = t.replace(/^(\d+)\. (.+)$/gm,'<div style="display:flex;gap:.5rem;padding:.2rem 0"><span style="color:var(--navy);flex-shrink:0;font-family:var(--mono);font-size:.75rem;font-weight:700;min-width:1.2rem">$1.</span><span>$2</span></div>');
+  // Table rows — convert | col | col | to styled rows
+  t = t.replace(/^\|(.+)\|$/gm, function(match, inner){
+    var cells = inner.split('|').map(function(c){ return c.trim(); });
+    if(cells.every(function(c){ return /^[-: ]+$/.test(c); })) return '';
+    return '<div style="display:grid;grid-template-columns:repeat('+cells.length+',1fr);border-bottom:1px solid var(--border)">' +
+      cells.map(function(c,i){
+        return '<div style="padding:.4rem .6rem;font-family:var(--sans);font-size:.78rem;'+(i===0?'font-weight:600;color:var(--navy)':'color:#333')+'">'+c+'</div>';
+      }).join('') + '</div>';
+  });
+  // Paragraph breaks
+  t = t.replace(/\n\n/g,'</p><p style="margin:.5rem 0">');
+  t = t.replace(/\n/g,'<br>');
+  return t;
 }
 
 
@@ -1807,7 +1850,7 @@ function renderReportResult(){
             <div style="font-family:var(--mono);font-size:.8rem;color:${sectionAccents[i]||'#1E3A5F'};font-weight:600;opacity:.5">${String(i+1).padStart(2,'0')}</div>
             <div class="report-section-title" style="margin-bottom:0">${s.title}</div>
           </div>
-          <div class="prose">${s.content}</div>
+          <div style="font-family:var(--sans);font-size:.82rem;color:#333;line-height:1.85"><p style="margin:.5rem 0">${parseMarkdown(s.content)}</p></div>
         </div>
       `).join('')}
     </div>
