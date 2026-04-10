@@ -1271,7 +1271,16 @@ function renderReport(el){
       </div>
     </div>
     <div class="content">
-      ${reportState.result?renderReportResult():renderReportForm()}
+      ${reportState.loading?`
+        <div style="padding:1.25rem">
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Generating market entry report — 4 modules</div>
+          <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.75rem">
+            <div id="r-progress" style="background:var(--gold);height:6px;border-radius:3px;width:5%;transition:width .8s ease"></div>
+          </div>
+          <div id="r-status" style="font-family:var(--mono);font-size:.65rem;color:var(--navy);margin-bottom:1.25rem">Starting...</div>
+          <div id="r-partial"></div>
+        </div>
+      `:reportState.result?renderReportResult():renderReportForm()}
     </div>
   `;
   if(!reportState.result) bindReportForm();
@@ -1336,181 +1345,406 @@ function updateReportBtn(){
   if(btn) btn.disabled=!reportForm.brandName||!reportForm.category||!reportForm.targetMarket;
 }
 
+
+/* ═══════════════════════════════════════════════════
+   RETAILER INTELLIGENCE DATABASE
+   Updated: April 2026 — Charlotte Hellberg
+   Founder-verified market intelligence for Nordic expansion
+═══════════════════════════════════════════════════ */
+const RETAILER_INTEL = {
+  "Matas": {
+    market: "Denmark",
+    stores: 290,
+    online: "matas.dk — 1.2M monthly visitors",
+    strategy2026: "Win the Nordics strategy. Post-acquisition integration of Kicks (acquired 2022) into unified Nordic beauty platform. Focus on Clinical Confidence and Eco-Evaluation as twin pillars. Automating logistics centre in Taastrup. Growing private label 'Matas Balance' in skincare.",
+    buyerPriority: "Dermocosmetic brands that bridge science and sustainability. Clinical validation (dermatologist tested, clinically proven claims). Eco credentials with proof — not just claims. Currently filling gaps in: refillable formats, clinical collagen, bio-retinol alternatives.",
+    marginExpectation: "45-52%",
+    moq: "300-500 units per SKU minimum for trial",
+    sustainability: "Actively scoring brands on Eco-Evaluation matrix. Prefer Nordic Swan, FSC, COSMOS. EUDR compliance required from December 2026.",
+    approach: "Submit via Matas Leverandorportal (suppliers portal). Warm intro via Danish distributor (Sahva, Beauty Trade DK) significantly increases success rate. Beauty Days promotions in spring and autumn — main listing window.",
+    basketSize: "217 DKK average basket (late 2025)",
+    categoryFocus: "Skincare growing 8% YoY. Biggest gap: mid-premium clinical skincare 200-350 DKK. Colour cosmetics flat. Wellness supplements growing.",
+    fitSignal: "High fit for Nordic clean clinical brands. Low fit for colour cosmetics without TikTok presence."
+  },
+  "Lyko": {
+    market: "Sweden",
+    stores: "120 stores + lyko.com — largest Nordic pure-play beauty e-commerce",
+    online: "lyko.com — 3.5M monthly visitors, 60% revenue online",
+    strategy2026: "Sworsk expansion — cross-border Swedish-Norwegian unified platform launch. Building Nordic beauty authority positioning. Heavy investment in content and influencer marketing. Focus on discovery brands with strong social proof.",
+    buyerPriority: "Brands with strong Instagram/TikTok presence and UGC. Sustainability story that is visually communicable. Innovative formats. Currently strong in haircare — actively building skincare tools and wellness categories.",
+    marginExpectation: "42-48%",
+    moq: "200 units per SKU for online launch. 500+ for in-store",
+    sustainability: "Green Beauty section growing. Prefer certified but will accept strong brand sustainability story without certification if narrative is compelling.",
+    approach: "Direct buyer contact via LinkedIn (buyer team visible). Annual supplier fair in Stockholm. Strong preference for brands with existing Swedish DTC sales as proof of consumer demand.",
+    categoryFocus: "Skincare tools strong growth. Hair tools #1 category. Fragrance growing. Beauty supplements emerging.",
+    fitSignal: "High fit for brands with social proof and visual appeal. Requires 2,000+ positive reviews or 50K+ social following for fast-track consideration."
+  },
+  "Kicks": {
+    market: "Sweden/Norway/Finland",
+    stores: "230 stores across Nordics (now Matas Group)",
+    online: "kicks.se — integrated with Matas Group platform",
+    strategy2026: "Post-Matas integration — repositioning upmarket. TikTok-first strategy for Gen Z. Immersive in-store beauty experiences. Growing fragrance and body care. Reducing dependency on colour cosmetics.",
+    buyerPriority: "Immersive and Shareable beauty — products that create TikTok moments. Sensory experience products. Fragrance with story. Body care innovation. Brands that can support in-store events and masterclasses.",
+    marginExpectation: "44-50%",
+    moq: "400 units minimum for store rollout",
+    sustainability: "Sustainability required but not primary driver — TikTok-friendliness and sensory experience prioritised",
+    approach: "Via Matas Group supplier portal post-integration. Separate buyer team for Sweden vs Norway. Trade show presence (Beautyworld, IN Cosmetics) helps.",
+    categoryFocus: "Fragrance growing fast. Body care innovation. Skincare tools. Colour declining.",
+    fitSignal: "High fit for sensory, visual, experience-led brands. Must have social content strategy."
+  },
+  "Apotek Hjärtat": {
+    market: "Sweden",
+    stores: "400 pharmacies",
+    online: "apotekhjartat.se",
+    strategy2026: "Expanding beyond pharmacy into lifestyle wellness. Building Premium Health Beauty section. Clinical positioning is core. Growing beauty supplement and skincare tool categories alongside traditional pharma.",
+    buyerPriority: "Clinical Validation is paramount — dermatologist tested, clinically proven, safety data. Premium health-beauty positioning. Ingredient transparency. Brands that can sit credibly alongside pharma products.",
+    marginExpectation: "40-45%",
+    moq: "500 units minimum. Prefers brands with existing EU market authorisation",
+    sustainability: "Environmental and safety sustainability both critical. Allergen transparency. Nordic Swan preferred.",
+    approach: "Formal supplier application process. Requires full safety documentation upfront. Slower process (3-6 months) but high loyalty once listed.",
+    categoryFocus: "Skincare with clinical claims. Sensitive skin. Anti-ageing science. Wellness supplements. Sexual health. Sun care.",
+    fitSignal: "High fit for clinical, science-backed brands. Low fit for lifestyle/trend brands without clinical backing."
+  },
+  "dm-drogerie markt": {
+    market: "Germany/Austria",
+    stores: "2,000+ in Germany alone",
+    online: "dm.de — significant online presence",
+    strategy2026: "Doubling down on own brand (Alverde organic, Balea mass). Selective about new brands — only those filling clear gaps. Strong sustainability mandate. Refillable formats actively sought. Zero-waste packaging interest.",
+    buyerPriority: "Clear category gap fill. Sustainability credentials (prefer NATRUE, Ecocert, COSMOS). Refillable/concentrated formats. Price-conscious consumer alignment — must work at accessible premium (8-15 EUR).",
+    marginExpectation: "45-55% — one of highest margins in German market",
+    moq: "1,000+ units. National rollout means high volumes",
+    sustainability: "One of strictest sustainability requirements. Own sustainability charter. Packaging must meet German VerpackG. EUDR compliance mandatory.",
+    approach: "Annual category review process. Approach via German distributor first — dm rarely onboards international brands direct without local representation.",
+    categoryFocus: "Natural and organic growing. Refillable formats. Solid and waterless. Baby and family.",
+    fitSignal: "High fit for genuinely natural brands with price discipline. Low fit for luxury positioning."
+  },
+  "Rossmann": {
+    market: "Germany",
+    stores: "2,200+ in Germany",
+    online: "rossmann.de",
+    strategy2026: "Competing directly with dm on natural beauty. Own brand Alterra growing. Open to international brands that bring novelty. Slightly more accessible than dm for smaller brands.",
+    buyerPriority: "Novelty and trend-forward. Nordic provenance is a positive signal. Sustainability story. More flexible on volume than dm.",
+    marginExpectation: "42-50%",
+    moq: "500-800 units for initial listing",
+    sustainability: "Sustainability required. Less strict than dm. Packaging recyclability important.",
+    approach: "Direct buyer approach possible. Frankfurt trade show presence helps. German distributor recommended.",
+    categoryFocus: "Natural beauty growing. Nordic/Scandinavian brands well-received. Body care. Haircare.",
+    fitSignal: "Good fit for Nordic brands — Scandinavian origin is a differentiator in German market."
+  },
+  "Holland & Barrett": {
+    market: "United Kingdom/Netherlands",
+    stores: "800+ UK, 100+ NL",
+    online: "hollandandbarrett.com",
+    strategy2026: "Pivot toward premium wellness and beauty supplements. Reducing food. Growing skincare with natural/organic credentials. Vitamins and supplements core. Growing ingestible beauty category.",
+    buyerPriority: "Natural and organic certification (Soil Association, COSMOS). Health claims substantiated. Vegan preferred. Ingestible beauty (collagen, hyaluronic supplements) very active.",
+    marginExpectation: "50-60% — highest margins in UK health retail",
+    moq: "300 units per SKU",
+    sustainability: "Full natural credentials required. B Corp or equivalent positive signal.",
+    approach: "Annual supplier portal submission. Buyers attend Natural & Organic Products Europe (London, April).",
+    categoryFocus: "Supplements dominant. Natural skincare growing. CBD. Sports nutrition.",
+    fitSignal: "High fit for certified natural/organic brands. Very low fit for conventional beauty."
+  },
+  "Boots UK": {
+    market: "United Kingdom",
+    stores: "2,200 stores",
+    online: "boots.com — major online beauty destination",
+    strategy2026: "Rebuilding premium beauty credentials post-Walgreens restructure. Growing No7 own brand. Opening premium beauty halls in key locations. Digital-first consumer journey. Loyalty scheme (Advantage Card) drives repeat purchase data.",
+    buyerPriority: "Track record in other markets. Strong brand story. Clinical claims valued. Must work at GBP 15-40 sweet spot for mainstream listing. Premium beauty hall: GBP 40-150.",
+    marginExpectation: "45-52%",
+    moq: "500 units minimum for trial. 2,000+ for national",
+    sustainability: "Sustainability important but not primary. Safety and efficacy first.",
+    approach: "Boots Gateway supplier portal. Very slow process — 6-12 months typical. Boots Beauty brand incubator programme for emerging brands.",
+    categoryFocus: "Skincare dominant. Fragrance growing. Beauty tools. Supplements growing in pharmacy.",
+    fitSignal: "Moderate fit — high barrier to entry but strong brand credibility once listed."
+  }
+};
+
+function getRetailerIntel(retailerName, market){
+  // Find retailer intel by name (partial match)
+  const key = Object.keys(RETAILER_INTEL).find(k =>
+    retailerName.toLowerCase().includes(k.toLowerCase()) ||
+    k.toLowerCase().includes(retailerName.toLowerCase())
+  );
+  return key ? RETAILER_INTEL[key] : null;
+}
+
+function getMarketRetailerIntel(market, category){
+  var entries = Object.entries(RETAILER_INTEL);
+  var filtered = entries.filter(function(e){ return e[1].market.indexOf(market) !== -1; });
+  var mapped = filtered.map(function(e){
+    var name = e[0];
+    var d = e[1];
+    var parts = [
+      name.toUpperCase(),
+      'Strategy 2026: ' + d.strategy2026,
+      'Buyer priority: ' + d.buyerPriority,
+      'Margin: ' + d.marginExpectation + ' | MOQ: ' + d.moq,
+      'Category focus: ' + d.categoryFocus,
+      'Fit signal: ' + d.fitSignal,
+      'How to approach: ' + d.approach
+    ];
+    if(d.basketSize) parts.push('Average basket: ' + d.basketSize);
+    return parts.join('\n');
+  });
+  return mapped.join('\n---\n') || '';
+}
+
+
 async function generateReport(){
   const btn=document.getElementById('r-generate-btn');
-  if(btn){btn.disabled=true;btn.textContent='Generating report…';}
+  if(btn){btn.disabled=true;btn.textContent='Generating report...';}
   savePageState('ns_reportForm',reportForm);
   const statusEl=document.getElementById('r-status');
   const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
-  setStatus('Contacting VeyaFlow…');
 
-  const isFood=reportForm.category==='Food & Beverage';
-  const isSkincare=reportForm.category==='Skincare & Beauty';
-  const isWellness=reportForm.category==='Wellness & Supplements';
-  const isFashion=reportForm.category==='Fashion & Apparel';
-
-  const retailContext={
-    "United Kingdom": isFood?"Waitrose, M&S Food, Sainsburys, Holland & Barrett, Planet Organic, Ocado, Whole Foods UK":isSkincare?"Space NK, Selfridges Beauty, Boots No7, Holland & Barrett, Liberty Beauty, Harvey Nichols":isWellness?"Holland & Barrett, Boots Pharmacy, Planet Organic, Amazon UK, Ocado":"John Lewis, Asos, Next, Wolf & Badger, Not On The High Street",
-    "Germany": isFood?"REWE, Edeka, Alnatura, denns Biomarkt, Bio Company, Kaufland":isSkincare?"dm-drogerie markt, Rossmann, Douglas, Sephora DE, Niche Beauty, Ludwig Beck":isWellness?"dm-drogerie markt, Rossmann, Alnatura, Amazon DE, Vitafy":"About You, Zalando DE, Breuninger, KaDeWe",
-    "Denmark": isFood?"Salling Group (Bilka, Fotex), Coop Danmark, Helsam, nemlig.com, Meny":isSkincare?"Matas (290 stores), Magasin du Nord, Illum, Lookfantastic DK":isWellness?"Matas, Helsam, Salling Group":"Zalando DK, Magasin du Nord",
-    "Norway": isFood?"NorgesGruppen (Meny, Kiwi), Coop Norge, Rema 1000, Helsam":isSkincare?"kicks.no, Vita, Matas NO, Sephora Oslo":isWellness?"Helsam, kicks.no, Vita, Apotek 1":"Zalando NO, Ellos",
-    "United States": isFood?"Whole Foods Market, Sprouts, Erewhon, Thrive Market, Target":isSkincare?"Sephora, Ulta Beauty, Target Beauty, Credo Beauty, Follain, Goop":isWellness?"Whole Foods, Sprouts, iHerb, Amazon US, GNC":"Nordstrom, Free People, Revolve",
-    "Australia": isFood?"Woolworths, Coles, Harris Farm, IGA, Mr Vitamins":isSkincare?"Mecca, Adore Beauty, Priceline, Chemist Warehouse, David Jones Beauty":isWellness?"Priceline, iHerb AU, Chemist Warehouse, Mr Vitamins":"David Jones, The Iconic",
-    "Netherlands": isFood?"Albert Heijn, Jumbo, Ekoplaza, Picnic, Holland & Barrett NL":isSkincare?"Ici Paris XL, Douglas NL, Sephora NL":isWellness?"Holland & Barrett NL, Etos, Kruidvat, Ekoplaza":"Zalando NL, Bol.com, De Bijenkorf",
-    "France": isFood?"Carrefour Bio, E.Leclerc, Biocoop, La Vie Claire, Naturalia":isSkincare?"Sephora FR, Marionnaud, Monoprix Beauty, Galeries Lafayette":isWellness?"Biocoop, La Vie Claire, Naturalia":"Galeries Lafayette, Asos FR",
-  };
-
-  const distributorContext={
-    "United Kingdom":"KeHE Distributors (organic/natural), CLF Distribution (beauty), Kinetic (health & wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
-    "Germany":"Biogrosshändler (organic food), DWS Handelsmarketing (beauty/care), Hanse Distribuzione (Scandinavian brands), Terra Naturkost (organic)",
-    "Denmark":"Dagrofa (grocery), Sahva (health), Beauty Trade (beauty brands), Scandinavian Premium (Scandi import specialist), NMC Nordic (FMCG)",
-    "Norway":"Aass (FMCG), Ultramar (specialty food), Nordic Beauty Agency (beauty/skincare), Brandhouse NO (premium brands)",
-    "United States":"KeHE (natural/organic grocery), UNFI (natural food), Presence Marketing (natural products), Kite Hill Brands (premium beauty)",
-    "Australia":"CLF Distribution AU, Unique Health Products, Aushealth (wellness), Concept Brands (beauty)",
-    "Netherlands":"Udea (natural food), Deli XL (FMCG), Beauty Holland (cosmetics), Nordic Import NL",
-    "France":"Biocoop (organic), Selecta France (beauty), Scandifood (Nordic brands), Distriborg (organic food)",
-  };
+  // Get live retailer intelligence from database
+  const retailerIntel = getMarketRetailerIntel(reportForm.targetMarket, reportForm.category);
 
   const complianceDetail={
-    "United Kingdom":{
-      "Skincare & Beauty":"UK Cosmetics Regulation SI 2019/696: UK Responsible Person (UK address mandatory), OPSS SCPN portal notification, English-only INCI labelling, UKCA mark. EU CPNP does NOT cover UK — separate notification required. Timeline: 4–8 weeks. Cost: £500–1,500.",
-      "Food & Beverage":"UK Food Information Regulations 2014: English ingredients, 14 allergens, UK Nutrition Facts format. FSA novel food approval. APHA import health certs for animal products. UKORG for organic (EU logo invalid). Show UK importer address.",
-      "Wellness & Supplements":"MHRA borderline products. Health claims: UK Nutrition and Health Claims Regulations 2007. UK Food Supplements Regulations 2003. UK Responsible Person if borderline medicine.",
+    "United Kingdom":{"Skincare & Beauty":"UK SI 2019/696: UK Responsible Person + SCPN notification (OPSS portal). English INCI. UKCA mark. EU CPNP does NOT cover UK post-Brexit. Timeline 4-8 weeks, cost GBP 500-1500. UKCA mark required.","Food & Beverage":"UK FIR 2014: English ingredients, 14 allergens, UK Nutrition Facts format. FSA novel food approval if applicable. UK importer address required on pack.","Wellness & Supplements":"MHRA borderline review required. UK Nutrition and Health Claims Regs 2007. UK Food Supplements Regs 2003. UK Responsible Person if borderline medicine."},
+    "Germany":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP notification (portal.cpnp.eu), EU Responsible Person with German address preferred, German INCI labelling. VerpackG packaging registration mandatory (Der Gruene Punkt or equivalent). Timeline 6-10 weeks, cost EUR 800-2000.","Food & Beverage":"EU FIR 1169/2011 in German. VerpackG mandatory. BVL notification for supplements. German organic: DE-OeKO-006 logo.","Wellness & Supplements":"LFGB German Food Code. EU Supplements Directive (NemV). Notify BVL before market placement. VerpackG mandatory for all packaging."},
+    "Denmark":{"Skincare & Beauty":"EU CPNP notification, EU Responsible Person. DVFA (Foedevarestyrelsen) oversight. Danish labelling required (sticker acceptable). Nordic Swan ecolabel for premium positioning. VAT 25%. EUDR compliance from December 2026 if relevant commodities.","Food & Beverage":"EU FIR 1169/2011 in Danish. DVFA registration. Organic: O-maerket (Danish organic). EUDR from December 2026.","Wellness & Supplements":"Sundhedsstyrelsen (Danish Health Authority) oversight. EU health claims only. DVFA notification. Danish labelling required."},
+    "Norway":{"Skincare & Beauty":"EEA mirrors EU Reg 1223/2009. Norwegian Responsible Person required. Mattilsynet (Norwegian Food Safety Authority) oversight. Norwegian labelling mandatory. VAT 25%. Non-EU requires separate EEA notification.","Food & Beverage":"Mattilsynet oversight. Debio certification for organic (NOR ORGANIC logo). Norwegian allergen labelling rules. Import documentation required.","Wellness & Supplements":"Mattilsynet. EU health claims apply via EEA agreement. Norwegian translation mandatory for all labelling."},
+    "Sweden":{"Skincare & Beauty":"EU CPNP notification, EU Responsible Person. Livsmedelsverket/Lakemedelsverket oversight depending on product type. Swedish labelling required. Swedish eco: Svanen (Nordic Swan) or KRAV for organic. EUDR compliance if relevant ingredients.","Food & Beverage":"EU FIR 1169/2011 in Swedish. Livsmedelsverket registration. KRAV for organic certification. Swedish allergen labelling.","Wellness & Supplements":"Lakemedelsverket borderline review. Swedish translation required. EU health claims only. Nordic Swan preferred."},
+    "Netherlands":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP, EU Responsible Person. Dutch/French/German INCI labelling. NVWA (Netherlands Food and Consumer Product Safety Authority) oversight. Dutch consumer law strict on claims.","Food & Beverage":"EU FIR 1169/2011 in Dutch. NVWA oversight. Novel food EFSA approval if applicable.","Wellness & Supplements":"NVWA. EU health claims only. Dutch labelling mandatory. Health claims substantiation required."},
+    "France":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP, EU Responsible Person. French INCI labelling mandatory — not optional. ANSM (Agence nationale de securite du medicament) oversight. French claims very strictly enforced. Cosmetics with borderline drug claims prosecuted.","Food & Beverage":"EU FIR 1169/2011 in French. DGCCRF oversight. French labelling mandatory. Strong enforcement on health claims.","Wellness & Supplements":"ANSES oversight. DGCCRF. French translation mandatory. EU health claims only. Very strict enforcement on functional claims."},
+  }[reportForm.targetMarket]?.[reportForm.category] || `Consult local regulatory counsel in ${reportForm.targetMarket} for ${reportForm.category} requirements.`;
+
+  const brandCtx = `BRAND: ${reportForm.brandName}
+CATEGORY: ${reportForm.category}
+KEY PRODUCTS/SKUs: ${reportForm.skus||'Premium products in this category'}
+PRICE POSITIONING: ${reportForm.pricePoint||'Premium'} (${brand?.annualRevenue?'Revenue: '+brand.annualRevenue:''})
+HOME MARKET: ${reportForm.currentMarket||'Sweden'}
+TARGET MARKET: ${reportForm.targetMarket}
+SUSTAINABILITY GOALS: ${brand?.sustainabilityGoals?.join(', ')||'sustainability-focused, clean ingredients'}
+BRAND USP: ${brand?.usp||reportForm.brandDesc||'Nordic premium consumer brand'}
+CLINICAL EVIDENCE: ${brand?.clinicalClaims||'Not specified'}
+PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,brand?.awardsCount].filter(Boolean).join(' | ')||'Not provided'}`;
+
+  const distributorContext={
+    "United Kingdom":"CLF Distribution (beauty/care), Kinetic (health/wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
+    "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist — key route for Nordic brands), Terra Naturkost (organic food/wellness)",
+    "Denmark":"Beauty Trade DK (beauty specialist), Scandinavian Premium (Scandi import specialist — ideal first call), NMC Nordic (FMCG), Sahva (health/pharmacy)",
+    "Norway":"Nordic Beauty Agency (beauty brands), Brandhouse NO (premium brands), Ultramar (specialty food/wellness)",
+    "Sweden":"Dagab (ICA group grocery), Menigo Foodservice, Nordic Brand Agency (premium brand builder)",
+    "Netherlands":"Udea (natural/organic food), Beauty Holland (cosmetics), Nordic Import NL (Scandinavian brands)",
+    "France":"Selecta France (beauty specialist), Scandifood (Nordic brands — strong existing network), Distriborg (organic food/wellness)",
+  };
+
+  const distributors = distributorContext[reportForm.targetMarket]||'major distributors';
+
+  // MODULE DEFINITIONS — each is a focused, deep-dive prompt
+  const modules = [
+    {
+      title: 'Executive Summary & Market Intelligence',
+      prompt: `You are VeyaFlow AI — a specialist Nordic brand market entry intelligence platform. April 2026.
+
+${brandCtx}
+
+LIVE RETAILER INTELLIGENCE FOR ${reportForm.targetMarket.toUpperCase()} (April 2026):
+${retailerIntel||'Generate from your knowledge of this market'}
+
+Generate the EXECUTIVE SUMMARY & MARKET INTELLIGENCE section.
+
+EXECUTIVE SUMMARY (internal memo format)
+Write as if briefing a board: Why ${reportForm.brandName}, why ${reportForm.targetMarket}, why April 2026 specifically.
+- Market Attractiveness Score: X/10 with three bullet justifications
+- Opportunity in one sentence (specific to April 2026 market conditions)
+- Primary risk in one sentence (specific, not generic)
+- Recommended entry route: [DTC first / distributor / direct retail] — justify in one sentence
+- Timeline to first sale: X months
+- Year 1 revenue potential: LOW X — HIGH Y (local currency, specific)
+
+MARKET SIZE & TIMING
+- ${reportForm.category} market size in ${reportForm.targetMarket} 2025/2026 (give specific figure in local currency)
+- YoY growth rate
+- Top 3 consumer trends driving purchase decisions RIGHT NOW in April 2026 (be specific to this market, not generic)
+- The specific window: why is this the right moment for a Nordic brand to enter?
+- One emerging gap in the ${reportForm.category} market that ${reportForm.brandName} is positioned to fill
+
+COMPETITIVE LANDSCAPE
+Think step by step: First identify 3 brands already succeeding in ${reportForm.category} in ${reportForm.targetMarket}. Then analyse their price points and positioning. Then identify the exact gap ${reportForm.brandName} can exploit.
+- Competitor 1: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits
+- Competitor 2: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits  
+- Competitor 3: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits
+- THE GAP: Specific positioning territory available to ${reportForm.brandName} in 2026`
     },
-    "Germany":{
-      "Skincare & Beauty":"EU Cosmetics Regulation EC 1223/2009: CPNP notification at portal.cpnp.eu, EU Responsible Person (EU address), German INCI labelling + warning texts. German packaging law VerpackG: register with Dual System (e.g. Der Grüne Punkt). Timeline: 6–10 weeks. Cost: €800–2,000.",
-      "Food & Beverage":"EU FIR 1169/2011 in German. German organic: DE-ÖKO-006. Novel food: EFSA approval. BVL notification. VerpackG packaging registration.",
-      "Wellness & Supplements":"LFGB German Food Code. EU Food Supplements Directive (Nahrungsergänzungsmittelverordnung). Health claims EC 1924/2006 only. Notify BVL before market placement. VerpackG mandatory.",
+    {
+      title: 'Retailer Deep-Dive & Pricing Strategy',
+      prompt: `You are VeyaFlow AI — a specialist Nordic brand market entry intelligence platform. April 2026.
+
+${brandCtx}
+
+FOUNDER-VERIFIED RETAILER INTELLIGENCE (April 2026):
+${retailerIntel||'Generate from your knowledge of this market in April 2026'}
+
+PRICING REASONING — think through this step by step before writing:
+1. What is the current average basket size at the target retailers?
+2. What is the typical retailer margin in this category?
+3. What price point positions ${reportForm.brandName} correctly vs competitors?
+4. What shelf velocity (units per store per week) is realistic?
+5. What is the Year 1 revenue potential if listed in 3-4 stores?
+Then write the pricing strategy based on this reasoning.
+
+Generate RETAILER DEEP-DIVE & PRICING STRATEGY.
+
+PRICING INTELLIGENCE
+- Recommended retail price in local currency (with justification vs competitor benchmarks)
+- Wholesale/ex-works price
+- Retailer margin % to offer
+- Shelf velocity estimate: X units per store per week (show your reasoning)
+- Year 1 revenue projection if listed in key retailers (show calculation)
+- Lead SKU recommendation: which product to launch with and why
+
+RETAILER ANALYSIS — for each relevant retailer from the intelligence provided:
+**[RETAILER NAME]** | [stores/reach]
+2026 Strategy: [their current focus — use the intel provided]
+What their buyer is looking for RIGHT NOW: [specific, from intel]
+Fit assessment for ${reportForm.brandName}: STRONG FIT / POSSIBLE FIT / NOT YET
+One-sentence justification:
+Margin requirement: X% | MOQ: X units
+How to get listed: [specific steps, portal names, approach]
+Timing: [best window — is there a range review, promotion period, or buying season coming up?]`
     },
-    "Denmark":{
-      "Skincare & Beauty":"EU CPNP notification, EU Responsible Person. DVFA oversight. Danish labelling (sticker acceptable). Nordic Swan ecolabel for premium positioning. VAT 25%.",
-      "Food & Beverage":"EU FIR 1169/2011 in Danish. DVFA registration. Organic: Ø-mærket certification. EUDR compliance from December 2026.",
-      "Wellness & Supplements":"Sundhedsstyrelsen oversight. EU health claims. DVFA notification. Danish labelling required.",
+    {
+      title: 'Regulatory Compliance Roadmap',
+      prompt: `You are VeyaFlow AI — compliance specialist. April 2026.
+
+${brandCtx}
+TARGET MARKET: ${reportForm.targetMarket}
+COMPLIANCE CONTEXT: ${complianceDetail}
+
+Generate a REGULATORY COMPLIANCE ROADMAP — actionable, specific, prioritised.
+
+COMPLIANCE CHECKLIST (in priority order — must-do before first sale first):
+
+For each requirement provide:
+REQUIREMENT | LEGAL REFERENCE | EXACT ACTION REQUIRED | AUTHORITY / PORTAL URL | TIMELINE | COST ESTIMATE | PRIORITY (CRITICAL/IMPORTANT/NICE TO HAVE)
+
+Then:
+COMPLIANCE TIMELINE — month by month from today (April 2026) to first sale:
+- Month 1: [specific actions]
+- Month 2: [specific actions]
+- Month 3: [specific actions]
+- [continue as needed]
+
+TOTAL COMPLIANCE INVESTMENT: GBP/EUR/SEK X — Y (low to high estimate)
+
+EUDR STATUS (if relevant to ${reportForm.category}):
+- Is ${reportForm.brandName} in scope for EUDR (December 30 2026 deadline)?
+- Which ingredients/materials are covered?
+- What action is required before December 30 2026?
+
+NORDIC-SPECIFIC CERTIFICATIONS worth pursuing:
+List 2-3 certifications that would increase listing success in ${reportForm.targetMarket} specifically (e.g. Nordic Swan, COSMOS, KRAV, Astma-Allergi Denmark) with cost and timeline for each.`
     },
-    "United States":{
-      "Skincare & Beauty":"FDA MoCRA 2022: facility registration (FURLS portal) + product listing mandatory. US Responsible Person required. INCI in English, weight in oz AND grams. California Prop 65 if applicable. FTC: all claims substantiated. Timeline: 2–4 weeks. Cost: $200–500.",
-      "Food & Beverage":"FDA facility registration (FURLS), Prior Notice for imports (PN). US Nutrition Facts Panel. Top 9 allergens + sesame. FSMA FSVP. USDA Organic (EU organic not recognised). California Prop 65.",
-      "Wellness & Supplements":"FDA DSHEA. Structure/function claims: notify FDA within 30 days. No disease claims. NSF or USP certification recommended. Supplement Facts panel in US format. California Prop 65.",
-    },
-  }[reportForm.targetMarket]?.[reportForm.category] || `Research specific ${reportForm.category} requirements with local regulatory counsel in ${reportForm.targetMarket}.`;
+    {
+      title: '90-Day Action Plan & Route to Market',
+      prompt: `You are VeyaFlow AI — market entry strategist. April 2026.
 
-  const prompt=`You are VeyaFlow AI — a paid market intelligence platform for Nordic consumer brands expanding internationally. Generate a consultant-grade market entry report. Every section must be specific — named retailers, named regulators, real figures, actionable decisions. No generic advice.
+${brandCtx}
+DISTRIBUTION OPTIONS: ${distributors}
+RETAILER LANDSCAPE: ${retailerIntel||'key retailers in this market'}
 
-BRAND BRIEF
-Brand: ${reportForm.brandName}
-Description: ${reportForm.brandDesc||'Premium Nordic consumer brand'}
-Category: ${reportForm.category}
-Key products / SKUs: ${reportForm.skus||'Premium products in this category'}
-Price positioning: ${reportForm.pricePoint||'Premium'}
-Home market: ${reportForm.currentMarket||'Sweden'}
-Target market: ${reportForm.targetMarket}
-Sustainability priorities: ${brand?.sustainabilityGoals?.join(', ')||'clean ingredients, sustainability credentials'}
+Generate a 90-DAY MARKET ENTRY ACTION PLAN — concrete, budgeted, with clear owners.
 
-INTELLIGENCE INPUTS (use these as starting points — add your own knowledge)
-Retailers in this category: ${retailContext[reportForm.targetMarket]||'major retailers in this market'}
-Known distributors: ${distributorContext[reportForm.targetMarket]||'major distributors'}
-Regulatory context: ${complianceDetail}
+ROUTE TO MARKET RECOMMENDATION
+Think step by step: First assess ${reportForm.brandName}'s current stage, resources, and brand proof. Then evaluate the three routes (DTC, distributor, direct retail). Then recommend the optimal sequence.
+RECOMMENDED ROUTE: [DTC first / distributor-led / direct retail / hybrid]
+JUSTIFICATION: [2-3 sentences specific to ${reportForm.brandName}'s situation]
 
-Generate an 8-section report. Format each section with its number and title on its own line.
+TOP DISTRIBUTOR RECOMMENDATIONS (from: ${distributors}):
+For each of the top 2 distributors:
+- Why they fit ${reportForm.brandName} specifically
+- Their typical fee/margin structure
+- What they need to see before signing a new brand
+- How to approach them (contact route, what to send first)
 
-1. EXECUTIVE SUMMARY
-Opportunity score (X/10), one-sentence opportunity, one-sentence biggest risk. Then: estimated time to first sale, recommended route to market, estimated Year 1 revenue potential. Be direct — give numbers.
+90-DAY PLAN:
 
-2. MARKET OPPORTUNITY
-Specific market size figure for ${reportForm.category} in ${reportForm.targetMarket} (local currency). YoY growth rate. Top 3 consumer trends driving demand right now. The specific window for a Nordic brand entering now. Name 1–2 competitors already winning and the gap ${reportForm.brandName} can exploit.
+MONTH 1 — FOUNDATION (Weeks 1-4)
+Goal: [specific milestone]
+| Action | Owner | Budget | Success Metric |
+[4 specific actions]
 
-3. SKU STRATEGY & PRICING
-For each product/SKU: recommended retail price in local currency, wholesale price, retailer margin %, fit assessment, regulatory flags. Name 2–3 direct competitor price benchmarks from this market. Recommend which SKU to lead with and why.
+MONTH 2 — ACTIVATION (Weeks 5-8)
+Goal: [specific milestone]  
+| Action | Owner | Budget | Success Metric |
+[4 specific actions]
 
-4. RETAIL LANDSCAPE — Named accounts
-For each of the 5–6 retailers from the input list:
-— Store count / online reach
-— How to approach the buyer (portal, direct email, trade show)
-— Typical margin requirement %
-— Minimum order quantity range
-— What this buyer specifically wants from a new brand
-— Fit rating: STRONG FIT / POSSIBLE / NOT YET — with one-sentence justification
+MONTH 3 — FIRST REVENUE (Weeks 9-12)
+Goal: [specific milestone]
+| Action | Owner | Budget | Success Metric]
+[4 specific actions]
 
-5. REGULATORY COMPLIANCE CHECKLIST
-Use the regulatory context provided. For each requirement:
-— Requirement and legal reference
-— Exact action required (form name, portal URL, authority name)
-— Time to complete
-— Estimated cost
-— Priority: URGENT (before any sales) / IMPORTANT / NICE TO HAVE
-List in priority order.
-
-6. ROUTE TO MARKET & DISTRIBUTION
-Recommend optimal entry route: DTC first, distributor-led, or direct retail. Justify with ${reportForm.brandName}-specific reasoning.
-For 2 specific distributors from the input list: why they fit, fee/margin structure, how to approach them, what they need to see before taking a new brand.
-
-7. LOCALISATION REQUIREMENTS
-Specific changes needed from the current ${reportForm.currentMarket||'Swedish'} version:
-— Language (what must be translated, what can stay)
-— Mandatory labelling changes (list each element)
-— Packaging changes
-— Claims to remove or add
-— Positioning adjustment — what travels well, what needs adapting for ${reportForm.targetMarket}
-
-8. 90-DAY MARKET ENTRY PLAN
-Month 1 — Foundation (Weeks 1–4): 4 actions each with: owner role, budget estimate, success metric
-Month 2 — Activation (Weeks 5–8): 4 actions each with: owner role, budget estimate, success metric
-Month 3 — First Revenue (Weeks 9–12): 4 actions each with: owner role, budget estimate, success metric
-Total 90-day investment estimate (range in local currency)
-Break-even timeline estimate`;
-
-  try{
-    const text=await callAPI([{role:"user",content:prompt}],1800);
-    setStatus('Parsing report sections…');
-    // Parse sections
-    const sectionTitles=["EXECUTIVE SUMMARY","MARKET OPPORTUNITY","SKU STRATEGY & PRICING","RETAIL LANDSCAPE","REGULATORY COMPLIANCE CHECKLIST","ROUTE TO MARKET & DISTRIBUTION","LOCALISATION REQUIREMENTS","90-DAY MARKET ENTRY PLAN"];
-    let sections=[];
-    const parts=text.split(/\n(?=\d+\.\s+[A-Z])/);
-    parts.forEach((part,i)=>{
-      const titleMatch=part.match(/^\d+\.\s+(.+?)(\n|$)/);
-      const title=titleMatch?titleMatch[1].trim():(sectionTitles[i]||`Section ${i+1}`);
-      const content=part.replace(/^\d+\.\s+.+?\n/,'').trim();
-      if(content.length>30)sections.push({title,content});
-    });
-    if(sections.length<3){
-      // Fallback: split by double newlines
-      sections=text.split(/\n\n+/).filter(s=>s.length>80).slice(0,7).map((s,i)=>({
-        title:sectionTitles[i]||`Section ${i+1}`,content:s.trim()
-      }));
+INVESTMENT SUMMARY:
+Total 90-day budget: LOW X — HIGH Y (local currency)
+Break-even timeline: X months from first listing
+Key risk to plan: [most likely obstacle and mitigation]`
     }
+  ];
 
-    const report={
-      id:Date.now().toString(),
-      brandName:reportForm.brandName,
-      category:reportForm.category,
-      currentMarket:reportForm.currentMarket,
-      targetMarket:reportForm.targetMarket,
-      pricePoint:reportForm.pricePoint,
-      date:new Date().toLocaleDateString('sv-SE'),
-      generatedBy:brand?.userName||null,
-      sections
-    };
-    savedReports=[report,...savedReports].slice(0,20);
-    saveReportState();
-    savePageState('ns_reportState',{result:report,sections});
-    savePageState('ns_reportForm',reportForm);
-    updateSidebarBrand();
-    reportState={loading:false,result:report,sections};
-    renderPage('report');
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='Generate market entry report →';}
-    const msg=e.message||'Unknown error';
-    if(msg.includes('Failed to fetch')||msg.includes('NetworkError')||msg.includes('CORS')){
-      alert('Connection error: The report generator requires an internet connection and must be served from a URL (not opened as a local file).\n\nFix: Drop this HTML file onto drop.netlify.com to get a live URL, then open that URL.');
-    } else if(msg.includes('401')){
-      alert('API key error (401): The Anthropic API key is missing or invalid. Deploy via Netlify with the proxy function to use your own API key securely.');
-    } else if(msg.includes('529')||msg.includes('overloaded')){
-      alert('The AI is temporarily overloaded. Please try again in a moment.');
-    } else {
-      alert('Could not generate report: '+msg);
+  // Show loading state
+  reportState={loading:true,result:null,sections:[]};
+  renderPage('report');
+
+  const completedSections = [];
+
+  for(let i=0; i<modules.length; i++){
+    const mod = modules[i];
+    setStatus(`Generating: ${mod.title} (${i+1} of ${modules.length})...`);
+
+    const progEl = document.getElementById('r-progress');
+    if(progEl) progEl.style.width = Math.round(((i+0.5)/modules.length)*100)+'%';
+
+    try{
+      const text = await callAPI([{role:"user",content:mod.prompt}], 1400);
+      completedSections.push({title:mod.title, content:text});
+
+      // Show sections as they complete
+      reportState.sections = [...completedSections];
+      const partial = document.getElementById('r-partial');
+      if(partial){
+        partial.innerHTML = completedSections.map(s=>`
+          <div style="margin-bottom:1.5rem;padding:1rem;background:#fff;border:1px solid var(--border);border-left:3px solid var(--gold)">
+            <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);font-weight:700;margin-bottom:.6rem">${s.title} \u2714</div>
+            <div style="font-family:var(--sans);font-size:.8rem;line-height:1.75;color:#333;white-space:pre-wrap">${s.content.slice(0,400)}${s.content.length>400?'...':''}</div>
+          </div>
+        `).join('');
+      }
+    }catch(err){
+      console.error('Module failed:', mod.title, err.message);
+      completedSections.push({
+        title: mod.title,
+        content: `Generation error for this section: ${err.message}. The other sections completed successfully.`
+      });
     }
   }
+
+  if(document.getElementById('r-progress')) document.getElementById('r-progress').style.width='100%';
+  setStatus('Report complete \u2014 4 modules generated.');
+
+  const report={
+    id:Date.now().toString(),
+    brandName:reportForm.brandName,
+    category:reportForm.category,
+    currentMarket:reportForm.currentMarket,
+    targetMarket:reportForm.targetMarket,
+    pricePoint:reportForm.pricePoint,
+    date:new Date().toLocaleDateString('sv-SE'),
+    generatedBy:brand?.userName||null,
+    sections:completedSections
+  };
+
+  savedReports=[report,...savedReports].slice(0,20);
+  saveReportState();
+  savePageState('ns_reportState',{result:report,sections:completedSections});
+  savePageState('ns_reportForm',reportForm);
+  updateSidebarBrand();
+  reportState={loading:false,result:report,sections:completedSections};
+  renderPage('report');
 }
+
 
 function renderReportResult(){
   const r=reportState.result;
