@@ -1714,25 +1714,257 @@ CLINICAL EVIDENCE: ${brand?.clinicalClaims||'Not specified'}
 PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,brand?.awardsCount].filter(Boolean).join(' | ')||'Not provided'}
 ${priceContext}`;
 
+  // Category-aware distributor context
+  const DISTRIBUTOR_BY_CATEGORY = {
+    "Skincare & Beauty": {
+      "United Kingdom":"CLF Distribution (beauty/care specialist), Selfridges Direct (premium), Space NK wholesale",
+      "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist)",
+      "Denmark":"Beauty Trade DK, Scandinavian Premium (Scandi import specialist — ideal first call), Sahva",
+      "Norway":"Nordic Beauty Agency, Brandhouse NO (premium)",
+      "Sweden":"Nordic Brand Agency, Lyko wholesale portal, Kicks supplier portal",
+      "Netherlands":"Beauty Holland, Nordic Import NL",
+      "France":"Selecta France (beauty specialist), Scandifood (Nordic brands)",
+      "Japan":"Cosmax Japan, Tokyu Agency — Japanese agent mandatory",
+      "South Korea":"Olive Young supplier portal, Nordic Beauty Korea",
+      "UAE":"Chalhoub Group (largest in region), Alshaya Group",
+      "Canada":"Kehe Canada, Presence Marketing Canada",
+      "Singapore":"Luxasia (distributes across SEA — key entry point)",
+    },
+    "Food & Beverage": {
+      "United Kingdom":"Suma Wholesale (natural/organic), Kinetic Health (wellness foods), CLF Distribution",
+      "Germany":"Terra Naturkost (organic), Biogros, UNFI Germany, Scandifood DE",
+      "Denmark":"Dagrofa (grocery), NMC Nordic (FMCG), Scandinavian Premium",
+      "Norway":"NorgesGruppen wholesale, Aass (FMCG), Ultramar (specialty)",
+      "Sweden":"Dagab (ICA group — mandatory for ICA), Menigo Foodservice, Martin & Servera",
+      "Netherlands":"Udea (natural/organic — key for Ekoplaza), Deli XL (FMCG)",
+      "France":"Distriborg (organic), Biocoop wholesale, Scandifood (Nordic brands)",
+      "Japan":"Meidi-ya import, Kinokuniya Food wholesale — Japanese food importer required",
+      "UAE":"Al Islami Foods, Albatha Group — Halal certification required",
+      "Canada":"UNFI Canada (natural), Kehe Canada, Organic Meadow",
+      "Singapore":"SFA-registered importer required, Cold Storage wholesale, NTUC wholesale",
+    },
+    "Fashion & Apparel": {
+      "United Kingdom":"Wolf & Badger (indie brands — direct portal), ASOS marketplace, Next Sourcing",
+      "Germany":"Zalando Partner Programme (key — direct portal), About You partner, GOTS-certified agent",
+      "Denmark":"Magasin wholesale, Zalando DK partner, local fashion agent",
+      "Norway":"Varner Group wholesale, Zalando NO partner",
+      "Sweden":"NA-KD wholesale (strong for sustainable), H&M Group wholesale, Zalando SE partner",
+      "Netherlands":"Zalando NL partner, De Bijenkorf wholesale, local agent",
+      "Japan":"TSI Holdings (fashion distributor), Itochu (trading company) — trading company almost always needed",
+      "South Korea":"W Concept wholesale, Musinsa partner programme, local Korean agent",
+      "UAE":"Landmark Group (Splash, Centre Point), Level Shoes, local agent required",
+      "United States":"Nordstrom wholesale, REVOLVE wholesale, local US showroom agent",
+    },
+    "Home & Design": {
+      "United Kingdom":"Not On The High Street (direct portal), John Lewis wholesale, Wayfair UK",
+      "Germany":"Connox wholesale, WestwingNow partner, Amazon DE Handmade",
+      "Denmark":"Illums Bolighus wholesale (premium Nordic positioning), Flying Tiger wholesale",
+      "Norway":"Bohus wholesale, Kid Interior, Elkjop (electronics)",
+      "Sweden":"IKEA supplier (high bar but massive scale), Åhléns wholesale, Designtorget partner",
+      "Netherlands":"Bol.com partner programme (dominant e-com), Fonq.nl wholesale",
+      "Japan":"Tokyu Hands wholesale, Loft wholesale, local Japanese trading company",
+      "United States":"Wayfair wholesale, Crate & Barrel wholesale, local US showroom",
+    },
+    "Wellness & Supplements": {
+      "United Kingdom":"Kinetic Natural Products (UK wellness specialist), Holland & Barrett wholesale, Ocado",
+      "Germany":"dm-drogerie markt supplier portal, Alnatura wholesale, Vitafy",
+      "Denmark":"Sahva (pharmacy/health specialist), Helsam wholesale, Matas wellness portal",
+      "Norway":"Helsam wholesale, Apotek 1 supplier, Boots Norway",
+      "Sweden":"Life wholesale (200+ stores), Apotek Hjärtat supplier, Coop hälsa",
+      "Netherlands":"Holland & Barrett NL wholesale, Etos supplier, Kruidvat",
+      "Japan":"Matsumoto Kiyoshi wholesale — Japanese agent mandatory for pharmacy channel",
+      "UAE":"Life Pharmacy wholesale, Boots UAE, Halal-certified distributor",
+      "Canada":"Health Canada NPN first, then UNFI Canada, Kehe",
+    },
+    "Baby & Family": {
+      "United Kingdom":"John Lewis Baby wholesale, Mamas & Papas, Amazon UK Vendor Central",
+      "Germany":"babymarkt.de wholesale, dm Baby supplier, Amazon DE",
+      "Denmark":"Babysam wholesale, Normal, Salling Group",
+      "Norway":"Kid wholesale, Jollyroom NO",
+      "Sweden":"KidsBrandStore wholesale, Jollyroom SE, Åhléns Baby",
+      "Japan":"Akachan Honpo wholesale — safety certification mandatory first",
+      "UAE":"Mothercare UAE, local agent for safety certification",
+    },
+    "Sport & Outdoor": {
+      "United Kingdom":"Cotswold Outdoor wholesale, Snow + Rock, Wiggle (online)",
+      "Germany":"Intersport DE supplier portal, SportScheck, Bergzeit wholesale",
+      "Denmark":"Intersport DK supplier, XXL Denmark supplier",
+      "Norway":"XXL wholesale (largest Nordic), Intersport NO — XXL is the key account",
+      "Sweden":"Stadium supplier portal, Intersport SE, Outnorth",
+      "Japan":"Montbell wholesale channel, Alpen Sports — local agent needed",
+      "United States":"REI wholesale (co-op — strong for sustainable outdoor), Backcountry.com, local US rep",
+    },
+  };
+
+  const categoryDist = (DISTRIBUTOR_BY_CATEGORY[cat]||{})[mkt] || distributorContext[mkt] || 'major distributors';
+
   const distributorContext={
     "United Kingdom":"CLF Distribution (beauty/care), Kinetic (health/wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
-    "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist — key route for Nordic brands), Terra Naturkost (organic food/wellness)",
-    "Denmark":"Beauty Trade DK (beauty specialist), Scandinavian Premium (Scandi import specialist — ideal first call), NMC Nordic (FMCG), Sahva (health/pharmacy)",
-    "Norway":"Nordic Beauty Agency (beauty brands), Brandhouse NO (premium brands), Ultramar (specialty food/wellness)",
-    "Sweden":"Dagab (ICA group grocery), Menigo Foodservice, Nordic Brand Agency (premium brand builder)",
-    "Netherlands":"Udea (natural/organic food), Beauty Holland (cosmetics), Nordic Import NL (Scandinavian brands)",
-    "France":"Selecta France (beauty specialist), Scandifood (Nordic brands — strong existing network), Distriborg (organic food/wellness)",
+    "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist), Terra Naturkost (organic food/wellness)",
+    "Denmark":"Beauty Trade DK, Scandinavian Premium (Scandi import specialist), NMC Nordic (FMCG), Sahva (health/pharmacy)",
+    "Norway":"Nordic Beauty Agency, Brandhouse NO (premium), Ultramar (specialty food/wellness)",
+    "Sweden":"Dagab (ICA group grocery), Menigo Foodservice, Nordic Brand Agency",
+    "Netherlands":"Udea (natural/organic food), Beauty Holland, Nordic Import NL",
+    "France":"Selecta France (beauty), Scandifood (Nordic brands), Distriborg (organic)",
     "Belgium":"Belcos (beauty/cosmetics), Scandinavian Products BE, Biofresh (natural/organic)",
     "Austria":"ARA Distribution (FMCG), Scandinavian Import AT, Kastner (organic food)",
-    "Japan":"Cosmax Japan (beauty distribution), Alpen Group (wellness), Scandinavian Trade House Tokyo — Japanese distributor mandatory for first entry",
-    "South Korea":"Olive Young supplier portal (direct for strong brands), Korea Cosmetics Agency, Nordic Beauty Korea (Scandi brand specialist)",
-    "UAE":"Chalhoub Group (luxury/beauty — largest in region), GMG (health/wellness), Jashanmal (premium brands) — local agent legally required",
-    "Canada":"UNFI Canada (natural/organic), Kehe Canada, Presence Marketing Canada (natural products)",
-    "Singapore":"Luxasia (premium beauty — distributes across SEA), EuroStar Singapore (European brands specialist), Zuellig Pharma (health/wellness)",
+    "Japan":"Cosmax Japan (beauty), Alpen Group (wellness), Scandinavian Trade House Tokyo",
+    "South Korea":"Olive Young supplier portal, Korea Cosmetics Agency, Nordic Beauty Korea",
+    "UAE":"Chalhoub Group (luxury/beauty), GMG (health/wellness), Jashanmal (premium)",
+    "Canada":"UNFI Canada (natural/organic), Kehe Canada, Presence Marketing Canada",
+    "Singapore":"Luxasia (premium beauty across SEA), EuroStar Singapore, Zuellig Pharma",
     "New Zealand":"Prolife Foods (health/wellness), Pharmacy Brands NZ, EuroFoods NZ",
   };
 
-  const distributors = distributorContext[reportForm.targetMarket]||'major distributors';
+  const distributors = categoryDist;
+
+  // Category-aware retailer intelligence
+  const cat = reportForm.category;
+  const mkt = reportForm.targetMarket;
+  const isBeauty = cat==='Skincare & Beauty';
+  const isFood = cat==='Food & Beverage';
+  const isWellness = cat==='Wellness & Supplements';
+  const isFashion = cat==='Fashion & Apparel';
+  const isHome = cat==='Home & Design';
+  const isBaby = cat==='Baby & Family';
+  const isSport = cat==='Sport & Outdoor';
+
+  // Build category-specific retailer list for this market
+  const CATEGORY_RETAILERS = {
+    "Denmark": {
+      "Skincare & Beauty": "Matas (290 stores, dominant), Kicks DK (Matas Group), Magasin du Nord, Illum, Lookfantastic DK",
+      "Food & Beverage": "Salling Group (Bilka, Fotex, Netto), Coop Danmark, Meny, Helsam, nemlig.com",
+      "Wellness & Supplements": "Matas, Helsam, Salling Group pharmacy, Apoteket.dk",
+      "Fashion & Apparel": "Magasin du Nord, Illum, Zalando DK, H&M DK, Weekday, ASOS DK",
+      "Home & Design": "Illums Bolighus (premium Nordic design destination), Flying Tiger, JYSK, Søstrene Grene, Normal",
+      "Baby & Family": "BabyTrold, Babysam, Normal, Salling Group",
+      "Sport & Outdoor": "Intersport DK, BR Sport, XXL Denmark, Stadium DK",
+    },
+    "Germany": {
+      "Skincare & Beauty": "dm-drogerie markt (2,000+ stores), Rossmann (2,200+), Douglas, Sephora DE, Müller, Niche Beauty",
+      "Food & Beverage": "REWE, Edeka, Alnatura (organic), denns Biomarkt, Bio Company Berlin, Kaufland, Lidl DE",
+      "Wellness & Supplements": "dm-drogerie markt, Rossmann, Alnatura, Vitafy, Amazon DE, DocMorris",
+      "Fashion & Apparel": "Zalando (HQ Berlin — key account), About You, Breuninger, KaDeWe, Peek & Cloppenburg, H&M DE",
+      "Home & Design": "Connox, Ambientedirect, Depot, Butlers, Zara Home DE, Flaconi (premium)",
+      "Baby & Family": "babymarkt.de, Jako-o, dm Babyline, Otto Baby, Amazon DE",
+      "Sport & Outdoor": "Intersport DE, SportScheck, Bergzeit, Globetrotter, Decathlon DE, About You Sports",
+    },
+    "Sweden": {
+      "Skincare & Beauty": "Lyko (dominant e-com), Kicks, Apotek Hjärtat (400 locations), Apoteket, Åhléns Beauty",
+      "Food & Beverage": "ICA (50% market share), Coop Sverige, Hemköp, Lidl SE, Willys, City Gross",
+      "Wellness & Supplements": "Apotek Hjärtat, Life (200+ stores), Apoteket, Lyko wellness, Coop hälsa",
+      "Fashion & Apparel": "H&M (HQ Stockholm), & Other Stories, Weekday, NA-KD, Åhléns, Zalando SE",
+      "Home & Design": "IKEA (HQ Malmö — key account), Grandpa, Artilleriet, Designtorget, Åhléns Hem, Clas Ohlson",
+      "Baby & Family": "BabyBjörn (premium), KidsBrandStore, Lindex Kids, Åhléns Baby, Normal",
+      "Sport & Outdoor": "Stadium (150+ stores), Intersport SE, Outnorth, XXL Sweden, Decathlon SE",
+    },
+    "United Kingdom": {
+      "Skincare & Beauty": "Space NK, Boots (2,200 stores), Liberty Beauty, Harvey Nichols, Selfridges, Cult Beauty",
+      "Food & Beverage": "Waitrose, M&S Food, Sainsburys, Ocado, Holland & Barrett, Planet Organic, Whole Foods UK",
+      "Wellness & Supplements": "Holland & Barrett (800+ stores), Boots Pharmacy, Planet Organic, Amazon UK, Ocado",
+      "Fashion & Apparel": "ASOS (UK HQ), NEXT, John Lewis, Selfridges, Harvey Nichols, Wolf & Badger (indie brands)",
+      "Home & Design": "John Lewis (key account), Heal's, Made.com, Not On The High Street, Anthropologie UK, Selfridges Home",
+      "Baby & Family": "John Lewis Baby, Mothercare, Boots Baby, Amazon UK, Mamas & Papas",
+      "Sport & Outdoor": "Sweaty Betty, Cotswold Outdoor, Snow + Rock, Wiggle, Amazon UK, John Lewis Sport",
+    },
+    "Norway": {
+      "Skincare & Beauty": "Kicks Norway (Matas Group), Vita, Apotek 1 (500+ locations), Sephora Oslo",
+      "Food & Beverage": "NorgesGruppen (Meny, KIWI, Spar NO), Coop Norge, Rema 1000, Helsam",
+      "Wellness & Supplements": "Helsam, Kicks, Vita, Apotek 1, Vitusapotek",
+      "Fashion & Apparel": "Zalando NO, Ellos, Cubus, Varner Group (Dressmann, Bik Bok), H&M NO",
+      "Home & Design": "Bohus, Kid Interior, IKEA Norway, Normal, Flying Tiger NO",
+      "Baby & Family": "Jollyroom NO, Kid (children's concept store), IKEA Baby, Normal",
+      "Sport & Outdoor": "XXL (Nordic's largest — 100+ stores), Intersport NO, Stadium NO, Bergans (Norwegian outdoor brand — strong)",
+    },
+    "Netherlands": {
+      "Skincare & Beauty": "Ici Paris XL, Douglas NL, Sephora NL, Kruidvat (750+ stores), Etos",
+      "Food & Beverage": "Albert Heijn (35% market share), Jumbo, Ekoplaza (organic), Picnic, Holland & Barrett NL",
+      "Wellness & Supplements": "Holland & Barrett NL, Etos, Kruidvat, Ekoplaza, bol.com",
+      "Fashion & Apparel": "Zalando NL, De Bijenkorf (premium), ASOS NL, H&M NL, Scotch & Soda (HQ Amsterdam)",
+      "Home & Design": "Fonq.nl, Bol.com (dominant), Hema, De Bijenkorf Home, Westwing NL",
+      "Baby & Family": "Babypark, Prenatal, Bol.com Baby, Hema Baby",
+      "Sport & Outdoor": "Decathlon NL, Sport 2000, bol.com Sport, Intersport NL",
+    },
+    "Japan": {
+      "Skincare & Beauty": "@cosme store (1,500+ brands listed), Isetan Beauty, Loft (300+ stores), Plaza, Matsumoto Kiyoshi",
+      "Food & Beverage": "Tokyu Food Show, Seijo Ishii (premium grocery), Dean & DeLuca Japan, Whole Foods Japan, Kinokuniya",
+      "Wellness & Supplements": "Matsumoto Kiyoshi (3,300 stores), Sundrug, Ain Pharmaciez, Amazon Japan, Rakuten",
+      "Fashion & Apparel": "Isetan, United Arrows, Beams, Tomorrowland, Ships, Dover Street Market Tokyo",
+      "Home & Design": "Actus, Francfranc, Muji (HQ Tokyo), Tokyu Hands, Loft Home",
+      "Baby & Family": "Akachan Honpo, Nishimatsuya, Babies R Us Japan, Amazon Japan",
+      "Sport & Outdoor": "Montbell (Japan's leading outdoor), L-Breath, Alpen Sports, Amazon Japan Sports",
+    },
+    "South Korea": {
+      "Skincare & Beauty": "Olive Young (1,300+ stores — dominant), Lotte Department Store, Shinsegae Beauty, SSG.com",
+      "Food & Beverage": "Lotte Mart, Homeplus, Market Kurly (premium online), Coupang, SSG.com",
+      "Wellness & Supplements": "Olive Young wellness, Lotte Mart, Coupang, iHerb Korea, GNC Korea",
+      "Fashion & Apparel": "W Concept (premium brands), Musinsa (streetwear/youth), Lotte, Shinsegae, 29CM",
+      "Home & Design": "Lotte Department Store Home, Hyundai Living, KakaoHome, IKEA Korea",
+      "Baby & Family": "Coupang (dominant), Lotte Baby, 11Street, Auction.co.kr",
+      "Sport & Outdoor": "Fila Korea (domestic brand), Black Yak, Kolon Sport, Decathlon Korea",
+    },
+  };
+
+  const categoryRetailers = (CATEGORY_RETAILERS[mkt]||{})[cat] || retailerIntel || 'major retailers in this market';
+
+  // Category-specific compliance additions
+  const CATEGORY_COMPLIANCE_EXTRA = {
+    "Fashion & Apparel": {
+      base: "EU TEXTILE REGULATION: EUDR in scope for cotton, leather, wood-based fibres (viscose, lyocell) from December 30 2026 — due diligence required. EU Textile Labelling Regulation 1007/2011: fibre composition label in local language mandatory. ESPR Textile Ecodesign Regulation: textile destruction ban from July 2026 — unsold stock cannot be destroyed. GOTS (Global Organic Textile Standard) strongly recommended. OEKO-TEX STANDARD 100 increases retail acceptance significantly.",
+      "Germany": "German Textiles Labelling Act. GRS (Global Recycled Standard) increases dm/Zalando acceptance. VerpackG for packaging.",
+      "United Kingdom": "UK Textile Products (Labelling and Fibre Composition) Regs 2012. UK-REACH for restricted substances. English fibre labels.",
+      "Denmark": "Danish labelling in Danish. Nordic Swan textile certification. EUDR December 2026.",
+      "United States": "FTC Care Labeling Rule: care instructions mandatory. FTC Textile Fiber Products Identification Act: fibre composition labels. Made in USA claims: strict FTC rules.",
+      "Japan": "Home Goods Quality Labelling Act: Japanese fibre composition labels mandatory. JIS (Japanese Industrial Standards) compliance.",
+    },
+    "Food & Beverage": {
+      base: "EUDR IN SCOPE for coffee, cocoa, soy, palm oil, beef, timber products — December 30 2026 deadline. Organic certification: EU Organic Regulation 2018/848. Novel Food Regulation EU 2015/2283 for new ingredients. Allergen labelling: 14 major allergens highlighted.",
+      "Germany": "BVL notification. VerpackG mandatory. German-language labels. DE-OeKO for organic.",
+      "United Kingdom": "FSA novel food. UK allergen rules (sesame now 15th). UKORG organic.",
+      "Denmark": "DVFA registration. O-maerket organic. EUDR scope check.",
+      "Japan": "Food Sanitation Act (Shokuhin Eiseiho). JAS organic (different from EU organic). Quarantine inspection mandatory. Japanese labelling.",
+      "South Korea": "MFDS Food Sanitation Act. Korean labelling. Import quarantine. Halal for Muslim segment.",
+      "UAE": "ESMA Halal certification typically required. Dubai Municipality approval. Arabic labelling.",
+    },
+    "Wellness & Supplements": {
+      base: "EU Food Supplements Directive 2002/46/EC. Health claims: ONLY approved EU register claims (Reg 1924/2006). No disease claims. Notify national authority before first placement. Novel food check required for new ingredients.",
+      "Germany": "Notify BVL. NemV compliance. VerpackG.",
+      "United Kingdom": "MHRA borderline check. UK Health Claims. UK NHP Regs.",
+      "Denmark": "Sundhedsstyrelsen notification. DVFA.",
+      "Japan": "FOSHU approval for functional claims. Very strict — most EU claims not transferable.",
+      "Canada": "Health Canada NPN licence (3-12 months). English + French.",
+      "UAE": "Ministry of Health registration. Halal preferred.",
+    },
+    "Home & Design": {
+      base: "EU General Product Safety Regulation (GPSR) 2023 — replaces GPSD from December 2024. CE marking for electronics/electrical. REACH regulation for chemical substances in products. ESPR Ecodesign: durability, repairability requirements coming. FSC or PEFC for wood products.",
+      "Germany": "GS mark (Geprufte Sicherheit) — voluntary but increases retail acceptance. VerpackG packaging. German safety requirements.",
+      "United Kingdom": "UKCA mark replacing CE for UK market. UK REACH.",
+      "Denmark": "Danish labelling. Nordic Swan for furniture/home. FSC for wood.",
+      "Japan": "PSE mark mandatory for electrical products (Ministry of Economy). Japanese labelling. JIS standards.",
+      "United States": "CPSC (Consumer Product Safety Commission) compliance. California Prop 65 for chemical substances. ASTM standards for furniture.",
+    },
+    "Baby & Family": {
+      base: "EU Toy Safety Directive 2011/65/EU (EN 71 standard): CE marking mandatory for toys. EU Baby Products: very strict safety standards. REACH restriction on certain chemicals in children's products. ESPR applies. EN 1888 for prams/pushchairs.",
+      "Germany": "TÜV or GS certification strongly recommended for retail access. VerpackG. Strict German safety enforcement.",
+      "United Kingdom": "UKCA mark for toys. UK Toy Safety Regs. UKCA replacing CE.",
+      "Denmark": "Danish labelling. Very strict baby product safety enforcement by SKAT/DCEA.",
+      "Japan": "ST mark (Safety Toy Japan) for toys. PSE for electrical baby products. Extremely strict import checks.",
+      "United States": "CPSC mandatory testing for children's products. ASTM F963 toy safety. California Prop 65.",
+    },
+    "Sport & Outdoor": {
+      base: "EU General Product Safety Regulation (GPSR). CE marking for relevant products. REACH for chemicals in textiles/equipment. ISO standards relevant to specific sport categories. Bluesign or OEKO-TEX for performance textiles.",
+      "Germany": "TÜV testing recommended. VerpackG. German safety standards. Intersport DE supplier requirements.",
+      "United Kingdom": "UKCA replacing CE. UK REACH.",
+      "Norway": "NSF certification for some outdoor categories. XXL supplier requirements: full REACH compliance, test reports.",
+      "Japan": "SGS-Japan testing. Japanese labelling. JIS standards for protective equipment.",
+      "United States": "CPSC. ASTM standards. FTC Care Labeling for apparel. California Prop 65.",
+    },
+  };
+
+  const categoryCompliance = cat && CATEGORY_COMPLIANCE_EXTRA[cat]
+    ? (CATEGORY_COMPLIANCE_EXTRA[cat].base||'')+' '+
+      (CATEGORY_COMPLIANCE_EXTRA[cat][mkt]||'Check local market requirements.')
+    : '';
 
   // MODULE DEFINITIONS — each is a focused, deep-dive prompt
   const modules = [
@@ -1742,8 +1974,9 @@ ${priceContext}`;
 
 ${brandCtx}
 
-LIVE RETAILER INTELLIGENCE FOR ${reportForm.targetMarket.toUpperCase()} (April 2026):
-${retailerIntel||'Generate from your knowledge of this market'}
+LIVE RETAILER INTELLIGENCE FOR ${reportForm.targetMarket.toUpperCase()} — ${reportForm.category.toUpperCase()} (April 2026):
+${categoryRetailers}
+${retailerIntel?'\nBEAUTY RETAILER DEEP-DIVE:\n'+retailerIntel:''}
 
 Generate EXECUTIVE SUMMARY & MARKET INTELLIGENCE.
 
@@ -1791,8 +2024,9 @@ Think step by step: identify 3 competitors, their shelf position, their weakness
 
 ${brandCtx}
 
-FOUNDER-VERIFIED RETAILER INTELLIGENCE (April 2026):
-${retailerIntel||'Generate from your knowledge of this market in April 2026'}
+RETAILER INTELLIGENCE FOR ${reportForm.category} IN ${reportForm.targetMarket} (April 2026):
+${categoryRetailers}
+${retailerIntel?'ADDITIONAL INTEL:\n'+retailerIntel:''}
 
 Generate RETAILER DEEP-DIVE & HIDDEN ECONOMICS.
 
@@ -1834,7 +2068,10 @@ A 50% headline margin is never 50% after deductions. Show the real P&L:
 
 ${brandCtx}
 TARGET MARKET: ${reportForm.targetMarket}
-COMPLIANCE CONTEXT: ${complianceDetail}
+CATEGORY: ${reportForm.category}
+EU BASE COMPLIANCE (applies to all EU/EEA markets — do not repeat per country): ${EU_BASE[reportForm.category]||'See general EU product safety requirements.'}
+MARKET-SPECIFIC COMPLIANCE: ${complianceDetail}
+CATEGORY-SPECIFIC REQUIREMENTS: ${categoryCompliance}
 
 Generate CLAIMS AUDIT & COMPLIANCE ROADMAP.
 
@@ -1883,7 +2120,7 @@ List any specific claim language that must change before export. If none, state 
       prompt: `You are VeyaFlow AI — market entry strategist. April 2026. Writing for a brand manager at a EUR 5M-50M brand — they need a phased scale-up plan, not just a 90-day sprint. They will present this to their board.
 
 ${brandCtx}
-DISTRIBUTION OPTIONS: ${distributors}
+DISTRIBUTION OPTIONS FOR ${reportForm.category} IN ${reportForm.targetMarket}: ${distributors}
 RETAILER LANDSCAPE: ${retailerIntel||'key retailers in this market'}
 
 Generate SCALE-UP ROADMAP & RISK REGISTER.
