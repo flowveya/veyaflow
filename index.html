@@ -433,6 +433,7 @@
     <div class="page" id="page-bizcase"></div>
     <div class="page" id="page-suppliers"></div>
     <div class="page" id="page-circular"></div>
+    <div class="page" id="page-skus"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -656,6 +657,8 @@ function loadState(){
     if(cirf){ const v=JSON.parse(cirf); Object.assign(circularForm,v); }
     if(cir) circularResult=JSON.parse(cir);
     if(ff){ const v=JSON.parse(ff); Object.assign(findForm,v); }
+    const sk=localStorage.getItem('ns_skus');
+    if(sk) skus=JSON.parse(sk);
     if(sf){ const v=JSON.parse(sf); Object.assign(supplierFilter,v); }
   }catch(e){ console.warn('State load error:',e); }
 }
@@ -734,6 +737,7 @@ const NAV=[
   {id:"bizcase", icon:"◉", label:"Retail Business Case",  stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
   {id:"suppliers",icon:"◈",label:"Supplier Nudge",        stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
   {id:"circular",icon:"◉", label:"Circular GPS",          stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"skus",    icon:"▦",  label:"My Products",            stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
 ];
 
 // Returns nav items visible for current brand stage
@@ -751,7 +755,7 @@ function getVisibleNav(){
   });
 }
 
-const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular"};
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products"};
 
 function buildNav(){
   var visibleNav = getVisibleNav();
@@ -853,13 +857,14 @@ function renderPage(id){
   else if(id==='bizcase')renderBizCase(el);
   else if(id==='suppliers')renderSuppliers(el);
   else if(id==='circular')renderCircular(el);
+  else if(id==='skus')renderSkus(el);
 }
 
 /* ═══════════════════════════════════════════════════
    HOME PAGE
 ═══════════════════════════════════════════════════ */
 let onboardStep=1;
-let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:''};
+let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:'',heroSkuName:'',heroSkuEan:'',heroSkuRsp:'',heroSkuCpnp:''};
 
 function renderHome(el){
   if(!brand){
@@ -870,7 +875,7 @@ function renderHome(el){
 }
 
 function renderOnboard(el){
-  const progress=(onboardStep/4)*100;
+  const progress=(onboardStep/5)*100;
   el.innerHTML=`
     <div class="progress-top"><div class="progress-top-fill" style="width:${progress}%"></div></div>
     <div class="onboard-wrap">
@@ -1007,9 +1012,38 @@ function renderOnboardStep(){
 
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=3;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1" onclick="completeOnboard()">Set up ${onboardForm.name||'my brand'} workspace →</button>
+        <button class="btn-primary" style="flex:1" onclick="onboardStep=5;renderPage('home')">Continue →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">All proof point fields are optional — add what you have now, update anytime</div>
+    `;
+  } else if(onboardStep===5){
+    inner.innerHTML=`
+      <div class="onboard-title">Add your hero SKU</div>
+      <div class="onboard-sub">Tell VeyaFlow about your lead product — the one you will pitch to retailers first. This unlocks the Brand Pack, Retailer Pitch, and compliance exports. You can add more products later.</div>
+
+      <div class="field"><label class="lbl">Product name *</label>
+        <input type="text" id="ob-sku-name" placeholder="e.g. Cloud & Glow LED Face Mask" value="${onboardForm.heroSkuName||''}" oninput="onboardForm.heroSkuName=this.value"></div>
+
+      <div class="grid-2">
+        <div class="field"><label class="lbl">EAN-13 barcode</label>
+          <input type="text" id="ob-sku-ean" placeholder="13 digits" value="${onboardForm.heroSkuEan||''}" oninput="onboardForm.heroSkuEan=this.value"></div>
+        <div class="field"><label class="lbl">RSP (home market)</label>
+          <input type="text" id="ob-sku-rsp" placeholder="e.g. 599 SEK" value="${onboardForm.heroSkuRsp||''}" oninput="onboardForm.heroSkuRsp=this.value"></div>
+      </div>
+
+      <div class="field"><label class="lbl">CPNP / notification number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — add now if you have it)</span></label>
+        <input type="text" placeholder="e.g. CPNP-2024-XXXXXXX" value="${onboardForm.heroSkuCpnp||''}" oninput="onboardForm.heroSkuCpnp=this.value"></div>
+
+      <div style="background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);padding:.75rem;font-family:var(--mono);font-size:.58rem;color:var(--gold);line-height:1.6;margin-bottom:1rem">
+        ✦ You can add full product data (INCI list, pricing, logistics, descriptions) in My Products after setup. This step just captures the basics.
+      </div>
+
+      <div style="display:flex;gap:.75rem">
+        <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=4;renderPage('home')">← Back</button>
+        <button class="btn-outline" style="flex:0 0 auto" onclick="completeOnboard()">Skip for now</button>
+        <button class="btn-primary" style="flex:1" onclick="completeOnboardWithSku()">Set up ${onboardForm.name||'my brand'} workspace →</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">Your workspace is saved in this browser — persists between sessions</div>
     `;
   }
 }
@@ -1146,6 +1180,20 @@ function showProofEdit(){
   };
 }
 
+function completeOnboardWithSku(){
+  // Save hero SKU if name provided
+  if(onboardForm.heroSkuName){
+    const heroSku = newSkuForm();
+    heroSku.name = onboardForm.heroSkuName;
+    heroSku.ean = onboardForm.heroSkuEan||'';
+    heroSku.rspSEK = onboardForm.heroSkuRsp||'';
+    heroSku.cpnp = onboardForm.heroSkuCpnp||'';
+    skus = [heroSku];
+    saveSkus();
+  }
+  completeOnboard();
+}
+
 function completeOnboard(){
   brand={...onboardForm,createdAt:new Date().toISOString()};
   saveBrandState();
@@ -1253,6 +1301,28 @@ function renderDashboard(el){
           </div>
           <div id="proof-summary" style="margin-bottom:1rem">
             ${renderProofSummary()}
+          </div>
+
+          <!-- YOUR PRODUCTS section -->
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;margin-top:.5rem;display:flex;align-items:center;justify-content:space-between">
+            <span>Your products</span>
+            <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;font-size:.58rem;text-decoration:underline">${skus.length>0?'View all →':'Add SKU →'}</span>
+          </div>
+          <div style="margin-bottom:1rem">
+            ${skus.length===0?`
+              <div style="padding:.6rem .85rem;background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.15);font-family:var(--sans);font-size:.75rem;color:var(--muted);line-height:1.5">
+                No products added yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first SKU →</span>
+              </div>
+            `:skus.slice(0,3).map(sku=>{
+              const r=skuReadiness(sku);
+              return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)">
+                <div style="flex:1;font-family:var(--sans);font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div>
+                <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div>
+                <div style="background:var(--border);width:50px;height:4px;border-radius:2px;flex-shrink:0">
+                  <div style="background:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'};height:4px;border-radius:2px;width:${r.pct}%"></div>
+                </div>
+              </div>`;
+            }).join('')}
           </div>
 
           <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Quick actions</div>
@@ -3015,6 +3085,636 @@ function renderBrandPackResult(){
       <strong>💡 Tip:</strong> To save as PDF — click Print, then select "Save as PDF" as the destination. The Brand Pack is formatted to print cleanly on A4.
     </div>
   `;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SKU / PRODUCT DATA ROOM
+   Spec: April 2026 — Charlotte Hellberg
+═══════════════════════════════════════════════════ */
+let skus = [];
+let skuEditId = null;
+let skuTab = 1;
+let skuForm = {};
+
+function newSkuForm(){
+  return {
+    id: Date.now().toString(),
+    // Tab 1 — Basics
+    name:'', articleNo:'', ean:'', netContent:'', netUnit:'g', unitsPerPack:1,
+    countryOfMfr:'', shelfLifeMonths:'', paoMonths:'',
+    // Tab 2 — Compliance
+    inci:'', hasFrag:false, allergens:'', ph:'',
+    cpnp:'', euResponsible:'', safetyRef:'',
+    claims:[], certifications:[],
+    // Tab 3 — Commercial
+    rspSEK:'', rspDKK:'', rspGBP:'', rspEUR:'',
+    netPriceSEK:'', vatRate:25, moq:'', caseQty:'', leadDays:'', warehouse:'', gln:'',
+    // Tab 4 — Assets
+    descSV:'', descEN:'', descDA:'',
+    // Meta
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveSkus(){
+  try{localStorage.setItem('ns_skus',JSON.stringify(skus));}catch(e){}
+}
+
+// SKU readiness score — what % complete and which retailers are unlocked
+function skuReadiness(sku){
+  const fields = [
+    {key:'name',label:'Product name',weight:2},
+    {key:'ean',label:'EAN barcode',weight:2},
+    {key:'netContent',label:'Net content',weight:1},
+    {key:'countryOfMfr',label:'Country of manufacture',weight:1},
+    {key:'shelfLifeMonths',label:'Shelf life',weight:1},
+    {key:'inci',label:'INCI list',weight:3},
+    {key:'cpnp',label:'CPNP number',weight:3},
+    {key:'euResponsible',label:'EU Responsible Person',weight:2},
+    {key:'safetyRef',label:'Safety Assessment ref',weight:2},
+    {key:'rspSEK',label:'RSP (SEK)',weight:1},
+    {key:'netPriceSEK',label:'Net price',weight:1},
+    {key:'moq',label:'MOQ',weight:1},
+    {key:'descEN',label:'Product description (EN)',weight:1},
+  ];
+  const total = fields.reduce((s,f)=>s+f.weight,0);
+  const scored = fields.reduce((s,f)=>s+(sku[f.key]&&String(sku[f.key]).trim().length>0?f.weight:0),0);
+  const pct = Math.round((scored/total)*100);
+  const missing = fields.filter(f=>!sku[f.key]||String(sku[f.key]).trim().length===0).map(f=>f.label);
+
+  // Retailer readiness
+  const ready = [];
+  const notReady = [];
+  const retailerReqs = {
+    'Lyko':        ['name','ean','inci','rspSEK','descSV','descEN'],
+    'Kicks':       ['name','ean','inci','rspSEK','cpnp'],
+    'Apotek Hjärtat':['name','ean','inci','cpnp','euResponsible','safetyRef','rspSEK','moq'],
+    'Matas':       ['name','ean','inci','cpnp','rspDKK','descEN'],
+    'Boots UK':    ['name','ean','inci','cpnp','euResponsible','safetyRef','rspGBP'],
+  };
+  Object.entries(retailerReqs).forEach(([retailer,reqs])=>{
+    const allMet = reqs.every(r=>sku[r]&&String(sku[r]).trim().length>0);
+    if(allMet) ready.push(retailer); else notReady.push(retailer);
+  });
+
+  return {pct, missing, ready, notReady};
+}
+
+// Claims traffic light — pure logic, no API
+const CLAIM_RULES = {
+  'clinically tested':  {SE:'green',DK:'green',DE:'green',UK:'amber',note:'Requires clinical study reference'},
+  'clinically proven':  {SE:'amber',DK:'amber',DE:'amber',UK:'red',note:'Strong claim — needs substantiation in UK'},
+  'dermatologist tested':{SE:'green',DK:'green',DE:'green',UK:'green',note:'Widely accepted'},
+  'dermatologist approved':{SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'"Approved" implies endorsement — rephrase to "tested"'},
+  'anti-aging':         {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: must say "reduces appearance of" — not anti-aging directly'},
+  'anti-ageing':        {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: rephrase required'},
+  'reduces wrinkles':   {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim if not therapeutic'},
+  'repairs skin':       {SE:'red',DK:'red',DE:'red',UK:'red',note:'Therapeutic claim — rephrase to "helps improve skin appearance"'},
+  'heals':              {SE:'red',DK:'red',DE:'red',UK:'red',note:'Medical claim — not permitted for cosmetics'},
+  'vegan':              {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted — no legal definition but widely used'},
+  'cruelty free':       {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted'},
+  'organic':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'If not certified organic — use "with organic ingredients"'},
+  'natural':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal definition — be specific about what is natural'},
+  'hypoallergenic':     {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal standard — ensure allergen testing done'},
+  'spf':                {SE:'green',DK:'green',DE:'green',UK:'green',note:'Regulated — must be SPF tested to ISO 24444'},
+  'collagen boosting':  {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim with substantiation'},
+};
+
+function getClaimLight(claim){
+  const key = claim.toLowerCase().trim();
+  const rule = CLAIM_RULES[key];
+  if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before printing on pack'};
+  const markets = brand?.targetMarkets||[];
+  const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
+  let worst = 'green';
+  markets.forEach(m=>{
+    const code = codes[m]||'SE';
+    const val = rule[code]||'amber';
+    if(val==='red') worst='red';
+    else if(val==='amber'&&worst!=='red') worst='amber';
+  });
+  return {light:worst, note:rule.note||''};
+}
+
+function renderSkus(el){
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+
+  if(skuEditId!==null){
+    renderSkuEdit(el);
+    return;
+  }
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
+          <div class="page-title">My Products</div>
+          <div class="page-sub">Product data room — fill once, export to any retailer</div>
+        </div>
+        <button class="btn-primary" onclick="startNewSku()">+ Add product</button>
+      </div>
+
+      ${skus.length===0?`
+        <div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">
+          <div style="font-size:2rem;margin-bottom:.75rem">▦</div>
+          <div class="empty-title">No products added yet</div>
+          <div class="empty-sub" style="margin-bottom:1.25rem">Add your first SKU — VeyaFlow stores all product data in one place and exports it in any retailer's format.</div>
+          <button class="btn-primary" onclick="startNewSku()">Add your first product →</button>
+        </div>
+      `:`
+        <div class="card" style="margin-bottom:1rem">
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Your products — ${skus.length} SKU${skus.length!==1?'s':''}</div>
+          ${skus.map(sku=>{
+            const r = skuReadiness(sku);
+            const barW = r.pct+'%';
+            const barC = r.pct>=90?'var(--green)':r.pct>=60?'var(--gold)':'#EF4444';
+            return `
+              <div style="padding:.85rem 0;border-bottom:1px solid var(--border)">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
+                  <div style="flex:1;min-width:180px">
+                    <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}</div>
+                    <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.15rem">${sku.ean?'EAN '+sku.ean:'No EAN'}${sku.netContent?' · '+sku.netContent+' '+sku.netUnit:''}</div>
+                  </div>
+                  <div style="display:flex;gap:.5rem;align-items:center">
+                    <button class="btn-outline" style="font-size:.7rem;padding:.3rem .7rem" onclick="editSku('${sku.id}')">Edit</button>
+                    <button class="btn-outline" style="font-size:.7rem;padding:.3rem .7rem;color:var(--gold);border-color:var(--gold)" onclick="showSkuExport('${sku.id}')">Export →</button>
+                  </div>
+                </div>
+                <div style="margin-top:.5rem">
+                  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem">
+                    <div style="flex:1;background:var(--border);height:5px;border-radius:3px">
+                      <div style="background:${barC};height:5px;border-radius:3px;width:${barW};transition:width .5s"></div>
+                    </div>
+                    <div style="font-family:var(--mono);font-size:.62rem;color:${barC};font-weight:700;flex-shrink:0">${r.pct}%</div>
+                  </div>
+                  <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+                    ${r.ready.map(rt=>`<span style="font-family:var(--mono);font-size:.5rem;background:var(--green-lt,#ECFDF5);color:#065F46;padding:.1rem .4rem;border:1px solid #A7F3D0">✓ ${rt}</span>`).join('')}
+                    ${r.notReady.slice(0,3).map(rt=>`<span style="font-family:var(--mono);font-size:.5rem;background:#FEF2F2;color:#991B1B;padding:.1rem .4rem;border:1px solid #FCA5A5">✗ ${rt}</span>`).join('')}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.85rem 1rem;font-family:var(--sans);font-size:.78rem;color:#1E40AF;line-height:1.6">
+        <strong>How it works:</strong> Fill in product data once across 4 tabs. VeyaFlow calculates your retailer readiness score and generates export files in each retailer's required format.
+      </div>
+    </div>
+  `;
+}
+
+function startNewSku(){
+  skuEditId = 'new';
+  skuTab = 1;
+  skuForm = newSkuForm();
+  // Pre-fill EU Responsible Person from brand if set
+  if(brand?.euResponsible) skuForm.euResponsible = brand.euResponsible;
+  renderPage('skus');
+}
+
+function editSku(id){
+  const sku = skus.find(s=>s.id===id);
+  if(!sku) return;
+  skuEditId = id;
+  skuTab = 1;
+  skuForm = {...sku};
+  renderPage('skus');
+}
+
+function saveSkuForm(){
+  skuForm.updatedAt = new Date().toISOString();
+  if(skuEditId==='new'){
+    skus.unshift({...skuForm});
+  } else {
+    const idx = skus.findIndex(s=>s.id===skuEditId);
+    if(idx>=0) skus[idx]={...skuForm};
+  }
+  skuEditId = null;
+  saveSkus();
+  renderPage('skus');
+}
+
+function cancelSkuEdit(){
+  skuEditId = null;
+  renderPage('skus');
+}
+
+async function formatInci(){
+  const raw = skuForm.inci;
+  if(!raw||raw.trim().length<10){alert('Paste your ingredient list first.');return;}
+  const btn = document.getElementById('inci-format-btn');
+  if(btn){btn.disabled=true;btn.textContent='Formatting...';}
+  try{
+    const text = await callAPI([{role:'user',content:`Format this ingredient list to correct INCI nomenclature standard — descending order by concentration, comma separated, using official INCI names. Return ONLY the formatted list, nothing else:\n\n${raw}`}],300);
+    skuForm.inci = text.trim();
+    const area = document.getElementById('inci-area');
+    if(area) area.value = skuForm.inci;
+    if(btn){btn.disabled=false;btn.textContent='✓ Formatted';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Format INCI';}
+    alert('Could not format: '+e.message);
+  }
+}
+
+async function generateSkuDesc(lang){
+  if(!brand?.usp&&!skuForm.name){alert('Add a product name first.');return;}
+  const btn = document.getElementById('desc-gen-'+lang);
+  if(btn){btn.disabled=true;btn.textContent='Generating...';}
+  try{
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}`}],200);
+    if(lang==='sv') skuForm.descSV=text.trim();
+    else if(lang==='da') skuForm.descDA=text.trim();
+    else skuForm.descEN=text.trim();
+    const area = document.getElementById('desc-area-'+lang);
+    if(area) area.value = text.trim();
+    if(btn){btn.disabled=false;btn.textContent='✓ Generated';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Generate';}
+    alert('Could not generate: '+e.message);
+  }
+}
+
+function addClaim(val){
+  val = val.trim();
+  if(!val||skuForm.claims.includes(val)) return;
+  skuForm.claims = [...skuForm.claims, val];
+  renderClaimsSection();
+}
+
+function removeClaim(claim){
+  skuForm.claims = skuForm.claims.filter(c=>c!==claim);
+  renderClaimsSection();
+}
+
+function renderClaimsSection(){
+  const el = document.getElementById('claims-section');
+  if(!el) return;
+  el.innerHTML = skuForm.claims.map(claim=>{
+    const {light,note} = getClaimLight(claim);
+    const colors = {green:['#ECFDF5','#065F46','#A7F3D0'],amber:['#FFFBEB','#92400E','#FCD34D'],red:['#FEF2F2','#991B1B','#FCA5A5']};
+    const [bg,fg,border] = colors[light]||colors.amber;
+    const icon = light==='green'?'✓':light==='red'?'✗':'⚠';
+    return `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.4rem .6rem;background:${bg};border:1px solid ${border};margin:.2rem 0">
+      <span style="font-family:var(--mono);font-size:.75rem;color:${fg};flex-shrink:0;font-weight:700">${icon}</span>
+      <div style="flex:1">
+        <div style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:${fg}">${claim}</div>
+        ${note?`<div style="font-family:var(--mono);font-size:.55rem;color:${fg};margin-top:.1rem;opacity:.8">${note}</div>`:''}
+      </div>
+      <span onclick="removeClaim('${claim.replace(/'/g,'&#39;')}')" style="cursor:pointer;color:${fg};font-size:.7rem;flex-shrink:0;padding:.1rem .2rem">\u00D7</span>
+    </div>`;
+  }).join('')||'<div style="font-family:var(--sans);font-size:.75rem;color:var(--muted)">No claims added yet</div>';
+}
+
+function renderSkuEdit(el){
+  const r = skuReadiness(skuForm);
+  const isNew = skuEditId === 'new';
+  const tabLabels = ['Product Basics','Ingredients & Compliance','Commercial & Logistics','Digital Assets'];
+  const hasDK = brand?.targetMarkets?.includes('Denmark');
+  const isSkincare = brand?.category==='Skincare & Beauty'||brand?.category==='Wellness & Supplements';
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">${isNew?'Add product':'Edit product'}</div>
+          <div class="page-sub">${skuForm.name||'New SKU'}</div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-outline" onclick="cancelSkuEdit()">Cancel</button>
+          <button class="btn-primary" onclick="saveSkuForm()">Save product</button>
+        </div>
+      </div>
+
+      <!-- Readiness bar -->
+      <div style="background:#fff;border:1px solid var(--border);padding:.85rem 1rem;margin-bottom:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">SKU Readiness</div>
+          <div style="font-family:var(--mono);font-size:.72rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div>
+        </div>
+        <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.5rem">
+          <div style="background:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'};height:6px;border-radius:3px;width:${r.pct}%;transition:width .5s"></div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          ${r.ready.map(rt=>`<span style="font-family:var(--mono);font-size:.52rem;background:#ECFDF5;color:#065F46;padding:.1rem .5rem;border:1px solid #A7F3D0">✓ ${rt}</span>`).join('')}
+          ${r.missing.slice(0,4).map(m=>`<span style="font-family:var(--mono);font-size:.52rem;background:#FEF2F2;color:#991B1B;padding:.1rem .5rem;border:1px solid #FCA5A5">Missing: ${m}</span>`).join('')}
+        </div>
+      </div>
+
+      <!-- Tab nav -->
+      <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">
+        ${tabLabels.map((t,i)=>`
+          <div onclick="skuTab=${i+1};renderSkuEdit(document.getElementById('page-skus'))"
+            style="padding:.5rem 1rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+            ${skuTab===i+1?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
+            ${i+1}. ${t}
+          </div>`).join('')}
+      </div>
+
+      <!-- Tab content -->
+      ${skuTab===1?`
+        <div class="card">
+          <div class="section-tag">Tell us what is in the box</div>
+          <div class="field"><label class="lbl">Product name (as sold) *</label>
+            <input type="text" id="sku-name" value="${skuForm.name||''}" placeholder="e.g. Cloud & Glow LED Face Mask" oninput="skuForm.name=this.value"></div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Internal article number</label>
+              <input type="text" value="${skuForm.articleNo||''}" placeholder="e.g. CG-001" oninput="skuForm.articleNo=this.value"></div>
+            <div class="field"><label class="lbl">EAN-13 barcode</label>
+              <input type="text" value="${skuForm.ean||''}" placeholder="13 digits" oninput="skuForm.ean=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Net content</label>
+              <div style="display:flex;gap:.4rem">
+                <input type="text" value="${skuForm.netContent||''}" placeholder="e.g. 50" oninput="skuForm.netContent=this.value" style="flex:1">
+                <select onchange="skuForm.netUnit=this.value" style="width:80px">
+                  ${['g','ml','pcs','oz','fl oz'].map(u=>`<option${skuForm.netUnit===u?' selected':''}>${u}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="field"><label class="lbl">Units per consumer pack</label>
+              <input type="number" value="${skuForm.unitsPerPack||1}" min="1" oninput="skuForm.unitsPerPack=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Country of manufacture</label>
+              <input type="text" value="${skuForm.countryOfMfr||''}" placeholder="e.g. Sweden" oninput="skuForm.countryOfMfr=this.value"></div>
+            <div class="field"><label class="lbl">Shelf life (months)</label>
+              <input type="number" value="${skuForm.shelfLifeMonths||''}" placeholder="e.g. 36" oninput="skuForm.shelfLifeMonths=this.value"></div>
+          </div>
+          ${isSkincare?`<div class="field"><label class="lbl">PAO — Period After Opening (months) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">The open jar symbol on your pack</span></label>
+            <input type="number" value="${skuForm.paoMonths||''}" placeholder="e.g. 12" oninput="skuForm.paoMonths=this.value"></div>`:''}
+        </div>
+      `:''}
+
+      ${skuTab===2?`
+        <div class="card">
+          <div class="section-tag">The regulatory core</div>
+          <div class="field">
+            <label class="lbl">INCI ingredient list <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Full INCI nomenclature, comma separated, descending order</span></label>
+            <textarea id="inci-area" rows="6" placeholder="e.g. Aqua, Glycerin, Niacinamide, Panthenol..." oninput="skuForm.inci=this.value">${skuForm.inci||''}</textarea>
+            <button id="inci-format-btn" class="btn-outline" style="margin-top:.4rem;font-size:.7rem" onclick="formatInci()">✦ Format to INCI standard</button>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Contains fragrance?</label>
+              <div style="display:flex;gap:.75rem;margin-top:.25rem">
+                <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=true;renderSkuEdit(document.getElementById('page-skus'))"> Yes</label>
+                <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${!skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=false;renderSkuEdit(document.getElementById('page-skus'))"> No</label>
+              </div>
+            </div>
+            ${isSkincare?`<div class="field"><label class="lbl">pH value <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+              <input type="text" value="${skuForm.ph||''}" placeholder="e.g. 5.5" oninput="skuForm.ph=this.value"></div>`:'<div></div>'}
+          </div>
+          ${skuForm.hasFrag?`<div class="field"><label class="lbl">Allergen declarations</label>
+            <input type="text" value="${skuForm.allergens||''}" placeholder="e.g. Contains Linalool, Limonene" oninput="skuForm.allergens=this.value"></div>`:''}
+          <div class="grid-2">
+            <div class="field"><label class="lbl">CPNP / SCPN notification number</label>
+              <input type="text" value="${skuForm.cpnp||''}" placeholder="e.g. CPNP-2024-XXXXXXX" oninput="skuForm.cpnp=this.value"></div>
+            <div class="field"><label class="lbl">EU Responsible Person</label>
+              <input type="text" value="${skuForm.euResponsible||''}" placeholder="Company name + country" oninput="skuForm.euResponsible=this.value"></div>
+          </div>
+          <div class="field"><label class="lbl">Safety Assessment reference</label>
+            <input type="text" value="${skuForm.safetyRef||''}" placeholder="e.g. SA-CG-2024-001" oninput="skuForm.safetyRef=this.value"></div>
+
+          <div class="field" style="margin-top:.75rem">
+            <label class="lbl">On-pack claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type a claim and press Enter — instant traffic light per market</span></label>
+            <input type="text" id="claim-input" placeholder='e.g. "Clinically tested" then press Enter'
+              onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}" style="margin-bottom:.5rem">
+            <div id="claims-section"></div>
+          </div>
+
+          <div class="field" style="margin-top:.75rem">
+            <label class="lbl">Certifications</label>
+            <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
+              ${['COSMOS Organic','COSMOS Natural','Vegan Society','Cruelty Free International','Nordic Swan','FSC packaging','GOTS','OEKO-TEX','B Corp','Halal','Kosher','Soil Association'].map(cert=>`
+                <div onclick="toggleSkuCert('${cert}')" style="padding:.3rem .7rem;border:1px solid ${skuForm.certifications?.includes(cert)?'var(--navy)':'var(--border)'};background:${skuForm.certifications?.includes(cert)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.72rem;color:${skuForm.certifications?.includes(cert)?'var(--navy)':'#555'}">
+                  ${skuForm.certifications?.includes(cert)?'✓ ':''} ${cert}
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+      `:''}
+
+      ${skuTab===3?`
+        <div class="card">
+          <div class="section-tag">What the buyer needs to say yes</div>
+          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Pricing</div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">RSP Sweden (SEK)</label>
+              <input type="number" value="${skuForm.rspSEK||''}" placeholder="e.g. 599" oninput="skuForm.rspSEK=this.value;updateMarginCalc()"></div>
+            <div class="field"><label class="lbl">RSP Denmark (DKK)</label>
+              <input type="number" value="${skuForm.rspDKK||''}" placeholder="e.g. 499" oninput="skuForm.rspDKK=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">RSP UK (GBP)</label>
+              <input type="number" value="${skuForm.rspGBP||''}" placeholder="e.g. 55" oninput="skuForm.rspGBP=this.value"></div>
+            <div class="field"><label class="lbl">RSP EU (EUR)</label>
+              <input type="number" value="${skuForm.rspEUR||''}" placeholder="e.g. 59" oninput="skuForm.rspEUR=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Net price to retailer (SEK)</label>
+              <input type="number" id="net-price" value="${skuForm.netPriceSEK||''}" placeholder="e.g. 250" oninput="skuForm.netPriceSEK=this.value;updateMarginCalc()"></div>
+            <div class="field"><label class="lbl">VAT rate %</label>
+              <input type="number" value="${skuForm.vatRate||25}" oninput="skuForm.vatRate=this.value"></div>
+          </div>
+          <div id="margin-calc" style="padding:.6rem .85rem;background:#EFF6FF;border:1px solid #BFDBFE;font-family:var(--mono);font-size:.65rem;color:#1E40AF;margin-bottom:.75rem"></div>
+
+          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;margin-top:.5rem">Logistics</div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">MOQ (units)</label>
+              <input type="number" value="${skuForm.moq||''}" placeholder="e.g. 200" oninput="skuForm.moq=this.value"></div>
+            <div class="field"><label class="lbl">Case pack quantity</label>
+              <input type="number" value="${skuForm.caseQty||''}" placeholder="e.g. 6" oninput="skuForm.caseQty=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Lead time (days)</label>
+              <input type="number" value="${skuForm.leadDays||''}" placeholder="e.g. 21" oninput="skuForm.leadDays=this.value"></div>
+            <div class="field"><label class="lbl">Warehouse / 3PL location</label>
+              <input type="text" value="${skuForm.warehouse||''}" placeholder="e.g. Stockholm, Sweden" oninput="skuForm.warehouse=this.value"></div>
+          </div>
+          <div class="field"><label class="lbl">GS1 GLN <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+            <input type="text" value="${skuForm.gln||''}" placeholder="13-digit location number" oninput="skuForm.gln=this.value"></div>
+        </div>
+      `:''}
+
+      ${skuTab===4?`
+        <div class="card">
+          <div class="section-tag">What appears on the shelf and online</div>
+          <div class="field">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+              <label class="lbl" style="margin:0">Product description (English) *</label>
+              <button id="desc-gen-en" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('en')">✦ Generate from USP</button>
+            </div>
+            <textarea id="desc-area-en" rows="4" placeholder="Max 120 words — used for Boots UK, Holland & Barrett, Matas EN..." oninput="skuForm.descEN=this.value">${skuForm.descEN||''}</textarea>
+          </div>
+          <div class="field">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+              <label class="lbl" style="margin:0">Product description (Swedish)</label>
+              <button id="desc-gen-sv" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('sv')">✦ Generate</button>
+            </div>
+            <textarea id="desc-area-sv" rows="4" placeholder="Lyko, Kicks, Apotek Hjärtat..." oninput="skuForm.descSV=this.value">${skuForm.descSV||''}</textarea>
+          </div>
+          ${hasDK?`
+          <div class="field">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+              <label class="lbl" style="margin:0">Product description (Danish)</label>
+              <button id="desc-gen-da" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('da')">✦ Generate</button>
+            </div>
+            <textarea id="desc-area-da" rows="4" placeholder="Matas, Magasin..." oninput="skuForm.descDA=this.value">${skuForm.descDA||''}</textarea>
+          </div>`:''}
+          <div style="background:#FFFBEB;border:1px solid #D97706;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#92400E;line-height:1.5">
+            <strong>📸 Product images:</strong> Image upload is coming in V2 once backend is live. For now, store your asset links or file references in the description field.
+          </div>
+        </div>
+      `:''}
+
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:.5rem">
+        <div style="display:flex;gap:.5rem">
+          ${skuTab>1?`<button class="btn-outline" onclick="skuTab--;renderSkuEdit(document.getElementById('page-skus'))">← Previous</button>`:''}
+        </div>
+        <div style="display:flex;gap:.5rem">
+          ${skuTab<4?`<button class="btn-primary" onclick="skuTab++;renderSkuEdit(document.getElementById('page-skus'))">Next →</button>`:
+          `<button class="btn-primary" onclick="saveSkuForm()">Save product ✓</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Re-render claims after DOM update
+  if(skuTab===2) setTimeout(renderClaimsSection,50);
+  // Re-render margin calc
+  if(skuTab===3) setTimeout(updateMarginCalc,50);
+}
+
+function toggleSkuCert(cert){
+  if(!skuForm.certifications) skuForm.certifications=[];
+  const idx = skuForm.certifications.indexOf(cert);
+  if(idx>=0) skuForm.certifications.splice(idx,1);
+  else skuForm.certifications.push(cert);
+  renderSkuEdit(document.getElementById('page-skus'));
+}
+
+function updateMarginCalc(){
+  const el = document.getElementById('margin-calc');
+  if(!el) return;
+  const rsp = parseFloat(document.getElementById('net-price')?.closest('.card')?.querySelector('[placeholder="e.g. 599"]')?.value||skuForm.rspSEK||0);
+  const net = parseFloat(document.getElementById('net-price')?.value||skuForm.netPriceSEK||0);
+  if(!rsp||!net){el.innerHTML='Enter RSP and net price to see margin calculation';return;}
+  const margin = Math.round(((rsp-net)/rsp)*100);
+  const ok = margin>=40&&margin<=60;
+  const warn = margin<40;
+  el.innerHTML=`Retailer margin: <strong>${margin}%</strong> ${ok?'✓ Within typical 40-55% range':warn?'⚠ Below 40% — most pharmacy retailers require 40-55%':'⚠ Above 60% — verify this is intentional'}`;
+  el.style.background = ok?'#ECFDF5':warn?'#FFFBEB':'#FEF2F2';
+  el.style.borderColor = ok?'#A7F3D0':warn?'#FCD34D':'#FCA5A5';
+  el.style.color = ok?'#065F46':warn?'#92400E':'#991B1B';
+}
+
+function showSkuExport(id){
+  const sku = skus.find(s=>s.id===id);
+  if(!sku) return;
+  const r = skuReadiness(sku);
+  const el = document.getElementById('page-skus');
+
+  el.innerHTML = `
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Export — ${sku.name||'Product'}</div>
+          <div class="page-sub">Choose retailer format</div>
+        </div>
+        <button class="btn-outline" onclick="renderSkus(document.getElementById('page-skus'))">← Back</button>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Export formats</div>
+        ${[
+          {name:'Apotek Hjärtat',format:'Excel template',desc:'Pre-filled supplier onboarding sheet. Requires: EAN, INCI, CPNP, safety ref, pricing.',ready:r.ready.includes('Apotek Hjärtat')},
+          {name:'Matas',format:'Compliance dossier',desc:'Product data sheet + compliance summary. Requires: EAN, INCI, CPNP, DKK pricing.',ready:r.ready.includes('Matas')},
+          {name:'Lyko',format:'Product sheet',desc:'Digital product listing data. Requires: EAN, INCI, SEK pricing, descriptions.',ready:r.ready.includes('Lyko')},
+          {name:'Kicks',format:'Product sheet',desc:'Matas Group format. Requires: EAN, INCI, CPNP, SEK pricing.',ready:r.ready.includes('Kicks')},
+          {name:'Boots UK',format:'Supplier data pack',desc:'UK compliance + product data. Requires: EAN, INCI, CPNP, GBP pricing, safety ref.',ready:r.ready.includes('Boots UK')},
+        ].map(exp=>`
+          <div style="display:flex;align-items:center;gap:.75rem;padding:.85rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+            <div style="flex:1;min-width:160px">
+              <div style="font-family:var(--sans);font-size:.85rem;font-weight:600;color:var(--navy)">${exp.name}</div>
+              <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.1rem">${exp.format}</div>
+              <div style="font-family:var(--sans);font-size:.72rem;color:#555;margin-top:.2rem">${exp.desc}</div>
+            </div>
+            ${exp.ready?
+              `<button class="btn-primary" style="font-size:.72rem;padding:.35rem .85rem" onclick="exportForRetailer('${id}','${exp.name}')">Export →</button>`:
+              `<div style="font-family:var(--mono);font-size:.6rem;color:#991B1B;text-align:right">Missing data<br><span style="cursor:pointer;text-decoration:underline" onclick="editSku('${id}')">Complete SKU →</span></div>`
+            }
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.5">
+        <strong>💡 Export generates a downloadable text file</strong> with all product data formatted for that retailer. Full Excel/PDF export coming in V2.
+      </div>
+    </div>
+  `;
+}
+
+function exportForRetailer(skuId, retailer){
+  const sku = skus.find(s=>s.id===skuId);
+  if(!sku) return;
+
+  const lines = [
+    `VEYAFLOW PRODUCT EXPORT — ${retailer.toUpperCase()}`,
+    `Generated: ${new Date().toLocaleDateString('en-GB')} by VeyaFlow`,
+    `Brand: ${brand?.name||''}`,
+    ``,
+    `PRODUCT INFORMATION`,
+    `Product name: ${sku.name||''}`,
+    `Article number: ${sku.articleNo||''}`,
+    `EAN-13: ${sku.ean||''}`,
+    `Net content: ${sku.netContent||''} ${sku.netUnit||''}`,
+    `Units per pack: ${sku.unitsPerPack||''}`,
+    `Country of manufacture: ${sku.countryOfMfr||''}`,
+    `Shelf life: ${sku.shelfLifeMonths||''} months`,
+    sku.paoMonths?`PAO: ${sku.paoMonths} months`:'',
+    ``,
+    `REGULATORY`,
+    `INCI list: ${sku.inci||''}`,
+    `Contains fragrance: ${sku.hasFrag?'Yes':'No'}`,
+    sku.allergens?`Allergen declarations: ${sku.allergens}`:'',
+    sku.ph?`pH: ${sku.ph}`:'',
+    `CPNP/SCPN number: ${sku.cpnp||''}`,
+    `EU Responsible Person: ${sku.euResponsible||''}`,
+    `Safety Assessment ref: ${sku.safetyRef||''}`,
+    sku.certifications?.length?`Certifications: ${sku.certifications.join(', ')}`:'',
+    sku.claims?.length?`On-pack claims: ${sku.claims.join(', ')}`:'',
+    ``,
+    `COMMERCIAL`,
+    `RSP Sweden: ${sku.rspSEK||''} SEK`,
+    `RSP Denmark: ${sku.rspDKK||''} DKK`,
+    `RSP UK: ${sku.rspGBP||''} GBP`,
+    `RSP EU: ${sku.rspEUR||''} EUR`,
+    `Net price (SEK): ${sku.netPriceSEK||''}`,
+    `VAT rate: ${sku.vatRate||''}%`,
+    `MOQ: ${sku.moq||''} units`,
+    `Case pack: ${sku.caseQty||''} units`,
+    `Lead time: ${sku.leadDays||''} days`,
+    `Warehouse: ${sku.warehouse||''}`,
+    sku.gln?`GS1 GLN: ${sku.gln}`:'',
+    ``,
+    `DESCRIPTIONS`,
+    `English: ${sku.descEN||''}`,
+    `Swedish: ${sku.descSV||''}`,
+    sku.descDA?`Danish: ${sku.descDA}`:'',
+    ``,
+    `--- END OF EXPORT ---`,
+    `VeyaFlow · veyaflow.com · ${new Date().toLocaleDateString('en-GB')}`,
+  ].filter(l=>l!=='').join('\n');
+
+  const blob = new Blob([lines], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`${brand?.name||'brand'}_${sku.name||'sku'}_${retailer.replace(/\s/g,'-')}.txt`;
+  a.click(); URL.revokeObjectURL(url);
 }
 
 function renderPitch(el){
