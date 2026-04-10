@@ -434,6 +434,8 @@
     <div class="page" id="page-suppliers"></div>
     <div class="page" id="page-circular"></div>
     <div class="page" id="page-skus"></div>
+    <div class="page" id="page-claims"></div>
+    <div class="page" id="page-cfo"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -738,6 +740,8 @@ const NAV=[
   {id:"suppliers",icon:"◈",label:"Supplier Nudge",        stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
   {id:"circular",icon:"◉", label:"Circular GPS",          stages:["trading","expanding","scaling"],                  cats:null},
   {id:"skus",    icon:"▦",  label:"My Products",            stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  {id:"claims",  icon:"⚑",  label:"Claim Localizer",        stages:["trading","expanding","scaling"],                  cats:null, badge:"New"},
+  {id:"cfo",     icon:"◈",  label:"CFO View",               stages:["trading","expanding","scaling"],                  cats:null, badge:"New"},
 ];
 
 // Returns nav items visible for current brand stage
@@ -755,7 +759,7 @@ function getVisibleNav(){
   });
 }
 
-const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products"};
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
 function buildNav(){
   var visibleNav = getVisibleNav();
@@ -858,6 +862,8 @@ function renderPage(id){
   else if(id==='suppliers')renderSuppliers(el);
   else if(id==='circular')renderCircular(el);
   else if(id==='skus')renderSkus(el);
+  else if(id==='claims')renderClaims(el);
+  else if(id==='cfo')renderCFO(el);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -3116,6 +3122,8 @@ function newSkuForm(){
     netPriceSEK:'', vatRate:25, moq:'', caseQty:'', leadDays:'', warehouse:'', gln:'',
     // Tab 4 — Assets
     descSV:'', descEN:'', descDA:'',
+    // Financials
+    exWorksCost:'',
     // Meta
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -3814,6 +3822,10 @@ function renderSkuEdit(el){
             <div class="field"><label class="lbl">VAT rate %</label>
               <input type="number" value="${skuForm.vatRate||25}" oninput="skuForm.vatRate=this.value"></div>
           </div>
+          <div class="field"><label class="lbl">Ex-works cost per unit (SEK) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Your COGS — unlocks CFO View calculations</span></label>
+            <input type="number" value="${skuForm.exWorksCost||''}" placeholder="e.g. 85" oninput="skuForm.exWorksCost=this.value"></div>
+          <div class="grid-2">
+          </div>
           <div id="margin-calc" style="padding:.6rem .85rem;background:#EFF6FF;border:1px solid #BFDBFE;font-family:var(--mono);font-size:.65rem;color:#1E40AF;margin-bottom:.75rem"></div>
 
           <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;margin-top:.5rem">Logistics</div>
@@ -4009,6 +4021,590 @@ function exportForRetailer(skuId, retailer){
   const a = document.createElement('a');
   a.href=url; a.download=`${brand?.name||'brand'}_${sku.name||'sku'}_${retailer.replace(/\s/g,'-')}.txt`;
   a.click(); URL.revokeObjectURL(url);
+}
+
+
+/* ═══════════════════════════════════════════════════
+   CLAIM LOCALIZER
+   Paste Swedish copy → AI flags issues per target market
+═══════════════════════════════════════════════════ */
+let claimsState = {input:'', result:null, loading:false};
+
+function renderClaims(el){
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
+          <div class="page-title">Claim Localizer</div>
+          <div class="page-sub">Paste your Swedish product copy — AI flags claims that need changing per market</div>
+        </div>
+      </div>
+
+      <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1.25rem">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">What this does</div>
+        <div style="font-family:var(--sans);font-size:.8rem;color:rgba(255,255,255,.8);line-height:1.65">
+          You write claims in Swedish. This tool checks whether each claim is legally safe for your target markets — Denmark, Germany, UK — and flags what needs to change before you print packaging or send a pitch deck. No more discovering "Anti-Aging" is restricted in Germany after the printer has run.
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="section-tag">Your product copy</div>
+        <div class="field">
+          <label class="lbl">Paste your claims / product copy (Swedish or English)</label>
+          <textarea id="claims-input" rows="7"
+            placeholder="e.g. Kliniskt testad. Reducerar rynkor med 32% på 8 veckor. Anti-aging formula. Läkares rekommendation. Reparerar huden på djupet. Organisk. Fri från konservering. Vegansk. SPF 30."
+            oninput="claimsState.input=this.value">${claimsState.input||''}</textarea>
+        </div>
+        <div class="field">
+          <label class="lbl">Target markets to check</label>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem">
+            ${['Denmark','Germany','United Kingdom','Norway','Netherlands','France','Sweden'].map(m=>`
+              <div class="market-chip${(brand.targetMarkets||[]).includes(m)||m==='Denmark'?' selected':''}"
+                onclick="this.classList.toggle('selected')" data-market="${m}">${m}</div>
+            `).join('')}
+          </div>
+        </div>
+        <button class="btn-primary" onclick="runClaimLocalizer()" ${claimsState.loading?'disabled':''} style="width:100%">
+          ${claimsState.loading?'Analysing claims...':'Analyse claims →'}
+        </button>
+      </div>
+
+      ${claimsState.loading?`
+        <div class="card" style="text-align:center;padding:2rem">
+          <div class="spinner" style="margin:0 auto 1rem"></div>
+          <div style="font-family:var(--mono);font-size:.68rem;color:var(--navy)">Checking each claim against market regulations...</div>
+        </div>
+      `:''}
+
+      ${claimsState.result&&!claimsState.loading?renderClaimsResult():''}
+    </div>
+  `;
+}
+
+async function runClaimLocalizer(){
+  const input = document.getElementById('claims-input')?.value||'';
+  if(!input.trim()){alert('Paste some claims first.');return;}
+
+  const selectedMarkets = [...document.querySelectorAll('.market-chip.selected')].map(el=>el.dataset.market).filter(Boolean);
+  if(!selectedMarkets.length){alert('Select at least one target market.');return;}
+
+  claimsState = {input, result:null, loading:true};
+  renderClaims(document.getElementById('page-claims'));
+
+  const prompt = `You are a cosmetics and consumer goods regulatory expert for Nordic brands expanding into European markets. April 2026.
+
+Analyse these product claims/copy for a ${brand.category||'consumer'} brand (${brand.name}) entering: ${selectedMarkets.join(', ')}.
+
+CLAIMS TO ANALYSE:
+${input}
+
+For each distinct claim or statement, provide a structured assessment. Format your response as a series of claim blocks using this EXACT format:
+
+CLAIM: [exact claim text]
+STATUS: [GREEN / AMBER / RED]
+MARKETS_AFFECTED: [list of markets where this is an issue, or "All clear"]
+ISSUE: [specific regulatory problem, or "No issues identified"]
+RECOMMENDED_CHANGE: [exact suggested replacement wording, or "No change needed"]
+---
+
+Rules for status:
+- GREEN: Claim is safe across all target markets as written
+- AMBER: Claim needs minor rewording or is market-specific — safe in some, restricted in others
+- RED: Claim is a serious regulatory risk — therapeutic/drug claim, unsubstantiated, or banned in one or more target markets
+
+Key rules to apply:
+- Germany: "Anti-Aging" must be "reduces the appearance of signs of aging" — the word itself is increasingly restricted
+- Germany: Any claim implying cellular repair or regeneration is a drug claim
+- UK post-Brexit: "Repairs", "heals", "regenerates" are drug claims under MHRA guidance
+- EU/UK: "Clinically proven" requires a clinical study on file — flag if no study reference
+- EU/UK: "Doctor recommended" or "dermatologist approved" implies endorsement — requires substantiation
+- SPF claims require ISO 24444 testing — flag if SPF claimed without test reference
+- "Organic" without certification = misleading under Green Claims Directive (September 2026)
+- "Natural" is acceptable but should be qualified
+- "Vegan" is acceptable across all markets
+- Health claims on food/supplements: only EFSA-approved claims permitted (EU)
+
+Be specific and actionable. Every RED must have a clear recommended change.`;
+
+  try{
+    const text = await callAPI([{role:'user',content:prompt}],1400);
+    claimsState = {input, result:text, loading:false};
+  }catch(err){
+    claimsState = {input, result:'ERROR:'+err.message, loading:false};
+  }
+  renderClaims(document.getElementById('page-claims'));
+}
+
+function renderClaimsResult(){
+  if(!claimsState.result) return '';
+  if(claimsState.result.startsWith('ERROR:')) return `<div style="color:var(--red);padding:1rem;background:#FEF2F2;font-family:var(--sans);font-size:.82rem">${claimsState.result.replace('ERROR:','')}</div>`;
+
+  const blocks = claimsState.result.split('---').map(b=>b.trim()).filter(b=>b.length>20);
+  let green=0, amber=0, red=0;
+
+  const parsed = blocks.map(block=>{
+    const claim = (block.match(/CLAIM:\s*(.+)/)||['',''])[1].trim();
+    const status = (block.match(/STATUS:\s*(GREEN|AMBER|RED)/)||['','AMBER'])[1];
+    const markets = (block.match(/MARKETS_AFFECTED:\s*(.+)/)||['',''])[1].trim();
+    const issue = (block.match(/ISSUE:\s*(.+)/)||['',''])[1].trim();
+    const fix = (block.match(/RECOMMENDED_CHANGE:\s*(.+)/)||['',''])[1].trim();
+    if(status==='GREEN') green++;
+    else if(status==='AMBER') amber++;
+    else if(status==='RED') red++;
+    return {claim, status, markets, issue, fix};
+  }).filter(p=>p.claim);
+
+  const statusStyle = {
+    GREEN: {bg:'#ECFDF5', border:'#A7F3D0', color:'#065F46', icon:'✓'},
+    AMBER: {bg:'#FFFBEB', border:'#FCD34D', color:'#92400E', icon:'⚠'},
+    RED:   {bg:'#FEF2F2', border:'#FCA5A5', color:'#991B1B', icon:'✗'},
+  };
+
+  return `
+    <!-- Summary bar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--border);background:#fff;margin-bottom:1rem">
+      ${[['✓ Clear',green,'#ECFDF5','#065F46'],['⚠ Review',amber,'#FFFBEB','#92400E'],['✗ Risk',red,'#FEF2F2','#991B1B']].map(([label,count,bg,color])=>`
+        <div style="padding:.85rem;text-align:center;background:${bg}">
+          <div style="font-family:var(--serif);font-size:1.6rem;color:${color};line-height:1">${count}</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:${color};text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem">${label}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Claim cards -->
+    ${parsed.map(p=>{
+      const s = statusStyle[p.status]||statusStyle.AMBER;
+      return `
+        <div style="border:1px solid ${s.border};background:${s.bg};padding:1rem 1.125rem;margin-bottom:.6rem">
+          <div style="display:flex;align-items:flex-start;gap:.6rem;margin-bottom:.5rem">
+            <span style="font-family:var(--mono);font-size:.8rem;font-weight:700;color:${s.color};flex-shrink:0">${s.icon}</span>
+            <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:${s.color}">"${p.claim}"</div>
+          </div>
+          ${p.markets&&p.markets!=='All clear'?`<div style="font-family:var(--mono);font-size:.58rem;color:${s.color};margin-bottom:.35rem">Markets: ${p.markets}</div>`:''}
+          ${p.issue&&p.issue!=='No issues identified'?`<div style="font-family:var(--sans);font-size:.78rem;color:${s.color};line-height:1.5;margin-bottom:.35rem">${p.issue}</div>`:''}
+          ${p.fix&&p.fix!=='No change needed'?`
+            <div style="background:rgba(255,255,255,.6);border:1px solid ${s.border};padding:.5rem .75rem;margin-top:.35rem">
+              <div style="font-family:var(--mono);font-size:.55rem;color:${s.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Suggested wording</div>
+              <div style="font-family:var(--sans);font-size:.8rem;color:var(--ink);font-style:italic">"${p.fix}"</div>
+            </div>
+          `:''}
+        </div>
+      `;
+    }).join('')}
+
+    <div style="display:flex;gap:.75rem;margin-top:1rem">
+      <button class="btn-outline" onclick="claimsState.result=null;claimsState.input='';renderClaims(document.getElementById('page-claims'))">← New analysis</button>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   CFO VIEW — Margin Stress-Tester + Landed Cost Calculator
+═══════════════════════════════════════════════════ */
+let cfoTab = 'margin';
+let marginState = {
+  rsp:0, netPrice:0, freight:0, listingFee:0, beautyDays:0,
+  samples:0, returns:0, cogs:0, currency:'SEK'
+};
+let landedState = {
+  exWorks:0, freightMode:'road', market:'Denmark', category:'Skincare & Beauty',
+  units:500, hsCode:'cosmetics'
+};
+
+// Import duty rates by market + HS category (April 2026)
+const DUTY_RATES = {
+  'Denmark':        {cosmetics:0, food:0, fashion:0, wellness:0, note:'EU member — no import duty from Sweden (EU internal trade)'},
+  'Germany':        {cosmetics:0, food:0, fashion:0, wellness:0, note:'EU member — no import duty from Sweden (EU internal trade)'},
+  'Netherlands':    {cosmetics:0, food:0, fashion:0, wellness:0, note:'EU member — no import duty from Sweden (EU internal trade)'},
+  'France':         {cosmetics:0, food:0, fashion:0, wellness:0, note:'EU member — no import duty from Sweden (EU internal trade)'},
+  'Norway':         {cosmetics:3.3, food:15, fashion:10.7, wellness:0, note:'EEA — preferential rates. Cosmetics 3.3%, food varies, fashion 10.7%'},
+  'United Kingdom': {cosmetics:0, food:0, fashion:12, wellness:0, note:'UK Global Tariff: Cosmetics 0%, fashion 12%, food varies by product'},
+  'United States':  {cosmetics:0, food:0, fashion:16.5, wellness:0, note:'MFN rates. Fashion 16.5% avg. Cosmetics generally 0%'},
+  'Japan':          {cosmetics:5.8, food:8.5, fashion:9.1, wellness:0, note:'Japan EPA preferential. Cosmetics 5.8%, food 8.5%, fashion 9.1%'},
+  'South Korea':    {cosmetics:6.5, food:8.0, fashion:13, wellness:0, note:'Korea FTA rates. Cosmetics 6.5%'},
+  'Australia':      {cosmetics:0, food:0, fashion:0, wellness:0, note:'Australia FTA — most goods 0%'},
+  'Canada':         {cosmetics:0, food:0, fashion:18, wellness:0, note:'CETA agreement. Cosmetics 0%, fashion ~18%'},
+};
+
+// Freight cost estimates per unit (SEK) by mode + destination
+const FREIGHT_EST = {
+  road:   {Denmark:8, Germany:12, Netherlands:14, France:18, Norway:10, Belgium:14, Austria:16},
+  sea:    {'United Kingdom':22, 'United States':45, Japan:65, 'South Korea':58, Australia:72, Canada:50, Singapore:60},
+  air:    {'United Kingdom':85, 'United States':140, Japan:180, 'South Korea':165, Australia:210, Canada:150, Singapore:155},
+};
+
+function getFreightCost(mode, market){
+  const modeRates = FREIGHT_EST[mode]||{};
+  return modeRates[market] || (mode==='road'?15:mode==='sea'?50:120);
+}
+
+function getDutyRate(market, category){
+  const rates = DUTY_RATES[market];
+  if(!rates) return {rate:0, note:'Rate unknown — verify with customs broker'};
+  const catKey = category.toLowerCase().includes('beauty')||category.toLowerCase().includes('skincare')?'cosmetics':
+                 category.toLowerCase().includes('food')?'food':
+                 category.toLowerCase().includes('fashion')||category.toLowerCase().includes('apparel')?'fashion':'wellness';
+  return {rate:rates[catKey]||0, note:rates.note||''};
+}
+
+function renderCFO(el){
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+
+  // Pre-fill from SKU data if available
+  const heroSku = skus.length>0?skus[0]:null;
+  if(heroSku){
+    if(heroSku.rspSEK && !marginState.rsp) marginState.rsp = parseFloat(heroSku.rspSEK)||0;
+    if(heroSku.netPriceSEK && !marginState.netPrice) marginState.netPrice = parseFloat(heroSku.netPriceSEK)||0;
+    if(heroSku.exWorksCost && !marginState.cogs) marginState.cogs = parseFloat(heroSku.exWorksCost)||0;
+    if(heroSku.exWorksCost && !landedState.exWorks) landedState.exWorks = parseFloat(heroSku.exWorksCost)||0;
+  }
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
+          <div class="page-title">CFO View</div>
+          <div class="page-sub">Margin stress-tester · Landed cost calculator · True net-to-brand</div>
+        </div>
+      </div>
+
+      <!-- Tab nav -->
+      <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">
+        <div onclick="cfoTab='margin';renderCFO(document.getElementById('page-cfo'))"
+          style="padding:.5rem 1.25rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+          ${cfoTab==='margin'?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
+          Margin Stress-Tester
+        </div>
+        <div onclick="cfoTab='landed';renderCFO(document.getElementById('page-cfo'))"
+          style="padding:.5rem 1.25rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+          ${cfoTab==='landed'?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
+          Landed Cost Calculator
+        </div>
+      </div>
+
+      ${cfoTab==='margin'?renderMarginTab():renderLandedTab()}
+    </div>
+  `;
+
+  // Bind live inputs
+  setTimeout(()=>{
+    document.querySelectorAll('[data-margin]').forEach(el=>{
+      el.addEventListener('input', function(){
+        marginState[this.dataset.margin] = parseFloat(this.value)||0;
+        updateMarginResult();
+      });
+    });
+    document.querySelectorAll('[data-landed]').forEach(el=>{
+      el.addEventListener('input', function(){
+        landedState[this.dataset.landed] = this.value;
+        updateLandedResult();
+      });
+    });
+    updateMarginResult();
+    updateLandedResult();
+  }, 50);
+}
+
+function renderMarginTab(){
+  const s = marginState;
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
+      <!-- Inputs -->
+      <div class="card">
+        <div class="section-tag">Your numbers</div>
+        ${[
+          ['rsp','RSP (recommended retail price)',s.rsp,'e.g. 599'],
+          ['netPrice','Net price to retailer',s.netPrice,'e.g. 250'],
+          ['cogs','Ex-works cost per unit (COGS)',s.cogs,'e.g. 85'],
+          ['freight','Freight cost per unit',s.freight,'e.g. 12'],
+        ].map(([key,label,val,ph])=>`
+          <div class="field">
+            <label class="lbl">${label} (SEK)</label>
+            <input type="number" data-margin="${key}" value="${val||''}" placeholder="${ph}" min="0">
+          </div>
+        `).join('')}
+
+        <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:.75rem 0 .5rem">Retailer deductions</div>
+        ${[
+          ['listingFee','Listing fee (one-off, SEK)',s.listingFee,'e.g. 5000'],
+          ['beautyDays','Promo participation (% of sales)',s.beautyDays,'e.g. 5'],
+          ['samples','Staff samples (SEK per store)',s.samples,'e.g. 150'],
+          ['returns','Returns allowance (%)',s.returns,'e.g. 3'],
+        ].map(([key,label,val,ph])=>`
+          <div class="field">
+            <label class="lbl">${label}</label>
+            <input type="number" data-margin="${key}" value="${val||''}" placeholder="${ph}" min="0">
+          </div>
+        `).join('')}
+
+        <div class="field">
+          <label class="lbl">Units sold Year 1 estimate</label>
+          <input type="number" data-margin="units" value="${s.units||1000}" placeholder="e.g. 1000" min="1">
+        </div>
+      </div>
+
+      <!-- Live results -->
+      <div id="margin-result">
+        <div class="card" style="text-align:center;padding:2rem;color:var(--muted)">
+          <div style="font-family:var(--mono);font-size:.68rem">Enter your numbers to see the analysis</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateMarginResult(){
+  const el = document.getElementById('margin-result');
+  if(!el) return;
+  const s = marginState;
+  if(!s.rsp||!s.netPrice){
+    el.innerHTML=`<div class="card" style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-family:var(--mono);font-size:.68rem">Enter RSP and net price to see margin analysis</div></div>`;
+    return;
+  }
+
+  const units = s.units||1000;
+  const rsp = s.rsp;
+  const net = s.netPrice;
+  const cogs = s.cogs||0;
+  const freight = s.freight||0;
+
+  // Retailer margin
+  const retailerMargin = ((rsp-net)/rsp*100);
+
+  // Brand deductions
+  const promoDeduction = net * (s.beautyDays/100||0);
+  const returnsDeduction = net * (s.returns/100||0);
+  const samplesTotal = s.samples||0; // per store, estimated 20 stores
+  const listingPerUnit = (s.listingFee||0)/units;
+
+  const trueNetPerUnit = net - promoDeduction - returnsDeduction - (samplesTotal*20/units) - listingPerUnit;
+  const grossProfitPerUnit = trueNetPerUnit - cogs - freight;
+  const grossMarginPct = trueNetPerUnit>0?(grossProfitPerUnit/trueNetPerUnit*100):0;
+  const totalRevenue = trueNetPerUnit * units;
+  const totalGrossProfit = grossProfitPerUnit * units;
+
+  // Break-even
+  const fixedCosts = (s.listingFee||0) + (s.samples||0)*20;
+  const breakEven = (cogs+freight)>0?Math.ceil(fixedCosts/(trueNetPerUnit-(cogs+freight))):0;
+
+  const marginColor = retailerMargin>=40&&retailerMargin<=60?'#10B981':retailerMargin<35?'#EF4444':'#F59E0B';
+  const gpColor = grossMarginPct>=40?'#10B981':grossMarginPct>=20?'#F59E0B':'#EF4444';
+
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:.75rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">Retailer relationship</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem">
+        <div style="text-align:center;padding:.75rem;background:#F9F8F6">
+          <div style="font-family:var(--serif);font-size:1.6rem;color:${marginColor}">${retailerMargin.toFixed(1)}%</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Retailer margin</div>
+          <div style="font-family:var(--sans);font-size:.65rem;color:${marginColor};margin-top:.2rem">${retailerMargin>=40&&retailerMargin<=60?'✓ Target range 40-60%':retailerMargin<35?'⚠ Below minimum':'⚠ Check this'}</div>
+        </div>
+        <div style="text-align:center;padding:.75rem;background:#F9F8F6">
+          <div style="font-family:var(--serif);font-size:1.6rem;color:${gpColor}">${grossMarginPct.toFixed(1)}%</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Your gross margin</div>
+          <div style="font-family:var(--sans);font-size:.65rem;color:${gpColor};margin-top:.2rem">${grossMarginPct>=40?'✓ Healthy':'⚠ Pressure here'}</div>
+        </div>
+      </div>
+
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">True net-to-brand (after all deductions)</div>
+      ${[
+        ['RSP', `${rsp.toFixed(0)} SEK`, '#333'],
+        ['→ Net to brand (headline)', `${net.toFixed(0)} SEK`, '#333'],
+        ['− Promo/Beauty Days', `-${promoDeduction.toFixed(0)} SEK`, '#991B1B'],
+        ['− Returns allowance', `-${returnsDeduction.toFixed(0)} SEK`, '#991B1B'],
+        ['− Listing fee (per unit)', `-${listingPerUnit.toFixed(0)} SEK`, '#991B1B'],
+        ['− Samples', `-${(samplesTotal*20/units).toFixed(0)} SEK`, '#991B1B'],
+        ['= True net per unit', `${trueNetPerUnit.toFixed(0)} SEK`, 'var(--navy)'],
+        ['− COGS', `-${cogs.toFixed(0)} SEK`, '#92400E'],
+        ['− Freight', `-${freight.toFixed(0)} SEK`, '#92400E'],
+        ['= Gross profit per unit', `${grossProfitPerUnit.toFixed(0)} SEK`, gpColor],
+      ].map(([label,val,color])=>`
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.77rem;color:var(--muted)">${label}</div>
+          <div style="font-family:var(--mono);font-size:.77rem;font-weight:600;color:${color}">${val}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="card" style="margin-bottom:.75rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">Year 1 at ${units.toLocaleString()} units</div>
+      ${[
+        ['Total revenue to brand', `${Math.round(totalRevenue).toLocaleString()} SEK`],
+        ['Total gross profit', `${Math.round(totalGrossProfit).toLocaleString()} SEK`],
+        ['Break-even units', breakEven>0?`${breakEven.toLocaleString()} units`:'Enter COGS to calculate'],
+      ].map(([label,val])=>`
+        <div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.8rem;color:var(--muted)">${label}</div>
+          <div style="font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--navy)">${val}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${grossMarginPct<20&&cogs>0?`
+      <div style="background:#FEF2F2;border:1px solid #FCA5A5;padding:.75rem 1rem;font-family:var(--sans);font-size:.78rem;color:#991B1B;line-height:1.5">
+        <strong>⚠ Margin pressure:</strong> Your gross margin is below 20% after all deductions. Consider increasing RSP, reducing COGS, or negotiating lower retailer margin before committing to this market.
+      </div>
+    `:''}
+  `;
+}
+
+function renderLandedTab(){
+  const s = landedState;
+  const isEU = ['Denmark','Germany','Netherlands','France','Belgium','Austria'].includes(s.market);
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
+      <div class="card">
+        <div class="section-tag">Shipment details</div>
+        <div class="field">
+          <label class="lbl">Ex-works cost per unit (SEK)</label>
+          <input type="number" data-landed="exWorks" value="${s.exWorks||''}" placeholder="e.g. 85" min="0">
+        </div>
+        <div class="field">
+          <label class="lbl">Units per shipment</label>
+          <input type="number" data-landed="units" value="${s.units||500}" placeholder="e.g. 500" min="1">
+        </div>
+        <div class="field">
+          <label class="lbl">Destination market</label>
+          <select data-landed="market">
+            ${['Denmark','Germany','Netherlands','United Kingdom','Norway','France','Belgium','Austria','United States','Japan','South Korea','Australia','Canada','Singapore'].map(m=>`<option${s.market===m?' selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Product category</label>
+          <select data-landed="category">
+            ${['Skincare & Beauty','Wellness & Supplements','Food & Beverage','Fashion & Apparel','Home & Design','Sport & Outdoor'].map(c=>`<option${s.category===c?' selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Freight mode</label>
+          <div style="display:flex;gap:.5rem;margin-top:.25rem">
+            ${[['road','🚛 Road'],['sea','🚢 Sea'],['air','✈ Air']].map(([mode,label])=>`
+              <div onclick="landedState.freightMode='${mode}';updateLandedResult();document.querySelectorAll('[data-landed]').forEach(el=>{if(el.dataset.landed==='freightMode')el.value='${mode}';});"
+                style="flex:1;padding:.5rem;text-align:center;border:1px solid ${s.freightMode===mode?'var(--navy)':'var(--border)'};background:${s.freightMode===mode?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.75rem;color:${s.freightMode===mode?'var(--navy)':'#555'}">
+                ${label}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="field">
+          <label class="lbl">RSP in target market (optional — for net-to-brand calc)</label>
+          <input type="number" data-landed="rsp" value="${s.rsp||''}" placeholder="Local currency" min="0">
+        </div>
+      </div>
+
+      <div id="landed-result">
+        <div class="card" style="text-align:center;padding:2rem;color:var(--muted)">
+          <div style="font-family:var(--mono);font-size:.68rem">Enter ex-works cost to see landed cost breakdown</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateLandedResult(){
+  const el = document.getElementById('landed-result');
+  if(!el) return;
+  const s = landedState;
+
+  // Read from DOM inputs (they may have changed)
+  document.querySelectorAll('[data-landed]').forEach(inp=>{
+    const key = inp.dataset.landed;
+    landedState[key] = inp.type==='number'?(parseFloat(inp.value)||0):inp.value;
+  });
+
+  const exWorks = landedState.exWorks||0;
+  if(!exWorks){
+    el.innerHTML=`<div class="card" style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-family:var(--mono);font-size:.68rem">Enter ex-works cost per unit to calculate</div></div>`;
+    return;
+  }
+
+  const units = landedState.units||500;
+  const market = landedState.market||'Denmark';
+  const category = landedState.category||'Skincare & Beauty';
+  const freightMode = landedState.freightMode||'road';
+  const rsp = landedState.rsp||0;
+
+  const freightPerUnit = getFreightCost(freightMode, market);
+  const {rate:dutyRate, note:dutyNote} = getDutyRate(market, category);
+  const dutyPerUnit = exWorks * (dutyRate/100);
+
+  // VAT on import (applied to CIF value in most markets)
+  const vatRates = {Denmark:25, Germany:19, Netherlands:21, 'United Kingdom':20, Norway:25, France:20, Belgium:21, Austria:20, 'United States':0, Japan:10, 'South Korea':10, Australia:10, Canada:5};
+  const vatRate = vatRates[market]||20;
+  const cifValue = exWorks + freightPerUnit;
+  const vatOnImport = (cifValue + dutyPerUnit) * (vatRate/100);
+  // Note: VAT is reclaimable for VAT-registered businesses — show both
+
+  // One-off costs (amortised per unit)
+  const oneOffCosts = {
+    'United Kingdom': {label:'UK Responsible Person setup', cost:65000, perUnit:65000/units}, // ~£5K in SEK
+    Norway: {label:'Norwegian Responsible Person + notification', cost:8000, perUnit:8000/units},
+    Japan: {label:'PMDA notification (estimated)', cost:45000, perUnit:45000/units},
+    'South Korea': {label:'MFDS registration (estimated)', cost:35000, perUnit:35000/units},
+  };
+  const oneOff = oneOffCosts[market]||null;
+
+  // Customs broker
+  const brokerFee = ['United Kingdom','United States','Japan','South Korea','Australia','Canada'].includes(market)?3500:0;
+  const brokerPerUnit = brokerFee/units;
+
+  const totalLanded = exWorks + freightPerUnit + dutyPerUnit + (oneOff?oneOff.perUnit:0) + brokerPerUnit;
+  const vatReclaimable = vatOnImport; // if VAT registered
+
+  // Net to brand if RSP provided
+  const netToBrand = rsp>0?(rsp*0.45)-totalLanded:null; // 45% = brand's share after ~55% retailer margin
+
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:.75rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">Landed cost breakdown — ${market}</div>
+      ${[
+        ['Ex-works cost', `${exWorks.toFixed(0)} SEK`, 'var(--ink)'],
+        [`Freight (${freightMode})`, `${freightPerUnit.toFixed(0)} SEK`, 'var(--ink)'],
+        [`Import duty (${dutyRate}%)`, dutyRate>0?`${dutyPerUnit.toFixed(0)} SEK`:'0 SEK — EU/FTA', dutyRate>0?'#92400E':'#10B981'],
+        ...(oneOff?[[`${oneOff.label} (amortised)`, `${oneOff.perUnit.toFixed(0)} SEK/unit`, '#92400E']]:[]),
+        ...(brokerFee>0?[[`Customs broker (amortised)`, `${brokerPerUnit.toFixed(0)} SEK/unit`, '#92400E']]:[]),
+        [`VAT on import (${vatRate}%)`, `${vatOnImport.toFixed(0)} SEK — reclaimable if VAT registered`, '#F59E0B'],
+      ].map(([label,val,color])=>`
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.77rem;color:var(--muted)">${label}</div>
+          <div style="font-family:var(--mono);font-size:.77rem;font-weight:600;color:${color}">${val}</div>
+        </div>
+      `).join('')}
+      <div style="display:flex;justify-content:space-between;padding:.4rem 0;margin-top:.25rem">
+        <div style="font-family:var(--sans);font-size:.82rem;font-weight:600;color:var(--navy)">True landed cost per unit</div>
+        <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--navy)">${totalLanded.toFixed(0)} SEK</div>
+      </div>
+      ${vatReclaimable>0?`<div style="font-family:var(--mono);font-size:.58rem;color:#92400E;margin-top:.2rem">+ ${vatReclaimable.toFixed(0)} SEK VAT (reclaimable if VAT registered in ${market})</div>`:''}
+    </div>
+
+    ${dutyNote?`<div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.6rem .85rem;font-family:var(--mono);font-size:.6rem;color:#1E40AF;margin-bottom:.75rem">${dutyNote}</div>`:''}
+
+    ${netToBrand!==null?`
+      <div class="card">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">Net-to-brand at ${rsp} RSP</div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.77rem;color:var(--muted)">Brand share (at 45% of RSP)</div>
+          <div style="font-family:var(--mono);font-size:.77rem;color:var(--ink)">${(rsp*0.45).toFixed(0)} SEK</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.77rem;color:var(--muted)">True landed cost</div>
+          <div style="font-family:var(--mono);font-size:.77rem;color:#991B1B">−${totalLanded.toFixed(0)} SEK</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.4rem 0;margin-top:.15rem">
+          <div style="font-family:var(--sans);font-size:.82rem;font-weight:600;color:var(--navy)">Net-to-brand per unit</div>
+          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:${netToBrand>0?'#10B981':'#EF4444'}">${netToBrand.toFixed(0)} SEK</div>
+        </div>
+      </div>
+    `:''}
+
+    <div style="background:#FFFBEB;border:1px solid #FCD34D;padding:.75rem 1rem;font-family:var(--sans);font-size:.73rem;color:#92400E;line-height:1.5;margin-top:.75rem">
+      <strong>Disclaimer:</strong> These are estimates based on standard rates. Verify duty rates with your customs broker before committing to a shipment. Rates correct as of April 2026.
+    </div>
+  `;
 }
 
 function renderPitch(el){
