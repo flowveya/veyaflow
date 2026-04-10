@@ -678,15 +678,21 @@ function savePageState(key,value){
 async function callAPI(messages,maxTokens=1200){
   let res;
   try{
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(), 24000); // 24s timeout
     res=await fetch("/.netlify/functions/anthropic-proxy",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:maxTokens,messages})
+      body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:maxTokens,messages}),
+      signal:controller.signal
     });
+    clearTimeout(timeout);
   }catch(networkErr){
+    if(networkErr.name==='AbortError') throw new Error("Request timed out after 24 seconds. Try again — the report generates in 4 steps and each step should complete within 10 seconds.");
     throw new Error("Connection error. Check your internet connection and try again.");
   }
   if(res.status===401)throw new Error("401 — API key missing. Deploy via Netlify proxy.");
+  if(res.status===504)throw new Error("504 — Request timed out. Your Netlify plan may need upgrading, or try again in a moment.");
   if(res.status===529)throw new Error("529 — AI overloaded. Try again in a moment.");
   if(!res.ok)throw new Error("API error "+res.status);
   const d=await res.json();
@@ -1690,19 +1696,6 @@ function confirmPricingAndGenerate(){
   generateReport();
 }
 
-async function generateReport(){
-  // Always clear previous result and render loading state immediately
-  reportState={loading:true,result:null,sections:[]};
-  renderPage('report');
-  const btn=document.getElementById('r-generate-btn');
-  if(btn){btn.disabled=true;btn.textContent='Generating report...';}
-  savePageState('ns_reportForm',reportForm);
-  const statusEl=document.getElementById('r-status');
-  const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
-
-  // Get live retailer intelligence from database
-  const retailerIntel = getMarketRetailerIntel(reportForm.targetMarket, reportForm.category);
-
   // EU BASE LAYER — shared across all EU/EEA markets
   const EU_BASE = {
     "Skincare & Beauty": "EU COSMETICS REGULATION (EC) 1223/2009 applies across all EU/EEA markets: (1) CPNP notification at portal.cpnp.eu before placing on market, (2) EU Responsible Person with EU address mandatory, (3) Product Information File (PIF) including safety assessment by qualified safety assessor, (4) INCI ingredient list in descending order, (5) CMR substance restrictions. These requirements are IDENTICAL in Denmark, Germany, Netherlands, France, Belgium, Austria, Sweden, Norway, Finland — do not repeat them per-country. Instead note only the country-specific additions below.",
@@ -1829,8 +1822,6 @@ ${priceContext}`;
     },
   };
 
-  const categoryDist = (DISTRIBUTOR_BY_CATEGORY[cat]||{})[mkt] || distributorContext[mkt] || 'major distributors';
-
   const distributorContext={
     "United Kingdom":"CLF Distribution (beauty/care), Kinetic (health/wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
     "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist), Terra Naturkost (organic food/wellness)",
@@ -1849,8 +1840,11 @@ ${priceContext}`;
     "New Zealand":"Prolife Foods (health/wellness), Pharmacy Brands NZ, EuroFoods NZ",
   };
 
-  const distributors = categoryDist;
 
+async function generateReport(){
+  // Always clear previous result and render loading state immediately
+  reportState={loading:true,result:null,sections:[]};
+  renderPage('report');
   // Category-aware retailer intelligence
   const cat = reportForm.category;
   const mkt = reportForm.targetMarket;
@@ -1861,6 +1855,10 @@ ${priceContext}`;
   const isHome = cat==='Home & Design';
   const isBaby = cat==='Baby & Family';
   const isSport = cat==='Sport & Outdoor';
+
+  // Category-specific distributor lookup
+  const categoryDist = (DISTRIBUTOR_BY_CATEGORY[cat]||{})[mkt] || distributorContext[mkt] || 'major distributors';
+  const distributors = categoryDist;
 
   // Build category-specific retailer list for this market
   const CATEGORY_RETAILERS = {
@@ -1938,7 +1936,8 @@ ${priceContext}`;
     },
   };
 
-  const categoryRetailers = (CATEGORY_RETAILERS[mkt]||{})[cat] || retailerIntel || 'major retailers in this market';
+  const categoryRetailersRaw = (CATEGORY_RETAILERS[mkt]||{})[cat] || retailerIntel || 'major retailers in this market';
+  const categoryRetailers = categoryRetailersRaw.slice(0,400);
 
   // Category-specific compliance additions
   const CATEGORY_COMPLIANCE_EXTRA = {
@@ -1998,6 +1997,16 @@ ${priceContext}`;
     ? (CATEGORY_COMPLIANCE_EXTRA[cat].base||'')+' '+
       (CATEGORY_COMPLIANCE_EXTRA[cat][mkt]||'Check local market requirements.')
     : '';
+
+  const btn=document.getElementById('r-generate-btn');
+  if(btn){btn.disabled=true;btn.textContent='Generating report...';}
+  savePageState('ns_reportForm',reportForm);
+  const statusEl=document.getElementById('r-status');
+  const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
+
+  // Get live retailer intelligence from database
+  const retailerIntelFull = getMarketRetailerIntel(reportForm.targetMarket, reportForm.category);
+  const retailerIntel = retailerIntelFull.slice(0,600);
 
   // MODULE DEFINITIONS — each is a focused, deep-dive prompt
   const modules = [
@@ -2103,8 +2112,8 @@ ${brandCtx}
 TARGET MARKET: ${reportForm.targetMarket}
 CATEGORY: ${reportForm.category}
 EU BASE COMPLIANCE (applies to all EU/EEA markets — do not repeat per country): ${EU_BASE[reportForm.category]||'See general EU product safety requirements.'}
-MARKET-SPECIFIC COMPLIANCE: ${complianceDetail}
-CATEGORY-SPECIFIC REQUIREMENTS: ${categoryCompliance}
+MARKET-SPECIFIC COMPLIANCE: ${complianceDetail.slice(0,600)}
+CATEGORY-SPECIFIC REQUIREMENTS: ${categoryCompliance.slice(0,400)}
 
 Generate CLAIMS AUDIT & COMPLIANCE ROADMAP.
 
