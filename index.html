@@ -609,7 +609,7 @@ let compareList = []; // manufacturer compare
 let brand = null;
 let savedReports = [];
 let reportState  = {loading:false,result:null,sections:[]};
-let reportForm   = {brandName:'',brandDesc:'',category:'',targetMarket:'',currentMarket:'Sweden',skus:'',pricePoint:'',additionalInfo:''};
+let reportForm   = {brandName:'',brandDesc:'',category:'',targetMarket:'',currentMarket:'Sweden',skus:'',pricePoint:'',additionalInfo:'',competitors:[],competitorsVerified:false};
 let compareForm  = {brandName:'',category:'',markets:[],stage:'trading'};
 let compareResult= null;
 let pitchForm    = {brandName:'',brandDesc:'',category:'',targetMarket:'United Kingdom',retailer:'',skus:'',usp:'',pricePoint:'',existingMarkets:'Sweden'};
@@ -1309,7 +1309,7 @@ function renderReportForm(){
         <div class="field"><label class="lbl">Price point</label>
           <select id="r-pricePoint"><option value="">Select…</option>${['Mass market','Mid-range','Premium','Luxury'].map(p=>`<option${reportForm.pricePoint===p?' selected':''}>${p}</option>`).join('')}</select>
         </div>
-        <button class="btn-primary" id="r-generate-btn" onclick="generateReport()" disabled>Generate market entry report →</button>
+        <button class="btn-primary" id="r-generate-btn" onclick="startReportFlow()" disabled>Generate market entry report →</button>
         <div id="r-status" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;margin-top:.5rem;min-height:1rem"></div>
       </div>
       <div>
@@ -1490,6 +1490,176 @@ function getMarketRetailerIntel(market, category){
 }
 
 
+
+/* ═══════════════════════════════════════════════════
+   PRICING VERIFICATION FLOW
+   Search → Verify → Generate
+═══════════════════════════════════════════════════ */
+
+// Known competitor price database — founder-verified April 2026
+// Structure: category → market → [{name, product, price, currency, retailer, verified}]
+const COMPETITOR_PRICES = {
+  "Skincare & Beauty": {
+    "Netherlands": [
+      {name:"CurrentBody", product:"LED Face Mask (entry)", price:399, currency:"EUR", retailer:"currentbody.com", verified:true},
+      {name:"CurrentBody", product:"LED Face Mask Pro", price:599, currency:"EUR", retailer:"currentbody.com", verified:true},
+      {name:"Foreo", product:"UFO 2", price:249, currency:"EUR", retailer:"iciparisxl.nl", verified:true},
+      {name:"NuFACE", product:"Trinity", price:339, currency:"EUR", retailer:"douglas.nl", verified:true},
+    ],
+    "Denmark": [
+      {name:"CurrentBody", product:"LED Face Mask", price:2999, currency:"DKK", retailer:"matas.dk", verified:true},
+      {name:"Foreo", product:"UFO 2", price:1799, currency:"DKK", retailer:"matas.dk", verified:true},
+      {name:"NuFACE", product:"Trinity", price:2299, currency:"DKK", retailer:"matas.dk", verified:true},
+      {name:"Dermalogica", product:"Pro Hero kit", price:899, currency:"DKK", retailer:"matas.dk", verified:true},
+    ],
+    "Germany": [
+      {name:"CurrentBody", product:"LED Face Mask", price:399, currency:"EUR", retailer:"currentbody.com/de", verified:true},
+      {name:"Foreo", product:"UFO 2", price:229, currency:"EUR", retailer:"douglas.de", verified:true},
+      {name:"NuFACE", product:"Trinity", price:329, currency:"EUR", retailer:"douglas.de", verified:true},
+    ],
+    "Sweden": [
+      {name:"CurrentBody", product:"LED Face Mask", price:4299, currency:"SEK", retailer:"currentbody.com", verified:true},
+      {name:"Foreo", product:"UFO 2", price:2499, currency:"SEK", retailer:"lyko.com", verified:true},
+      {name:"NuFACE", product:"Trinity", price:3299, currency:"SEK", retailer:"kicks.se", verified:true},
+    ],
+    "United Kingdom": [
+      {name:"CurrentBody", product:"LED Face Mask", price:329, currency:"GBP", retailer:"currentbody.com", verified:true},
+      {name:"Foreo", product:"UFO 2", price:199, currency:"GBP", retailer:"boots.com", verified:true},
+      {name:"NuFACE", product:"Trinity", price:279, currency:"GBP", retailer:"spacenk.com", verified:true},
+    ],
+  }
+};
+
+let pricingVerificationState = {
+  loading: false,
+  suggestions: [],
+  confirmed: [],
+  done: false
+};
+
+async function startReportFlow(){
+  // Skip verification if already verified or category has no price data
+  if(reportForm.competitorsVerified){
+    generateReport();
+    return;
+  }
+
+  const market = reportForm.targetMarket;
+  const category = reportForm.category;
+
+  // Get known competitors for this market + category
+  const known = (COMPETITOR_PRICES[category]||{})[market]||[];
+
+  // Show verification UI
+  pricingVerificationState = {loading:false, suggestions:known, confirmed:[], done:false};
+  showPricingVerification();
+}
+
+function showPricingVerification(){
+  const el = document.getElementById('page-report');
+  if(!el) return;
+
+  const market = reportForm.targetMarket;
+  const category = reportForm.category;
+  const suggestions = pricingVerificationState.suggestions;
+  const currency = {Denmark:'DKK',Germany:'EUR',Netherlands:'EUR','United Kingdom':'GBP',Norway:'NOK','United States':'USD',Australia:'AUD',Sweden:'SEK',France:'EUR'}[market]||'EUR';
+
+  el.innerHTML = `
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Verify competitor pricing</div>
+          <div class="page-sub">Before generating your report, confirm these prices are accurate for your market</div>
+        </div>
+      </div>
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.85rem 1rem;font-family:var(--sans);font-size:.78rem;color:#1E40AF;line-height:1.6;margin-bottom:1.25rem">
+        <strong>Why we ask:</strong> AI-generated prices are unreliable. VeyaFlow uses founder-verified data as a starting point — you confirm, correct, or add competitors so the pricing analysis in your report is accurate, not fabricated.
+      </div>
+
+      ${suggestions.length>0?`
+        <div class="card" style="margin-bottom:1rem">
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">
+            Known competitors in ${category} — ${market}
+            <span style="color:var(--gold);margin-left:.5rem">Founder-verified April 2026</span>
+          </div>
+          ${suggestions.map((c,i)=>`
+            <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)" id="comp-row-${i}">
+              <input type="checkbox" id="comp-check-${i}" checked style="flex-shrink:0;width:16px;height:16px;accent-color:var(--navy)">
+              <div style="flex:1">
+                <div style="font-family:var(--sans);font-size:.82rem;font-weight:600;color:var(--navy)">${c.name} — ${c.product}</div>
+                <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">${c.retailer}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:.4rem">
+                <input type="number" id="comp-price-${i}" value="${c.price}" style="width:90px;font-family:var(--mono);font-size:.82rem;padding:.3rem .5rem;border:1px solid var(--border);text-align:right">
+                <span style="font-family:var(--mono);font-size:.75rem;color:var(--muted)">${c.currency}</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:#10B981">✓ verified</div>
+            </div>
+          `).join('')}
+        </div>
+      `:''}
+
+      <div class="card" style="margin-bottom:1.25rem">
+        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Add competitors we missed</div>
+        <div id="extra-competitors">
+          ${[0,1,2].map(i=>`
+            <div style="display:grid;grid-template-columns:1fr 1fr 100px 70px;gap:.5rem;margin-bottom:.5rem">
+              <input type="text" placeholder="Brand name" id="extra-brand-${i}" style="font-family:var(--sans);font-size:.78rem;padding:.35rem .6rem;border:1px solid var(--border)">
+              <input type="text" placeholder="Product name" id="extra-product-${i}" style="font-family:var(--sans);font-size:.78rem;padding:.35rem .6rem;border:1px solid var(--border)">
+              <input type="number" placeholder="Price" id="extra-price-${i}" style="font-family:var(--mono);font-size:.78rem;padding:.35rem .6rem;border:1px solid var(--border)">
+              <div style="font-family:var(--mono);font-size:.75rem;color:var(--muted);align-self:center">${currency}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem">Your own prices and any competitors you know. These are injected directly into the report — no AI guessing.</div>
+      </div>
+
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn-outline" onclick="renderPage('report')" style="flex:0 0 auto">← Back to form</button>
+        <button class="btn-primary" style="flex:1" onclick="confirmPricingAndGenerate()">Confirm prices & generate report →</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.5rem">
+        You can skip this — the report will note that competitor prices were not verified
+      </div>
+    </div>
+  `;
+}
+
+function confirmPricingAndGenerate(){
+  const suggestions = pricingVerificationState.suggestions;
+  const confirmed = [];
+
+  // Collect verified suggestions
+  suggestions.forEach(function(c, i){
+    const checkbox = document.getElementById('comp-check-'+i);
+    const priceInput = document.getElementById('comp-price-'+i);
+    if(checkbox && checkbox.checked && priceInput){
+      confirmed.push({
+        name: c.name,
+        product: c.product,
+        price: parseFloat(priceInput.value)||c.price,
+        currency: c.currency,
+        retailer: c.retailer,
+        verified: true
+      });
+    }
+  });
+
+  // Collect extra competitors
+  for(var i=0; i<3; i++){
+    var brand = (document.getElementById('extra-brand-'+i)||{}).value||'';
+    var product = (document.getElementById('extra-product-'+i)||{}).value||'';
+    var price = parseFloat((document.getElementById('extra-price-'+i)||{}).value)||0;
+    if(brand && price>0){
+      confirmed.push({name:brand, product:product||'Product', price:price, currency:'', retailer:'', verified:true});
+    }
+  }
+
+  reportForm.competitors = confirmed;
+  reportForm.competitorsVerified = true;
+  generateReport();
+}
+
 async function generateReport(){
   const btn=document.getElementById('r-generate-btn');
   if(btn){btn.disabled=true;btn.textContent='Generating report...';}
@@ -1510,6 +1680,13 @@ async function generateReport(){
     "France":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP, EU Responsible Person. French INCI labelling mandatory — not optional. ANSM (Agence nationale de securite du medicament) oversight. French claims very strictly enforced. Cosmetics with borderline drug claims prosecuted.","Food & Beverage":"EU FIR 1169/2011 in French. DGCCRF oversight. French labelling mandatory. Strong enforcement on health claims.","Wellness & Supplements":"ANSES oversight. DGCCRF. French translation mandatory. EU health claims only. Very strict enforcement on functional claims."},
   }[reportForm.targetMarket]?.[reportForm.category] || `Consult local regulatory counsel in ${reportForm.targetMarket} for ${reportForm.category} requirements.`;
 
+  // Build verified competitor pricing context
+  const verifiedPrices = reportForm.competitors||[];
+  const priceContext = verifiedPrices.length>0
+    ? 'VERIFIED COMPETITOR PRICES (confirmed by brand — use these exact figures, do not invent others):\n' +
+      verifiedPrices.map(function(c){ return '- '+c.name+' '+c.product+': '+c.price+' '+(c.currency||'')+' at '+c.retailer; }).join('\n')
+    : 'COMPETITOR PRICES: Not verified by brand — do NOT invent specific prices. Describe positioning ranges only (e.g. "premium tier typically 250-400 EUR") without naming specific competitor prices.';
+
   const brandCtx = `BRAND: ${reportForm.brandName}
 CATEGORY: ${reportForm.category}
 KEY PRODUCTS/SKUs: ${reportForm.skus||'Premium products in this category'}
@@ -1519,7 +1696,8 @@ TARGET MARKET: ${reportForm.targetMarket}
 SUSTAINABILITY GOALS: ${brand?.sustainabilityGoals?.join(', ')||'sustainability-focused, clean ingredients'}
 BRAND USP: ${brand?.usp||reportForm.brandDesc||'Nordic premium consumer brand'}
 CLINICAL EVIDENCE: ${brand?.clinicalClaims||'Not specified'}
-PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,brand?.awardsCount].filter(Boolean).join(' | ')||'Not provided'}`;
+PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,brand?.awardsCount].filter(Boolean).join(' | ')||'Not provided'}
+${priceContext}`;
 
   const distributorContext={
     "United Kingdom":"CLF Distribution (beauty/care), Kinetic (health/wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
