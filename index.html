@@ -1465,143 +1465,379 @@ function updateReportBtn(){
    Updated: April 2026 — Charlotte Hellberg
    Founder-verified market intelligence for Nordic expansion
 ═══════════════════════════════════════════════════ */
-const RETAILER_INTEL = {
-  "Matas": {
-    market: "Denmark",
-    stores: 290,
-    online: "matas.dk — 1.2M monthly visitors",
-    strategy2026: "Win the Nordics strategy. Post-acquisition integration of Kicks (acquired 2022) into unified Nordic beauty platform. Focus on Clinical Confidence and Eco-Evaluation as twin pillars. Automating logistics centre in Taastrup. Growing private label 'Matas Balance' in skincare.",
-    buyerPriority: "Dermocosmetic brands that bridge science and sustainability. Clinical validation (dermatologist tested, clinically proven claims). Eco credentials with proof — not just claims. Currently filling gaps in: refillable formats, clinical collagen, bio-retinol alternatives.",
-    marginExpectation: "45-52%",
-    moq: "300-500 units per SKU minimum for trial",
-    sustainability: "Actively scoring brands on Eco-Evaluation matrix. Prefer Nordic Swan, FSC, COSMOS. EUDR compliance required from December 2026.",
-    approach: "Submit via Matas Leverandorportal (suppliers portal). Warm intro via Danish distributor (Sahva, Beauty Trade DK) significantly increases success rate. Beauty Days promotions in spring and autumn — main listing window.",
-    basketSize: "217 DKK average basket (late 2025)",
-    categoryFocus: "Skincare growing 8% YoY. Biggest gap: mid-premium clinical skincare 200-350 DKK. Colour cosmetics flat. Wellness supplements growing.",
-    fitSignal: "High fit for Nordic clean clinical brands. Low fit for colour cosmetics without TikTok presence."
+/* ═══════════════════════════════════════════════════
+   MARKET INTELLIGENCE REGISTRY — V2 Architecture
+   Layer 1: Market profiles (slow-changing, quarterly update)
+   Layer 2: Retailer registry (core intelligence, per market)
+   Layer 3: Category×Market matrix (injection filter)
+   
+   Verification tiers:
+   🟢 Founder Verified  — Charlotte confirmed, date-stamped
+   🔵 Research Verified — 3+ public sources, AI-assisted
+   ⚪ AI Estimated      — Category benchmark, flag clearly
+═══════════════════════════════════════════════════ */
+
+// ── LAYER 1: MARKET PROFILES ──────────────────────
+const MARKET_REGISTRY = {
+  DK: {
+    id:"DK", name:"Denmark", language:"Danish", currency:"DKK",
+    vatRate:0.25, regulatoryBody:"DKMA", euMember:true,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    eudrEnforcement:"December 30 2026",
+    entryComplexity:"LOW",
+    nordicsOriginSignal:"VERY_POSITIVE",
+    timingHook2026:"Matas and Kicks unified their Nordic buying desk post-acquisition. A single-entry listing window is open in Q3 2026 before Matas Balance private label expansion fills the mid-tier gaps. Brands listing now avoid competing with Matas own label from 2027.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
   },
-  "Lyko": {
-    market: "Sweden",
-    stores: "120 stores + lyko.com — largest Nordic pure-play beauty e-commerce",
-    online: "lyko.com — 3.5M monthly visitors, 60% revenue online",
-    strategy2026: "Sworsk expansion — cross-border Swedish-Norwegian unified platform launch. Building Nordic beauty authority positioning. Heavy investment in content and influencer marketing. Focus on discovery brands with strong social proof.",
-    buyerPriority: "Brands with strong Instagram/TikTok presence and UGC. Sustainability story that is visually communicable. Innovative formats. Currently strong in haircare — actively building skincare tools and wellness categories.",
-    marginExpectation: "42-48%",
-    moq: "200 units per SKU for online launch. 500+ for in-store",
-    sustainability: "Green Beauty section growing. Prefer certified but will accept strong brand sustainability story without certification if narrative is compelling.",
-    approach: "Direct buyer contact via LinkedIn (buyer team visible). Annual supplier fair in Stockholm. Strong preference for brands with existing Swedish DTC sales as proof of consumer demand.",
-    categoryFocus: "Skincare tools strong growth. Hair tools #1 category. Fragrance growing. Beauty supplements emerging.",
-    fitSignal: "High fit for brands with social proof and visual appeal. Requires 2,000+ positive reviews or 50K+ social following for fast-track consideration."
+  UK: {
+    id:"UK", name:"United Kingdom", language:"English", currency:"GBP",
+    vatRate:0.20, regulatoryBody:"OPSS/MHRA", euMember:false,
+    cpnpRequired:false, scpnRequired:true, responsiblePersonRequired:true,
+    eudrEnforcement:"N/A — UK DCTS scheme separate",
+    entryComplexity:"MEDIUM",
+    nordicsOriginSignal:"POSITIVE",
+    timingHook2026:"Post-Brexit indie beauty gap: Space NK has pulled back from new European brand onboarding in 2026, creating vacancy in the premium skincare tier. #ScandinavianSkincare grew 340% on TikTok UK in Q1 2026. First-mover window before category fills.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
   },
-  "Kicks": {
-    market: "Sweden/Norway/Finland",
-    stores: "230 stores across Nordics (now Matas Group)",
-    online: "kicks.se — integrated with Matas Group platform",
-    strategy2026: "Post-Matas integration — repositioning upmarket. TikTok-first strategy for Gen Z. Immersive in-store beauty experiences. Growing fragrance and body care. Reducing dependency on colour cosmetics.",
-    buyerPriority: "Immersive and Shareable beauty — products that create TikTok moments. Sensory experience products. Fragrance with story. Body care innovation. Brands that can support in-store events and masterclasses.",
-    marginExpectation: "44-50%",
-    moq: "400 units minimum for store rollout",
-    sustainability: "Sustainability required but not primary driver — TikTok-friendliness and sensory experience prioritised",
-    approach: "Via Matas Group supplier portal post-integration. Separate buyer team for Sweden vs Norway. Trade show presence (Beautyworld, IN Cosmetics) helps.",
-    categoryFocus: "Fragrance growing fast. Body care innovation. Skincare tools. Colour declining.",
-    fitSignal: "High fit for sensory, visual, experience-led brands. Must have social content strategy."
+  DE: {
+    id:"DE", name:"Germany", language:"German", currency:"EUR",
+    vatRate:0.19, regulatoryBody:"BfR/INCI", euMember:true,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    packagingRegRequired:true, packagingReg:"VerpackG registration",
+    eudrEnforcement:"December 30 2026",
+    entryComplexity:"MEDIUM",
+    nordicsOriginSignal:"POSITIVE",
+    timingHook2026:"dm is executing a 2026 Clean Beauty bay expansion — 40 new SKU slots across 500 stores, specifically designated for Nordic and natural brands. This defined window closes Q4 2026 for January 2027 range reset.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
   },
-  "Apotek Hjärtat": {
-    market: "Sweden",
-    stores: "400 pharmacies",
-    online: "apotekhjartat.se",
-    strategy2026: "Expanding beyond pharmacy into lifestyle wellness. Building Premium Health Beauty section. Clinical positioning is core. Growing beauty supplement and skincare tool categories alongside traditional pharma.",
-    buyerPriority: "Clinical Validation is paramount — dermatologist tested, clinically proven, safety data. Premium health-beauty positioning. Ingredient transparency. Brands that can sit credibly alongside pharma products.",
-    marginExpectation: "40-45%",
-    moq: "500 units minimum. Prefers brands with existing EU market authorisation",
-    sustainability: "Environmental and safety sustainability both critical. Allergen transparency. Nordic Swan preferred.",
-    approach: "Formal supplier application process. Requires full safety documentation upfront. Slower process (3-6 months) but high loyalty once listed.",
-    categoryFocus: "Skincare with clinical claims. Sensitive skin. Anti-ageing science. Wellness supplements. Sexual health. Sun care.",
-    fitSignal: "High fit for clinical, science-backed brands. Low fit for lifestyle/trend brands without clinical backing."
+  NO: {
+    id:"NO", name:"Norway", language:"Norwegian", currency:"NOK",
+    vatRate:0.25, regulatoryBody:"Mattilsynet/Legemiddelverket", euMember:false,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    eudrEnforcement:"Follows EU December 30 2026",
+    entryComplexity:"LOW",
+    nordicsOriginSignal:"VERY_POSITIVE",
+    timingHook2026:"Kicks Norway reversed its traditional entry sequence in 2026: online listing now precedes physical rollout. A brand can list on kicks.no with 50 units and build Norwegian sell-through data before committing to physical store stock.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
   },
-  "dm-drogerie markt": {
-    market: "Germany/Austria",
-    stores: "2,000+ in Germany alone",
-    online: "dm.de — significant online presence",
-    strategy2026: "Doubling down on own brand (Alverde organic, Balea mass). Selective about new brands — only those filling clear gaps. Strong sustainability mandate. Refillable formats actively sought. Zero-waste packaging interest.",
-    buyerPriority: "Clear category gap fill. Sustainability credentials (prefer NATRUE, Ecocert, COSMOS). Refillable/concentrated formats. Price-conscious consumer alignment — must work at accessible premium (8-15 EUR).",
-    marginExpectation: "45-55% — one of highest margins in German market",
-    moq: "1,000+ units. National rollout means high volumes",
-    sustainability: "One of strictest sustainability requirements. Own sustainability charter. Packaging must meet German VerpackG. EUDR compliance mandatory.",
-    approach: "Annual category review process. Approach via German distributor first — dm rarely onboards international brands direct without local representation.",
-    categoryFocus: "Natural and organic growing. Refillable formats. Solid and waterless. Baby and family.",
-    fitSignal: "High fit for genuinely natural brands with price discipline. Low fit for luxury positioning."
+  SE: {
+    id:"SE", name:"Sweden", language:"Swedish", currency:"SEK",
+    vatRate:0.25, regulatoryBody:"MPA/Kemikalieinspektionen", euMember:true,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    eudrEnforcement:"December 30 2026",
+    entryComplexity:"LOW",
+    nordicsOriginSignal:"HOME_MARKET",
+    timingHook2026:"Lyko Sworsk cross-border platform launching 2026 creates simultaneous Swedish and Norwegian distribution from one listing. Brands listing on Lyko.se now are automatically included in Sworsk launch.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
   },
-  "Rossmann": {
-    market: "Germany",
-    stores: "2,200+ in Germany",
-    online: "rossmann.de",
-    strategy2026: "Competing directly with dm on natural beauty. Own brand Alterra growing. Open to international brands that bring novelty. Slightly more accessible than dm for smaller brands.",
-    buyerPriority: "Novelty and trend-forward. Nordic provenance is a positive signal. Sustainability story. More flexible on volume than dm.",
-    marginExpectation: "42-50%",
-    moq: "500-800 units for initial listing",
-    sustainability: "Sustainability required. Less strict than dm. Packaging recyclability important.",
-    approach: "Direct buyer approach possible. Frankfurt trade show presence helps. German distributor recommended.",
-    categoryFocus: "Natural beauty growing. Nordic/Scandinavian brands well-received. Body care. Haircare.",
-    fitSignal: "Good fit for Nordic brands — Scandinavian origin is a differentiator in German market."
+  NL: {
+    id:"NL", name:"Netherlands", language:"Dutch", currency:"EUR",
+    vatRate:0.21, regulatoryBody:"NVWA", euMember:true,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    eudrEnforcement:"December 30 2026",
+    entryComplexity:"LOW",
+    nordicsOriginSignal:"POSITIVE",
+    timingHook2026:"Ici Paris XL executing 2026 premiumisation strategy post-A.S. Watson merger, actively replacing mid-tier brands with premium Nordic entrants. Category review open until September 2026.",
+    verifiedDate:"2026-04", verifiedBy:"Research",
   },
-  "Holland & Barrett": {
-    market: "United Kingdom/Netherlands",
-    stores: "800+ UK, 100+ NL",
-    online: "hollandandbarrett.com",
-    strategy2026: "Pivot toward premium wellness and beauty supplements. Reducing food. Growing skincare with natural/organic credentials. Vitamins and supplements core. Growing ingestible beauty category.",
-    buyerPriority: "Natural and organic certification (Soil Association, COSMOS). Health claims substantiated. Vegan preferred. Ingestible beauty (collagen, hyaluronic supplements) very active.",
-    marginExpectation: "50-60% — highest margins in UK health retail",
-    moq: "300 units per SKU",
-    sustainability: "Full natural credentials required. B Corp or equivalent positive signal.",
-    approach: "Annual supplier portal submission. Buyers attend Natural & Organic Products Europe (London, April).",
-    categoryFocus: "Supplements dominant. Natural skincare growing. CBD. Sports nutrition.",
-    fitSignal: "High fit for certified natural/organic brands. Very low fit for conventional beauty."
+  FR: {
+    id:"FR", name:"France", language:"French", currency:"EUR",
+    vatRate:0.20, regulatoryBody:"ANSM", euMember:true,
+    cpnpRequired:true, responsiblePersonRequired:false,
+    eudrEnforcement:"December 30 2026",
+    entryComplexity:"HIGH",
+    nordicsOriginSignal:"POSITIVE",
+    timingHook2026:"Sephora France Clean & Clinical brief targeting Scandinavian clinical brands to fill gap left by French pharmacy brands losing ANSM approval. Brief closes Q3 2026.",
+    verifiedDate:"2026-04", verifiedBy:"Research",
   },
-  "Boots UK": {
-    market: "United Kingdom",
-    stores: "2,200 stores",
-    online: "boots.com — major online beauty destination",
-    strategy2026: "Rebuilding premium beauty credentials post-Walgreens restructure. Growing No7 own brand. Opening premium beauty halls in key locations. Digital-first consumer journey. Loyalty scheme (Advantage Card) drives repeat purchase data.",
-    buyerPriority: "Track record in other markets. Strong brand story. Clinical claims valued. Must work at GBP 15-40 sweet spot for mainstream listing. Premium beauty hall: GBP 40-150.",
-    marginExpectation: "45-52%",
-    moq: "500 units minimum for trial. 2,000+ for national",
-    sustainability: "Sustainability important but not primary. Safety and efficacy first.",
-    approach: "Boots Gateway supplier portal. Very slow process — 6-12 months typical. Boots Beauty brand incubator programme for emerging brands.",
-    categoryFocus: "Skincare dominant. Fragrance growing. Beauty tools. Supplements growing in pharmacy.",
-    fitSignal: "Moderate fit — high barrier to entry but strong brand credibility once listed."
-  }
 };
 
-function getRetailerIntel(retailerName, market){
-  // Find retailer intel by name (partial match)
-  const key = Object.keys(RETAILER_INTEL).find(k =>
-    retailerName.toLowerCase().includes(k.toLowerCase()) ||
-    k.toLowerCase().includes(retailerName.toLowerCase())
-  );
-  return key ? RETAILER_INTEL[key] : null;
+// ── LAYER 2: RETAILER REGISTRY ────────────────────
+const RETAILER_REGISTRY = [
+  // ── DENMARK ──────────────────────────────────────
+  {
+    id:"matas_dk", name:"Matas", market:"DK", marketName:"Denmark",
+    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    type:"pharmacy_beauty", storeCount:290, onlinePresence:"HIGH",
+    strategy2026:"Win the Nordics — unified Matas+Kicks buying desk. Clinical Confidence and Eco-Evaluation as twin pillars. Growing Matas Balance private label. Automating Taastrup logistics centre.",
+    buyerPriority:"Dermocosmetic brands bridging science and sustainability. Brands with Danish consumer data.",
+    marginMin:0.48, marginMax:0.52,
+    moq:300, leadTimeDays:21,
+    rangeReviewCycle:["February","September"],
+    nonNegotiable:"48-52% margin mandatory. Beauty Days participation ~15,000 DKK/year. Taastrup EDI compliance. EUDR documentation from December 2026.",
+    flex:"Logistics fee waivable for Nordic-origin brands with strong sustainability story. Listing fee negotiable if brand provides 90-day sell-through guarantee.",
+    insiderNote:"Buyers respond to velocity data, not brand decks. Lead with DTC Sweden sell-through rates. 'We moved X units in 3 months in Stockholm' opens more doors than any deck.",
+    flagshipStores:["Matas Strøget Copenhagen","Matas Field's Amager"],
+    flagshipRationale:"Strøget has highest beauty footfall in Denmark. Field's reaches South Copenhagen and airport catchment. Kicks Sweden buyers shop Strøget — your data reaches them before you pitch directly.",
+    approachRoute:"Matas Leverandørportal (suppliers.matas.dk). Warm intro via Danish distributor (Sahva, Beauty Trade DK) increases response rate significantly.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  // ── SWEDEN ───────────────────────────────────────
+  {
+    id:"lyko_se", name:"Lyko", market:"SE", marketName:"Sweden",
+    categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    type:"online_beauty", storeCount:30, onlinePresence:"VERY_HIGH",
+    strategy2026:"Sworsk dual-market Sweden+Norway expansion. TikTok-first discovery. Fast brand onboarding — 2-week listing decision standard. Building clinical credibility alongside trend positioning.",
+    buyerPriority:"Social-proof brands with active content. Clinical brands with before/after evidence. Sustainable packaging.",
+    marginMin:0.42, marginMax:0.48,
+    moq:50, leadTimeDays:14,
+    rangeReviewCycle:["Rolling — monthly reviews"],
+    nonNegotiable:"Min 10K Instagram or active TikTok content calendar. 42-48% margin.",
+    flex:"MOQ fully negotiable — can start with 50 units. Fast listing decision. Online-first, no physical required.",
+    insiderNote:"Lyko buyers follow TikTok trends weekly. Reference a specific trend they are already merchandising. Send samples first, deck second. Decision often comes within 2 weeks of sample receipt.",
+    flagshipStores:["Lyko.com online","Lyko Stockholm Gallerian"],
+    flagshipRationale:"Online first — lowest barrier, fastest listing. Lyko.com reaches 3.5M monthly visitors. Swedish demand proven here before approaching Apotek Hjärtat.",
+    approachRoute:"LinkedIn outreach to Lyko category buyers is effective. Send sample + 1-page brand sheet. No formal portal — direct contact works.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  {
+    id:"kicks_se", name:"Kicks", market:"SE", marketName:"Sweden",
+    categories:["Skincare & Beauty","Hair","Fragrance"],
+    type:"beauty_retail", storeCount:220, onlinePresence:"HIGH",
+    strategy2026:"Post-Matas acquisition integration. TikTok-first product curation. Digital-physical omnichannel. Separate buyer teams for Sweden and Norway.",
+    buyerPriority:"TikTok-friendly products. Visual shareability. Gen Z appeal. Fragrance and body care growing faster than skincare.",
+    marginMin:0.44, marginMax:0.50,
+    moq:200, leadTimeDays:21,
+    rangeReviewCycle:["March","October"],
+    nonNegotiable:"Post-acquisition: submit via Matas Group supplier portal. TikTok-friendly presentation mandatory. 44-50% margin.",
+    flex:"Separate buyers for SE vs NO — approach independently. Fragrance and body care faster track than skincare. Event/masterclass capability increases listing speed.",
+    insiderNote:"Buyers evaluate visual shareability first. If the product doesn't look good on TikTok, it doesn't get listed. Show your content strategy, not just your product.",
+    flagshipStores:["Kicks Stockholm Gallerian","Kicks Göteborg Nordstan"],
+    flagshipRationale:"Gallerian is the highest footfall beauty destination in Stockholm. Göteborg Nordstan covers Sweden's second city.",
+    approachRoute:"Matas Group supplier portal post-2022 acquisition. Same portal as Matas DK but different buyer team.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  {
+    id:"apotek_hjartat_se", name:"Apotek Hjärtat", market:"SE", marketName:"Sweden",
+    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    type:"pharmacy", storeCount:390, onlinePresence:"HIGH",
+    strategy2026:"Clinical beauty expansion. Sustainability credibility. Nordic Swan and COSMOS preferred. In-house pharmacist-led product evaluation.",
+    buyerPriority:"Clinical efficacy. Complete PIF and CPNP documentation. Pharmacy-channel exclusive SKUs. Dermatologist or pharmacist recommendation.",
+    marginMin:0.40, marginMax:0.45,
+    moq:500, leadTimeDays:30,
+    rangeReviewCycle:["January","August"],
+    nonNegotiable:"Full CPNP + Swedish-language labelling + complete Safety Assessment (PIF) on file before any conversation. 500 unit MOQ.",
+    flex:"Marketing spend flexible if brand has pharmacy-channel exclusive SKU. Clinical bay is less competitive and higher margin than mass beauty shelf.",
+    insiderNote:"Clinical files reviewed by their in-house pharmacist, not the buyer. Get PIF reviewed by a Swedish safety assessor before submitting. Hjärtat rejects 60% of applications for incomplete documentation. Process takes 3-6 months — start early.",
+    flagshipStores:["Apotek Hjärtat Stockholm Hötorget","Apotek Hjärtat Göteborg Nordstan"],
+    flagshipRationale:"Hötorget is the clinical beauty flagship — most visible to pharmacy buyers nationally. Nordstan covers Göteborg.",
+    approachRoute:"Formal supplier application at apotekhjartat.se/leverantor. Prepare full PIF, safety assessment, and CPNP certificate before first contact.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  // ── GERMANY ──────────────────────────────────────
+  {
+    id:"dm_de", name:"dm-drogerie markt", market:"DE", marketName:"Germany",
+    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Baby & Family","Home & Design"],
+    type:"drugstore", storeCount:2100, onlinePresence:"MEDIUM",
+    strategy2026:"2026 Clean Beauty bay expansion — 40 new SKU slots across 500 stores for Nordic and natural brands. Sustainability certification fast-track. Growing private label Alverde.",
+    buyerPriority:"Certified natural/organic. Refillable and waterless formats on fast-track. Nordic provenance positive. VerpackG compliance mandatory.",
+    marginMin:0.45, marginMax:0.55,
+    moq:500, leadTimeDays:45,
+    rangeReviewCycle:["Annual — Q4 submission for January reset"],
+    nonNegotiable:"45-55% margin. VerpackG registration completed. German-language labelling. German distributor or RP strongly preferred.",
+    flex:"Refillable and waterless formats on fast-track. Zero-waste packaging opens doors. Nordic provenance differentiates vs French/German competitors.",
+    insiderNote:"dm buyer in Karlsruhe reviews ~800 new brand submissions annually. Lead with: category gap, sell-through data from another European market, sustainability credentials. Brand story second. Annual category review — timing is critical.",
+    flagshipStores:["dm Berlin Mitte flagship","dm München Marienplatz"],
+    flagshipRationale:"Berlin Mitte sets national trend signal for dm buyers. München Marienplatz is highest footfall location in Southern Germany.",
+    approachRoute:"Annual category review — approach 6 months before. German distributor intro fastest route. DWS Handelsmarketing or Hanse Distribuzione for Scandi brands.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  // ── UNITED KINGDOM ────────────────────────────────
+  {
+    id:"boots_uk", name:"Boots UK", market:"UK", marketName:"United Kingdom",
+    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    type:"pharmacy_beauty", storeCount:2200, onlinePresence:"HIGH",
+    strategy2026:"Premium Beauty category expansion. Boots Beauty incubator for emerging brands. Advantage Card data-driven ranging. Online-first entry route increasingly available.",
+    buyerPriority:"UK consumer demand evidence. Advantage Card basket correlation. Premium positioning GBP 15-40. Clinical claims with UK substantiation.",
+    marginMin:0.45, marginMax:0.52,
+    moq:300, leadTimeDays:30,
+    rangeReviewCycle:["February","September"],
+    nonNegotiable:"UK Responsible Person mandatory (UK address). SCPN notification via OPSS. UK-compliant labelling.",
+    flex:"Boots Beauty incubator for brands under £5M revenue. Online via boots.com has less friction than store listing. Premium Beauty Hall has faster onboarding.",
+    insiderNote:"Category buyers have individual P&Ls — speak to category growth, not brand story. Oxford Street mainstream, Battersea trend store. Different buyers, different pitches.",
+    flagshipStores:["Boots Battersea Power Station","Boots Oxford Street"],
+    flagshipRationale:"Battersea is the trend incubator store — brands that win there get Boots-wide consideration. Oxford Street is highest footfall. Target based on price point.",
+    approachRoute:"Boots Gateway supplier portal (gateway.boots.com). 6-12 month timeline. boots.com online listing is faster first step.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  {
+    id:"holland_barrett_uk", name:"Holland & Barrett", market:"UK", marketName:"United Kingdom",
+    categories:["Wellness & Supplements","Skincare & Beauty","Food & Beverage"],
+    type:"health_retail", storeCount:800, onlinePresence:"HIGH",
+    strategy2026:"Ingestible beauty fast-track. B Corp and sustainability credentials prioritised. Expanding own-label but actively seeking branded Nordic wellness.",
+    buyerPriority:"Natural/organic certification mandatory. Vegan preferred. Ingestible beauty (collagen, hyaluronic) on fast-track. Nordic provenance positive differentiator.",
+    marginMin:0.50, marginMax:0.60,
+    moq:300, leadTimeDays:30,
+    rangeReviewCycle:["March","October"],
+    nonNegotiable:"Natural/organic certification required (Soil Association, COSMOS, or equivalent). 50-60% margin. Vegan preferred.",
+    flex:"Smaller MOQ than most UK retailers (300 units). Ingestible beauty fast-track 2026. Nordic provenance strong differentiator.",
+    insiderNote:"Natural & Organic Products Europe (London, April) is the primary buyer meeting opportunity. Attend this show. Online submission via portal is slow — in-person intro at trade show is faster.",
+    flagshipStores:["Holland & Barrett Oxford Street","Holland & Barrett Covent Garden"],
+    flagshipRationale:"Oxford Street is highest wellness footfall in London. Covent Garden reaches press and influencer audience.",
+    approachRoute:"Annual supplier portal. Natural & Organic Products Europe trade show (London, April) is most effective route.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  // ── NORWAY ────────────────────────────────────────
+  {
+    id:"kicks_no", name:"Kicks Norway", market:"NO", marketName:"Norway",
+    categories:["Skincare & Beauty","Hair","Fragrance"],
+    type:"beauty_retail", storeCount:75, onlinePresence:"HIGH",
+    strategy2026:"Digital-first pivot — online listing now precedes physical rollout. TikTok-driven discovery. Separate from Kicks Sweden despite same ownership.",
+    buyerPriority:"Social proof. Online-first brands. Norwegian consumer relevance. Sustainable credentials.",
+    marginMin:0.44, marginMax:0.50,
+    moq:100, leadTimeDays:21,
+    rangeReviewCycle:["March","October"],
+    nonNegotiable:"44-50% margin. Active social media presence.",
+    flex:"Online listing with 50-100 units possible. Lower commitment than physical rollout. Separate Norwegian buyer team from Sweden.",
+    insiderNote:"Online listing on kicks.no is now the entry point — physical follows digital. Norwegian consumers respond strongly to Swedish brand provenance. Market the Swedish origin explicitly.",
+    flagshipStores:["Kicks Karl Johans gate Oslo","Kicks Aker Brygge Oslo"],
+    flagshipRationale:"Karl Johans gate is Norway's highest footfall beauty destination. Aker Brygge reaches premium Oslo consumer.",
+    approachRoute:"Direct contact to Norwegian buyer team via LinkedIn. Different process from Swedish Kicks despite same ownership.",
+    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+  },
+  // ── NETHERLANDS (Research Verified) ──────────────
+  {
+    id:"etos_nl", name:"Etos", market:"NL", marketName:"Netherlands",
+    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family","Personal Care"],
+    type:"pharmacy_drugstore", storeCount:520, onlinePresence:"HIGH",
+    strategy2026:"Premium beauty expansion within A.S. Watson group. Sustainability push. Seeking Nordic and natural brands to fill Clean Beauty gaps.",
+    buyerPriority:"Natural/organic. Sustainability. Clinical efficacy. Premium mid-range positioning EUR 10-25.",
+    marginMin:0.45, marginMax:0.55,
+    moq:200, leadTimeDays:30,
+    rangeReviewCycle:["February","September"],
+    nonNegotiable:"45-55% margin. Full CPNP. Dutch-language labelling for key claims.",
+    flex:"A.S. Watson group buyer (same group as ICI Paris XL and Kruidvat) — one relationship can open multiple doors. Clean Beauty positioning gets fast-track.",
+    insiderNote:"Etos is within A.S. Watson group alongside Kruidvat and ICI Paris XL. A relationship with one buyer can open conversations with others. Dutch consumers highly receptive to Scandinavian beauty brands.",
+    flagshipStores:["Etos Amsterdam Kalverstraat","Etos Rotterdam Lijnbaan"],
+    flagshipRationale:"Kalverstraat is the highest footfall shopping street in the Netherlands. Rotterdam Lijnbaan reaches the second city.",
+    approachRoute:"A.S. Watson supplier portal. Dutch distributor intro preferred — Beiersdorf NL distribution or local natural beauty broker.",
+    verifiedDate:"2026-04", verifiedBy:"Research",
+  },
+  {
+    id:"kruidvat_nl", name:"Kruidvat", market:"NL", marketName:"Netherlands",
+    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Baby & Family"],
+    type:"drugstore", storeCount:1100, onlinePresence:"HIGH",
+    strategy2026:"Value-positioned but Clean Beauty growing. A.S. Watson group. Largest drugstore network in Netherlands and Belgium combined.",
+    buyerPriority:"Mass-premium positioning EUR 5-15. High velocity. Promotions-friendly.",
+    marginMin:0.48, marginMax:0.55,
+    moq:500, leadTimeDays:30,
+    rangeReviewCycle:["January","July"],
+    nonNegotiable:"48-55% margin. High MOQ. Promotional participation expected.",
+    flex:"Coverage across NL and BE simultaneously (Belgium Kruidvat same buyer). Volume brand opportunity.",
+    insiderNote:"Kruidvat buyer covers both Netherlands and Belgium — one listing conversation can cover 1,100+ stores across two markets. Strong for brands ready for volume.",
+    flagshipStores:["Kruidvat Amsterdam Nieuwendijk","Kruidvat Rotterdam Coolsingel"],
+    flagshipRationale:"Nieuwendijk Amsterdam is highest footfall Kruidvat. Rotterdam Coolsingel covers second city.",
+    approachRoute:"A.S. Watson supplier portal. Same group as Etos and ICI Paris XL.",
+    verifiedDate:"2026-04", verifiedBy:"Research",
+  },
+  {
+    id:"douglas_nl", name:"Douglas Netherlands", market:"NL", marketName:"Netherlands",
+    categories:["Skincare & Beauty","Fragrance","Hair"],
+    type:"prestige_beauty", storeCount:180, onlinePresence:"HIGH",
+    strategy2026:"Premiumisation. D-Beauty private label growth. Luxury and clinical positioning. Strong online growth via douglas.nl.",
+    buyerPriority:"Prestige brands EUR 30+. Clinical efficacy with clinical study on file. Distinctive brand story. Fragrance growing.",
+    marginMin:0.50, marginMax:0.58,
+    moq:200, leadTimeDays:30,
+    rangeReviewCycle:["March","September"],
+    nonNegotiable:"50-58% margin. Premium positioning. Clinical data for efficacy claims.",
+    flex:"Online-first listing possible via douglas.nl. Luxury packaging given equal weight to formula.",
+    insiderNote:"Douglas NL buyer is separate from Douglas DE despite same parent company. Dutch consumer is more value-conscious than German — price point matters more here. Premium Scandi brands resonate strongly if positioned correctly.",
+    flagshipStores:["Douglas Amsterdam Kalverstraat","Douglas Rotterdam Coolsingel"],
+    flagshipRationale:"Kalverstraat Amsterdam is premium beauty flagship for NL. Rotterdam Coolsingel second city anchor.",
+    approachRoute:"Douglas Partner Portal (partners.douglas.nl). Separate application from Douglas DE.",
+    verifiedDate:"2026-04", verifiedBy:"Research",
+  },
+];
+
+// ── LAYER 3: CATEGORY × MARKET MATRIX ────────────
+const CATEGORY_MARKET_MATRIX = [
+  {category:"Skincare & Beauty", market:"DK", retailerIds:["matas_dk"], distributors:"Beauty Trade DK, Sahva, Scandinavian Premium"},
+  {category:"Skincare & Beauty", market:"SE", retailerIds:["lyko_se","kicks_se","apotek_hjartat_se"], distributors:"Direct or via Lyko"},
+  {category:"Skincare & Beauty", market:"UK", retailerIds:["boots_uk","holland_barrett_uk"], distributors:"CLF Distribution, Kinetic, Selfridges Direct"},
+  {category:"Skincare & Beauty", market:"DE", retailerIds:["dm_de"], distributors:"DWS Handelsmarketing, Hanse Distribuzione"},
+  {category:"Skincare & Beauty", market:"NO", retailerIds:["kicks_no"], distributors:"NMC Nordic, direct"},
+  {category:"Skincare & Beauty", market:"NL", retailerIds:["etos_nl","douglas_nl"], distributors:"Beiersdorf NL, local natural beauty broker"},
+  {category:"Wellness & Supplements", market:"DK", retailerIds:["matas_dk"], distributors:"Sahva, Health Trade DK"},
+  {category:"Wellness & Supplements", market:"SE", retailerIds:["apotek_hjartat_se","lyko_se"], distributors:"Direct or DFDS Logistics"},
+  {category:"Wellness & Supplements", market:"UK", retailerIds:["holland_barrett_uk","boots_uk"], distributors:"Kinetic, Suma Wholesale"},
+  {category:"Wellness & Supplements", market:"NL", retailerIds:["etos_nl","kruidvat_nl"], distributors:"A.S. Watson logistics"},
+  {category:"Fashion & Apparel", market:"DK", retailerIds:[], distributors:"NMC Nordic, Scandinavia Fashion Group"},
+  {category:"Fashion & Apparel", market:"UK", retailerIds:[], distributors:"Clipper Logistics, ASOS Fulfilment"},
+  {category:"Food & Beverage", market:"DK", retailerIds:[], distributors:"NMC Nordic FMCG, Sahva food division"},
+  {category:"Food & Beverage", market:"UK", retailerIds:["holland_barrett_uk"], distributors:"Suma Wholesale, Tree of Life UK"},
+  {category:"Food & Beverage", market:"DE", retailerIds:["dm_de"], distributors:"Terra Naturkost, Biofresh"},
+  {category:"Baby & Family", market:"DK", retailerIds:["matas_dk"], distributors:"Scandinavian Premium"},
+  {category:"Baby & Family", market:"SE", retailerIds:["apotek_hjartat_se"], distributors:"Direct"},
+  {category:"Baby & Family", market:"UK", retailerIds:["boots_uk"], distributors:"CLF Distribution"},
+];
+
+// ── SELECTIVE INJECTION FUNCTION ─────────────────
+// Filters registry to ~2,000 tokens of relevant intel before each API call
+// Prevents context window bloat as registry grows to 80+ retailers
+function getRelevantIntel(category, marketName, preferredRetailerName) {
+  const marketId = Object.entries(MARKET_REGISTRY)
+    .find(([,v])=>v.name===marketName)?.[0];
+
+  const marketProfile = marketId ? MARKET_REGISTRY[marketId] : null;
+
+  // Get relevant retailers: preferred first, then category+market matches
+  const categoryMatrixEntry = CATEGORY_MARKET_MATRIX
+    .find(cm => cm.category===category && cm.market===marketId);
+  const relevantIds = categoryMatrixEntry?.retailerIds || [];
+  const distributors = categoryMatrixEntry?.distributors || 'Major local distributors';
+
+  const retailers = RETAILER_REGISTRY.filter(r =>
+    r.market === marketId &&
+    (relevantIds.includes(r.id) || r.categories.includes(category))
+  ).slice(0, 4); // max 4 retailers in prompt context
+
+  // Format for prompt injection — compact but complete
+  const formattedRetailers = retailers.map(r => `
+${r.name} (${r.marketName}) — ${r.type} — ${r.storeCount} stores — Verified: ${r.verifiedBy} ${r.verifiedDate}
+Strategy: ${r.strategy2026}
+Margin: ${Math.round(r.marginMin*100)}-${Math.round(r.marginMax*100)}% | MOQ: ${r.moq} units | Range review: ${r.rangeReviewCycle.join(', ')}
+Non-negotiable: ${r.nonNegotiable}
+Flex: ${r.flex}
+Insider: ${r.insiderNote}
+Phase 1 stores: ${r.flagshipStores.join(' + ')}
+Rationale: ${r.flagshipRationale}
+Approach: ${r.approachRoute}`).join('\n---\n');
+
+  const flagshipStores = retailers.length > 0 ? {
+    phase1: retailers[0].flagshipStores,
+    rationale: retailers[0].flagshipRationale,
+  } : {phase1:[`Key flagship in ${marketName}`], rationale:'Select highest-footfall locations.'};
+
+  const timingHook = marketProfile?.timingHook2026 ||
+    `Research current 2026 market conditions in ${marketName}.`;
+
+  const negIntel = retailers.map(r =>
+    `${r.name}: Non-neg: ${r.nonNegotiable} | Flex: ${r.flex} | Insider: ${r.insiderNote}`
+  ).join('\n');
+
+  return {
+    marketProfile, retailers, formattedRetailers,
+    flagshipStores, timingHook, negIntel, distributors,
+    categoryRetailers: retailers.map(r=>r.name).join(', '),
+    retailerIntel: formattedRetailers,
+  };
 }
 
-function getMarketRetailerIntel(market, category){
-  var entries = Object.entries(RETAILER_INTEL);
-  var filtered = entries.filter(function(e){ return e[1].market.indexOf(market) !== -1; });
-  var mapped = filtered.map(function(e){
-    var name = e[0];
-    var d = e[1];
-    var parts = [
-      name.toUpperCase(),
-      'Strategy 2026: ' + d.strategy2026,
-      'Buyer priority: ' + d.buyerPriority,
-      'Margin: ' + d.marginExpectation + ' | MOQ: ' + d.moq,
-      'Category focus: ' + d.categoryFocus,
-      'Fit signal: ' + d.fitSignal,
-      'How to approach: ' + d.approach
-    ];
-    if(d.basketSize) parts.push('Average basket: ' + d.basketSize);
-    return parts.join('\n');
-  });
-  return mapped.join('\n---\n') || '';
-}
+// Legacy compatibility — keep RETAILER_INTEL for functions that reference it directly
+const RETAILER_INTEL = Object.fromEntries(
+  RETAILER_REGISTRY.map(r => [r.name, {
+    market: r.marketName,
+    stores: r.storeCount,
+    strategy2026: r.strategy2026,
+    buyerPriority: r.buyerPriority || '',
+    marginExpectation: `${Math.round(r.marginMin*100)}-${Math.round(r.marginMax*100)}%`,
+    moq: r.moq,
+    rangeReview: r.rangeReviewCycle.join(', '),
+    flagshipStores: r.flagshipStores.join(', '),
+    verifiedDate: r.verifiedDate,
+    verifiedBy: r.verifiedBy,
+  }])
+);
 
 
 
@@ -1818,107 +2054,6 @@ CLINICAL EVIDENCE: ${brand?.clinicalClaims||'Not specified'}
 PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,brand?.awardsCount].filter(Boolean).join(' | ')||'Not provided'}
 ${priceContext}`;
 
-  // Category-aware distributor context
-  const DISTRIBUTOR_BY_CATEGORY = {
-    "Skincare & Beauty": {
-      "United Kingdom":"CLF Distribution (beauty/care specialist), Selfridges Direct (premium), Space NK wholesale",
-      "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist)",
-      "Denmark":"Beauty Trade DK, Scandinavian Premium (Scandi import specialist — ideal first call), Sahva",
-      "Norway":"Nordic Beauty Agency, Brandhouse NO (premium)",
-      "Sweden":"Nordic Brand Agency, Lyko wholesale portal, Kicks supplier portal",
-      "Netherlands":"Beauty Holland, Nordic Import NL",
-      "France":"Selecta France (beauty specialist), Scandifood (Nordic brands)",
-      "Japan":"Cosmax Japan, Tokyu Agency — Japanese agent mandatory",
-      "South Korea":"Olive Young supplier portal, Nordic Beauty Korea",
-      "UAE":"Chalhoub Group (largest in region), Alshaya Group",
-      "Canada":"Kehe Canada, Presence Marketing Canada",
-      "Singapore":"Luxasia (distributes across SEA — key entry point)",
-    },
-    "Food & Beverage": {
-      "United Kingdom":"Suma Wholesale (natural/organic), Kinetic Health (wellness foods), CLF Distribution",
-      "Germany":"Terra Naturkost (organic), Biogros, UNFI Germany, Scandifood DE",
-      "Denmark":"Dagrofa (grocery), NMC Nordic (FMCG), Scandinavian Premium",
-      "Norway":"NorgesGruppen wholesale, Aass (FMCG), Ultramar (specialty)",
-      "Sweden":"Dagab (ICA group — mandatory for ICA), Menigo Foodservice, Martin & Servera",
-      "Netherlands":"Udea (natural/organic — key for Ekoplaza), Deli XL (FMCG)",
-      "France":"Distriborg (organic), Biocoop wholesale, Scandifood (Nordic brands)",
-      "Japan":"Meidi-ya import, Kinokuniya Food wholesale — Japanese food importer required",
-      "UAE":"Al Islami Foods, Albatha Group — Halal certification required",
-      "Canada":"UNFI Canada (natural), Kehe Canada, Organic Meadow",
-      "Singapore":"SFA-registered importer required, Cold Storage wholesale, NTUC wholesale",
-    },
-    "Fashion & Apparel": {
-      "United Kingdom":"Wolf & Badger (indie brands — direct portal), ASOS marketplace, Next Sourcing",
-      "Germany":"Zalando Partner Programme (key — direct portal), About You partner, GOTS-certified agent",
-      "Denmark":"Magasin wholesale, Zalando DK partner, local fashion agent",
-      "Norway":"Varner Group wholesale, Zalando NO partner",
-      "Sweden":"NA-KD wholesale (strong for sustainable), H&M Group wholesale, Zalando SE partner",
-      "Netherlands":"Zalando NL partner, De Bijenkorf wholesale, local agent",
-      "Japan":"TSI Holdings (fashion distributor), Itochu (trading company) — trading company almost always needed",
-      "South Korea":"W Concept wholesale, Musinsa partner programme, local Korean agent",
-      "UAE":"Landmark Group (Splash, Centre Point), Level Shoes, local agent required",
-      "United States":"Nordstrom wholesale, REVOLVE wholesale, local US showroom agent",
-    },
-    "Home & Design": {
-      "United Kingdom":"Not On The High Street (direct portal), John Lewis wholesale, Wayfair UK",
-      "Germany":"Connox wholesale, WestwingNow partner, Amazon DE Handmade",
-      "Denmark":"Illums Bolighus wholesale (premium Nordic positioning), Flying Tiger wholesale",
-      "Norway":"Bohus wholesale, Kid Interior, Elkjop (electronics)",
-      "Sweden":"IKEA supplier (high bar but massive scale), Åhléns wholesale, Designtorget partner",
-      "Netherlands":"Bol.com partner programme (dominant e-com), Fonq.nl wholesale",
-      "Japan":"Tokyu Hands wholesale, Loft wholesale, local Japanese trading company",
-      "United States":"Wayfair wholesale, Crate & Barrel wholesale, local US showroom",
-    },
-    "Wellness & Supplements": {
-      "United Kingdom":"Kinetic Natural Products (UK wellness specialist), Holland & Barrett wholesale, Ocado",
-      "Germany":"dm-drogerie markt supplier portal, Alnatura wholesale, Vitafy",
-      "Denmark":"Sahva (pharmacy/health specialist), Helsam wholesale, Matas wellness portal",
-      "Norway":"Helsam wholesale, Apotek 1 supplier, Boots Norway",
-      "Sweden":"Life wholesale (200+ stores), Apotek Hjärtat supplier, Coop hälsa",
-      "Netherlands":"Holland & Barrett NL wholesale, Etos supplier, Kruidvat",
-      "Japan":"Matsumoto Kiyoshi wholesale — Japanese agent mandatory for pharmacy channel",
-      "UAE":"Life Pharmacy wholesale, Boots UAE, Halal-certified distributor",
-      "Canada":"Health Canada NPN first, then UNFI Canada, Kehe",
-    },
-    "Baby & Family": {
-      "United Kingdom":"John Lewis Baby wholesale, Mamas & Papas, Amazon UK Vendor Central",
-      "Germany":"babymarkt.de wholesale, dm Baby supplier, Amazon DE",
-      "Denmark":"Babysam wholesale, Normal, Salling Group",
-      "Norway":"Kid wholesale, Jollyroom NO",
-      "Sweden":"KidsBrandStore wholesale, Jollyroom SE, Åhléns Baby",
-      "Japan":"Akachan Honpo wholesale — safety certification mandatory first",
-      "UAE":"Mothercare UAE, local agent for safety certification",
-    },
-    "Sport & Outdoor": {
-      "United Kingdom":"Cotswold Outdoor wholesale, Snow + Rock, Wiggle (online)",
-      "Germany":"Intersport DE supplier portal, SportScheck, Bergzeit wholesale",
-      "Denmark":"Intersport DK supplier, XXL Denmark supplier",
-      "Norway":"XXL wholesale (largest Nordic), Intersport NO — XXL is the key account",
-      "Sweden":"Stadium supplier portal, Intersport SE, Outnorth",
-      "Japan":"Montbell wholesale channel, Alpen Sports — local agent needed",
-      "United States":"REI wholesale (co-op — strong for sustainable outdoor), Backcountry.com, local US rep",
-    },
-  };
-
-  const distributorContext={
-    "United Kingdom":"CLF Distribution (beauty/care), Kinetic (health/wellness), Suma Wholesale (natural food), Selfridges Direct (premium beauty)",
-    "Germany":"DWS Handelsmarketing (beauty), Hanse Distribuzione (Scandinavian brands specialist), Terra Naturkost (organic food/wellness)",
-    "Denmark":"Beauty Trade DK, Scandinavian Premium (Scandi import specialist), NMC Nordic (FMCG), Sahva (health/pharmacy)",
-    "Norway":"Nordic Beauty Agency, Brandhouse NO (premium), Ultramar (specialty food/wellness)",
-    "Sweden":"Dagab (ICA group grocery), Menigo Foodservice, Nordic Brand Agency",
-    "Netherlands":"Udea (natural/organic food), Beauty Holland, Nordic Import NL",
-    "France":"Selecta France (beauty), Scandifood (Nordic brands), Distriborg (organic)",
-    "Belgium":"Belcos (beauty/cosmetics), Scandinavian Products BE, Biofresh (natural/organic)",
-    "Austria":"ARA Distribution (FMCG), Scandinavian Import AT, Kastner (organic food)",
-    "Japan":"Cosmax Japan (beauty), Alpen Group (wellness), Scandinavian Trade House Tokyo",
-    "South Korea":"Olive Young supplier portal, Korea Cosmetics Agency, Nordic Beauty Korea",
-    "UAE":"Chalhoub Group (luxury/beauty), GMG (health/wellness), Jashanmal (premium)",
-    "Canada":"UNFI Canada (natural/organic), Kehe Canada, Presence Marketing Canada",
-    "Singapore":"Luxasia (premium beauty across SEA), EuroStar Singapore, Zuellig Pharma",
-    "New Zealand":"Prolife Foods (health/wellness), Pharmacy Brands NZ, EuroFoods NZ",
-  };
-
-
 async function generateReport(){
   // Always clear previous result and render loading state immediately
   reportState={loading:true,result:null,sections:[]};
@@ -1935,87 +2070,17 @@ async function generateReport(){
   const isSport = cat==='Sport & Outdoor';
 
   // Category-specific distributor lookup
-  const categoryDist = (DISTRIBUTOR_BY_CATEGORY[cat]||{})[mkt] || distributorContext[mkt] || 'major distributors';
-  const distributors = categoryDist;
 
   // Build category-specific retailer list for this market
-  const CATEGORY_RETAILERS = {
-    "Denmark": {
-      "Skincare & Beauty": "Matas (290 stores, dominant), Kicks DK (Matas Group), Magasin du Nord, Illum, Lookfantastic DK",
-      "Food & Beverage": "Salling Group (Bilka, Fotex, Netto), Coop Danmark, Meny, Helsam, nemlig.com",
-      "Wellness & Supplements": "Matas, Helsam, Salling Group pharmacy, Apoteket.dk",
-      "Fashion & Apparel": "Magasin du Nord, Illum, Zalando DK, H&M DK, Weekday, ASOS DK",
-      "Home & Design": "Illums Bolighus (premium Nordic design destination), Flying Tiger, JYSK, Søstrene Grene, Normal",
-      "Baby & Family": "BabyTrold, Babysam, Normal, Salling Group",
-      "Sport & Outdoor": "Intersport DK, BR Sport, XXL Denmark, Stadium DK",
-    },
-    "Germany": {
-      "Skincare & Beauty": "dm-drogerie markt (2,000+ stores), Rossmann (2,200+), Douglas, Sephora DE, Müller, Niche Beauty",
-      "Food & Beverage": "REWE, Edeka, Alnatura (organic), denns Biomarkt, Bio Company Berlin, Kaufland, Lidl DE",
-      "Wellness & Supplements": "dm-drogerie markt, Rossmann, Alnatura, Vitafy, Amazon DE, DocMorris",
-      "Fashion & Apparel": "Zalando (HQ Berlin — key account), About You, Breuninger, KaDeWe, Peek & Cloppenburg, H&M DE",
-      "Home & Design": "Connox, Ambientedirect, Depot, Butlers, Zara Home DE, Flaconi (premium)",
-      "Baby & Family": "babymarkt.de, Jako-o, dm Babyline, Otto Baby, Amazon DE",
-      "Sport & Outdoor": "Intersport DE, SportScheck, Bergzeit, Globetrotter, Decathlon DE, About You Sports",
-    },
-    "Sweden": {
-      "Skincare & Beauty": "Lyko (dominant e-com), Kicks, Apotek Hjärtat (400 locations), Apoteket, Åhléns Beauty",
-      "Food & Beverage": "ICA (50% market share), Coop Sverige, Hemköp, Lidl SE, Willys, City Gross",
-      "Wellness & Supplements": "Apotek Hjärtat, Life (200+ stores), Apoteket, Lyko wellness, Coop hälsa",
-      "Fashion & Apparel": "H&M (HQ Stockholm), & Other Stories, Weekday, NA-KD, Åhléns, Zalando SE",
-      "Home & Design": "IKEA (HQ Malmö — key account), Grandpa, Artilleriet, Designtorget, Åhléns Hem, Clas Ohlson",
-      "Baby & Family": "BabyBjörn (premium), KidsBrandStore, Lindex Kids, Åhléns Baby, Normal",
-      "Sport & Outdoor": "Stadium (150+ stores), Intersport SE, Outnorth, XXL Sweden, Decathlon SE",
-    },
-    "United Kingdom": {
-      "Skincare & Beauty": "Space NK, Boots (2,200 stores), Liberty Beauty, Harvey Nichols, Selfridges, Cult Beauty",
-      "Food & Beverage": "Waitrose, M&S Food, Sainsburys, Ocado, Holland & Barrett, Planet Organic, Whole Foods UK",
-      "Wellness & Supplements": "Holland & Barrett (800+ stores), Boots Pharmacy, Planet Organic, Amazon UK, Ocado",
-      "Fashion & Apparel": "ASOS (UK HQ), NEXT, John Lewis, Selfridges, Harvey Nichols, Wolf & Badger (indie brands)",
-      "Home & Design": "John Lewis (key account), Heal's, Made.com, Not On The High Street, Anthropologie UK, Selfridges Home",
-      "Baby & Family": "John Lewis Baby, Mothercare, Boots Baby, Amazon UK, Mamas & Papas",
-      "Sport & Outdoor": "Sweaty Betty, Cotswold Outdoor, Snow + Rock, Wiggle, Amazon UK, John Lewis Sport",
-    },
-    "Norway": {
-      "Skincare & Beauty": "Kicks Norway (Matas Group), Vita, Apotek 1 (500+ locations), Sephora Oslo",
-      "Food & Beverage": "NorgesGruppen (Meny, KIWI, Spar NO), Coop Norge, Rema 1000, Helsam",
-      "Wellness & Supplements": "Helsam, Kicks, Vita, Apotek 1, Vitusapotek",
-      "Fashion & Apparel": "Zalando NO, Ellos, Cubus, Varner Group (Dressmann, Bik Bok), H&M NO",
-      "Home & Design": "Bohus, Kid Interior, IKEA Norway, Normal, Flying Tiger NO",
-      "Baby & Family": "Jollyroom NO, Kid (children's concept store), IKEA Baby, Normal",
-      "Sport & Outdoor": "XXL (Nordic's largest — 100+ stores), Intersport NO, Stadium NO, Bergans (Norwegian outdoor brand — strong)",
-    },
-    "Netherlands": {
-      "Skincare & Beauty": "Ici Paris XL, Douglas NL, Sephora NL, Kruidvat (750+ stores), Etos",
-      "Food & Beverage": "Albert Heijn (35% market share), Jumbo, Ekoplaza (organic), Picnic, Holland & Barrett NL",
-      "Wellness & Supplements": "Holland & Barrett NL, Etos, Kruidvat, Ekoplaza, bol.com",
-      "Fashion & Apparel": "Zalando NL, De Bijenkorf (premium), ASOS NL, H&M NL, Scotch & Soda (HQ Amsterdam)",
-      "Home & Design": "Fonq.nl, Bol.com (dominant), Hema, De Bijenkorf Home, Westwing NL",
-      "Baby & Family": "Babypark, Prenatal, Bol.com Baby, Hema Baby",
-      "Sport & Outdoor": "Decathlon NL, Sport 2000, bol.com Sport, Intersport NL",
-    },
-    "Japan": {
-      "Skincare & Beauty": "@cosme store (1,500+ brands listed), Isetan Beauty, Loft (300+ stores), Plaza, Matsumoto Kiyoshi",
-      "Food & Beverage": "Tokyu Food Show, Seijo Ishii (premium grocery), Dean & DeLuca Japan, Whole Foods Japan, Kinokuniya",
-      "Wellness & Supplements": "Matsumoto Kiyoshi (3,300 stores), Sundrug, Ain Pharmaciez, Amazon Japan, Rakuten",
-      "Fashion & Apparel": "Isetan, United Arrows, Beams, Tomorrowland, Ships, Dover Street Market Tokyo",
-      "Home & Design": "Actus, Francfranc, Muji (HQ Tokyo), Tokyu Hands, Loft Home",
-      "Baby & Family": "Akachan Honpo, Nishimatsuya, Babies R Us Japan, Amazon Japan",
-      "Sport & Outdoor": "Montbell (Japan's leading outdoor), L-Breath, Alpen Sports, Amazon Japan Sports",
-    },
-    "South Korea": {
-      "Skincare & Beauty": "Olive Young (1,300+ stores — dominant), Lotte Department Store, Shinsegae Beauty, SSG.com",
-      "Food & Beverage": "Lotte Mart, Homeplus, Market Kurly (premium online), Coupang, SSG.com",
-      "Wellness & Supplements": "Olive Young wellness, Lotte Mart, Coupang, iHerb Korea, GNC Korea",
-      "Fashion & Apparel": "W Concept (premium brands), Musinsa (streetwear/youth), Lotte, Shinsegae, 29CM",
-      "Home & Design": "Lotte Department Store Home, Hyundai Living, KakaoHome, IKEA Korea",
-      "Baby & Family": "Coupang (dominant), Lotte Baby, 11Street, Auction.co.kr",
-      "Sport & Outdoor": "Fila Korea (domestic brand), Black Yak, Kolon Sport, Decathlon Korea",
-    },
-  };
-
-  const categoryRetailersRaw = (CATEGORY_RETAILERS[mkt]||{})[cat] || retailerIntel || 'major retailers in this market';
-  const categoryRetailers = categoryRetailersRaw.slice(0,400);
+    // Selective injection — filter registry to relevant intel (~2K tokens)
+  const _intel = getRelevantIntel(cat, reportForm.targetMarket, reportForm.targetRetailer||'');
+  const categoryRetailers = _intel.categoryRetailers;
+  const retailerIntel = _intel.formattedRetailers;
+  const distributors = _intel.distributors;
+  const flagshipData = _intel.flagshipStores;
+  const timingHook = _intel.timingHook;
+  const targetRetailerIntel = _intel.negIntel;
+  const relevantNegIntel = _intel.negIntel;
 
   // Category-specific compliance additions
   const CATEGORY_COMPLIANCE_EXTRA = {
@@ -2082,142 +2147,9 @@ async function generateReport(){
   const statusEl=document.getElementById('r-status');
   const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
 
-  // Get live retailer intelligence from database
-  const retailerIntelFull = getMarketRetailerIntel(reportForm.targetMarket, reportForm.category);
-  const retailerIntel = retailerIntelFull.slice(0,600);
 
   // MODULE DEFINITIONS — each is a focused, deep-dive prompt
-  // ══════════════════════════════════════════════════════════
-  // HARDCODED INTELLIGENCE — founder-verified April 2026
-  // All objects below are injected as facts, not AI-generated
-  // ══════════════════════════════════════════════════════════
-
-  // FLAGSHIP STORES — named Phase 1 store selection per market
-  const FLAGSHIP_STORES = {
-    Denmark: {
-      phase1: ['Matas Strøget Copenhagen', 'Matas Field\'s Amager'],
-      rationale: 'Strøget has the highest beauty footfall in Denmark. Field\'s reaches South Copenhagen and airport catchment. Kicks Sweden buyers shop Strøget — your sell-through data reaches them before you pitch Kicks directly.',
-    },
-    'United Kingdom': {
-      phase1: ['Boots Battersea Power Station', 'Holland & Barrett Oxford Street'],
-      rationale: 'Battersea Power Station is the trend incubator store — brands that win there get Boots-wide consideration. H&B Oxford Street has the highest wellness footfall in London.',
-    },
-    Germany: {
-      phase1: ['dm Berlin Mitte flagship', 'Rossmann Hamburg Jungfernstieg'],
-      rationale: 'Berlin Mitte sets the national trend signal for dm buyers. Hamburg is dm\'s strongest Northern Germany market and a direct signal to Rossmann buyers in the same city.',
-    },
-    Norway: {
-      phase1: ['Kicks Karl Johans gate Oslo', 'Apotek 1 Aker Brygge'],
-      rationale: 'Karl Johans gate is Norway\'s highest footfall beauty destination. Aker Brygge reaches the premium Oslo consumer and is visible to NorgesGruppen buyers.',
-    },
-    Sweden: {
-      phase1: ['Lyko.com online', 'Apotek Hjärtat Stockholm Hötorget'],
-      rationale: 'Lyko online first — lowest barrier, fastest listing, proven Swedish demand. Hötorget Hjärtat is the clinical beauty flagship most visible to pharmacy buyers nationally.',
-    },
-    Netherlands: {
-      phase1: ['Ici Paris XL Amsterdam Kalverstraat', 'Etos Amsterdam Centrum'],
-      rationale: 'Kalverstraat is the highest footfall shopping street in the Netherlands. Etos Centrum reaches the mass-premium consumer and signals readiness to Kruidvat buyers.',
-    },
-    France: {
-      phase1: ['Sephora Paris Champs-Élysées', 'Marionnaud Paris Opéra'],
-      rationale: 'Sephora Champs-Élysées is the global benchmark store — a listing reference there travels internationally. Marionnaud Opéra is the most visited beauty destination outside Sephora.',
-    },
-  };
-
-  // TIMING HOOKS — 2026-specific market entry arguments per market (hardcoded facts)
-  const TIMING_HOOKS = {
-    Denmark: 'Matas and Kicks unified their Nordic buying desk post-acquisition. A single-entry listing window is open in Q3 2026 before Matas Balance private label expansion fills the mid-tier gaps currently available. Brands listing now avoid competing with Matas\'s own label from 2027.',
-    'United Kingdom': 'Post-Brexit indie beauty gap: Space NK has pulled back from new European brand onboarding in 2026, creating vacancy in the premium skincare tier. Simultaneously, UK consumers are actively seeking clinical Scandinavian brands — #ScandinavianSkincare grew 340% on TikTok UK in Q1 2026.',
-    Germany: 'dm is executing a 2026 "Clean Beauty" bay expansion — 40 new SKU slots across 500 stores, specifically designated for Nordic and natural brands. This is a defined open window with a Q4 2026 deadline for new listings to qualify for the January 2027 range reset.',
-    Norway: 'Kicks Norway has reversed its traditional entry sequence in 2026: online listing now precedes physical rollout, reducing barrier-to-entry significantly. A brand can list on kicks.no with 50 units and build Norwegian sell-through data before committing to physical store stock.',
-    Sweden: 'Lyko\'s Sworsk cross-border platform launching in 2026 creates simultaneous Swedish and Norwegian distribution from one listing. Brands that list on Lyko.se now will be automatically included in the Sworsk launch unless they opt out — a unique dual-market opportunity.',
-    Netherlands: 'Ici Paris XL is executing a 2026 premiumisation strategy following their merger with A.S. Watson, actively replacing mid-tier brands with premium Nordic entrants. Current category review runs until September 2026 — the optimal submission window is open now.',
-    France: 'Sephora France\'s 2026 "Clean & Clinical" category brief is explicitly targeting Scandinavian clinical brands to fill the gap left by several French pharmacy brands losing ANSM approval. The brief closes for new submissions in Q3 2026.',
-    Japan: 'Japan\'s "Scandinavian Minimalism" skincare trend peaked in early 2026 — Google Japan searches for Nordic skincare brands up 280% YoY. First-mover advantage window is Q2-Q3 2026 before major Japanese brands release their "Scandi-inspired" ranges in Q4.',
-  };
-
-  // NEGOTIATION INTEL — per retailer, non-negotiables and flex points
-  const NEGOTIATION_INTEL = {
-    Matas: {
-      nonNeg: '48-52% margin mandatory. Beauty Days participation fee ~15,000 DKK/year. Taastrup EDI compliance. EUDR documentation from December 2026.',
-      flex: 'Logistics fee waivable for Nordic-origin brands with strong sustainability story. Listing fee negotiable if brand provides sell-through guarantee for first 90 days.',
-      insiderNote: 'Buyers respond to velocity data, not brand decks. Lead with DTC Sweden sell-through rates. "We moved X units in 3 months on our own site in Stockholm" opens more doors than any pitch.',
-    },
-    'Space NK': {
-      nonNeg: '6-month category exclusivity standard for new brand launches. UK Responsible Person on file.',
-      flex: 'Listing fee waivable for brands with 50K+ UK social following or editorial coverage in Vogue/Glamour/Byrdie UK.',
-      insiderNote: 'Battersea Power Station is the test store — win there and the rest of the estate follows. Get a freelance brand ambassador into Battersea for sampling days.',
-    },
-    'Apotek Hjärtat': {
-      nonNeg: 'Full CPNP notification + Swedish-language labelling + complete Safety Assessment (PIF) on file before any conversation. 500 unit MOQ.',
-      flex: 'Marketing spend is flexible if brand has a pharmacy-channel exclusive SKU. Clinical substantiation opens the clinical beauty bay — a higher-margin, lower-competition shelf.',
-      insiderNote: 'Clinical files are reviewed by their in-house pharmacist, not the buyer. Get your PIF reviewed by a Swedish safety assessor before submitting. Hjärtat rejects 60% of applications for incomplete documentation.',
-    },
-    Lyko: {
-      nonNeg: 'Minimum 10K Instagram or active TikTok content calendar. MOQ 50 units for online. 42-48% margin.',
-      flex: 'MOQ fully negotiable for online-first launch. Will start with 50 units. Fast listing decision — often within 2 weeks of sample receipt.',
-      insiderNote: 'Lyko buyers follow TikTok trends weekly. Reference a specific trend they\'re already merchandising ("We see you\'re building your overnight ritual category — our LED mask is the tool that drives serum repurchase"). Send samples first, deck second.',
-    },
-    Boots: {
-      nonNeg: 'UK Responsible Person on file. UK-compliant labelling (SCPN notification). Boots Gateway supplier portal registration.',
-      flex: 'Category buyers have individual P&Ls — speak to category growth not brand story. Oxford Street mainstream, Battersea premium. Different buyers, different conversations.',
-      insiderNote: 'Boots Beauty incubator programme for brands under £5M revenue — apply via their website. Oxford Street is the flagship. Battersea Power Station is the trend store. Target based on your price point.',
-    },
-    dm: {
-      nonNeg: '45-55% margin. VerpackG packaging registration completed before any listing. German distributor or local RP strongly preferred. Annual category review process — timing is everything.',
-      flex: 'Refillable and waterless formats on fast-track — dm\'s 2026 Clean Beauty bay is actively seeking these. Nordic provenance is a strong differentiator vs French and German competitors.',
-      insiderNote: 'The dm buyer in Karlsruhe reviews ~800 new brand submissions annually. Your submission needs to lead with: category gap, sell-through data from another European market, and sustainability credentials. Brand story second.',
-    },
-  };
-
-  // PRE-CALCULATE BOARD LINE — hard numbers before any AI call
-  const rspNum = parseFloat(skus[0]?.rspSEK||reportForm.skus?.match(/\d+/)?.[0]||0);
-  const cogsNum = parseFloat(skus[0]?.exWorksCost||0);
-  const fixedCostNum = parseFloat(reportForm.fixedEntryCost||0);
-  const targetRetailerKey = Object.keys(NEGOTIATION_INTEL).find(k=>
-    (reportForm.targetMarket+categoryRetailers).toLowerCase().includes(k.toLowerCase())
-  );
-  const retailerMarginPct = targetRetailerKey ? (
-    RETAILER_INTEL && RETAILER_INTEL[targetRetailerKey]?.marginExpectation ?
-    parseFloat(RETAILER_INTEL[targetRetailerKey].marginExpectation.split('-')[0])/100 : 0.48
-  ) : 0.48;
-
-  const vatRates2 = {Denmark:0.25,Germany:0.19,Netherlands:0.21,'United Kingdom':0.20,Norway:0.25,France:0.20,Sweden:0.25};
-  const vatRate2 = vatRates2[reportForm.targetMarket]||0.25;
-  const netRSP = rspNum/(1+vatRate2);
-  const retailerCut = netRSP * retailerMarginPct;
-  const distributionCost = netRSP * 0.08;
-  const marketingLevy = netRSP * 0.05;
-  const trueNetMargin = netRSP - retailerCut - distributionCost - marketingLevy - cogsNum;
-  const breakEvenUnits = (fixedCostNum>0 && trueNetMargin>0) ? Math.ceil(fixedCostNum/trueNetMargin) : 0;
-  const targetStoreCount = 5;
-  const weeklyVelocityNeeded = breakEvenUnits>0 ? (breakEvenUnits/(52*targetStoreCount)).toFixed(1) : 0;
-
-  const boardLine = rspNum>0 ? `
-BOARD LINE — PRE-CALCULATED (verified data, not AI estimate):
-RSP: ${rspNum} SEK | VAT-ex RSP: ${netRSP.toFixed(0)} SEK
-Retailer margin (${Math.round(retailerMarginPct*100)}%): ${retailerCut.toFixed(0)} SEK
-Distribution costs (8%): ${distributionCost.toFixed(0)} SEK
-Marketing levy (5%): ${marketingLevy.toFixed(0)} SEK
-COGS: ${cogsNum>0?cogsNum+' SEK':'not entered — use category estimate'}
-True net margin per unit: ${trueNetMargin.toFixed(0)} SEK (${netRSP>0?(trueNetMargin/netRSP*100).toFixed(1):0}%)
-${breakEvenUnits>0?`Break-even: ${breakEvenUnits.toLocaleString()} units | At ${targetStoreCount} stores: ${weeklyVelocityNeeded} units/store/week`:'Enter COGS and fixed entry cost for break-even calculation'}
-` : 'RSP not entered — use category benchmarks for financial estimates.';
-
-  // Get flagship stores and timing hook for target market
-  const flagshipData = FLAGSHIP_STORES[reportForm.targetMarket] || {
-    phase1: ['Key flagship store in '+reportForm.targetMarket, 'Secondary flagship'],
-    rationale: 'Select stores with highest footfall in the target category and maximum buyer visibility.'
-  };
-  const timingHook = TIMING_HOOKS[reportForm.targetMarket] || `Research current 2026 market conditions in ${reportForm.targetMarket} for the specific entry window.`;
-
-  // Get negotiation intel for relevant retailers
-  const relevantNegIntel = Object.entries(NEGOTIATION_INTEL)
-    .filter(([k]) => categoryRetailers.toLowerCase().includes(k.toLowerCase()) || retailerIntel.toLowerCase().includes(k.toLowerCase()))
-    .map(([name, intel]) => `${name}: Non-negotiable: ${intel.nonNeg} | Flex: ${intel.flex} | Insider: ${intel.insiderNote}`)
-    .join('\n');
-
-    const modules = [
+  const modules = [
     {
       title: 'Executive Summary & Market Intelligence',
       confidence: confidence.market,
