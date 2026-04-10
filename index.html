@@ -3096,6 +3096,10 @@ let skus = [];
 let skuEditId = null;
 let skuTab = 1;
 let skuForm = {};
+let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
+let skuUploadData = null; // parsed CSV rows
+let skuColumnMap = {};    // {veyafield: csvcolumn}
+let skuUploadRows = [];   // mapped rows ready to import
 
 function newSkuForm(){
   return {
@@ -3201,10 +3205,10 @@ function getClaimLight(claim){
 function renderSkus(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  if(skuEditId!==null){
-    renderSkuEdit(el);
-    return;
-  }
+  if(skuUploadMode==='choice'){renderSkuChoice(el);return;}
+  if(skuUploadMode==='mapping'){renderSkuMapping(el);return;}
+  if(skuUploadMode==='preview'){renderSkuPreview(el);return;}
+  if(skuEditId!==null){renderSkuEdit(el);return;}
 
   el.innerHTML=`
     <div class="page-wrap">
@@ -3269,10 +3273,300 @@ function renderSkus(el){
 }
 
 function startNewSku(){
+  skuUploadMode = 'choice';
+  skuEditId = null;
+  renderPage('skus');
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SKU FILE UPLOAD — CSV/Excel column mapper
+═══════════════════════════════════════════════════ */
+const SKU_FIELDS = [
+  {key:'name',       label:'Product name',         aliases:['product name','name','product','article name','produktnamn','varunamn']},
+  {key:'ean',        label:'EAN-13',                aliases:['ean','ean13','barcode','streckkod','gtin','ean-13']},
+  {key:'articleNo',  label:'Article number',        aliases:['article','article no','articlenumber','artikelnummer','item no','sku','item number']},
+  {key:'netContent', label:'Net content (amount)',  aliases:['net content','content','weight','volume','amount','nettovikt','nettovolym']},
+  {key:'netUnit',    label:'Net content unit',      aliases:['unit','units','enhet','net unit']},
+  {key:'countryOfMfr',label:'Country of manufacture',aliases:['country','country of manufacture','origin','tillverkningsland','made in']},
+  {key:'shelfLifeMonths',label:'Shelf life (months)',aliases:['shelf life','best before','hållbarhet','expiry months','shelflife']},
+  {key:'inci',       label:'INCI list',             aliases:['inci','ingredients','ingredienser','inci list','ingredient list','formula']},
+  {key:'cpnp',       label:'CPNP number',           aliases:['cpnp','cpnp number','notification','notification number','scpn']},
+  {key:'euResponsible',label:'EU Responsible Person',aliases:['responsible person','eu responsible','ansvarig person','rp']},
+  {key:'rspSEK',     label:'RSP Sweden (SEK)',      aliases:['rsp sek','price sek','pris sek','swedish price','rekommenderat pris']},
+  {key:'rspDKK',     label:'RSP Denmark (DKK)',     aliases:['rsp dkk','price dkk','danish price','pris dkk']},
+  {key:'rspGBP',     label:'RSP UK (GBP)',          aliases:['rsp gbp','price gbp','uk price','gbp']},
+  {key:'rspEUR',     label:'RSP EU (EUR)',          aliases:['rsp eur','price eur','eu price','eur']},
+  {key:'netPriceSEK',label:'Net price (SEK)',       aliases:['net price','netpris','wholesale price','trade price']},
+  {key:'moq',        label:'MOQ',                  aliases:['moq','minimum order','min order','lagsta order']},
+  {key:'leadDays',   label:'Lead time (days)',      aliases:['lead time','lead days','leveranstid','delivery time']},
+  {key:'descEN',     label:'Description (English)', aliases:['description en','description english','desc en','product description']},
+  {key:'descSV',     label:'Description (Swedish)', aliases:['description sv','description swedish','produktbeskrivning','desc sv']},
+];
+
+const RETAILER_TEMPLATES = {
+  'Apotek Hjartat': {
+    'Produktnamn':'name','EAN':'ean','Artikelnummer':'articleNo',
+    'INCI-forteckning':'inci','CPNP-nummer':'cpnp','Ansvarig person EU':'euResponsible',
+    'Rekommenderat pris':'rspSEK','Nettopris':'netPriceSEK','MOQ':'moq',
+    'Ledtid (dagar)':'leadDays','Hallbarhet (man)':'shelfLifeMonths',
+    'Nettovikt/volym':'netContent','Tillverkningsland':'countryOfMfr',
+  },
+  'Matas': {
+    'Produktnavn':'name','EAN-kode':'ean','INCI':'inci','CPNP':'cpnp',
+    'Vejledende pris DKK':'rspDKK','Nettopris DKK':'netPriceSEK',
+    'MOQ':'moq','Holdbarhed (mdr)':'shelfLifeMonths','Oprindelsesland':'countryOfMfr',
+  },
+};
+
+function autoMatchColumns(headers){
+  var map = {};
+  headers.forEach(function(col){
+    var colLower = col.toLowerCase().trim();
+    for(var r in RETAILER_TEMPLATES){
+      if(RETAILER_TEMPLATES[r][col]){map[RETAILER_TEMPLATES[r][col]]=col;return;}
+    }
+    for(var fi=0;fi<SKU_FIELDS.length;fi++){
+      var field=SKU_FIELDS[fi];
+      if(field.aliases.some(function(a){return colLower===a||colLower.includes(a)||a.includes(colLower);})){
+        if(!map[field.key]) map[field.key]=col;
+        return;
+      }
+    }
+  });
+  return map;
+}
+
+function parseCSVText(text){
+  var lines=text.split('\n').filter(function(l){return l.trim().length>0;});
+  if(lines.length<2) return null;
+  var sep=lines[0].includes('\t')?'\t':',';
+  var headers=lines[0].split(sep).map(function(h){return h.replace(/^["']|["']$/g,'').trim();});
+  var rows=[];
+  for(var i=1;i<lines.length;i++){
+    var vals=[],cur='',inQ=false,line=lines[i];
+    for(var j=0;j<line.length;j++){
+      var c=line[j];
+      if(c==='"'&&!inQ){inQ=true;continue;}
+      if(c==='"'&&inQ){inQ=false;continue;}
+      if(c===sep[0]&&!inQ){vals.push(cur.trim());cur='';continue;}
+      cur+=c;
+    }
+    vals.push(cur.trim());
+    var row={};
+    headers.forEach(function(h,k){row[h]=(vals[k]||'');});
+    if(Object.values(row).some(function(v){return v.trim().length>0;})) rows.push(row);
+  }
+  return {headers:headers,rows:rows};
+}
+
+function handleSkuFileUpload(input){
+  var file=input.files[0];
+  if(!file) return;
+  var ext=file.name.split('.').pop().toLowerCase();
+  var errEl=document.getElementById('upload-error');
+  var statEl=document.getElementById('upload-status');
+  if(!['csv','txt','tsv'].includes(ext)){
+    if(errEl) errEl.textContent='For Excel (.xlsx): save as CSV first (File \u2192 Save As \u2192 CSV UTF-8). Full Excel support coming in V2.';
+    return;
+  }
+  if(errEl) errEl.textContent='';
+  if(statEl) statEl.textContent='Reading file...';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var parsed=parseCSVText(e.target.result);
+    if(!parsed||!parsed.rows||parsed.rows.length===0){
+      if(errEl) errEl.textContent='Could not read file. Ensure it is CSV with headers in row 1.';
+      if(statEl) statEl.textContent='';
+      return;
+    }
+    skuUploadData=parsed;
+    skuColumnMap=autoMatchColumns(parsed.headers);
+    var detectedRetailer=null;
+    for(var r in RETAILER_TEMPLATES){
+      var matches=parsed.headers.filter(function(h){return RETAILER_TEMPLATES[r][h];}).length;
+      if(matches>=3){detectedRetailer=r;break;}
+    }
+    if(statEl) statEl.textContent='';
+    var detEl=document.getElementById('upload-detected');
+    if(detectedRetailer&&detEl){
+      detEl.textContent='\u2713 Recognised as '+detectedRetailer+' template \u2014 mapped automatically';
+      detEl.style.color='#065F46';
+    }
+    setTimeout(function(){skuUploadMode='mapping';renderPage('skus');},300);
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+function renderSkuChoice(el){
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Add products</div>
+          <div class="page-sub">How do you want to add your product data?</div>
+        </div>
+        <button class="btn-outline" onclick="skuUploadMode=null;renderPage('skus')">Cancel</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:580px;margin:1.5rem 0">
+        <div style="border:2px solid var(--navy);padding:1.5rem;cursor:pointer;position:relative" onclick="document.getElementById('sku-file-input').click()">
+          <div style="position:absolute;top:.5rem;right:.5rem;font-family:var(--mono);font-size:.5rem;background:var(--gold);color:var(--navy);padding:.1rem .35rem;font-weight:700">RECOMMENDED</div>
+          <div style="font-size:1.4rem;margin-bottom:.5rem">\uD83D\uDCC2</div>
+          <div style="font-family:var(--sans);font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">Upload a file</div>
+          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);line-height:1.6">CSV, or an existing Apotek Hj\u00E4rtat or Matas template. VeyaFlow maps columns automatically.</div>
+          <div style="margin-top:.75rem;font-family:var(--mono);font-size:.6rem;color:var(--navy)">Upload CSV \u2192</div>
+        </div>
+        <div style="border:1px solid var(--border);padding:1.5rem;cursor:pointer" onclick="startManualSku()">
+          <div style="font-size:1.4rem;margin-bottom:.5rem">\u270F\uFE0F</div>
+          <div style="font-family:var(--sans);font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">Fill in manually</div>
+          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);line-height:1.6">Enter product data across 4 tabs. Good for a single new SKU.</div>
+          <div style="margin-top:.75rem;font-family:var(--mono);font-size:.6rem;color:var(--muted)">Open form \u2192</div>
+        </div>
+      </div>
+      <input type="file" id="sku-file-input" accept=".csv,.txt,.tsv" style="display:none" onchange="handleSkuFileUpload(this)">
+      <div id="upload-status" style="font-family:var(--mono);font-size:.65rem;color:var(--navy);margin-top:.5rem"></div>
+      <div id="upload-detected" style="font-family:var(--mono);font-size:.65rem;margin-top:.2rem"></div>
+      <div id="upload-error" style="font-family:var(--mono);font-size:.65rem;color:#991B1B;margin-top:.2rem"></div>
+      <div style="background:#FFFBEB;border:1px solid #D97706;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#92400E;line-height:1.6;max-width:580px;margin-top:1rem">
+        <strong>Accepted:</strong> CSV (.csv), tab-separated (.tsv), plain text (.txt).<br>
+        <strong>Excel users:</strong> File \u2192 Save As \u2192 CSV UTF-8 before uploading.<br>
+        <strong>Retailer templates:</strong> Upload an existing Apotek Hj\u00E4rtat or Matas file \u2014 columns auto-recognised.
+      </div>
+    </div>
+  `;
+}
+
+function renderSkuMapping(el){
+  if(!skuUploadData){renderPage('skus');return;}
+  var headers=skuUploadData.headers, rows=skuUploadData.rows;
+  var preview=rows.slice(0,3);
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Map columns</div>
+          <div class="page-sub">${rows.length} products found \u2014 confirm which column contains which data</div>
+        </div>
+        <button class="btn-outline" onclick="skuUploadMode='choice';renderPage('skus')">\u2190 Back</button>
+      </div>
+      <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.6rem .85rem;font-family:var(--mono);font-size:.62rem;color:#065F46;margin-bottom:1rem">
+        \u2713 Auto-matched ${Object.keys(skuColumnMap).length} of ${headers.length} columns \u2014 review and adjust below
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Column mapping</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+          ${SKU_FIELDS.map(function(field){return `
+            <div style="display:flex;align-items:center;gap:.4rem;padding:.3rem 0;border-bottom:1px solid var(--border)">
+              <div style="font-family:var(--sans);font-size:.75rem;font-weight:500;color:var(--navy);min-width:130px;flex-shrink:0">${field.label}</div>
+              <select data-field="${field.key}" onchange="skuColumnMap[this.dataset.field]=this.value==='__none__'?null:this.value"
+                style="flex:1;font-family:var(--sans);font-size:.7rem;padding:.2rem .35rem;border:1px solid var(--border)">
+                <option value="__none__">\u2014 skip \u2014</option>
+                ${headers.map(function(h){return `<option value="${h.replace(/"/g,'&quot;')}"${skuColumnMap[field.key]===h?' selected':''}>${h}</option>`;}).join('')}
+              </select>
+            </div>`;}).join('')}
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">File preview (first 3 rows)</div>
+        <div style="overflow-x:auto;max-width:100%">
+          <table style="border-collapse:collapse;font-family:var(--sans);font-size:.68rem;min-width:100%">
+            <thead><tr>${headers.map(function(h){return `<th style="padding:.3rem .5rem;background:var(--navy);color:#fff;text-align:left;font-weight:600;white-space:nowrap">${h}</th>`;}).join('')}</tr></thead>
+            <tbody>${preview.map(function(row,i){return `<tr style="background:${i%2===0?'#fff':'#F9F8F6'}">${headers.map(function(h){return `<td style="padding:.3rem .5rem;border-bottom:1px solid var(--border);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row[h]||''}</td>`;}).join('')}</tr>`;}).join('')}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn-outline" onclick="skuUploadMode='choice';renderPage('skus')">\u2190 Choose different file</button>
+        <button class="btn-primary" onclick="buildSkuPreview()">Preview import (${rows.length} products) \u2192</button>
+      </div>
+    </div>
+  `;
+}
+
+function buildSkuPreview(){
+  if(!skuUploadData) return;
+  skuUploadRows = skuUploadData.rows.map(function(row){
+    var sku=newSkuForm();
+    SKU_FIELDS.forEach(function(field){
+      var col=skuColumnMap[field.key];
+      if(col&&row[col]!==undefined&&String(row[col]).trim().length>0) sku[field.key]=String(row[col]).trim();
+    });
+    return sku;
+  }).filter(function(s){return s.name||s.ean;});
+  skuUploadMode='preview';
+  renderPage('skus');
+}
+
+function renderSkuPreview(el){
+  if(!skuUploadRows.length){
+    el.innerHTML='<div class="page-wrap"><div class="card" style="padding:1rem"><p style="color:#991B1B">No products could be mapped. Check your column mapping.</p><button class="btn-outline" onclick="skuUploadMode=\'mapping\';renderPage(\'skus\')">\u2190 Back to mapping</button></div></div>';
+    return;
+  }
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Import preview</div>
+          <div class="page-sub">${skuUploadRows.length} products ready to import</div>
+        </div>
+        <button class="btn-outline" onclick="skuUploadMode='mapping';renderPage('skus')">\u2190 Back</button>
+      </div>
+      <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.6rem .85rem;font-family:var(--mono);font-size:.62rem;color:#065F46;margin-bottom:1rem">
+        \u2713 ${skuUploadRows.length} products mapped \u2014 review then confirm import
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        ${skuUploadRows.map(function(sku){
+          var r=skuReadiness(sku);
+          var barC=r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444';
+          return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+              <div style="flex:1;min-width:150px">
+                <div style="font-family:var(--sans);font-size:.83rem;font-weight:600;color:var(--navy)">${sku.name||'\u2014'}</div>
+                <div style="font-family:var(--mono);font-size:.56rem;color:var(--muted);margin-top:.1rem">${sku.ean?'EAN '+sku.ean:'No EAN'}${sku.rspSEK?' \u00B7 '+sku.rspSEK+' SEK':''}${sku.cpnp?' \u00B7 CPNP \u2713':''}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:.35rem">
+                <div style="background:var(--border);width:50px;height:4px;border-radius:2px"><div style="background:${barC};height:4px;border-radius:2px;width:${r.pct}%"></div></div>
+                <span style="font-family:var(--mono);font-size:.58rem;color:${barC};font-weight:700">${r.pct}%</span>
+              </div>
+            </div>
+            ${r.missing.length?`<div style="font-family:var(--mono);font-size:.53rem;color:var(--muted);margin-top:.15rem">Missing: ${r.missing.slice(0,4).join(', ')}${r.missing.length>4?' +'+(r.missing.length-4)+' more':''}</div>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn-outline" onclick="skuUploadMode='mapping';renderPage('skus')">\u2190 Adjust mapping</button>
+        <button class="btn-primary" onclick="confirmSkuImport()">Import ${skuUploadRows.length} product${skuUploadRows.length!==1?'s':''} \u2192</button>
+      </div>
+      <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted);margin-top:.75rem;line-height:1.5">After import you can edit each product to fill in missing fields. Low-readiness products are highlighted.</div>
+    </div>
+  `;
+}
+
+function confirmSkuImport(){
+  var existingEans=new Set(skus.map(function(s){return s.ean;}).filter(Boolean));
+  var added=0,skipped=0;
+  skuUploadRows.forEach(function(row){
+    if(row.ean&&existingEans.has(row.ean)){skipped++;return;}
+    skus.push(row);
+    if(row.ean) existingEans.add(row.ean);
+    added++;
+  });
+  saveSkus();
+  skuUploadMode=null; skuUploadData=null; skuUploadRows=[]; skuColumnMap={};
+  var el=document.getElementById('page-skus');
+  el.innerHTML=`<div class="page-wrap"><div class="card" style="text-align:center;padding:2.5rem">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">\u2713</div>
+    <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.35rem">${added} product${added!==1?'s':''} imported</div>
+    ${skipped?`<div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.75rem">${skipped} skipped (duplicate EAN)</div>`:''}
+    <button class="btn-primary" onclick="renderPage('skus')">View my products \u2192</button>
+  </div></div>`;
+}
+
+function startManualSku(){
+  skuUploadMode = null;
   skuEditId = 'new';
   skuTab = 1;
   skuForm = newSkuForm();
-  // Pre-fill EU Responsible Person from brand if set
   if(brand?.euResponsible) skuForm.euResponsible = brand.euResponsible;
   renderPage('skus');
 }
