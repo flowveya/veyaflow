@@ -447,7 +447,7 @@
 ═══════════════════════════════════════════════════ */
 
 const CATEGORIES = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor","Other"];
-const MARKETS    = ["Denmark","Germany","Netherlands","United Kingdom","Norway","Finland","France","Belgium","Austria","Switzerland","United States","Australia"];
+const MARKETS    = ["Denmark","Germany","Netherlands","United Kingdom","Norway","Finland","France","Belgium","Austria","Switzerland","United States","Canada","Australia","Japan","South Korea","UAE","Singapore","New Zealand"];
 const CURRENT_MARKETS = ["Sweden","Norway","Finland","Denmark","Iceland"];
 
 const BRAND_STAGES = [
@@ -594,11 +594,11 @@ const RETAILERS={
   "Whole Foods Market":{country:"United States",type:"Premium grocery & wellness",buyerPriority:"Clean ingredient standards, organic/non-GMO preferred, sustainability story. Local Forager programme for smaller brands.",language:"en",minOrderNote:"Apply via Whole Foods Local Forager portal. FDA MoCRA facility registration required first.",category:["Food & Beverage","Skincare & Beauty","Wellness & Supplements"]},
 };
 const RETAILER_BY_MARKET={"United Kingdom":["Waitrose","Holland & Barrett","Planet Organic"],"Denmark":["Matas","Salling Group"],"Germany":["dm-drogerie markt","Alnatura","Rossmann"],"Norway":["Meny"],"United States":["Whole Foods Market"]};
-const PITCH_MARKETS=["United Kingdom","Denmark","Germany","Norway","United States"];
+const PITCH_MARKETS=["United Kingdom","Denmark","Germany","Norway","Sweden","Netherlands","France","United States","Australia","Japan","South Korea","UAE","Canada","Singapore"];
 const PITCH_CATEGORIES=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel","Home & Design"];
 
 // COMPARE page data
-const COMPARE_MARKETS=["Denmark","Germany","United Kingdom","Norway","Netherlands","France","United States","Australia"];
+const COMPARE_MARKETS=["Denmark","Germany","United Kingdom","Norway","Sweden","Netherlands","France","Belgium","Austria","United States","Canada","Australia","Japan","South Korea","UAE","Singapore"];
 
 /* ═══════════════════════════════════════════════════
    STATE
@@ -891,10 +891,8 @@ function renderOnboardStep(){
       </div>
       <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="ob-skus" value="${onboardForm.skus}" placeholder="e.g. LED Face Mask, Overnight Lip Tape, Silk Pillowcase" oninput="onboardForm.skus=this.value"></div>
       <div class="field"><label class="lbl">Your name</label><input type="text" id="ob-username" value="${onboardForm.userName||''}" placeholder="e.g. Charlotte" oninput="onboardForm.userName=this.value"></div>
-      <div class="field">
-        <label class="lbl">Invite teammates <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-        <input type="text" id="ob-team" value="${onboardForm.teamEmails||''}" placeholder="colleague@brand.com, another@brand.com" oninput="onboardForm.teamEmails=this.value">
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem">Teammates will be notified when this workspace is ready to share</div>
+      <div style="padding:.6rem .85rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);font-family:var(--mono);font-size:.58rem;color:var(--gold);line-height:1.6">
+        ◈ Multi-user workspace — coming in V2. Your workspace is currently single-user. Team invites will be added once the Supabase backend is live.
       </div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=2;renderPage('home')">← Back</button>
@@ -1661,6 +1659,8 @@ function confirmPricingAndGenerate(){
 }
 
 async function generateReport(){
+  // Always clear previous result before generating
+  reportState={loading:true,result:null,sections:[]};
   const btn=document.getElementById('r-generate-btn');
   if(btn){btn.disabled=true;btn.textContent='Generating report...';}
   savePageState('ns_reportForm',reportForm);
@@ -1670,14 +1670,29 @@ async function generateReport(){
   // Get live retailer intelligence from database
   const retailerIntel = getMarketRetailerIntel(reportForm.targetMarket, reportForm.category);
 
+  // EU BASE LAYER — shared across all EU/EEA markets
+  const EU_BASE = {
+    "Skincare & Beauty": "EU COSMETICS REGULATION (EC) 1223/2009 applies across all EU/EEA markets: (1) CPNP notification at portal.cpnp.eu before placing on market, (2) EU Responsible Person with EU address mandatory, (3) Product Information File (PIF) including safety assessment by qualified safety assessor, (4) INCI ingredient list in descending order, (5) CMR substance restrictions. These requirements are IDENTICAL in Denmark, Germany, Netherlands, France, Belgium, Austria, Sweden, Norway, Finland — do not repeat them per-country. Instead note only the country-specific additions below.",
+    "Food & Beverage": "EU FOOD INFORMATION REGULATION (EU) 1169/2011 applies across all EU/EEA markets: mandatory nutrition declaration, 14 major allergens highlighted, net quantity, best before/use by, storage conditions, country of origin for certain products. These apply identically in all EU markets. Note only country-specific additions.",
+    "Wellness & Supplements": "EU FOOD SUPPLEMENTS DIRECTIVE 2002/46/EC applies across all EU/EEA markets: notification to national authority before first placement, EU health claims from Regulation 1924/2006 only (no disease claims), INCI/ingredient list. These apply identically in all EU markets. Note only country-specific additions.",
+  };
+
   const complianceDetail={
-    "United Kingdom":{"Skincare & Beauty":"UK SI 2019/696: UK Responsible Person + SCPN notification (OPSS portal). English INCI. UKCA mark. EU CPNP does NOT cover UK post-Brexit. Timeline 4-8 weeks, cost GBP 500-1500. UKCA mark required.","Food & Beverage":"UK FIR 2014: English ingredients, 14 allergens, UK Nutrition Facts format. FSA novel food approval if applicable. UK importer address required on pack.","Wellness & Supplements":"MHRA borderline review required. UK Nutrition and Health Claims Regs 2007. UK Food Supplements Regs 2003. UK Responsible Person if borderline medicine."},
-    "Germany":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP notification (portal.cpnp.eu), EU Responsible Person with German address preferred, German INCI labelling. VerpackG packaging registration mandatory (Der Gruene Punkt or equivalent). Timeline 6-10 weeks, cost EUR 800-2000.","Food & Beverage":"EU FIR 1169/2011 in German. VerpackG mandatory. BVL notification for supplements. German organic: DE-OeKO-006 logo.","Wellness & Supplements":"LFGB German Food Code. EU Supplements Directive (NemV). Notify BVL before market placement. VerpackG mandatory for all packaging."},
-    "Denmark":{"Skincare & Beauty":"EU CPNP notification, EU Responsible Person. DVFA (Foedevarestyrelsen) oversight. Danish labelling required (sticker acceptable). Nordic Swan ecolabel for premium positioning. VAT 25%. EUDR compliance from December 2026 if relevant commodities.","Food & Beverage":"EU FIR 1169/2011 in Danish. DVFA registration. Organic: O-maerket (Danish organic). EUDR from December 2026.","Wellness & Supplements":"Sundhedsstyrelsen (Danish Health Authority) oversight. EU health claims only. DVFA notification. Danish labelling required."},
-    "Norway":{"Skincare & Beauty":"EEA mirrors EU Reg 1223/2009. Norwegian Responsible Person required. Mattilsynet (Norwegian Food Safety Authority) oversight. Norwegian labelling mandatory. VAT 25%. Non-EU requires separate EEA notification.","Food & Beverage":"Mattilsynet oversight. Debio certification for organic (NOR ORGANIC logo). Norwegian allergen labelling rules. Import documentation required.","Wellness & Supplements":"Mattilsynet. EU health claims apply via EEA agreement. Norwegian translation mandatory for all labelling."},
-    "Sweden":{"Skincare & Beauty":"EU CPNP notification, EU Responsible Person. Livsmedelsverket/Lakemedelsverket oversight depending on product type. Swedish labelling required. Swedish eco: Svanen (Nordic Swan) or KRAV for organic. EUDR compliance if relevant ingredients.","Food & Beverage":"EU FIR 1169/2011 in Swedish. Livsmedelsverket registration. KRAV for organic certification. Swedish allergen labelling.","Wellness & Supplements":"Lakemedelsverket borderline review. Swedish translation required. EU health claims only. Nordic Swan preferred."},
-    "Netherlands":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP, EU Responsible Person. Dutch/French/German INCI labelling. NVWA (Netherlands Food and Consumer Product Safety Authority) oversight. Dutch consumer law strict on claims.","Food & Beverage":"EU FIR 1169/2011 in Dutch. NVWA oversight. Novel food EFSA approval if applicable.","Wellness & Supplements":"NVWA. EU health claims only. Dutch labelling mandatory. Health claims substantiation required."},
-    "France":{"Skincare & Beauty":"EU Reg 1223/2009: CPNP, EU Responsible Person. French INCI labelling mandatory — not optional. ANSM (Agence nationale de securite du medicament) oversight. French claims very strictly enforced. Cosmetics with borderline drug claims prosecuted.","Food & Beverage":"EU FIR 1169/2011 in French. DGCCRF oversight. French labelling mandatory. Strong enforcement on health claims.","Wellness & Supplements":"ANSES oversight. DGCCRF. French translation mandatory. EU health claims only. Very strict enforcement on functional claims."},
+    "United Kingdom":{"Skincare & Beauty":"UK SI 2019/696 (post-Brexit, separate from EU): UK Responsible Person with UK address required, SCPN notification via OPSS portal (opss.gov.uk), English-language INCI, UKCA mark. EU CPNP does NOT cover UK — separate UK notification mandatory. Timeline 4-8 weeks, cost GBP 500-1500. UK organic: Soil Association (EU organic logo not valid).","Food & Beverage":"UK FIR 2014: English ingredients, 14 allergens, UK Nutrition Facts format (not EU format). FSA novel food approval if applicable. UK importer address on pack. UKORG for organic. APHA health certs for animal products.","Wellness & Supplements":"MHRA borderline product review. UK Nutrition and Health Claims Regs 2007. UK Food Supplements Regs 2003. UK Responsible Person if borderline medicine."},
+    "Germany":{"Skincare & Beauty":"EU BASE applies (see above). Germany-specific additions: VerpackG packaging registration mandatory (Der Gruene Punkt or Interseroh) — register at verpackungsregister.org before first sale. German-language INCI preferred. INCI warning texts in German. Timeline 6-10 weeks total, cost EUR 800-2000.","Food & Beverage":"EU BASE applies. Germany-specific: VerpackG mandatory. BVL notification for supplements. German-language labels mandatory. Organic: DE-OeKO-006 logo.","Wellness & Supplements":"EU BASE applies. Germany-specific: LFGB German Food Code compliance. Notify BVL (bvl.bund.de) before market placement. VerpackG mandatory. Nahrungsergaenzungsmittelverordnung (NemV)."},
+    "Denmark":{"Skincare & Beauty":"EU BASE applies (see above). Denmark-specific additions: Danish labelling required (sticker on top of Swedish acceptable). DVFA (foedevarestyrelsen.dk) oversight. Nordic Swan ecolabel (svanen.dk) strongly recommended for premium positioning — increases Matas listing success. VAT 25%. EUDR from December 30 2026 if cocoa, coffee, palm, soy, wood-derived ingredients.","Food & Beverage":"EU BASE applies. Denmark-specific: Danish labelling required. DVFA registration. Organic: O-maerket (okologisk.dk). EUDR December 2026 for relevant commodities.","Wellness & Supplements":"EU BASE applies. Denmark-specific: Sundhedsstyrelsen (sst.dk) oversight for borderline products. Danish labelling. DVFA notification required."},
+    "Netherlands":{"Skincare & Beauty":"EU BASE applies. Netherlands-specific: NVWA (nvwa.nl) oversight. Dutch or multilingual (NL/FR/DE) labelling required. Dutch consumer protection strict on efficacy claims. EAN barcode mandatory for retail.","Food & Beverage":"EU BASE applies. Netherlands-specific: NVWA oversight. Dutch labelling. Novel food: EFSA approval required.","Wellness & Supplements":"EU BASE applies. Netherlands-specific: NVWA. Dutch labelling. Health claims strictly enforced by NVWA."},
+    "France":{"Skincare & Beauty":"EU BASE applies. France-specific: French-language labelling MANDATORY (not optional — legal requirement). ANSM (ansm.sante.fr) oversight. French authorities very strict on drug-cosmetic boundary claims. Avoid claims like 'regenerates', 'repairs DNA' — will trigger borderline medicine review. French distributor or RP with French address strongly recommended.","Food & Beverage":"EU BASE applies. France-specific: French labelling mandatory. DGCCRF oversight. Biocoop/organic: AB logo (same as EU organic but French version preferred).","Wellness & Supplements":"EU BASE applies. France-specific: ANSES (anses.fr) oversight. French translation mandatory. DGCCRF enforcement active."},
+    "Norway":{"Skincare & Beauty":"Norway is EEA — mirrors EU Reg 1223/2009 via EEA agreement. Norwegian Responsible Person required (different from EU RP). Mattilsynet (mattilsynet.no) oversight. Norwegian labelling mandatory. VAT 25%. Non-EU: requires separate EEA/Norwegian notification in addition to CPNP.","Food & Beverage":"Mattilsynet oversight. Debio certification for organic (NOR ORGANIC logo — EU organic not used). Norwegian allergen labelling. Import documentation required.","Wellness & Supplements":"Mattilsynet. Norwegian translation required. EU health claims apply via EEA."},
+    "Sweden":{"Skincare & Beauty":"EU BASE applies (Sweden is EU member). Sweden-specific: Livsmedelsverket/Lakemedelsverket oversight. Swedish labelling required. Nordic Swan (svanen.se) or KRAV for organic. Apotek Hjärtat requires full PIF before listing. Swedish Consumer Agency (KO) active on claims enforcement.","Food & Beverage":"EU BASE applies. Swedish labelling required. Livsmedelsverket registration. KRAV organic certification.","Wellness & Supplements":"EU BASE applies. Lakemedelsverket borderline review active. Swedish translation. EU health claims only."},
+    "Belgium":{"Skincare & Beauty":"EU BASE applies. Belgium-specific: French AND Dutch labelling both required (Flemish + Wallonia market). FAMHP (fagg-afmps.be) oversight. Belgian cosmetics notification to SPF Sante.","Food & Beverage":"EU BASE applies. Both French and Dutch labelling required.","Wellness & Supplements":"EU BASE applies. FASFC (favv-afsca.be) oversight. Bilingual labelling."},
+    "Austria":{"Skincare & Beauty":"EU BASE applies. Austria-specific: German-language labelling. BASG (basg.gv.at) oversight. Austrian packaging law (VerpackVO) — register with ARA (ara.at). Very similar to Germany.","Food & Beverage":"EU BASE applies. German labelling. AGES (ages.at) oversight.","Wellness & Supplements":"EU BASE applies. BASG oversight. German labelling mandatory."},
+    "Japan":{"Skincare & Beauty":"Japan Pharmaceutical and Medical Device Act (PMDA): quasi-drug classification for active-claim products (separate approval needed). Cosmetics: file notification with PMDA before import. Japanese INCI (J-INCI) labelling in Japanese mandatory. No EU/US Responsible Person accepted — Japanese importer/responsible agent required. Prohibited ingredient list differs from EU. Timeline: 3-6 months, cost JPY 300,000-800,000. Japanese distributor almost always required for first entry.","Food & Beverage":"Food Sanitation Act (Shokuhin Eiseiho). Japanese labelling in Japanese mandatory. Quarantine inspection. MAFF approval for organic claims (JAS organic). No EU organic logo recognised.","Wellness & Supplements":"FOSHU (Foods for Specified Health Uses) — separate approval process. Japanese labelling. No health claims without FOSHU approval. Functional food claims via FFC system."},
+    "South Korea":{"Skincare & Beauty":"Cosmetics Act (MFDS): cosmetics licence required before import. MFDS (Ministry of Food and Drug Safety) registration. Korean labelling in Korean mandatory. Cruelty-free claims: no animal testing for imports (required since 2017). Functional cosmetics (whitening, anti-wrinkle, UV): separate functional cosmetic approval needed. Korean importer with MFDS licence required.","Food & Beverage":"Food Sanitation Act. Korean labelling mandatory. MFDS approval. Korean Fair Trade Commission claims rules.","Wellness & Supplements":"MFDS health functional food approval. Korean labelling. Strict health claim regulations."},
+    "UAE":{"Skincare & Beauty":"Dubai Municipality / Emirates Authority for Standardisation (ESMA) registration. Halal certification strongly recommended (not mandatory but significantly increases retail access). Arabic labelling required alongside English. No alcohol above trace amounts in some channels. ESMA product registration before import. UAE importer/local agent required. Timeline 4-8 weeks.","Food & Beverage":"ESMA and Dubai Municipality. Halal certification (ESMA-approved body) typically required. Arabic labelling. Pork and alcohol-derived ingredients prohibited.","Wellness & Supplements":"Ministry of Health registration for health claims. Halal preferred. Arabic labelling required."},
+    "Canada":{"Skincare & Beauty":"Health Canada — Natural Health Products Directorate for quasi-drug products. Cosmetics: notify Health Canada within 10 days of first sale via Cosmetics Notification System (CNS). English AND French labelling mandatory (bilingual). Cosmetic Ingredient Hotlist compliance. Canadian Responsible Person or importer required.","Food & Beverage":"CFIA (Canadian Food Inspection Agency). Bilingual (English/French) labelling mandatory. Canadian Nutrition Facts format. CFIA organic certification (Canada Organic logo).","Wellness & Supplements":"Health Canada NPN (Natural Product Number) required before sale. English and French labelling. Timeline 3-12 months for NPN, cost CAD 1,000-5,000."},
+    "Australia":{"Skincare & Beauty":"Therapeutic Goods Administration (TGA) for therapeutic claims. Cosmetics: AICIS (Australian Industrial Chemicals Introduction Scheme) — notify new chemicals. ACCC fair trading. Australian English labelling. No EU CPNP accepted — separate Australian process.","Food & Beverage":"FSANZ (Food Standards Australia New Zealand). Australian English. ACO for organic certification.","Wellness & Supplements":"TGA listed medicine (ARTG) for therapeutic claims. Australian Register of Therapeutic Goods. Timeline 3-6 months."},
+    "Singapore":{"Skincare & Beauty":"Health Sciences Authority (HSA) — notification via PRISM portal before import. Singapore standard (SS ISO 22716 GMP) compliance. English labelling. HSA active on illegal whitening/anti-ageing claims. Halal certification useful for broader market access. Singapore importer required.","Food & Beverage":"Singapore Food Agency (SFA). English labelling. Novel food notification. Halal (MUIS) for Muslim consumer segment.","Wellness & Supplements":"HSA health products regulation. English labelling. No unsubstantiated health claims."},
   }[reportForm.targetMarket]?.[reportForm.category] || `Consult local regulatory counsel in ${reportForm.targetMarket} for ${reportForm.category} requirements.`;
 
   // Build verified competitor pricing context
@@ -1707,6 +1722,14 @@ ${priceContext}`;
     "Sweden":"Dagab (ICA group grocery), Menigo Foodservice, Nordic Brand Agency (premium brand builder)",
     "Netherlands":"Udea (natural/organic food), Beauty Holland (cosmetics), Nordic Import NL (Scandinavian brands)",
     "France":"Selecta France (beauty specialist), Scandifood (Nordic brands — strong existing network), Distriborg (organic food/wellness)",
+    "Belgium":"Belcos (beauty/cosmetics), Scandinavian Products BE, Biofresh (natural/organic)",
+    "Austria":"ARA Distribution (FMCG), Scandinavian Import AT, Kastner (organic food)",
+    "Japan":"Cosmax Japan (beauty distribution), Alpen Group (wellness), Scandinavian Trade House Tokyo — Japanese distributor mandatory for first entry",
+    "South Korea":"Olive Young supplier portal (direct for strong brands), Korea Cosmetics Agency, Nordic Beauty Korea (Scandi brand specialist)",
+    "UAE":"Chalhoub Group (luxury/beauty — largest in region), GMG (health/wellness), Jashanmal (premium brands) — local agent legally required",
+    "Canada":"UNFI Canada (natural/organic), Kehe Canada, Presence Marketing Canada (natural products)",
+    "Singapore":"Luxasia (premium beauty — distributes across SEA), EuroStar Singapore (European brands specialist), Zuellig Pharma (health/wellness)",
+    "New Zealand":"Prolife Foods (health/wellness), Pharmacy Brands NZ, EuroFoods NZ",
   };
 
   const distributors = distributorContext[reportForm.targetMarket]||'major distributors';
@@ -1917,8 +1940,7 @@ Brand managers love seeing that risks have been thought through. Be specific —
     }
   ];
 
-  // Show loading state
-  reportState={loading:true,result:null,sections:[]};
+  // Show loading state (result already cleared above)
   renderPage('report');
 
   const completedSections = [];
