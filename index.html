@@ -1691,8 +1691,9 @@ function confirmPricingAndGenerate(){
 }
 
 async function generateReport(){
-  // Always clear previous result before generating
+  // Always clear previous result and render loading state immediately
   reportState={loading:true,result:null,sections:[]};
+  renderPage('report');
   const btn=document.getElementById('r-generate-btn');
   if(btn){btn.disabled=true;btn.textContent='Generating report...';}
   savePageState('ns_reportForm',reportForm);
@@ -2209,8 +2210,7 @@ Brand managers love seeing that risks have been thought through. Be specific —
     }
   ];
 
-  // Show loading state (result already cleared above)
-  renderPage('report');
+  // Loading state already rendered above
 
   const completedSections = [];
 
