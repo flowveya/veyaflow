@@ -1715,150 +1715,205 @@ ${priceContext}`;
   const modules = [
     {
       title: 'Executive Summary & Market Intelligence',
-      prompt: `You are VeyaFlow AI — a specialist Nordic brand market entry intelligence platform. April 2026.
+      prompt: `You are VeyaFlow AI — specialist Nordic brand market entry intelligence platform. April 2026. Writing for a brand manager at a EUR 5M-50M brand preparing to justify international expansion to their board.
 
 ${brandCtx}
 
 LIVE RETAILER INTELLIGENCE FOR ${reportForm.targetMarket.toUpperCase()} (April 2026):
 ${retailerIntel||'Generate from your knowledge of this market'}
 
-Generate the EXECUTIVE SUMMARY & MARKET INTELLIGENCE section.
+Generate EXECUTIVE SUMMARY & MARKET INTELLIGENCE.
 
-EXECUTIVE SUMMARY (internal memo format)
-Write as if briefing a board: Why ${reportForm.brandName}, why ${reportForm.targetMarket}, why April 2026 specifically.
-- Market Attractiveness Score: X/10 with three bullet justifications
-- Opportunity in one sentence (specific to April 2026 market conditions)
-- Primary risk in one sentence (specific, not generic)
-- Recommended entry route: [DTC first / distributor / direct retail] — justify in one sentence
-- Timeline to first sale: X months
-- Year 1 revenue potential: LOW X — HIGH Y (local currency, specific)
+## EXECUTIVE SUMMARY
+Board-ready internal memo format. Be direct. Give numbers.
+- **Market Attractiveness Score:** X/10
+- **Why now (April 2026):** One specific sentence referencing a current market shift in ${reportForm.targetMarket}
+- **The opportunity:** What specific gap exists on shelf today that ${reportForm.brandName} fills
+- **Primary risk:** One specific, non-generic risk for this brand in this market
+- **Recommended entry route:** DTC / distributor / direct retail — one sentence justification
+- **Timeline to first sale:** X months
+- **Year 1 revenue potential:** LOW — HIGH (local currency)
 
-MARKET SIZE & TIMING
-- ${reportForm.category} market size in ${reportForm.targetMarket} 2025/2026 (give specific figure in local currency)
-- YoY growth rate
-- Top 3 consumer trends driving purchase decisions RIGHT NOW in April 2026 (be specific to this market, not generic)
-- The specific window: why is this the right moment for a Nordic brand to enter?
-- One emerging gap in the ${reportForm.category} market that ${reportForm.brandName} is positioned to fill
+## MARKET SIZE & TIMING
+CRITICAL: Every cell must have a value. Use estimates if needed — never leave blank.
 
-COMPETITIVE LANDSCAPE
-Think step by step: First identify 3 brands already succeeding in ${reportForm.category} in ${reportForm.targetMarket}. Then analyse their price points and positioning. Then identify the exact gap ${reportForm.brandName} can exploit.
-- Competitor 1: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits
-- Competitor 2: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits  
-- Competitor 3: [Name] — price point — retailer presence — weakness ${reportForm.brandName} exploits
-- THE GAP: Specific positioning territory available to ${reportForm.brandName} in 2026`
+| Metric | Figure | Note |
+| ${reportForm.category} market size ${reportForm.targetMarket} (2025) | [DKK/EUR/GBP figure] | [source or estimate] |
+| YoY growth rate | [+X%] | [estimate] |
+| Online vs in-store split | [X% online] | [estimate] |
+| Premium segment share | [X% of total] | [estimate] |
+| Danish consumer shift driving demand | [one trend] | [April 2026] |
+
+**WHY NOW — THE MACRO TREND:**
+Danish/German/UK consumers are currently moving away from [X] toward [Y] — give the specific macro shift happening in ${reportForm.targetMarket} in 2026 that creates the opening for ${reportForm.brandName}. Quote a supply gap percentage or trend statistic if possible. This is what a brand manager uses to justify expansion to their board.
+
+**TOP 3 CONSUMER TRENDS (${reportForm.targetMarket}, April 2026):**
+1. **[Trend name]:** [2 sentences — specific to this market, why it matters for ${reportForm.brandName}]
+2. **[Trend name]:** [2 sentences]
+3. **[Trend name]:** [2 sentences]
+
+## COMPETITIVE LANDSCAPE & SHELF POSITIONING
+Think step by step: identify 3 competitors, their shelf position, their weakness, then map where ${reportForm.brandName} sits.
+
+**SHELF ADJACENCY MAP — who ${reportForm.brandName} sits next to:**
+| Brand | Shelf position | Price | Positioning | ${reportForm.brandName} vs them |
+[3 rows — name real brands in this market]
+
+**THE GAP:** One specific sentence — the exact positioning territory available to ${reportForm.brandName} that none of the above occupies.
+**SHELF NEIGHBOURHOOD RISK:** Is there a brand nearby that could dilute ${reportForm.brandName}'s premium positioning? Name it and suggest how to brief the retailer on placement.`
     },
     {
-      title: 'Retailer Deep-Dive & Pricing Strategy',
-      prompt: `You are VeyaFlow AI — a specialist Nordic brand market entry intelligence platform. April 2026.
+      title: 'Retailer Deep-Dive & Hidden Economics',
+      prompt: `You are VeyaFlow AI — specialist Nordic brand market entry intelligence platform. April 2026. Writing for a brand CFO who needs to understand the true cost of retail entry, not just the headline margin.
 
 ${brandCtx}
 
 FOUNDER-VERIFIED RETAILER INTELLIGENCE (April 2026):
 ${retailerIntel||'Generate from your knowledge of this market in April 2026'}
 
-PRICING REASONING — think through this step by step before writing:
-1. What is the current average basket size at the target retailers?
-2. What is the typical retailer margin in this category?
-3. What price point positions ${reportForm.brandName} correctly vs competitors?
-4. What shelf velocity (units per store per week) is realistic?
-5. What is the Year 1 revenue potential if listed in 3-4 stores?
-Then write the pricing strategy based on this reasoning.
+Generate RETAILER DEEP-DIVE & HIDDEN ECONOMICS.
 
-Generate RETAILER DEEP-DIVE & PRICING STRATEGY.
+## HERO-FIRST ASSORTMENT STRATEGY
+A retailer will give ${reportForm.brandName} 3-5 slots initially. Recommend the optimal assortment.
 
-PRICING INTELLIGENCE
-- Recommended retail price in local currency (with justification vs competitor benchmarks)
-- Wholesale/ex-works price
-- Retailer margin % to offer
-- Shelf velocity estimate: X units per store per week (show your reasoning)
-- Year 1 revenue projection if listed in key retailers (show calculation)
-- Lead SKU recommendation: which product to launch with and why
+| Role | SKU | Why this SKU | Expected sell-through |
+| **Lead SKU (door opener)** | [product name] | [why it breaks the market — high velocity, strong story, proves the brand] | [units/week estimate] |
+| **Basket Builder 1** | [product name] | [drives margin and repeat purchase] | [units/week estimate] |
+| **Basket Builder 2** | [product name] | [complements lead SKU, increases basket size] | [units/week estimate] |
 
-RETAILER ANALYSIS — for each relevant retailer from the intelligence provided:
-**[RETAILER NAME]** | [stores/reach]
-2026 Strategy: [their current focus — use the intel provided]
-What their buyer is looking for RIGHT NOW: [specific, from intel]
-Fit assessment for ${reportForm.brandName}: STRONG FIT / POSSIBLE FIT / NOT YET
-One-sentence justification:
-Margin requirement: X% | MOQ: X units
-How to get listed: [specific steps, portal names, approach]
-Timing: [best window — is there a range review, promotion period, or buying season coming up?]`
+**SELL-THROUGH REASONING:** Think step by step — what is the typical sell-through rate for a new ${reportForm.category} brand in ${reportForm.targetMarket}? What does ${reportForm.brandName} need to sell per store per week to get reordered and earn more shelf space?
+
+## RETAILER ANALYSIS — for each key retailer:
+**[RETAILER NAME]** | [stores] | [2026 strategy from intel]
+- **What their buyer wants RIGHT NOW:** [specific — from retailer intel]
+- **Fit for ${reportForm.brandName}:** STRONG FIT / POSSIBLE FIT / NOT YET — [one sentence why]
+- **How to approach:** [portal / LinkedIn / distributor / trade show — specific]
+- **Best timing:** [range review window, Beauty Days, buying season]
+- **STAFF EDUCATION REQUIREMENT:** How will shop floor staff explain this product to a customer? What training does ${reportForm.brandName} need to provide? [e.g. "Matas staff training sessions required — estimate 2 hours per store for premium tools"]
+
+## THE HIDDEN ECONOMICS — true cost of retail
+A 50% headline margin is never 50% after deductions. Show the real P&L:
+
+| Cost Item | Typical % or amount | Notes |
+| Headline retailer margin | [X%] | [standard for this category] |
+| Listing fee | [EUR/DKK amount or "none"] | [varies by retailer] |
+| Beauty Days / promotions participation | [X% of sales or flat fee] | [e.g. Matas Beauty Days mandatory for new brands] |
+| Staff samples (per store) | [amount] | [estimate] |
+| Return allowance | [X%] | [typical in this market] |
+| Co-op marketing / digital | [amount or %] | [e.g. Lyko.com product placement] |
+| **TRUE NET MARGIN after deductions** | **[X%]** | **[vs headline X%]** |
+
+**P&L REALITY CHECK:** At ${reportForm.pricePoint||'premium'} price point, after all deductions, is this market profitable at Year 1 volumes? Give a direct yes/no with the break-even volume calculation.`
     },
     {
-      title: 'Regulatory Compliance Roadmap',
-      prompt: `You are VeyaFlow AI — compliance specialist. April 2026.
+      title: 'Claims Audit & Compliance Roadmap',
+      prompt: `You are VeyaFlow AI — compliance and regulatory specialist. April 2026. Writing for a brand legal/ops team at an established brand — a compliance error in a new market is a PR risk that affects the home market too.
 
 ${brandCtx}
 TARGET MARKET: ${reportForm.targetMarket}
 COMPLIANCE CONTEXT: ${complianceDetail}
 
-Generate a REGULATORY COMPLIANCE ROADMAP — actionable, specific, prioritised.
+Generate CLAIMS AUDIT & COMPLIANCE ROADMAP.
 
-COMPLIANCE CHECKLIST (in priority order — must-do before first sale first):
+## CLAIMS AUDIT — export readiness check
+This section tells the brand whether their current packaging and claims are export-ready or require changes.
 
-For each requirement provide:
-REQUIREMENT | LEGAL REFERENCE | EXACT ACTION REQUIRED | AUTHORITY / PORTAL URL | TIMELINE | COST ESTIMATE | PRIORITY (CRITICAL/IMPORTANT/NICE TO HAVE)
+**PACKAGING EXPORT READINESS:**
+| Claim / Element | Currently says | ${reportForm.targetMarket} status | Required change | Cost impact |
+| Anti-aging claim | [typical claim] | [ALLOWED / MUST REPHRASE / BANNED] | [exact required wording if change needed] | [low/medium/high — reprint cost] |
+| Clinical/efficacy claim | [e.g. "clinically proven"] | [status] | [change if needed] | [cost] |
+| Ingredient highlight | [e.g. "retinol"] | [status] | [change if needed] | [cost] |
+| Country of origin | [e.g. "Made in Sweden"] | [POSITIVE ASSET / NEUTRAL / CHECK] | [guidance] | [none] |
+| Certifications shown | [e.g. COSMOS] | [RECOGNISED / NOT RECOGNISED] | [local equivalent] | [cost] |
 
-Then:
-COMPLIANCE TIMELINE — month by month from today (April 2026) to first sale:
-- Month 1: [specific actions]
-- Month 2: [specific actions]
-- Month 3: [specific actions]
-- [continue as needed]
+**RED FLAG CLAIMS** — claims that are legal in Sweden but problematic in ${reportForm.targetMarket}:
+List any specific claim language that must change before export. If none, state "No red flags identified — current claims appear export-ready."
 
-TOTAL COMPLIANCE INVESTMENT: GBP/EUR/SEK X — Y (low to high estimate)
+**PACKAGING CHANGE COST ESTIMATE:**
+- Minor (label sticker): EUR/DKK X
+- Moderate (label reprint): EUR/DKK X  
+- Major (full packaging redesign): EUR/DKK X — avoid if possible
 
-EUDR STATUS (if relevant to ${reportForm.category}):
-- Is ${reportForm.brandName} in scope for EUDR (December 30 2026 deadline)?
-- Which ingredients/materials are covered?
-- What action is required before December 30 2026?
+## COMPLIANCE CHECKLIST
+| Requirement | Legal reference | Exact action | Portal/Authority | Timeline | Cost | Priority |
+[list all requirements in priority order — CRITICAL first]
 
-NORDIC-SPECIFIC CERTIFICATIONS worth pursuing:
-List 2-3 certifications that would increase listing success in ${reportForm.targetMarket} specifically (e.g. Nordic Swan, COSMOS, KRAV, Astma-Allergi Denmark) with cost and timeline for each.`
+## COMPLIANCE TIMELINE (April 2026 onward)
+- Month 1 (April 2026): [actions]
+- Month 2 (May 2026): [actions]
+- Month 3 (June 2026): [actions]
+- [continue to first sale date]
+
+**TOTAL COMPLIANCE INVESTMENT:** LOW — HIGH (local currency)
+
+## EUDR STATUS
+- In scope for ${reportForm.brandName}? [YES/NO/PARTIALLY — which ingredients]
+- December 30 2026 deadline: [what must be done]
+- Recommended action: [specific next step]
+
+## CERTIFICATIONS THAT UNLOCK SHELF SPACE IN ${reportForm.targetMarket.toUpperCase()}
+| Certification | Why it matters for this market | Timeline | Cost | Priority |
+[2-3 specific certifications — e.g. Astma-Allergi Denmark, Nordic Swan, COSMOS]`
     },
     {
-      title: '90-Day Action Plan & Route to Market',
-      prompt: `You are VeyaFlow AI — market entry strategist. April 2026.
+      title: 'Scale-Up Roadmap & Risk Register',
+      prompt: `You are VeyaFlow AI — market entry strategist. April 2026. Writing for a brand manager at a EUR 5M-50M brand — they need a phased scale-up plan, not just a 90-day sprint. They will present this to their board.
 
 ${brandCtx}
 DISTRIBUTION OPTIONS: ${distributors}
 RETAILER LANDSCAPE: ${retailerIntel||'key retailers in this market'}
 
-Generate a 90-DAY MARKET ENTRY ACTION PLAN — concrete, budgeted, with clear owners.
+Generate SCALE-UP ROADMAP & RISK REGISTER.
 
-ROUTE TO MARKET RECOMMENDATION
-Think step by step: First assess ${reportForm.brandName}'s current stage, resources, and brand proof. Then evaluate the three routes (DTC, distributor, direct retail). Then recommend the optimal sequence.
-RECOMMENDED ROUTE: [DTC first / distributor-led / direct retail / hybrid]
-JUSTIFICATION: [2-3 sentences specific to ${reportForm.brandName}'s situation]
+## PHASED MARKET ENTRY PLAN
+Medium brands do not launch everywhere at once. They prove, then scale.
 
-TOP DISTRIBUTOR RECOMMENDATIONS (from: ${distributors}):
-For each of the top 2 distributors:
-- Why they fit ${reportForm.brandName} specifically
-- Their typical fee/margin structure
-- What they need to see before signing a new brand
-- How to approach them (contact route, what to send first)
-
-90-DAY PLAN:
-
-MONTH 1 — FOUNDATION (Weeks 1-4)
-Goal: [specific milestone]
-| Action | Owner | Budget | Success Metric |
+**PHASE 1 — PROOF OF CONCEPT (Months 1-3)**
+Goal: Prove sell-through at 3-5 pilot locations before committing to national rollout
+| Action | Owner | Budget | Success metric |
 [4 specific actions]
+Investment: LOW — HIGH
 
-MONTH 2 — ACTIVATION (Weeks 5-8)
-Goal: [specific milestone]  
-| Action | Owner | Budget | Success Metric |
+**PHASE 2 — REGIONAL ROLLOUT (Months 4-6)**
+Goal: Expand to 15-25 locations based on Phase 1 data
+| Action | Owner | Budget | Success metric |
 [4 specific actions]
+Investment: LOW — HIGH
 
-MONTH 3 — FIRST REVENUE (Weeks 9-12)
-Goal: [specific milestone]
-| Action | Owner | Budget | Success Metric]
+**PHASE 3 — NATIONAL PRESENCE (Month 7 — Year 2)**
+Goal: Full national listing, own DTC in-market, repeat purchase established
+| Action | Owner | Budget | Success metric |
 [4 specific actions]
+Investment: LOW — HIGH
 
-INVESTMENT SUMMARY:
-Total 90-day budget: LOW X — HIGH Y (local currency)
-Break-even timeline: X months from first listing
-Key risk to plan: [most likely obstacle and mitigation]`
+**LOGISTICS GROUNDING — operational readiness:**
+- Can the recommended distributor handle ${reportForm.targetMarket} retailer warehouse requirements? (e.g. Matas automated logistics centre in Taastrup requires EDI integration — is the distributor EDI-capable?)
+- Lead time from order to shelf: X weeks
+- Minimum stock holding recommendation: X units
+- Returns handling process in ${reportForm.targetMarket}
+
+## LOCAL VOICE — INFLUENCER & MARKETING STRATEGY
+Brand managers need local credibility, not just awareness.
+
+**3 INFLUENCER PROFILES that drive actual sales (not just likes) in ${reportForm.targetMarket} for ${reportForm.category}:**
+For each: profile type, typical fee range, why they convert in this market (not generic — be specific to ${reportForm.targetMarket} consumer behaviour)
+
+**LOCAL MARKETING CALENDAR:**
+Key moments in the ${reportForm.targetMarket} ${reportForm.category} market to plan activations around (e.g. Copenhagen Fashion Week, Danish sustainability awards, Matas Beauty Days dates)
+
+## RISK REGISTER
+Brand managers love seeing that risks have been thought through. Be specific — not generic "market risk."
+
+| Risk | Probability | Impact | Mitigation |
+| Competitor launches BOGO during our launch month | [LOW/MED/HIGH] | [impact on sell-through] | [specific response plan] |
+| Retailer delays listing to next range review | [prob] | [impact] | [mitigation] |
+| Packaging claim requires reprint for ${reportForm.targetMarket} | [prob] | [cost impact] | [mitigation] |
+| Distributor capacity — cannot handle Taastrup EDI requirements | [prob] | [impact] | [alternative distributor] |
+| Currency risk (SEK vs ${reportForm.targetMarket} currency) | [prob] | [margin impact] | [hedging approach] |
+| EUDR compliance not completed by Dec 2026 | [prob] | [legal/PR impact] | [action if falling behind] |
+[add 1-2 more specific risks for this brand/market combination]
+
+**OVERALL RISK ASSESSMENT:** LOW / MEDIUM / HIGH — one paragraph summary of the risk profile of this market entry for ${reportForm.brandName} specifically.`
     }
   ];
 
@@ -1946,7 +2001,7 @@ function parseMarkdown(text){
   t = t.replace(/\bCRITICAL\b/g,'<span style="display:inline-block;background:#FEF2F2;color:#991B1B;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">CRITICAL</span>');
   t = t.replace(/\bIMPORTANT\b/g,'<span style="display:inline-block;background:#FFFBEB;color:#92400E;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">IMPORTANT</span>');
   // Score badges
-  t = t.replace(/(\d+)\/10/g,'<span style="display:inline-block;background:var(--navy);color:var(--gold);font-family:var(--mono);font-size:.85rem;font-weight:700;padding:.1rem .4rem">$1/10</span>');
+  t = t.replace(/([\d.]+)\/10/g,'<span style="display:inline-block;background:var(--navy);color:var(--gold);font-family:var(--mono);font-size:.85rem;font-weight:700;padding:.1rem .4rem">$1/10</span>');
   // Bullet points
   t = t.replace(/^[-*] (.+)$/gm,'<div style="display:flex;gap:.5rem;padding:.2rem 0"><span style="color:var(--gold);flex-shrink:0;font-weight:700">&#8211;</span><span>$1</span></div>');
   // Numbered list items
@@ -1957,7 +2012,9 @@ function parseMarkdown(text){
     if(cells.every(function(c){ return /^[-: ]+$/.test(c); })) return '';
     return '<div style="display:grid;grid-template-columns:repeat('+cells.length+',1fr);border-bottom:1px solid var(--border)">' +
       cells.map(function(c,i){
-        return '<div style="padding:.4rem .6rem;font-family:var(--sans);font-size:.78rem;'+(i===0?'font-weight:600;color:var(--navy)':'color:#333')+'">'+c+'</div>';
+        var val = c||'';
+        var isEmpty = val.trim()==='';
+        return '<div style="padding:.4rem .6rem;font-family:var(--sans);font-size:.78rem;'+(i===0?'font-weight:600;color:var(--navy)':'color:#333')+(isEmpty?';color:#bbb;font-style:italic':'')+'">'+(isEmpty?'—':val)+'</div>';
       }).join('') + '</div>';
   });
   // Paragraph breaks
@@ -1973,9 +2030,9 @@ function renderReportResult(){
 
   // Extract executive summary metrics from first section if available
   const execSection=r.sections.find(s=>s.title?.toUpperCase().includes('EXECUTIVE')||s.title?.toUpperCase().includes('SUMMARY'));
-  const scoreMatch=execSection?.content?.match(/(\d+)\/10|score[:\s]+(\d+)/i);
+  const scoreMatch=execSection?.content?.match(/([\d.]+)\/10|score[:\s]+([\d.]+)/i);
   const opportunityScore=scoreMatch?(scoreMatch[1]||scoreMatch[2]):'—';
-  const scoreColor=opportunityScore>=7?'#10B981':opportunityScore>=5?'#F59E0B':'#EF4444';
+  const scoreColor=parseFloat(opportunityScore)>=7?'#10B981':parseFloat(opportunityScore)>=5?'#F59E0B':'#EF4444';
 
   // Section accent colors for visual hierarchy
   const sectionAccents=["#1E3A5F","#10B981","#F59E0B","#EF4444","#8B5CF6","#0EA5E9","#C4A882","#1E3A5F"];
