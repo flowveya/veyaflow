@@ -696,22 +696,53 @@ async function callAPI(messages,maxTokens=1200){
 /* ═══════════════════════════════════════════════════
    NAV
 ═══════════════════════════════════════════════════ */
+// Category groups for nav filtering
+const RETAIL_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor"];
+const COMPLIANCE_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Baby & Family"];
+
+// Category-specific labels for modules
+const CAT_LABELS = {
+  "Skincare & Beauty":  {pitch:"Retailer Pitch",  bizcase:"Retail Business Case", find:"Find Manufacturer", report:"Market Report"},
+  "Wellness & Supplements": {pitch:"Buyer Pitch", bizcase:"Retail Business Case", find:"Find Manufacturer", report:"Market Report"},
+  "Food & Beverage":    {pitch:"Buyer Pitch",     bizcase:"Retail Business Case", find:"Find Co-Packer",    report:"Market Report"},
+  "Fashion & Apparel":  {pitch:"Wholesale Pitch", bizcase:"Wholesale Business Case", find:"Find Manufacturer", report:"Market Report"},
+  "Home & Design":      {pitch:"Trade Pitch",     bizcase:"Trade Business Case",  find:"Find Manufacturer", report:"Market Report"},
+  "Baby & Family":      {pitch:"Buyer Pitch",     bizcase:"Retail Business Case", find:"Find Manufacturer", report:"Market Report"},
+  "Sport & Outdoor":    {pitch:"Trade Pitch",     bizcase:"Trade Business Case",  find:"Find Manufacturer", report:"Market Report"},
+};
+
+function getCatLabel(id){
+  const cat = brand&&brand.category;
+  const labels = CAT_LABELS[cat]||{};
+  const defaults = {pitch:"Retailer Pitch",bizcase:"Retail Business Case",find:"Source",report:"Market Report"};
+  return labels[id]||defaults[id];
+}
+
 const NAV=[
-  {id:"home",icon:"⌂",label:"Brand Home",stages:["idea","product","trading","expanding","scaling"]},
-  {id:"find",icon:"◌",label:"Source",stages:["idea","product","trading","expanding","scaling"]},
-  {id:"report",icon:"◎",label:"Market Report",stages:["idea","product","trading","expanding","scaling"]},
-  {id:"compare",icon:"⇄",label:"Compare Markets",stages:["trading","expanding","scaling"]},
-  {id:"pitch",icon:"✉",label:"Retailer Pitch",stages:["trading","expanding","scaling"]},
-  {id:"brandpack",icon:"◫",label:"Brand Pack",stages:["trading","expanding","scaling"],badge:"New"},
-  {id:"bizcase",icon:"◉",label:"Retail Business Case",stages:["trading","expanding","scaling"],badge:"New"},
-  {id:"suppliers",icon:"◈",label:"Supplier Nudge",stages:["product","trading","expanding","scaling"]},
-  {id:"circular",icon:"◉",label:"Circular GPS",stages:["trading","expanding","scaling"]},
+  {id:"home",    icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"find",    icon:"◌", label:"Source",                stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"report",  icon:"◎", label:"Market Report",         stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"compare", icon:"⇄", label:"Compare Markets",       stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"pitch",   icon:"✉", label:"Retailer Pitch",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"brandpack",icon:"◫",label:"Brand Pack",            stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
+  {id:"bizcase", icon:"◉", label:"Retail Business Case",  stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
+  {id:"suppliers",icon:"◈",label:"Supplier Nudge",        stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"circular",icon:"◉", label:"Circular GPS",          stages:["trading","expanding","scaling"],                  cats:null},
 ];
 
 // Returns nav items visible for current brand stage
 function getVisibleNav(){
   const stage = brand?.stage || 'trading';
-  return NAV.filter(n => n.stages.includes(stage));
+  const cat = brand?.category || null;
+  return NAV.filter(function(n){
+    if(!n.stages.includes(stage)) return false;
+    if(n.cats && cat && !n.cats.includes(cat)) return false;
+    return true;
+  }).map(function(n){
+    // Apply category-specific label
+    var label = getCatLabel(n.id)||n.label;
+    return Object.assign({}, n, {label:label});
+  });
 }
 
 const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular"};
@@ -724,7 +755,8 @@ function buildNav(){
   var currentStage = brand&&brand.stage?brand.stage:'trading';
   var html='';
   if(brand){
-    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+(stageLabels[currentStage]||'Trading')+' · '+(brand.category||'')+'</div>';
+    var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion').replace('Home & Design','Home').replace('Baby & Family','Baby').replace('Sport & Outdoor','Sport');
+    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
   visibleNav.forEach(function(n){
     html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
@@ -2539,7 +2571,7 @@ function renderBizCase(el){
       <div class="topbar">
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">Retail Business Case</div>
+          <div class="page-title">${getCatLabel('bizcase')||'Retail Business Case'}</div>
           <div class="page-sub">The commercial argument that wins shelf space</div>
         </div>
       </div>
@@ -2764,15 +2796,19 @@ function renderBrandPack(el){
       <div class="topbar">
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">Brand Pack</div>
+          <div class="page-title">${brand?.category==='Fashion & Apparel'?'Wholesale Pack':brand?.category==='Home & Design'||brand?.category==='Sport & Outdoor'?'Trade Pack':'Brand Pack'}</div>
           <div class="page-sub">Your retailer-ready document — generated in 60 seconds</div>
         </div>
       </div>
 
       <div style="background:linear-gradient(135deg,var(--navy) 0%,#2d5a8e 100%);padding:1.25rem;margin-bottom:1.25rem">
-        <div style="font-family:var(--mono);font-size:.6rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">What is the Brand Pack?</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">What is the ${brand?.category==='Fashion & Apparel'?'Wholesale Pack':brand?.category==='Home & Design'||brand?.category==='Sport & Outdoor'?'Trade Pack':'Brand Pack'}?</div>
         <div style="font-family:var(--sans);font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.65">
-          A professional retailer-ready document combining your compliance credentials, commercial proof points, and a personalised buyer argument — formatted for your next buyer meeting. The document no brand currently has but every buyer wants to see.
+          ${brand?.category==='Fashion & Apparel'?
+            'A professional wholesale document combining your production credentials, sustainability certifications, and a personalised buyer argument — formatted for your next showroom or trade meeting.':
+            brand?.category==='Food & Beverage'?
+            'A professional trade document combining your food safety certifications, category data, and a personalised buyer argument — formatted for your next buyer or distributor meeting.':
+            'A professional retailer-ready document combining your compliance credentials, commercial proof points, and a personalised buyer argument — formatted for your next buyer meeting. The document no brand currently has but every buyer wants to see.'}
         </div>
         <div style="display:flex;gap:1rem;margin-top:.85rem;flex-wrap:wrap">
           ${['✓ VeyaFlow Verified badge','✓ AI retailer pitch','✓ Commercial proof points','✓ Compliance summary','✓ Market intelligence'].map(f=>`<div style="font-family:var(--mono);font-size:.58rem;color:var(--gold)">${f}</div>`).join('')}
