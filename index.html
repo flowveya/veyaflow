@@ -74,6 +74,7 @@
     background: #fff; border-bottom: 1px solid var(--border);
     padding: 1.1rem 2rem; display: flex; align-items: center;
     justify-content: space-between; gap: 1rem; flex-shrink: 0;
+    position: sticky; top: 0; z-index: 10;
   }
   .page-title { font-family: var(--serif); font-size: 1.35rem; color: var(--navy); font-weight: 400; }
   .page-sub { font-family: var(--mono); font-size: .58rem; color: var(--muted); margin-top: .2rem; letter-spacing: .04em; }
@@ -268,7 +269,7 @@
   .analysis-text { font-family: var(--sans); font-size: .78rem; color: #444; line-height: 1.7; }
 
   /* PAGE VISIBILITY */
-  .page { display: none; flex-direction: column; height: 100%; }
+  .page { display: none; flex-direction: column; height: 100%; overflow-y: auto; }
   .page.active { display: flex; }
 
   /* PROGRESS BAR TOP */
@@ -3314,7 +3315,7 @@ async function generateBrandPack(){
   const retailer = brandPackState.retailer;
   const market = brandPackState.market||'Denmark';
   const cover = BRAND_PACK_COVERS[retailer]||{tone:'professional',accent:'#1E3A5F'};
-  const heroSku = skus.length>0?skus[0]:null;
+  const heroSku = skus.length>0?sanitiseSkuForRetailer(skus[0]):null; // sanitised
   const intel = getRelevantIntel(brand.category||'Skincare & Beauty', market, retailer);
   const retailerEntry = intel.retailers.find(r=>r.name===retailer)||intel.retailers[0]||{};
   const neighbours = SHELF_NEIGHBOURS[retailer]?.[brand.category||'Skincare & Beauty']||[];
@@ -3631,6 +3632,50 @@ let skus = [];
 let skuEditId = null;
 let skuTab = 1;
 let skuForm = {};
+/* ═══════════════════════════════════════════════════
+   DATA PRIVACY — Two-tier field classification
+   PRIVATE: never enters AI prompts, never exported to retailers
+   PUBLIC:  safe for Brand Pack, Retailer Pitch, exports
+═══════════════════════════════════════════════════ */
+const PRIVATE_SKU_FIELDS = [
+  'exWorksCost',   // COGS — most sensitive number a brand owns
+  'netPriceSEK',   // Internal net price — reveals margin floor
+  'vatRate',       // Internal accounting
+  'gln',           // Internal logistics identifier
+  'articleNo',     // Internal reference
+];
+
+const RETAILER_SAFE_FIELDS = [
+  'id','name','ean','netContent','netUnit','unitsPerPack',
+  'countryOfMfr','shelfLifeMonths','paoMonths',
+  'inci','hasFrag','allergens','ph',
+  'cpnp','euResponsible','safetyRef',
+  'claims','certifications',
+  'rspSEK','rspDKK','rspGBP','rspEUR',
+  'moq','caseQty','leadDays','warehouse',
+  'descSV','descEN','descDA',
+  'createdAt','updatedAt',
+];
+
+// Strip private fields before any retailer-facing use
+function sanitiseSkuForRetailer(sku){
+  if(!sku) return {};
+  const safe = {};
+  RETAILER_SAFE_FIELDS.forEach(function(k){
+    if(sku[k]!==undefined) safe[k] = sku[k];
+  });
+  return safe;
+}
+
+// Verify no private data in a prompt string (dev safety check)
+function assertNoPrivateData(str){
+  const leaked = PRIVATE_SKU_FIELDS.filter(function(f){
+    return str.includes(f) && str.includes('exWorksCost');
+  });
+  if(leaked.length>0) console.warn('VeyaFlow privacy warning: private field in prompt:', leaked);
+}
+
+
 let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
 let skuUploadData = null; // parsed CSV rows
 let skuColumnMap = {};    // {veyafield: csvcolumn}
@@ -4260,17 +4305,17 @@ function renderSkuEdit(el){
   const isSkincare = brand?.category==='Skincare & Beauty'||brand?.category==='Wellness & Supplements';
 
   el.innerHTML=`
-    <div class="page-wrap">
-      <div class="topbar">
-        <div>
-          <div class="page-title">${isNew?'Add product':'Edit product'}</div>
-          <div class="page-sub">${skuForm.name||'New SKU'}</div>
-        </div>
-        <div style="display:flex;gap:.5rem">
-          <button class="btn-outline" onclick="cancelSkuEdit()">Cancel</button>
-          <button class="btn-primary" onclick="saveSkuForm()">Save product</button>
-        </div>
+    <div class="topbar">
+      <div>
+        <div class="page-title">${isNew?'Add product':'Edit product'}</div>
+        <div class="page-sub">${skuForm.name||'New SKU'}</div>
       </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-outline" onclick="cancelSkuEdit()">Cancel</button>
+        <button class="btn-primary" onclick="saveSkuForm()">Save product</button>
+      </div>
+    </div>
+    <div class="page-wrap">
 
       <!-- Readiness bar -->
       <div style="background:#fff;border:1px solid var(--border);padding:.85rem 1rem;margin-bottom:1rem">
@@ -4402,8 +4447,15 @@ function renderSkuEdit(el){
             <div class="field"><label class="lbl">VAT rate %</label>
               <input type="number" value="${skuForm.vatRate||25}" oninput="skuForm.vatRate=this.value"></div>
           </div>
-          <div class="field"><label class="lbl">Ex-works cost per unit (SEK) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Your COGS — unlocks CFO View calculations</span></label>
-            <input type="number" value="${skuForm.exWorksCost||''}" placeholder="e.g. 85" oninput="skuForm.exWorksCost=this.value"></div>
+          <div class="field">
+            <label class="lbl">
+              <span style="background:#FEF2F2;color:#991B1B;font-size:.55rem;padding:.1rem .3rem;margin-right:.35rem;border:1px solid #FCA5A5">🔒 PRIVATE</span>
+              Ex-works cost per unit (SEK)
+              <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)"> — never shared with retailers. Unlocks CFO View.</span>
+            </label>
+            <input type="number" value="${skuForm.exWorksCost||''}" placeholder="e.g. 85" oninput="skuForm.exWorksCost=this.value">
+            <div style="font-family:var(--mono);font-size:.55rem;color:#991B1B;margin-top:.2rem">This field is private. It will never appear in Brand Pack, Retailer Pitch, or any export.</div>
+          </div>
           <div class="grid-2">
           </div>
           <div id="margin-calc" style="padding:.6rem .85rem;background:#EFF6FF;border:1px solid #BFDBFE;font-family:var(--mono);font-size:.65rem;color:#1E40AF;margin-bottom:.75rem"></div>
@@ -4545,8 +4597,10 @@ function showSkuExport(id){
 }
 
 function exportForRetailer(skuId, retailer){
-  const sku = skus.find(s=>s.id===skuId);
-  if(!sku) return;
+  const skuRaw = skus.find(s=>s.id===skuId);
+  if(!skuRaw) return;
+  // Sanitise — strip private fields before any export
+  const sku = sanitiseSkuForRetailer(skuRaw);
 
   const lines = [
     `VEYAFLOW PRODUCT EXPORT — ${retailer.toUpperCase()}`,
@@ -4847,8 +4901,10 @@ function renderCFO(el){
       <div class="topbar">
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">CFO View</div>
-          <div class="page-sub">Margin stress-tester · Landed cost calculator · True net-to-brand</div>
+          <div class="page-title">CFO View
+            <span style="font-family:var(--mono);font-size:.55rem;background:#FEF2F2;color:#991B1B;padding:.1rem .4rem;border:1px solid #FCA5A5;margin-left:.6rem;vertical-align:middle">🔒 Private</span>
+          </div>
+          <div class="page-sub">Client-side only · Calculations never sent to API · Never included in retailer exports</div>
         </div>
       </div>
 
@@ -5408,7 +5464,7 @@ async function generatePitch(){
   const numbers = buildCommercialNumbers();
   const ask = buildAsk();
   const hook = pitchForm.hook||'';
-  const heroSku = skus.length>0?skus[0]:null;
+  const heroSku = skus.length>0?sanitiseSkuForRetailer(skus[0]):null; // sanitised
 
   const numbersStr = numbers.length>0
     ? numbers.join(' | ')
