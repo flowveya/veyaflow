@@ -396,6 +396,7 @@
     #mobile-header { display: flex; }
   }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -3902,17 +3903,12 @@ function handleSkuFileUpload(input){
   var ext=file.name.split('.').pop().toLowerCase();
   var errEl=document.getElementById('upload-error');
   var statEl=document.getElementById('upload-status');
-  if(!['csv','txt','tsv'].includes(ext)){
-    if(errEl) errEl.textContent='For Excel (.xlsx): save as CSV first (File \u2192 Save As \u2192 CSV UTF-8). Full Excel support coming in V2.';
-    return;
-  }
   if(errEl) errEl.textContent='';
   if(statEl) statEl.textContent='Reading file...';
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var parsed=parseCSVText(e.target.result);
+
+  function processData(parsed){
     if(!parsed||!parsed.rows||parsed.rows.length===0){
-      if(errEl) errEl.textContent='Could not read file. Ensure it is CSV with headers in row 1.';
+      if(errEl) errEl.textContent='Could not read file. Ensure headers are in row 1.';
       if(statEl) statEl.textContent='';
       return;
     }
@@ -3926,10 +3922,67 @@ function handleSkuFileUpload(input){
     if(statEl) statEl.textContent='';
     var detEl=document.getElementById('upload-detected');
     if(detectedRetailer&&detEl){
-      detEl.textContent='\u2713 Recognised as '+detectedRetailer+' template \u2014 mapped automatically';
+      detEl.textContent='\u2713 Recognised as '+detectedRetailer+' template \u2014 '+parsed.rows.length+' products found';
       detEl.style.color='#065F46';
+    } else if(detEl){
+      detEl.textContent='\u2713 '+parsed.rows.length+' rows found \u2014 '+Object.keys(skuColumnMap).length+' columns auto-matched';
+      detEl.style.color='var(--navy)';
     }
     setTimeout(function(){skuUploadMode='mapping';renderPage('skus');},300);
+  }
+
+  // Excel files — use SheetJS
+  if(['xlsx','xls'].includes(ext)){
+    if(typeof XLSX==='undefined'){
+      if(errEl) errEl.textContent='Excel parser not loaded. Please refresh the page and try again.';
+      if(statEl) statEl.textContent='';
+      return;
+    }
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:'array'});
+        // Use first sheet
+        var wsName=wb.SheetNames[0];
+        var ws=wb.Sheets[wsName];
+        // Convert to array of arrays first to get headers + rows
+        var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        if(!aoa||aoa.length<2){
+          if(errEl) errEl.textContent='Excel file appears empty or has no data rows.';
+          if(statEl) statEl.textContent='';
+          return;
+        }
+        // First non-empty row = headers
+        var headers=aoa[0].map(function(h){return String(h).trim();}).filter(function(h){return h.length>0;});
+        if(headers.length===0){
+          if(errEl) errEl.textContent='No header row found. Ensure row 1 contains column names.';
+          return;
+        }
+        var rows=aoa.slice(1).map(function(row){
+          var obj={};
+          headers.forEach(function(h,i){obj[h]=row[i]!==undefined?String(row[i]).trim():'';});
+          return obj;
+        }).filter(function(r){return Object.values(r).some(function(v){return v.length>0;});});
+        if(statEl) statEl.textContent='Sheet: "'+wsName+'" — '+rows.length+' rows';
+        processData({headers:headers,rows:rows});
+      }catch(err){
+        if(errEl) errEl.textContent='Could not read Excel file: '+err.message;
+        if(statEl) statEl.textContent='';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    return;
+  }
+
+  // CSV / TSV / TXT
+  if(!['csv','txt','tsv'].includes(ext)){
+    if(errEl) errEl.textContent='Unsupported file type. Upload .xlsx, .xls, .csv, or .tsv';
+    if(statEl) statEl.textContent='';
+    return;
+  }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    processData(parseCSVText(e.target.result));
   };
   reader.readAsText(file,'UTF-8');
 }
@@ -3949,7 +4002,7 @@ function renderSkuChoice(el){
           <div style="position:absolute;top:.5rem;right:.5rem;font-family:var(--mono);font-size:.5rem;background:var(--gold);color:var(--navy);padding:.1rem .35rem;font-weight:700">RECOMMENDED</div>
           <div style="font-size:1.4rem;margin-bottom:.5rem">\uD83D\uDCC2</div>
           <div style="font-family:var(--sans);font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">Upload a file</div>
-          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);line-height:1.6">CSV, or an existing Apotek Hj\u00E4rtat or Matas template. VeyaFlow maps columns automatically.</div>
+          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);line-height:1.6">Excel (.xlsx), CSV, or an existing Apotek Hjärtat / Matas template. Columns mapped automatically.</div>
           <div style="margin-top:.75rem;font-family:var(--mono);font-size:.6rem;color:var(--navy)">Upload CSV \u2192</div>
         </div>
         <div style="border:1px solid var(--border);padding:1.5rem;cursor:pointer" onclick="startManualSku()">
@@ -3959,14 +4012,13 @@ function renderSkuChoice(el){
           <div style="margin-top:.75rem;font-family:var(--mono);font-size:.6rem;color:var(--muted)">Open form \u2192</div>
         </div>
       </div>
-      <input type="file" id="sku-file-input" accept=".csv,.txt,.tsv" style="display:none" onchange="handleSkuFileUpload(this)">
+      <input type="file" id="sku-file-input" accept=".csv,.txt,.tsv,.xlsx,.xls" style="display:none" onchange="handleSkuFileUpload(this)">
       <div id="upload-status" style="font-family:var(--mono);font-size:.65rem;color:var(--navy);margin-top:.5rem"></div>
       <div id="upload-detected" style="font-family:var(--mono);font-size:.65rem;margin-top:.2rem"></div>
       <div id="upload-error" style="font-family:var(--mono);font-size:.65rem;color:#991B1B;margin-top:.2rem"></div>
-      <div style="background:#FFFBEB;border:1px solid #D97706;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#92400E;line-height:1.6;max-width:580px;margin-top:1rem">
-        <strong>Accepted:</strong> CSV (.csv), tab-separated (.tsv), plain text (.txt).<br>
-        <strong>Excel users:</strong> File \u2192 Save As \u2192 CSV UTF-8 before uploading.<br>
-        <strong>Retailer templates:</strong> Upload an existing Apotek Hj\u00E4rtat or Matas file \u2014 columns auto-recognised.
+      <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#065F46;line-height:1.6;max-width:580px;margin-top:1rem">
+        <strong>Accepted formats:</strong> Excel (.xlsx, .xls), CSV (.csv), tab-separated (.tsv).<br>
+        <strong>Retailer templates:</strong> Upload an existing Apotek Hjärtat or Matas Excel file — columns recognised automatically.
       </div>
     </div>
   `;
