@@ -3721,66 +3721,6 @@ function saveSkus(){
 }
 
 // SKU readiness score — what % complete and which retailers are unlocked
-function skuReadiness(sku){
-  const type = sku.productType||'cosmetic';
-  const rawFields = READINESS_FIELDS[type]||READINESS_FIELDS.cosmetic;
-  const fields = rawFields.map(function(f){
-    return {key:f.key, label:FIELD_LABELS[f.key]||f.key, weight:f.weight};
-  });
-  const total = fields.reduce((s,f)=>s+f.weight,0);
-  const scored = fields.reduce((s,f)=>s+(sku[f.key]&&String(sku[f.key]).trim().length>0?f.weight:0),0);
-  const pct = Math.round((scored/total)*100);
-  const missing = fields.filter(f=>!sku[f.key]||String(sku[f.key]).trim().length===0).map(f=>f.label);
-
-  // Retailer readiness — per product type
-  const ready = [];
-  const notReady = [];
-  const retailerReqs = RETAILER_REQS[type]||RETAILER_REQS.cosmetic;
-  Object.entries(retailerReqs).forEach(function([retailer,reqs]){
-    const allMet = reqs.every(function(r){return sku[r]&&String(sku[r]).trim().length>0;});
-    if(allMet) ready.push(retailer); else notReady.push(retailer);
-  });
-
-  return {pct, missing, ready, notReady};
-}
-
-// Claims traffic light — pure logic, no API
-const CLAIM_RULES = {
-  'clinically tested':  {SE:'green',DK:'green',DE:'green',UK:'amber',note:'Requires clinical study reference'},
-  'clinically proven':  {SE:'amber',DK:'amber',DE:'amber',UK:'red',note:'Strong claim — needs substantiation in UK'},
-  'dermatologist tested':{SE:'green',DK:'green',DE:'green',UK:'green',note:'Widely accepted'},
-  'dermatologist approved':{SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'"Approved" implies endorsement — rephrase to "tested"'},
-  'anti-aging':         {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: must say "reduces appearance of" — not anti-aging directly'},
-  'anti-ageing':        {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: rephrase required'},
-  'reduces wrinkles':   {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim if not therapeutic'},
-  'repairs skin':       {SE:'red',DK:'red',DE:'red',UK:'red',note:'Therapeutic claim — rephrase to "helps improve skin appearance"'},
-  'heals':              {SE:'red',DK:'red',DE:'red',UK:'red',note:'Medical claim — not permitted for cosmetics'},
-  'vegan':              {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted — no legal definition but widely used'},
-  'cruelty free':       {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted'},
-  'organic':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'If not certified organic — use "with organic ingredients"'},
-  'natural':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal definition — be specific about what is natural'},
-  'hypoallergenic':     {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal standard — ensure allergen testing done'},
-  'spf':                {SE:'green',DK:'green',DE:'green',UK:'green',note:'Regulated — must be SPF tested to ISO 24444'},
-  'collagen boosting':  {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim with substantiation'},
-};
-
-function getClaimLight(claim){
-  const key = claim.toLowerCase().trim();
-  const rule = CLAIM_RULES[key];
-  if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before printing on pack'};
-  const markets = brand?.targetMarkets||[];
-  const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
-  let worst = 'green';
-  markets.forEach(m=>{
-    const code = codes[m]||'SE';
-    const val = rule[code]||'amber';
-    if(val==='red') worst='red';
-    else if(val==='amber'&&worst!=='red') worst='amber';
-  });
-  return {light:worst, note:rule.note||''};
-}
-
-
 // ── PRODUCT TYPES ─────────────────────────────────
 const PRODUCT_TYPES = [
   {id:'cosmetic',    label:'Cosmetic / Skincare',    icon:'◎', desc:'Creams, serums, cleansers, masks, SPF'},
@@ -3958,6 +3898,68 @@ const RETAILER_REQS = {
     'Matas': ['name','ean','rspDKK'],
   },
 };
+
+
+function skuReadiness(sku){
+  const type = sku.productType||'cosmetic';
+  const rawFields = READINESS_FIELDS[type]||READINESS_FIELDS.cosmetic;
+  const fields = rawFields.map(function(f){
+    return {key:f.key, label:FIELD_LABELS[f.key]||f.key, weight:f.weight};
+  });
+  const total = fields.reduce((s,f)=>s+f.weight,0);
+  const scored = fields.reduce((s,f)=>s+(sku[f.key]&&String(sku[f.key]).trim().length>0?f.weight:0),0);
+  const pct = Math.round((scored/total)*100);
+  const missing = fields.filter(f=>!sku[f.key]||String(sku[f.key]).trim().length===0).map(f=>f.label);
+
+  // Retailer readiness — per product type
+  const ready = [];
+  const notReady = [];
+  const retailerReqs = RETAILER_REQS[type]||RETAILER_REQS.cosmetic;
+  Object.entries(retailerReqs).forEach(function([retailer,reqs]){
+    const allMet = reqs.every(function(r){return sku[r]&&String(sku[r]).trim().length>0;});
+    if(allMet) ready.push(retailer); else notReady.push(retailer);
+  });
+
+  return {pct, missing, ready, notReady};
+}
+
+// Claims traffic light — pure logic, no API
+const CLAIM_RULES = {
+  'clinically tested':  {SE:'green',DK:'green',DE:'green',UK:'amber',note:'Requires clinical study reference'},
+  'clinically proven':  {SE:'amber',DK:'amber',DE:'amber',UK:'red',note:'Strong claim — needs substantiation in UK'},
+  'dermatologist tested':{SE:'green',DK:'green',DE:'green',UK:'green',note:'Widely accepted'},
+  'dermatologist approved':{SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'"Approved" implies endorsement — rephrase to "tested"'},
+  'anti-aging':         {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: must say "reduces appearance of" — not anti-aging directly'},
+  'anti-ageing':        {SE:'amber',DK:'amber',DE:'red',UK:'amber',note:'Germany: rephrase required'},
+  'reduces wrinkles':   {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim if not therapeutic'},
+  'repairs skin':       {SE:'red',DK:'red',DE:'red',UK:'red',note:'Therapeutic claim — rephrase to "helps improve skin appearance"'},
+  'heals':              {SE:'red',DK:'red',DE:'red',UK:'red',note:'Medical claim — not permitted for cosmetics'},
+  'vegan':              {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted — no legal definition but widely used'},
+  'cruelty free':       {SE:'green',DK:'green',DE:'green',UK:'green',note:'Accepted'},
+  'organic':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'If not certified organic — use "with organic ingredients"'},
+  'natural':            {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal definition — be specific about what is natural'},
+  'hypoallergenic':     {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'No legal standard — ensure allergen testing done'},
+  'spf':                {SE:'green',DK:'green',DE:'green',UK:'green',note:'Regulated — must be SPF tested to ISO 24444'},
+  'collagen boosting':  {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim with substantiation'},
+};
+
+function getClaimLight(claim){
+  const key = claim.toLowerCase().trim();
+  const rule = CLAIM_RULES[key];
+  if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before printing on pack'};
+  const markets = brand?.targetMarkets||[];
+  const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
+  let worst = 'green';
+  markets.forEach(m=>{
+    const code = codes[m]||'SE';
+    const val = rule[code]||'amber';
+    if(val==='red') worst='red';
+    else if(val==='amber'&&worst!=='red') worst='amber';
+  });
+  return {light:worst, note:rule.note||''};
+}
+
+
 
 function getClaimLight(claim){
   const productType = skuForm.productType||'cosmetic';
