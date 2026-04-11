@@ -3820,6 +3820,21 @@ const CLAIMS_RULES = {
 CLAIMS_RULES.garment = CLAIMS_RULES.textile;
 
 // ── READINESS RULES — per product type ────────────
+const FIELD_LABELS = {
+  name:'Product name', ean:'EAN barcode', netContent:'Net content',
+  countryOfMfr:'Country of manufacture', shelfLifeMonths:'Shelf life',
+  inci:'INCI list', cpnp:'CPNP number', euResponsible:'EU Responsible Person',
+  safetyRef:'Safety Assessment', rspSEK:'RSP (SEK)', netPriceSEK:'Net price',
+  moq:'MOQ', descEN:'Description (EN)', modelNo:'Model number',
+  ceMarking:'CE marking', docOnFile:'Declaration of Conformity',
+  voltageInput:'Voltage input', batteryType:'Battery type',
+  ukCaMarking:'UK CA marking', materialComposition:'Material composition',
+  eudrStatus:'EUDR status', reachCompliant:'REACH compliance',
+  careInstructions:'Care instructions', ingredientList:'Ingredient list',
+  allergens:'Allergens', novelFoodStatus:'Novel Food status',
+  servingSize:'Serving size', nutritionLabel:'Nutrition label',
+};
+
 const READINESS_FIELDS = {
   cosmetic: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
