@@ -3684,6 +3684,8 @@ let skuUploadRows = [];   // mapped rows ready to import
 function newSkuForm(){
   return {
     id: Date.now().toString(),
+    // Product type — drives all compliance fields
+    productType:'cosmetic',
     // Tab 1 — Basics
     name:'', articleNo:'', ean:'', netContent:'', netUnit:'g', unitsPerPack:1,
     countryOfMfr:'', shelfLifeMonths:'', paoMonths:'',
@@ -3696,8 +3698,18 @@ function newSkuForm(){
     netPriceSEK:'', vatRate:25, moq:'', caseQty:'', leadDays:'', warehouse:'', gln:'',
     // Tab 4 — Assets
     descSV:'', descEN:'', descDA:'',
-    // Financials
+    // Financials (PRIVATE)
     exWorksCost:'',
+    // Device fields
+    modelNo:'', voltageInput:'', frequencyHz:'', powerOutput:'', batteryType:'',
+    ipRating:'', ceMarking:'', ukCaMarking:'', docOnFile:'', directives:[],
+    userManualLangs:[],
+    // Textile/Garment fields
+    materialComposition:'', eudrStatus:'', reachCompliant:'', careInstructions:'',
+    gotsCertNo:'', oekotexCertNo:'',
+    // Supplement/Food fields
+    ingredientList:'', servingSize:'', servingsPerPack:'', novelFoodStatus:'',
+    nutritionLabel:'', suitableFor:[],
     // Meta
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -3710,38 +3722,22 @@ function saveSkus(){
 
 // SKU readiness score — what % complete and which retailers are unlocked
 function skuReadiness(sku){
-  const fields = [
-    {key:'name',label:'Product name',weight:2},
-    {key:'ean',label:'EAN barcode',weight:2},
-    {key:'netContent',label:'Net content',weight:1},
-    {key:'countryOfMfr',label:'Country of manufacture',weight:1},
-    {key:'shelfLifeMonths',label:'Shelf life',weight:1},
-    {key:'inci',label:'INCI list',weight:3},
-    {key:'cpnp',label:'CPNP number',weight:3},
-    {key:'euResponsible',label:'EU Responsible Person',weight:2},
-    {key:'safetyRef',label:'Safety Assessment ref',weight:2},
-    {key:'rspSEK',label:'RSP (SEK)',weight:1},
-    {key:'netPriceSEK',label:'Net price',weight:1},
-    {key:'moq',label:'MOQ',weight:1},
-    {key:'descEN',label:'Product description (EN)',weight:1},
-  ];
+  const type = sku.productType||'cosmetic';
+  const rawFields = READINESS_FIELDS[type]||READINESS_FIELDS.cosmetic;
+  const fields = rawFields.map(function(f){
+    return {key:f.key, label:FIELD_LABELS[f.key]||f.key, weight:f.weight};
+  });
   const total = fields.reduce((s,f)=>s+f.weight,0);
   const scored = fields.reduce((s,f)=>s+(sku[f.key]&&String(sku[f.key]).trim().length>0?f.weight:0),0);
   const pct = Math.round((scored/total)*100);
   const missing = fields.filter(f=>!sku[f.key]||String(sku[f.key]).trim().length===0).map(f=>f.label);
 
-  // Retailer readiness
+  // Retailer readiness — per product type
   const ready = [];
   const notReady = [];
-  const retailerReqs = {
-    'Lyko':        ['name','ean','inci','rspSEK','descSV','descEN'],
-    'Kicks':       ['name','ean','inci','rspSEK','cpnp'],
-    'Apotek Hjärtat':['name','ean','inci','cpnp','euResponsible','safetyRef','rspSEK','moq'],
-    'Matas':       ['name','ean','inci','cpnp','rspDKK','descEN'],
-    'Boots UK':    ['name','ean','inci','cpnp','euResponsible','safetyRef','rspGBP'],
-  };
-  Object.entries(retailerReqs).forEach(([retailer,reqs])=>{
-    const allMet = reqs.every(r=>sku[r]&&String(sku[r]).trim().length>0);
+  const retailerReqs = RETAILER_REQS[type]||RETAILER_REQS.cosmetic;
+  Object.entries(retailerReqs).forEach(function([retailer,reqs]){
+    const allMet = reqs.every(function(r){return sku[r]&&String(sku[r]).trim().length>0;});
     if(allMet) ready.push(retailer); else notReady.push(retailer);
   });
 
@@ -3782,6 +3778,208 @@ function getClaimLight(claim){
     else if(val==='amber'&&worst!=='red') worst='amber';
   });
   return {light:worst, note:rule.note||''};
+}
+
+
+// ── PRODUCT TYPES ─────────────────────────────────
+const PRODUCT_TYPES = [
+  {id:'cosmetic',    label:'Cosmetic / Skincare',    icon:'◎', desc:'Creams, serums, cleansers, masks, SPF'},
+  {id:'device',      label:'Beauty Device / Tool',   icon:'⚡', desc:'LED masks, microcurrent, gua sha, rollers'},
+  {id:'textile',     label:'Textile / Accessory',    icon:'◈', desc:'Silk pillowcases, eye masks, hair accessories'},
+  {id:'supplement',  label:'Supplement / Ingestible',icon:'⊕', desc:'Vitamins, collagen, powders, capsules'},
+  {id:'food',        label:'Food & Beverage',        icon:'◉', desc:'Functional food, drinks, snacks'},
+  {id:'garment',     label:'Garment / Apparel',      icon:'◫', desc:'Clothing, swimwear, activewear'},
+  {id:'home',        label:'Home & Living',          icon:'⌂', desc:'Candles, diffusers, home accessories'},
+];
+
+// ── CLAIMS RULES — per product type ───────────────
+const CLAIMS_RULES = {
+  cosmetic: {
+    'clinically tested':     {status:'green', note:'Acceptable — requires study reference on file'},
+    'clinically proven':     {status:'amber', note:'Requires RCT or validated clinical study'},
+    'dermatologist tested':  {status:'green', note:'Widely accepted'},
+    'dermatologist approved':{status:'amber', note:'Implies endorsement — rephrase to "tested"'},
+    'anti-aging':            {status:'amber', note:'Germany: rephrase to "reduces appearance of signs of aging"'},
+    'anti-ageing':           {status:'amber', note:'Germany: rephrase required'},
+    'reduces wrinkles':      {status:'amber', note:'Acceptable as cosmetic claim if not therapeutic'},
+    'repairs skin':          {status:'red',   note:'Therapeutic claim — rephrase to "improves skin appearance"'},
+    'heals':                 {status:'red',   note:'Medical claim — not permitted for cosmetics'},
+    'vegan':                 {status:'green', note:'Accepted — no legal definition but widely used'},
+    'cruelty free':          {status:'green', note:'Accepted'},
+    'organic':               {status:'amber', note:'No legal standard without certification'},
+    'natural':               {status:'amber', note:'Qualify with % or certification'},
+    'hypoallergenic':        {status:'amber', note:'No legal standard — ensure allergen testing done'},
+    'spf':                   {status:'green', note:'Regulated — must be SPF tested to ISO 24444'},
+  },
+  device: {
+    'medical grade':          {status:'red',   note:'Triggers MDR 2017/745 pathway — significant compliance cost'},
+    'clinically proven':      {status:'red',   note:'Clinical investigation under MDR required'},
+    'fda cleared':            {status:'amber', note:'FDA clearance ≠ EU MDR — verify EU equivalent pathway'},
+    'clinically tested':      {status:'amber', note:'Study must be under EU standards to be claimable'},
+    'reduces wrinkles':       {status:'amber', note:'Cosmetic claim acceptable if device not classified as medical'},
+    'anti-aging':             {status:'amber', note:'Acceptable as aesthetic/cosmetic outcome claim'},
+    'safe for sensitive skin':{status:'green', note:'Acceptable general safety claim'},
+    'dermatologist tested':   {status:'green', note:'Acceptable with test documentation on file'},
+    'pain relief':            {status:'red',   note:'Medical device claim — triggers MDR pathway'},
+    'treats acne':            {status:'red',   note:'Disease treatment claim — MDR pathway required'},
+    'professional grade':     {status:'amber', note:'Substantiate with certifications or professional use data'},
+    'ce certified':           {status:'green', note:'Accurate and recommended to include'},
+  },
+  supplement: {
+    'boosts energy':          {status:'red',   note:'Not an approved EU health claim (EC 1924/2006)'},
+    'boosts immunity':        {status:'red',   note:'Not an approved EU claim — use "supports normal immune function"'},
+    'supports immune function':{status:'green',note:'Valid EU claim if Vit C/D/Zinc above NRV threshold'},
+    'supports normal immune system':{status:'green',note:'Approved EFSA claim with qualifying nutrients'},
+    'detox':                  {status:'red',   note:'No approved EU health claim exists for detox'},
+    'anti-inflammatory':      {status:'red',   note:'Not an approved EU claim as general statement'},
+    'promotes gut health':    {status:'amber', note:'Specific approved claims exist — check EFSA register'},
+    'reduces tiredness':      {status:'green', note:'Approved claim: "contributes to reduction of tiredness" with B vitamins'},
+    'contributes to normal collagen formation':{status:'green',note:'Approved EU claim for Vitamin C'},
+    'natural':                {status:'amber', note:'No legal definition — qualify ingredients'},
+    'vegan':                  {status:'green', note:'Accepted'},
+    'clinically proven':      {status:'amber', note:'Requires clinical study under EU standards'},
+  },
+  textile: {
+    '100% natural':           {status:'amber', note:'Full % breakdown of all fibres required (EU Textile Labelling Reg 1007/2011)'},
+    'sustainable':            {status:'amber', note:'Green Claims Directive 2026: requires certification or specific evidence'},
+    'eco-friendly':           {status:'amber', note:'Green Claims Directive: vague claim — specify what makes it eco-friendly'},
+    'hypoallergenic':         {status:'red',   note:'Requires clinical substantiation — no standard definition for textiles'},
+    'organic':                {status:'amber', note:'Requires GOTS or equivalent certification — cannot self-certify'},
+    'biodegradable':          {status:'amber', note:'Green Claims Directive: must specify conditions and timeframe'},
+    'recycled':               {status:'green', note:'Acceptable with GRS or equivalent certification and % stated'},
+    'gots certified':         {status:'green', note:'Strong claim — include certificate number'},
+    'oeko-tex':               {status:'green', note:'Strong claim — include standard and certificate number'},
+    'cruelty free':           {status:'green', note:'Accepted for textiles'},
+    'vegan':                  {status:'green', note:'Accepted — relevant for silk alternatives and wool-free'},
+  },
+  food: {
+    'natural':                {status:'amber', note:'No legal EU definition — qualify'},
+    'organic':                {status:'green', note:'Requires EU organic certification (Regulation 2018/848)'},
+    'no added sugar':         {status:'green', note:'Permitted if product contains no added sugars'},
+    'sugar free':             {status:'green', note:'Permitted if ≤0.5g sugar per 100g/ml'},
+    'low calorie':            {status:'green', note:'Permitted if ≤40 kcal per 100g or ≤20 kcal per 100ml'},
+    'high protein':           {status:'green', note:'Permitted if >20% energy from protein'},
+    'detox':                  {status:'red',   note:'No approved EU health claim'},
+    'boosts energy':          {status:'red',   note:'Not an approved EU claim as general statement'},
+    'functional':             {status:'amber', note:'No legal definition — specify the function with approved claim'},
+    'vegan':                  {status:'green', note:'Accepted'},
+    'gluten free':            {status:'green', note:'Permitted if ≤20mg/kg gluten'},
+  },
+  garment: CLAIMS_RULES_TEXTILE_PLACEHOLDER,
+  home: {
+    'natural':                {status:'amber', note:'Qualify with specific ingredient percentages'},
+    'eco-friendly':           {status:'amber', note:'Green Claims Directive 2026: specify evidence'},
+    'non-toxic':              {status:'amber', note:'Requires substantiation — specify what is absent'},
+    'vegan':                  {status:'green', note:'Accepted'},
+    'organic':                {status:'amber', note:'Requires certification for this claim'},
+    'cruelty free':           {status:'green', note:'Accepted'},
+    'biodegradable':          {status:'amber', note:'Specify conditions and timeframe'},
+  },
+};
+// garment uses textile rules
+CLAIMS_RULES.garment = CLAIMS_RULES.textile;
+
+// ── READINESS RULES — per product type ────────────
+const READINESS_FIELDS = {
+  cosmetic: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
+    {key:'shelfLifeMonths',weight:1},{key:'inci',weight:3},{key:'cpnp',weight:3},
+    {key:'euResponsible',weight:2},{key:'safetyRef',weight:2},
+    {key:'rspSEK',weight:1},{key:'netPriceSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  device: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'modelNo',weight:1},
+    {key:'ceMarking',weight:3},{key:'docOnFile',weight:3},{key:'voltageInput',weight:1},
+    {key:'batteryType',weight:1},{key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  textile: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
+    {key:'countryOfMfr',weight:1},{key:'eudrStatus',weight:2},{key:'reachCompliant',weight:2},
+    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  supplement: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'ingredientList',weight:3},
+    {key:'servingSize',weight:1},{key:'allergens',weight:2},{key:'novelFoodStatus',weight:2},
+    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  food: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'ingredientList',weight:3},
+    {key:'allergens',weight:3},{key:'nutritionLabel',weight:2},{key:'shelfLifeMonths',weight:1},
+    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  garment: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
+    {key:'countryOfMfr',weight:1},{key:'eudrStatus',weight:2},{key:'careInstructions',weight:1},
+    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  home: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
+    {key:'countryOfMfr',weight:1},{key:'shelfLifeMonths',weight:1},
+    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+};
+
+// Retailer readiness per product type
+const RETAILER_REQS = {
+  cosmetic: {
+    'Lyko':         ['name','ean','inci','rspSEK','descSV','descEN'],
+    'Kicks':        ['name','ean','inci','rspSEK','cpnp'],
+    'Apotek Hjärtat':['name','ean','inci','cpnp','euResponsible','safetyRef','rspSEK','moq'],
+    'Matas':        ['name','ean','inci','cpnp','rspDKK','descEN'],
+    'Boots UK':     ['name','ean','inci','cpnp','euResponsible','safetyRef','rspGBP'],
+  },
+  device: {
+    'Lyko':          ['name','ean','ceMarking','docOnFile','rspSEK','descEN'],
+    'Kicks':         ['name','ean','ceMarking','rspSEK'],
+    'Apotek Hjärtat':['name','ean','ceMarking','docOnFile','voltageInput','rspSEK','moq'],
+    'Matas':         ['name','ean','ceMarking','docOnFile','rspDKK'],
+    'Boots UK':      ['name','ean','ceMarking','docOnFile','ukCaMarking','rspGBP'],
+  },
+  textile: {
+    'Lyko':          ['name','ean','materialComposition','rspSEK'],
+    'Matas':         ['name','ean','materialComposition','reachCompliant','rspDKK'],
+    'Boots UK':      ['name','ean','materialComposition','rspGBP'],
+  },
+  supplement: {
+    'Holland & Barrett':['name','ean','ingredientList','allergens','novelFoodStatus','rspGBP'],
+    'Apotek Hjärtat':   ['name','ean','ingredientList','allergens','cpnp','rspSEK','moq'],
+    'Matas':            ['name','ean','ingredientList','allergens','rspDKK'],
+  },
+  food: {
+    'Holland & Barrett':['name','ean','ingredientList','allergens','nutritionLabel','rspGBP'],
+    'Matas':            ['name','ean','ingredientList','allergens','rspDKK'],
+  },
+  garment: {
+    'Matas':  ['name','ean','materialComposition','eudrStatus','rspDKK'],
+    'Boozt':  ['name','ean','materialComposition','reachCompliant','rspSEK'],
+  },
+  home: {
+    'Lyko':  ['name','ean','rspSEK','descEN'],
+    'Matas': ['name','ean','rspDKK'],
+  },
+};
+
+function getClaimLight(claim){
+  const productType = skuForm.productType||'cosmetic';
+  const rules = CLAIMS_RULES[productType]||CLAIMS_RULES.cosmetic;
+  const key = claim.toLowerCase().trim();
+  const rule = rules[key];
+  if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before use'};
+  // For cosmetics also check market-specific rules
+  if(productType==='cosmetic'){
+    const markets = brand?.targetMarkets||[];
+    const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
+    let worst = rule.status;
+    if(rule.status==='amber'){
+      markets.forEach(function(m){
+        const code = codes[m]||'SE';
+        if(code==='DE' && (key.includes('anti-aging')||key.includes('anti-ageing'))) worst='red';
+        if(code==='UK' && (key.includes('repairs')||key.includes('heals'))) worst='red';
+      });
+    }
+    return {light:worst, note:rule.note||''};
+  }
+  return {light:rule.status, note:rule.note||''};
 }
 
 function renderSkus(el){
@@ -4297,6 +4495,281 @@ function renderClaimsSection(){
   }).join('')||'<div style="font-family:var(--sans);font-size:.75rem;color:var(--muted)">No claims added yet</div>';
 }
 
+
+function renderSkuTab2(){
+  const type = skuForm.productType||'cosmetic';
+  const isSkincare = type==='cosmetic';
+
+  // ── COSMETIC ──────────────────────────────────
+  if(type==='cosmetic') return `
+    <div class="card">
+      <div class="section-tag">The regulatory core — EU Cosmetics Regulation 1223/2009</div>
+      <div class="field">
+        <label class="lbl">INCI ingredient list <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Full INCI nomenclature, comma separated, descending order</span></label>
+        <textarea id="inci-area" rows="6" placeholder="e.g. Aqua, Glycerin, Niacinamide, Panthenol..." oninput="skuForm.inci=this.value">${skuForm.inci||''}</textarea>
+        <button id="inci-format-btn" class="btn-outline" style="margin-top:.4rem;font-size:.7rem" onclick="formatInci()">✦ Format to INCI standard</button>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Contains fragrance?</label>
+          <div style="display:flex;gap:.75rem;margin-top:.25rem">
+            <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=true;renderSkuEdit(document.getElementById('page-skus'))"> Yes</label>
+            <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${!skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=false;renderSkuEdit(document.getElementById('page-skus'))"> No</label>
+          </div>
+        </div>
+        <div class="field"><label class="lbl">pH value <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+          <input type="text" value="${skuForm.ph||''}" placeholder="e.g. 5.5" oninput="skuForm.ph=this.value"></div>
+      </div>
+      ${skuForm.hasFrag?`<div class="field"><label class="lbl">Allergen declarations</label>
+        <input type="text" value="${skuForm.allergens||''}" placeholder="e.g. Contains Linalool, Limonene" oninput="skuForm.allergens=this.value"></div>`:''}
+      <div class="grid-2">
+        <div class="field"><label class="lbl">CPNP / SCPN notification number</label>
+          <input type="text" value="${skuForm.cpnp||''}" placeholder="e.g. CPNP-2024-XXXXXXX" oninput="skuForm.cpnp=this.value"></div>
+        <div class="field"><label class="lbl">EU Responsible Person</label>
+          <input type="text" value="${skuForm.euResponsible||''}" placeholder="Company name + country" oninput="skuForm.euResponsible=this.value"></div>
+      </div>
+      <div class="field"><label class="lbl">Safety Assessment reference</label>
+        <input type="text" value="${skuForm.safetyRef||''}" placeholder="e.g. SA-CG-2024-001" oninput="skuForm.safetyRef=this.value"></div>
+      <div class="field" style="margin-top:.75rem">
+        <label class="lbl">On-pack claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type claim + Enter — instant traffic light per product type</span></label>
+        <input type="text" id="claim-input" placeholder='e.g. "Clinically tested" then press Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+      <div class="field" style="margin-top:.75rem">
+        <label class="lbl">Certifications</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
+          ${['COSMOS Organic','COSMOS Natural','Vegan Society','Cruelty Free International','Nordic Swan','FSC packaging','GOTS','OEKO-TEX','B Corp','Halal','Kosher','Soil Association'].map(cert=>`
+            <div onclick="toggleSkuCert('${cert}')" style="padding:.3rem .7rem;border:1px solid ${skuForm.certifications?.includes(cert)?'var(--navy)':'var(--border)'};background:${skuForm.certifications?.includes(cert)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.72rem;color:${skuForm.certifications?.includes(cert)?'var(--navy)':'#555'}">
+              ${skuForm.certifications?.includes(cert)?'✓ ':''} ${cert}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // ── BEAUTY DEVICE / ELECTRONIC ────────────────
+  if(type==='device') return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — LVD 2014/35/EU · EMC 2014/30/EU · RoHS 2011/65/EU</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Model number</label>
+          <input type="text" value="${skuForm.modelNo||''}" placeholder="e.g. CG-LED-001" oninput="skuForm.modelNo=this.value"></div>
+        <div class="field"><label class="lbl">Voltage input</label>
+          <input type="text" value="${skuForm.voltageInput||''}" placeholder="e.g. 100-240V" oninput="skuForm.voltageInput=this.value"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Battery type</label>
+          <select onchange="skuForm.batteryType=this.value">
+            ${['','Built-in lithium-ion','USB-C only','AA/AAA batteries','No battery'].map(b=>`<option${skuForm.batteryType===b?' selected':''}>${b||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">IP rating <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(water resistance)</span></label>
+          <input type="text" value="${skuForm.ipRating||''}" placeholder="e.g. IPX4 or N/A" oninput="skuForm.ipRating=this.value"></div>
+      </div>
+      <div class="field" style="margin-top:.5rem"><label class="lbl">EU Directives — tick all that apply</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem">
+          ${[['LVD','Low Voltage Directive 2014/35/EU'],['EMC','EMC Directive 2014/30/EU'],['RED','Radio Equipment Directive 2014/53/EU (if Bluetooth/WiFi)'],['RoHS','RoHS Directive 2011/65/EU'],['WEEE','WEEE compliance'],['MDR','MDR 2017/745 (if medical claims)']].map(([id,label])=>`
+            <div onclick="toggleDirective('${id}')" style="padding:.3rem .65rem;border:1px solid ${(skuForm.directives||[]).includes(id)?'var(--navy)':'var(--border)'};background:${(skuForm.directives||[]).includes(id)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.7rem;color:${(skuForm.directives||[]).includes(id)?'var(--navy)':'#555'}">
+              ${(skuForm.directives||[]).includes(id)?'✓ ':''} ${label}
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">CE marking</label>
+          <select onchange="skuForm.ceMarking=this.value">
+            ${['','Yes','No','In progress'].map(v=>`<option${skuForm.ceMarking===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">UK CA marking</label>
+          <select onchange="skuForm.ukCaMarking=this.value">
+            ${['','Yes','No','In progress','Not required'].map(v=>`<option${skuForm.ukCaMarking===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label class="lbl">Declaration of Conformity on file</label>
+        <div style="display:flex;gap:.75rem;margin-top:.25rem">
+          <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="doc" ${skuForm.docOnFile==='yes'?'checked':''} onchange="skuForm.docOnFile='yes'"> Yes</label>
+          <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="doc" ${skuForm.docOnFile==='no'?'checked':''} onchange="skuForm.docOnFile='no'"> No</label>
+          <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="doc" ${skuForm.docOnFile==='in_progress'?'checked':''} onchange="skuForm.docOnFile='in_progress'"> In progress</label>
+        </div>
+      </div>
+      ${(skuForm.directives||[]).includes('MDR')?`<div style="background:#FEF2F2;border:1px solid #FCA5A5;padding:.6rem .85rem;font-family:var(--sans);font-size:.75rem;color:#991B1B;line-height:1.5">
+        ⚠ MDR 2017/745 pathway: if your device makes medical claims, full clinical evaluation and Notified Body review is required. Timeline 12-24 months, cost €50K-200K+. Consult a regulatory specialist before proceeding.
+      </div>`:''}
+      <div class="field" style="margin-top:.75rem">
+        <label class="lbl">Device claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type claim + Enter — "Medical grade" triggers MDR warning</span></label>
+        <input type="text" id="claim-input" placeholder='e.g. "Clinically tested to reduce wrinkles" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+    </div>`;
+
+  // ── TEXTILE / ACCESSORY ───────────────────────
+  if(type==='textile'||type==='garment') return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — EU Textile Labelling Reg 1007/2011 · REACH · EUDR</div>
+      <div class="field"><label class="lbl">Material composition *</label>
+        <input type="text" value="${skuForm.materialComposition||''}" placeholder="e.g. 100% Mulberry Silk / 95% Cotton, 5% Elastane" oninput="skuForm.materialComposition=this.value"></div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">REACH compliance</label>
+          <select onchange="skuForm.reachCompliant=this.value">
+            ${['','Yes','No','In progress'].map(v=>`<option${skuForm.reachCompliant===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">EUDR due diligence status</label>
+          <select onchange="skuForm.eudrStatus=this.value">
+            ${['','Compliant — documentation on file','In progress','Not applicable (synthetic only)','Requires assessment'].map(v=>`<option${skuForm.eudrStatus===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="background:#FFFBEB;border:1px solid #FCD34D;padding:.5rem .75rem;font-family:var(--sans);font-size:.73rem;color:#92400E;margin-bottom:.75rem">
+        EUDR December 2026: cotton, silk, viscose, and wood-based fibres require full due diligence documentation. Check if your material is in scope.
+      </div>
+      <div class="field"><label class="lbl">Care instructions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(required on EU label)</span></label>
+        <input type="text" value="${skuForm.careInstructions||''}" placeholder="e.g. 30°C machine wash, do not tumble dry" oninput="skuForm.careInstructions=this.value"></div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">GOTS certificate number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(if applicable)</span></label>
+          <input type="text" value="${skuForm.gotsCertNo||''}" placeholder="e.g. GOTS-XXXXXX" oninput="skuForm.gotsCertNo=this.value"></div>
+        <div class="field"><label class="lbl">OEKO-TEX certificate <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(if applicable)</span></label>
+          <input type="text" value="${skuForm.oekotexCertNo||''}" placeholder="e.g. 12.345.678 HOHENSTEIN" oninput="skuForm.oekotexCertNo=this.value"></div>
+      </div>
+      <div class="field" style="margin-top:.5rem">
+        <label class="lbl">Claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">"Sustainable" and "100% natural" trigger Green Claims Directive checks</span></label>
+        <input type="text" id="claim-input" placeholder='e.g. "100% natural" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+    </div>`;
+
+  // ── SUPPLEMENT / INGESTIBLE ───────────────────
+  if(type==='supplement') return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — Novel Food 2015/2283 · Health Claims 1924/2006</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Format</label>
+          <select onchange="skuForm.batteryType=this.value">
+            ${['','Capsule','Tablet','Powder','Liquid','Gummy','Softgel'].map(v=>`<option${skuForm.batteryType===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">Serving size</label>
+          <input type="text" value="${skuForm.servingSize||''}" placeholder="e.g. 2 capsules / 5g" oninput="skuForm.servingSize=this.value"></div>
+      </div>
+      <div class="field"><label class="lbl">Full ingredient list with quantities *</label>
+        <textarea rows="4" placeholder="e.g. Vitamin C (ascorbic acid) 500mg, Zinc (zinc gluconate) 10mg..." oninput="skuForm.ingredientList=this.value">${skuForm.ingredientList||''}</textarea></div>
+      <div class="field"><label class="lbl">EU 14 allergens <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(tick all present)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem">
+          ${['Gluten','Crustaceans','Eggs','Fish','Peanuts','Soy','Milk','Nuts','Celery','Mustard','Sesame','Sulphites','Lupin','Molluscs'].map(a=>`
+            <div onclick="toggleAllergen('${a}')" style="padding:.25rem .55rem;border:1px solid ${(skuForm.allergens||'').includes(a)?'#991B1B':'var(--border)'};background:${(skuForm.allergens||'').includes(a)?'#FEF2F2':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.7rem;color:${(skuForm.allergens||'').includes(a)?'#991B1B':'#555'}">
+              ${(skuForm.allergens||'').includes(a)?'⚠ ':''} ${a}
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="field"><label class="lbl">Novel Food status</label>
+        <select onchange="skuForm.novelFoodStatus=this.value">
+          ${['','All ingredients have established history of use','Contains Novel Food ingredient — authorisation on file','Contains Novel Food ingredient — pending authorisation','Unsure — requires assessment'].map(v=>`<option${skuForm.novelFoodStatus===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label class="lbl">Health claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">"Boosts energy" is red. "Contributes to reduction of tiredness" is green.</span></label>
+        <input type="text" id="claim-input" placeholder='e.g. "Supports immune function" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+      <div class="field"><label class="lbl">Suitable for</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem">
+          ${['Vegan','Vegetarian','Gluten-free','Halal','Kosher','Dairy-free','Nut-free'].map(s=>`
+            <div onclick="toggleSuitableFor('${s}')" style="padding:.25rem .55rem;border:1px solid ${(skuForm.suitableFor||[]).includes(s)?'var(--navy)':'var(--border)'};background:${(skuForm.suitableFor||[]).includes(s)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.7rem;color:${(skuForm.suitableFor||[]).includes(s)?'var(--navy)':'#555'}">
+              ${(skuForm.suitableFor||[]).includes(s)?'✓ ':''} ${s}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // ── FOOD & BEVERAGE ───────────────────────────
+  if(type==='food') return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — Food Information Regulation 1169/2011 · EUDR</div>
+      <div class="field"><label class="lbl">Full ingredient list (legal declaration order) *</label>
+        <textarea rows="4" placeholder="e.g. Water, apple juice (25%), lemon juice, ginger extract..." oninput="skuForm.ingredientList=this.value">${skuForm.ingredientList||''}</textarea></div>
+      <div class="field"><label class="lbl">EU 14 allergens present</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem">
+          ${['Gluten','Crustaceans','Eggs','Fish','Peanuts','Soy','Milk','Nuts','Celery','Mustard','Sesame','Sulphites','Lupin','Molluscs'].map(a=>`
+            <div onclick="toggleAllergen('${a}')" style="padding:.25rem .55rem;border:1px solid ${(skuForm.allergens||'').includes(a)?'#991B1B':'var(--border)'};background:${(skuForm.allergens||'').includes(a)?'#FEF2F2':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.7rem;color:${(skuForm.allergens||'').includes(a)?'#991B1B':'#555'}">
+              ${(skuForm.allergens||'').includes(a)?'⚠ ':''} ${a}
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Nutrition label compliant</label>
+          <select onchange="skuForm.nutritionLabel=this.value">
+            ${['','Yes — EU 1169/2011 format','In progress','No'].map(v=>`<option${skuForm.nutritionLabel===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">EUDR status</label>
+          <select onchange="skuForm.eudrStatus=this.value">
+            ${['','Compliant','Not in scope','In progress'].map(v=>`<option${skuForm.eudrStatus===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label class="lbl">Claims (nutrition/health)</label>
+        <input type="text" id="claim-input" placeholder='e.g. "No added sugar" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+    </div>`;
+
+  // ── HOME & LIVING ─────────────────────────────
+  return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — GPSR 2023/988 · REACH</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">REACH compliance</label>
+          <select onchange="skuForm.reachCompliant=this.value">
+            ${['','Yes','No','In progress'].map(v=>`<option${skuForm.reachCompliant===v?' selected':''}>${v||'Select…'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label class="lbl">CE / UKCA marking <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(if electrical)</span></label>
+          <input type="text" value="${skuForm.ceMarking||''}" placeholder="e.g. CE + UKCA" oninput="skuForm.ceMarking=this.value"></div>
+      </div>
+      <div class="field">
+        <label class="lbl">Claims</label>
+        <input type="text" id="claim-input" placeholder='e.g. "100% natural" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+      <div class="field"><label class="lbl">Certifications</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
+          ${['FSC','PEFC','Vegan','COSMOS','B Corp','Fairtrade','Rainforest Alliance'].map(cert=>`
+            <div onclick="toggleSkuCert('${cert}')" style="padding:.3rem .7rem;border:1px solid ${skuForm.certifications?.includes(cert)?'var(--navy)':'var(--border)'};background:${skuForm.certifications?.includes(cert)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.72rem;color:${skuForm.certifications?.includes(cert)?'var(--navy)':'#555'}">
+              ${skuForm.certifications?.includes(cert)?'✓ ':''} ${cert}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Helper toggle functions for new field types
+function toggleDirective(id){
+  if(!skuForm.directives) skuForm.directives=[];
+  const idx = skuForm.directives.indexOf(id);
+  if(idx>=0) skuForm.directives.splice(idx,1); else skuForm.directives.push(id);
+  renderSkuEdit(document.getElementById('page-skus'));
+}
+
+function toggleAllergen(a){
+  const current = skuForm.allergens||'';
+  const list = current.split(',').map(s=>s.trim()).filter(Boolean);
+  const idx = list.indexOf(a);
+  if(idx>=0) list.splice(idx,1); else list.push(a);
+  skuForm.allergens = list.join(', ');
+  renderSkuEdit(document.getElementById('page-skus'));
+}
+
+function toggleSuitableFor(s){
+  if(!skuForm.suitableFor) skuForm.suitableFor=[];
+  const idx = skuForm.suitableFor.indexOf(s);
+  if(idx>=0) skuForm.suitableFor.splice(idx,1); else skuForm.suitableFor.push(s);
+  renderSkuEdit(document.getElementById('page-skus'));
+}
+
 function renderSkuEdit(el){
   const r = skuReadiness(skuForm);
   const isNew = skuEditId === 'new';
@@ -4345,6 +4818,18 @@ function renderSkuEdit(el){
       <!-- Tab content -->
       ${skuTab===1?`
         <div class="card">
+          <div class="section-tag">Product type</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.4rem;margin-bottom:1rem">
+            ${PRODUCT_TYPES.map(pt=>`
+              <div onclick="skuForm.productType='${pt.id}';renderSkuEdit(document.getElementById('page-skus'))"
+                style="padding:.5rem .65rem;border:1px solid ${skuForm.productType===pt.id?'var(--navy)':'var(--border)'};background:${skuForm.productType===pt.id?'#EFF6FF':'#fff'};cursor:pointer">
+                <div style="font-size:.85rem;margin-bottom:.15rem">${pt.icon}</div>
+                <div style="font-family:var(--sans);font-size:.72rem;font-weight:${skuForm.productType===pt.id?'600':'400'};color:${skuForm.productType===pt.id?'var(--navy)':'#555'}">${pt.label}</div>
+                <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.1rem">${pt.desc}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="card">
           <div class="section-tag">Tell us what is in the box</div>
           <div class="field"><label class="lbl">Product name (as sold) *</label>
             <input type="text" id="sku-name" value="${skuForm.name||''}" placeholder="e.g. Cloud & Glow LED Face Mask" oninput="skuForm.name=this.value"></div>
@@ -4377,53 +4862,7 @@ function renderSkuEdit(el){
         </div>
       `:''}
 
-      ${skuTab===2?`
-        <div class="card">
-          <div class="section-tag">The regulatory core</div>
-          <div class="field">
-            <label class="lbl">INCI ingredient list <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Full INCI nomenclature, comma separated, descending order</span></label>
-            <textarea id="inci-area" rows="6" placeholder="e.g. Aqua, Glycerin, Niacinamide, Panthenol..." oninput="skuForm.inci=this.value">${skuForm.inci||''}</textarea>
-            <button id="inci-format-btn" class="btn-outline" style="margin-top:.4rem;font-size:.7rem" onclick="formatInci()">✦ Format to INCI standard</button>
-          </div>
-          <div class="grid-2">
-            <div class="field"><label class="lbl">Contains fragrance?</label>
-              <div style="display:flex;gap:.75rem;margin-top:.25rem">
-                <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=true;renderSkuEdit(document.getElementById('page-skus'))"> Yes</label>
-                <label style="font-family:var(--sans);font-size:.8rem;cursor:pointer"><input type="radio" name="frag" ${!skuForm.hasFrag?'checked':''} onchange="skuForm.hasFrag=false;renderSkuEdit(document.getElementById('page-skus'))"> No</label>
-              </div>
-            </div>
-            ${isSkincare?`<div class="field"><label class="lbl">pH value <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-              <input type="text" value="${skuForm.ph||''}" placeholder="e.g. 5.5" oninput="skuForm.ph=this.value"></div>`:'<div></div>'}
-          </div>
-          ${skuForm.hasFrag?`<div class="field"><label class="lbl">Allergen declarations</label>
-            <input type="text" value="${skuForm.allergens||''}" placeholder="e.g. Contains Linalool, Limonene" oninput="skuForm.allergens=this.value"></div>`:''}
-          <div class="grid-2">
-            <div class="field"><label class="lbl">CPNP / SCPN notification number</label>
-              <input type="text" value="${skuForm.cpnp||''}" placeholder="e.g. CPNP-2024-XXXXXXX" oninput="skuForm.cpnp=this.value"></div>
-            <div class="field"><label class="lbl">EU Responsible Person</label>
-              <input type="text" value="${skuForm.euResponsible||''}" placeholder="Company name + country" oninput="skuForm.euResponsible=this.value"></div>
-          </div>
-          <div class="field"><label class="lbl">Safety Assessment reference</label>
-            <input type="text" value="${skuForm.safetyRef||''}" placeholder="e.g. SA-CG-2024-001" oninput="skuForm.safetyRef=this.value"></div>
-
-          <div class="field" style="margin-top:.75rem">
-            <label class="lbl">On-pack claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type a claim and press Enter — instant traffic light per market</span></label>
-            <input type="text" id="claim-input" placeholder='e.g. "Clinically tested" then press Enter'
-              onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}" style="margin-bottom:.5rem">
-            <div id="claims-section"></div>
-          </div>
-
-          <div class="field" style="margin-top:.75rem">
-            <label class="lbl">Certifications</label>
-            <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
-              ${['COSMOS Organic','COSMOS Natural','Vegan Society','Cruelty Free International','Nordic Swan','FSC packaging','GOTS','OEKO-TEX','B Corp','Halal','Kosher','Soil Association'].map(cert=>`
-                <div onclick="toggleSkuCert('${cert}')" style="padding:.3rem .7rem;border:1px solid ${skuForm.certifications?.includes(cert)?'var(--navy)':'var(--border)'};background:${skuForm.certifications?.includes(cert)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.72rem;color:${skuForm.certifications?.includes(cert)?'var(--navy)':'#555'}">
-                  ${skuForm.certifications?.includes(cert)?'✓ ':''} ${cert}
-                </div>`).join('')}
-            </div>
-          </div>
-        </div>
-      `:''}
+      ${skuTab===2?renderSkuTab2():``}
 
       ${skuTab===3?`
         <div class="card">
