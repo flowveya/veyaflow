@@ -5011,107 +5011,288 @@ function showSkuExport(id){
   if(!sku) return;
   const r = skuReadiness(sku);
   const el = document.getElementById('page-skus');
+  const type = sku.productType||'cosmetic';
+
+  const EXPORT_OPTIONS = [
+    {
+      name:'Apotek Hjärtat', format:'CSV', fileExt:'csv',
+      desc:'Comma-separated — opens directly in Excel. Article data template format.',
+      ready:r.ready.includes('Apotek Hjärtat'),
+    },
+    {
+      name:'Apotek Hjärtat', format:'TXT data sheet', fileExt:'txt',
+      desc:'Formatted product data sheet. Paste into email or internal doc.',
+      ready:r.ready.includes('Apotek Hjärtat'),
+    },
+    {
+      name:'Matas', format:'CSV', fileExt:'csv',
+      desc:'Comma-separated — opens in Excel. DKK pricing required.',
+      ready:r.ready.includes('Matas'),
+    },
+    {
+      name:'Matas', format:'TXT data sheet', fileExt:'txt',
+      desc:'Formatted compliance dossier.',
+      ready:r.ready.includes('Matas'),
+    },
+    {
+      name:'Lyko', format:'CSV', fileExt:'csv',
+      desc:'Digital product listing data. SEK pricing + descriptions required.',
+      ready:r.ready.includes('Lyko'),
+    },
+    {
+      name:'Kicks', format:'CSV', fileExt:'csv',
+      desc:'Matas Group format. SEK pricing required.',
+      ready:r.ready.includes('Kicks'),
+    },
+    {
+      name:'Boots UK', format:'CSV', fileExt:'csv',
+      desc:'UK supplier data. GBP pricing + safety ref required.',
+      ready:r.ready.includes('Boots UK'),
+    },
+    {
+      name:'Universal', format:'JSON data pack', fileExt:'json',
+      desc:'Full product data in JSON — for your own system or developer handoff.',
+      ready:true,
+    },
+    {
+      name:'Universal', format:'CSV all fields', fileExt:'csv',
+      desc:'All SKU fields as CSV — import into any spreadsheet or system.',
+      ready:true,
+    },
+  ];
+
+  // Group by retailer
+  const retailers = [...new Set(EXPORT_OPTIONS.map(e=>e.name))];
 
   el.innerHTML = `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Export — ${sku.name||'Product'}</div>
+        <div class="page-sub">Choose retailer and file format</div>
+      </div>
+      <button class="btn-outline" onclick="renderSkus(document.getElementById('page-skus'))">← Back</button>
+    </div>
     <div class="page-wrap">
-      <div class="topbar">
-        <div>
-          <div class="page-title">Export — ${sku.name||'Product'}</div>
-          <div class="page-sub">Choose retailer format</div>
-        </div>
-        <button class="btn-outline" onclick="renderSkus(document.getElementById('page-skus'))">← Back</button>
-      </div>
-
-      <div class="card" style="margin-bottom:1rem">
-        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Export formats</div>
-        ${[
-          {name:'Apotek Hjärtat',format:'Excel template',desc:'Pre-filled supplier onboarding sheet. Requires: EAN, INCI, CPNP, safety ref, pricing.',ready:r.ready.includes('Apotek Hjärtat')},
-          {name:'Matas',format:'Compliance dossier',desc:'Product data sheet + compliance summary. Requires: EAN, INCI, CPNP, DKK pricing.',ready:r.ready.includes('Matas')},
-          {name:'Lyko',format:'Product sheet',desc:'Digital product listing data. Requires: EAN, INCI, SEK pricing, descriptions.',ready:r.ready.includes('Lyko')},
-          {name:'Kicks',format:'Product sheet',desc:'Matas Group format. Requires: EAN, INCI, CPNP, SEK pricing.',ready:r.ready.includes('Kicks')},
-          {name:'Boots UK',format:'Supplier data pack',desc:'UK compliance + product data. Requires: EAN, INCI, CPNP, GBP pricing, safety ref.',ready:r.ready.includes('Boots UK')},
-        ].map(exp=>`
-          <div style="display:flex;align-items:center;gap:.75rem;padding:.85rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-            <div style="flex:1;min-width:160px">
-              <div style="font-family:var(--sans);font-size:.85rem;font-weight:600;color:var(--navy)">${exp.name}</div>
-              <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.1rem">${exp.format}</div>
-              <div style="font-family:var(--sans);font-size:.72rem;color:#555;margin-top:.2rem">${exp.desc}</div>
+      ${retailers.map(retailer=>{
+        const opts = EXPORT_OPTIONS.filter(e=>e.name===retailer);
+        const anyReady = opts.some(e=>e.ready);
+        return `
+          <div class="card" style="margin-bottom:.75rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+              <div>
+                <div style="font-family:var(--sans);font-size:.92rem;font-weight:600;color:var(--navy)">${retailer}</div>
+                ${!anyReady?`<div style="font-family:var(--mono);font-size:.58rem;color:#991B1B;margin-top:.1rem">Missing required fields — <span style="cursor:pointer;text-decoration:underline" onclick="editSku('${id}')">complete SKU →</span></div>`:''}
+              </div>
             </div>
-            ${exp.ready?
-              `<button class="btn-primary" style="font-size:.72rem;padding:.35rem .85rem" onclick="exportForRetailer('${id}','${exp.name}')">Export →</button>`:
-              `<div style="font-family:var(--mono);font-size:.6rem;color:#991B1B;text-align:right">Missing data<br><span style="cursor:pointer;text-decoration:underline" onclick="editSku('${id}')">Complete SKU →</span></div>`
-            }
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+              ${opts.map(opt=>`
+                <div style="flex:1;min-width:160px;border:1px solid ${opt.ready?'var(--border)':'#F5F5F5'};padding:.65rem .85rem;background:${opt.ready?'#fff':'#FAFAFA'}">
+                  <div style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${opt.ready?'var(--navy)':'var(--muted)'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">${opt.format}</div>
+                  <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);line-height:1.5;margin-bottom:.5rem">${opt.desc}</div>
+                  ${opt.ready
+                    ? `<button class="btn-primary" style="font-size:.65rem;padding:.3rem .75rem;width:100%"
+                        onclick="exportForRetailer('${id}','${opt.name}','${opt.format}','${opt.fileExt}')">
+                        Download .${opt.fileExt} →
+                      </button>`
+                    : `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Complete SKU data first</div>`
+                  }
+                </div>
+              `).join('')}
+            </div>
           </div>
-        `).join('')}
-      </div>
-
-      <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.75rem 1rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.5">
-        <strong>💡 Export generates a downloadable text file</strong> with all product data formatted for that retailer. Full Excel/PDF export coming in V2.
-      </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
 
-function exportForRetailer(skuId, retailer){
+function exportForRetailer(skuId, retailer, format, fileExt){
   const skuRaw = skus.find(s=>s.id===skuId);
   if(!skuRaw) return;
-  // Sanitise — strip private fields before any export
   const sku = sanitiseSkuForRetailer(skuRaw);
+  const brandName = brand?.name||'Brand';
+  const filename = `${brandName}_${sku.name||'product'}_${retailer.replace(/\s/g,'-')}_${format.replace(/\s/g,'-')}`.replace(/[^a-zA-Z0-9_\-]/g,'');
 
+  // ── JSON export ──────────────────────────────
+  if(fileExt==='json'){
+    const data = {
+      _meta:{generatedBy:'VeyaFlow',date:new Date().toISOString(),brand:brandName,retailer,format},
+      product: sku,
+    };
+    downloadBlob(JSON.stringify(data,null,2), filename+'.json', 'application/json');
+    return;
+  }
+
+  // ── CSV export ───────────────────────────────
+  if(fileExt==='csv'){
+    // Field sets per retailer
+    const RETAILER_CSV_FIELDS = {
+      'Apotek Hjärtat': [
+        ['Produktnamn',          sku.name||''],
+        ['EAN',                  sku.ean||''],
+        ['Artikelnummer',        sku.articleNo||''],
+        ['INCI-förteckning',     sku.inci||''],
+        ['CPNP-nummer',          sku.cpnp||''],
+        ['Ansvarig person EU',   sku.euResponsible||''],
+        ['Säkerhetsbedömning ref',sku.safetyRef||''],
+        ['Rekommenderat pris SEK',sku.rspSEK||''],
+        ['Hållbarhet (månader)', sku.shelfLifeMonths||''],
+        ['PAO (månader)',        sku.paoMonths||''],
+        ['Nettovikt/volym',      `${sku.netContent||''} ${sku.netUnit||''}`],
+        ['Tillverkningsland',    sku.countryOfMfr||''],
+        ['MOQ',                  sku.moq||''],
+        ['Ledtid (dagar)',       sku.leadDays||''],
+        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Påståenden',           (sku.claims||[]).join('; ')],
+        ['Beskrivning SV',       sku.descSV||''],
+        ['Beskrivning EN',       sku.descEN||''],
+      ],
+      'Matas': [
+        ['Produktnavn',          sku.name||''],
+        ['EAN-kode',             sku.ean||''],
+        ['INCI',                 sku.inci||''],
+        ['CPNP',                 sku.cpnp||''],
+        ['EU Ansvarlig person',  sku.euResponsible||''],
+        ['Vejledende pris DKK',  sku.rspDKK||''],
+        ['Holdbarhed (mdr)',     sku.shelfLifeMonths||''],
+        ['PAO (mdr)',            sku.paoMonths||''],
+        ['Oprindelsesland',      sku.countryOfMfr||''],
+        ['MOQ',                  sku.moq||''],
+        ['Leveringstid (dage)',  sku.leadDays||''],
+        ['Certifikater',         (sku.certifications||[]).join('; ')],
+        ['Påstande',             (sku.claims||[]).join('; ')],
+        ['Beskrivelse EN',       sku.descEN||''],
+        ['Beskrivelse DA',       sku.descDA||''],
+      ],
+      'Lyko': [
+        ['Produktnamn',          sku.name||''],
+        ['EAN',                  sku.ean||''],
+        ['INCI',                 sku.inci||''],
+        ['RSP SEK',              sku.rspSEK||''],
+        ['PAO',                  sku.paoMonths||''],
+        ['Hållbarhet',           sku.shelfLifeMonths||''],
+        ['Nettovikt',            `${sku.netContent||''} ${sku.netUnit||''}`],
+        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Produktbeskrivning SV',sku.descSV||''],
+        ['Produktbeskrivning EN',sku.descEN||''],
+      ],
+      'Kicks': [
+        ['Produktnamn',          sku.name||''],
+        ['EAN',                  sku.ean||''],
+        ['INCI',                 sku.inci||''],
+        ['CPNP',                 sku.cpnp||''],
+        ['RSP SEK',              sku.rspSEK||''],
+        ['Hållbarhet (mån)',     sku.shelfLifeMonths||''],
+        ['Tillverkningsland',    sku.countryOfMfr||''],
+        ['MOQ',                  sku.moq||''],
+        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Beskrivning',          sku.descSV||sku.descEN||''],
+      ],
+      'Boots UK': [
+        ['Product name',         sku.name||''],
+        ['EAN-13',               sku.ean||''],
+        ['INCI list',            sku.inci||''],
+        ['CPNP/SCPN number',     sku.cpnp||''],
+        ['EU/UK Responsible Person', sku.euResponsible||''],
+        ['Safety Assessment ref',sku.safetyRef||''],
+        ['RSP GBP',              sku.rspGBP||''],
+        ['Shelf life (months)',  sku.shelfLifeMonths||''],
+        ['PAO (months)',         sku.paoMonths||''],
+        ['Country of manufacture',sku.countryOfMfr||''],
+        ['MOQ',                  sku.moq||''],
+        ['Lead time (days)',     sku.leadDays||''],
+        ['Certifications',       (sku.certifications||[]).join('; ')],
+        ['Claims',               (sku.claims||[]).join('; ')],
+        ['Description EN',       sku.descEN||''],
+      ],
+    };
+
+    // Universal CSV — all fields
+    const universalFields = [
+      ['Product name',sku.name||''],['EAN',sku.ean||''],['Article no',sku.articleNo||''],
+      ['Net content',`${sku.netContent||''} ${sku.netUnit||''}`],['Units per pack',sku.unitsPerPack||''],
+      ['Country of manufacture',sku.countryOfMfr||''],['Shelf life (months)',sku.shelfLifeMonths||''],
+      ['PAO (months)',sku.paoMonths||''],['INCI list',sku.inci||''],
+      ['Contains fragrance',sku.hasFrag?'Yes':'No'],['Allergens',sku.allergens||''],
+      ['pH',sku.ph||''],['CPNP number',sku.cpnp||''],['EU Responsible Person',sku.euResponsible||''],
+      ['Safety Assessment ref',sku.safetyRef||''],['Certifications',(sku.certifications||[]).join('; ')],
+      ['Claims',(sku.claims||[]).join('; ')],['RSP SEK',sku.rspSEK||''],['RSP DKK',sku.rspDKK||''],
+      ['RSP GBP',sku.rspGBP||''],['RSP EUR',sku.rspEUR||''],
+      ['MOQ',sku.moq||''],['Case qty',sku.caseQty||''],['Lead time (days)',sku.leadDays||''],
+      ['Warehouse',sku.warehouse||''],['Description EN',sku.descEN||''],
+      ['Description SV',sku.descSV||''],['Description DA',sku.descDA||''],
+    ];
+
+    const fields = RETAILER_CSV_FIELDS[retailer] || universalFields;
+
+    // Build CSV: header row + data row
+    function escCsv(v){
+      const s = String(v).replace(/"/g,'""');
+      return /[,"\n\r]/.test(s) ? '"'+s+'"' : s;
+    }
+    const header = fields.map(f=>escCsv(f[0])).join(',');
+    const row    = fields.map(f=>escCsv(f[1])).join(',');
+    const csv    = '\uFEFF' + header + '\r\n' + row + '\r\n'; // BOM for Excel UTF-8
+    downloadBlob(csv, filename+'.csv', 'text/csv;charset=utf-8');
+    return;
+  }
+
+  // ── TXT formatted data sheet ─────────────────
   const lines = [
-    `VEYAFLOW PRODUCT EXPORT — ${retailer.toUpperCase()}`,
-    `Generated: ${new Date().toLocaleDateString('en-GB')} by VeyaFlow`,
-    `Brand: ${brand?.name||''}`,
+    `VEYAFLOW PRODUCT DATA SHEET — ${retailer.toUpperCase()}`,
+    `Generated: ${new Date().toLocaleDateString('en-GB')} · Brand: ${brandName}`,
     ``,
-    `PRODUCT INFORMATION`,
-    `Product name: ${sku.name||''}`,
-    `Article number: ${sku.articleNo||''}`,
-    `EAN-13: ${sku.ean||''}`,
-    `Net content: ${sku.netContent||''} ${sku.netUnit||''}`,
-    `Units per pack: ${sku.unitsPerPack||''}`,
-    `Country of manufacture: ${sku.countryOfMfr||''}`,
-    `Shelf life: ${sku.shelfLifeMonths||''} months`,
-    sku.paoMonths?`PAO: ${sku.paoMonths} months`:'',
+    `PRODUCT`,
+    `Name:               ${sku.name||''}`,
+    `EAN-13:             ${sku.ean||''}`,
+    `Article no:         ${sku.articleNo||''}`,
+    `Net content:        ${sku.netContent||''} ${sku.netUnit||''}`,
+    `Country of mfr:     ${sku.countryOfMfr||''}`,
+    `Shelf life:         ${sku.shelfLifeMonths||''} months`,
+    sku.paoMonths ? `PAO:                ${sku.paoMonths} months` : '',
     ``,
     `REGULATORY`,
-    `INCI list: ${sku.inci||''}`,
+    `INCI list:          ${sku.inci||''}`,
     `Contains fragrance: ${sku.hasFrag?'Yes':'No'}`,
-    sku.allergens?`Allergen declarations: ${sku.allergens}`:'',
-    sku.ph?`pH: ${sku.ph}`:'',
-    `CPNP/SCPN number: ${sku.cpnp||''}`,
+    sku.allergens ? `Allergens:          ${sku.allergens}` : '',
+    `CPNP/SCPN:          ${sku.cpnp||''}`,
     `EU Responsible Person: ${sku.euResponsible||''}`,
-    `Safety Assessment ref: ${sku.safetyRef||''}`,
-    sku.certifications?.length?`Certifications: ${sku.certifications.join(', ')}`:'',
-    sku.claims?.length?`On-pack claims: ${sku.claims.join(', ')}`:'',
+    `Safety Assessment:  ${sku.safetyRef||''}`,
+    (sku.certifications||[]).length ? `Certifications:     ${sku.certifications.join(', ')}` : '',
+    (sku.claims||[]).length ? `Claims:             ${sku.claims.join(', ')}` : '',
     ``,
     `COMMERCIAL`,
-    `RSP Sweden: ${sku.rspSEK||''} SEK`,
-    `RSP Denmark: ${sku.rspDKK||''} DKK`,
-    `RSP UK: ${sku.rspGBP||''} GBP`,
-    `RSP EU: ${sku.rspEUR||''} EUR`,
-    `Net price (SEK): ${sku.netPriceSEK||''}`,
-    `VAT rate: ${sku.vatRate||''}%`,
-    `MOQ: ${sku.moq||''} units`,
-    `Case pack: ${sku.caseQty||''} units`,
-    `Lead time: ${sku.leadDays||''} days`,
-    `Warehouse: ${sku.warehouse||''}`,
-    sku.gln?`GS1 GLN: ${sku.gln}`:'',
+    sku.rspSEK ? `RSP Sweden:         ${sku.rspSEK} SEK` : '',
+    sku.rspDKK ? `RSP Denmark:        ${sku.rspDKK} DKK` : '',
+    sku.rspGBP ? `RSP UK:             ${sku.rspGBP} GBP` : '',
+    sku.rspEUR ? `RSP EU:             ${sku.rspEUR} EUR` : '',
+    `MOQ:                ${sku.moq||''} units`,
+    `Lead time:          ${sku.leadDays||''} days`,
+    sku.warehouse ? `Warehouse:          ${sku.warehouse}` : '',
     ``,
     `DESCRIPTIONS`,
-    `English: ${sku.descEN||''}`,
-    `Swedish: ${sku.descSV||''}`,
-    sku.descDA?`Danish: ${sku.descDA}`:'',
+    sku.descEN ? `English:\n${sku.descEN}` : '',
+    sku.descSV ? `Swedish:\n${sku.descSV}` : '',
+    sku.descDA ? `Danish:\n${sku.descDA}` : '',
     ``,
-    `--- END OF EXPORT ---`,
-    `VeyaFlow · veyaflow.com · ${new Date().toLocaleDateString('en-GB')}`,
-  ].filter(l=>l!=='').join('\n');
+    `--- VeyaFlow · veyaflow.com · ${new Date().toLocaleDateString('en-GB')} ---`,
+  ].filter(l=>l!==undefined&&l!=='').join('\n');
 
-  const blob = new Blob([lines], {type:'text/plain'});
+  downloadBlob(lines, filename+'.txt', 'text/plain;charset=utf-8');
+}
+
+function downloadBlob(content, filename, mimeType){
+  const blob = new Blob([content], {type:mimeType});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href=url; a.download=`${brand?.name||'brand'}_${sku.name||'sku'}_${retailer.replace(/\s/g,'-')}.txt`;
-  a.click(); URL.revokeObjectURL(url);
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
+
 
 
 /* ═══════════════════════════════════════════════════
