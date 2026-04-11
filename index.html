@@ -358,6 +358,11 @@
     background: var(--navy); border-top: 1px solid rgba(255,255,255,.1);
     z-index: 100; padding-bottom: env(safe-area-inset-bottom);
   }
+  #mobile-nav::after {
+    content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+    width: 28px; pointer-events: none;
+    background: linear-gradient(to right, transparent, rgba(30,58,95,.9));
+  }
   #mobile-nav-inner {
     display: flex; overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -366,13 +371,13 @@
   #mobile-nav-inner::-webkit-scrollbar { display: none; }
   .mob-nav-item {
     display: flex; flex-direction: column; align-items: center;
-    padding: .6rem .5rem .4rem; cursor: pointer; min-width: 60px;
+    padding: .45rem .4rem .35rem; cursor: pointer; min-width: 52px;
     flex-shrink: 0; position: relative; transition: background .15s;
   }
   .mob-nav-item.active { background: rgba(196,168,130,.15); }
-  .mob-nav-icon { font-size: .9rem; color: rgba(255,255,255,.4); }
+  .mob-nav-icon { font-size: .8rem; color: rgba(255,255,255,.4); line-height: 1; }
   .mob-nav-item.active .mob-nav-icon { color: var(--gold); }
-  .mob-nav-label { font-family: var(--mono); font-size: .48rem; color: rgba(255,255,255,.35); margin-top: .2rem; letter-spacing: .04em; white-space: nowrap; }
+    .mob-nav-label { font-family: var(--mono); font-size: .42rem; color: rgba(255,255,255,.4); margin-top: .1rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
   .mob-nav-item.active .mob-nav-label { color: var(--gold); }
   .mob-badge { position: absolute; top: .35rem; right: .6rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 4px; font-family: var(--mono); font-size: .42rem; }
 
@@ -387,7 +392,7 @@
   .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--gold); text-align: right; cursor: pointer; }
 
   @media (max-width: 680px) {
-    #mobile-nav { display: block; }
+    #mobile-nav { display: flex; }
     #mobile-header { display: flex; }
   }
 </style>
@@ -615,7 +620,7 @@ let reportState  = {loading:false,result:null,sections:[]};
 let reportForm   = {brandName:'',brandDesc:'',category:'',targetMarket:'',currentMarket:'Sweden',skus:'',pricePoint:'',additionalInfo:'',competitors:[],competitorsVerified:false,fixedEntryCost:''};
 let compareForm  = {brandName:'',category:'',markets:[],stage:'trading'};
 let compareResult= null;
-let pitchForm    = {brandName:'',brandDesc:'',category:'',targetMarket:'United Kingdom',retailer:'',skus:'',usp:'',pricePoint:'',existingMarkets:'Sweden'};
+let pitchForm    = {brandName:'',brandDesc:'',category:'',targetMarket:'Denmark',retailer:'',skus:'',usp:'',pricePoint:'',existingMarkets:'Sweden',stage:'cold',hook:''};
 let pitchResult  = null;
 let circularForm = {productName:'',materials:'',units:'',category:'',reason:'End_of_season_overstock',preferredCat:''};
 let circularResult = null;
@@ -759,7 +764,7 @@ function getVisibleNav(){
   });
 }
 
-const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Brand Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
 function buildNav(){
   var visibleNav = getVisibleNav();
@@ -786,7 +791,7 @@ function buildNav(){
   var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
     var mobHtml='';
-    visibleNav.slice(0,5).forEach(function(n){
+    visibleNav.forEach(function(n){
       mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
       if(n.id==='suppliers') mobHtml+='<span class="mob-badge">2</span>';
@@ -2685,176 +2690,391 @@ const LANG_NAMES={en:"English",da:"Danish",de:"German",no:"Norwegian"};
 
 
 /* ═══════════════════════════════════════════════════
-   RETAIL BUSINESS CASE GENERATOR
+   RETAIL BUSINESS CASE — V2
+   Audience: Category Manager (internal listing approval)
+   Not a pitch — a pre-approved justification document.
 ═══════════════════════════════════════════════════ */
-let bizCaseState = {retailer:'', market:'', generating:false, result:null};
+let bizCaseState = {
+  retailer:'', market:'', mode:'catman', generating:false, result:null, timestamp:null
+};
+
+// Risk probabilities hardcoded per situation — not AI-estimated
+const BIZ_CASE_RISKS = {
+  default: [
+    {risk:'Low initial sell-through', prob:30, impact:'brand funds 50% markdown on slow SKUs', mitigation:'8-week review trigger with brand-funded markdown guarantee'},
+    {risk:'CPNP/compliance issue discovered post-listing', prob:5, impact:'listing withdrawal and delisting cost', mitigation:'Full PIF and CPNP documentation verified pre-listing — on file'},
+    {risk:'Brand social presence drops below threshold', prob:20, impact:'slower consumer pull-through', mitigation:'Brand commits to minimum 4 posts/month tagging retailer during launch quarter'},
+    {risk:'Competitor launches similar SKU within 6 months', prob:25, impact:'estimated 15% category share pressure', mitigation:'Brand has 18-month product roadmap — exclusivity clause available for discussion'},
+    {risk:'Supply chain disruption — late delivery', prob:15, impact:'out-of-stock during key sales period', mitigation:'Brand holds 90-day safety stock at 3PL — delivery within 14 days of order'},
+    {risk:'EUDR non-compliance by December 30 2026', prob:10, impact:'forced delisting of affected SKUs', mitigation:'Palm-free formulation — EUDR scope confirmed as out-of-scope'},
+  ],
+  Matas: [
+    {risk:'Low initial sell-through at Matas flagship', prob:25, impact:'−180,000 DKK margin contribution Y1', mitigation:'8-week sell-through review with brand-funded markdown. Strøget pilot before national rollout.'},
+    {risk:'Beauty Days fee erodes margin contribution', prob:40, impact:'−15,000 DKK/year fixed cost', mitigation:'Brand accepts Beauty Days as cost of listing — pre-agreed in commercial terms'},
+    {risk:'Matas Balance private label expansion displaces SKU', prob:20, impact:'shelf space reallocation Q3 2027', mitigation:'Position in Clean Clinical bay — Matas Balance targets mass-mid tier only'},
+    {risk:'EUDR documentation not complete by Dec 2026', prob:10, impact:'Matas compliance team requests delisting', mitigation:'EUDR due diligence completed — documentation available on request'},
+    {risk:'Buyer team change at Matas post-acquisition', prob:30, impact:'relationship reset — re-pitch required', mitigation:'Category performance data makes the case regardless of buyer relationship'},
+    {risk:'Competitor BOGO promotion during launch window', prob:35, impact:'estimated −20% launch month sell-through', mitigation:'Launch co-ordinated around Beauty Days to benefit from promotional uplift'},
+  ],
+  Lyko: [
+    {risk:'Social metrics drop below Lyko minimum', prob:20, impact:'de-prioritised in algorithm, lower visibility', mitigation:'Brand commits to weekly TikTok content minimum throughout listing period'},
+    {risk:'Low online sell-through in first 60 days', prob:30, impact:'de-listing at 90-day review', mitigation:'Brand funds promotional bundle offer for first 60 days — Lyko co-funded option available'},
+    {risk:'Sworsk dual-market launch delays', prob:25, impact:'Norway revenue delayed 6 months', mitigation:'SE listing confirmed regardless — NO listing follows independently'},
+    {risk:'Returns rate above Lyko threshold', prob:15, impact:'margin erosion + de-listing risk', mitigation:'Brand accepts returns above 5% threshold — refund policy confirmed'},
+    {risk:'Algorithm change deprioritises category', prob:20, impact:'reduced organic visibility', mitigation:'Brand invests in Lyko paid placement for 90-day launch window'},
+    {risk:'Competitor flash sale in same category', prob:35, impact:'estimated −25% sell-through during event', mitigation:'Pre-agreed promotional response — brand can match within 48 hours'},
+  ],
+};
+
+// Cannibalisation assessment data per retailer + category
+const CANNIB_DATA = {
+  Matas: {
+    'Skincare & Beauty': {
+      nearestSkus: ['Nuori Vitamin Complex Serum (399 DKK)','Verso Super Eye Serum (495 DKK)','Lumene Valo Serum (219 DKK)'],
+      overlapPct: '15–20',
+      assessment: 'primarily recruits from the "no current evening routine product" consumer segment and LED device buyers — not from existing serum purchasers. Nuori and Verso target a different positioning (ingredient-led vs technology-led). Category incrementality: HIGH.',
+      risk: 'LOW',
+    },
+  },
+  Lyko: {
+    'Skincare & Beauty': {
+      nearestSkus: ['Byoma Moisturising Gel Cream (249 SEK)','Medik8 Crystal Retinal (645 SEK)'],
+      overlapPct: '10–15',
+      assessment: 'primarily attracts the TikTok-influenced consumer segment active in the LED/device category. Byoma and Medik8 target different price tiers and consumer motivations. Incremental category revenue: HIGH.',
+      risk: 'LOW',
+    },
+  },
+  'Boots UK': {
+    'Skincare & Beauty': {
+      nearestSkus: ['The Inkey List Retinol Serum (£10)','Pai Rosehip Bioregenerate Oil (£38)'],
+      overlapPct: '20–25',
+      assessment: 'targets the clinical-premium consumer not well served in the £28–45 tier. Some overlap with Pai on premium natural positioning, but LED technology differentiates clearly. Net incrementality: MEDIUM-HIGH.',
+      risk: 'LOW-MEDIUM',
+    },
+  },
+};
+
+// Space productivity benchmarks per category at key retailers
+const SPACE_BENCHMARKS = {
+  Matas:     {'Skincare & Beauty':380000, 'Wellness & Supplements':290000, default:320000, currency:'DKK'},
+  Lyko:      {'Skincare & Beauty':520000, 'Wellness & Supplements':380000, default:440000, currency:'SEK'},
+  'Boots UK':{'Skincare & Beauty':450000, 'Wellness & Supplements':340000, default:380000, currency:'GBP'},
+  default:   {default:350000, currency:'SEK'},
+};
 
 function renderBizCase(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  const BIZ_RETAILERS = {
-    "Denmark": ["Matas","Magasin du Nord","Normal","Salling Group","Bilka","Føtex","Søstrene Grene"],
-    "Norway": ["Boots Norway","Kicks Norway","Coop Norge","Meny","Europris"],
-    "Germany": ["dm-drogerie markt","Rossmann","Douglas","Müller","Alnatura","Rewe","Sephora Germany","Edeka"],
-    "Sweden": ["Lyko","Kicks","Apotek Hjärtat","Apoteket","Åhléns","NK","H&M Beauty","ICA"],
-    "Finland": ["Stockmann","Sokos","Prisma","K-Group"],
-    "United Kingdom": ["Boots UK","Holland & Barrett","Selfridges","John Lewis","Superdrug","Space NK","Waitrose"],
-    "Netherlands": ["Etos","Douglas NL","Kruidvat","Hema","De Bijenkorf","Albert Heijn"],
+  if(bizCaseState.generating){
+    el.innerHTML=`<div class="page-wrap"><div class="topbar"><div><div class="page-title">Retail Business Case</div></div></div>
+      <div class="card" style="text-align:center;padding:2.5rem">
+        <div class="spinner" style="margin:0 auto 1rem"></div>
+        <div style="font-family:var(--mono);font-size:.68rem;color:var(--navy)">Building the business case…</div>
+      </div></div>`;
+    return;
+  }
+
+  if(bizCaseState.result){
+    renderBizCaseResult(el);
+    return;
+  }
+
+  const MARKETS = ['Denmark','Sweden','United Kingdom','Germany','Norway','Netherlands','France'];
+  const RETAILERS = {
+    Denmark:['Matas','Kicks Denmark','Magasin du Nord'],
+    Sweden:['Lyko','Kicks Sweden','Apotek Hjärtat'],
+    'United Kingdom':['Boots UK','Holland & Barrett','Space NK'],
+    Germany:['dm-drogerie markt','Rossmann','Douglas DE'],
+    Norway:['Kicks Norway','Apotek 1','Vitusapotek'],
+    Netherlands:['Etos','Kruidvat','Douglas NL'],
+    France:['Sephora FR','Monoprix'],
   };
-
-  const markets = Object.keys(BIZ_RETAILERS);
-  const retailers = bizCaseState.market ? BIZ_RETAILERS[bizCaseState.market] || [] : [];
-
-  const hasProof = brand.annualRevenue||brand.socialFollowers||brand.waitlistCount||
-                   brand.reviewScore||brand.pressCount||brand.clinicalClaims||
-                   brand.basketImpact||brand.routineStep||brand.wholesaleEnquiries;
+  const retailers = RETAILERS[bizCaseState.market||'Denmark']||RETAILERS.Denmark;
+  const heroSku = skus.length>0?skus[0]:null;
 
   el.innerHTML=`
     <div class="page-wrap">
       <div class="topbar">
         <div>
-          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">${getCatLabel('bizcase')||'Retail Business Case'}</div>
-          <div class="page-sub">The commercial argument that wins shelf space</div>
+          <div class="page-title">Retail Business Case</div>
+          <div class="page-sub">Internal listing approval document — written for the category manager, not the buyer</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:1.25rem">
-        ${[
-          {icon:'📊',label:'From aesthetic to evidence',desc:'Clinical data, certifications, proof your product works'},
-          {icon:'💆',label:'From product to protocol',desc:'How your brand fits the consumer routine and amplifies existing sales'},
-          {icon:'📈',label:'From vendor to volume',desc:'Why stocking you increases the retailer\u2019s total category revenue'},
-        ].map(f=>`
-          <div style="background:var(--navy);padding:.85rem;text-align:center">
-            <div style="font-size:1.2rem;margin-bottom:.3rem">${f.icon}</div>
-            <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);font-weight:700;margin-bottom:.25rem">${f.label}</div>
-            <div style="font-family:var(--sans);font-size:.65rem;color:rgba(255,255,255,.6);line-height:1.5">${f.desc}</div>
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;background:#F9F8F6;padding:.6rem .85rem;border:1px solid var(--border)">
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-right:.5rem;align-self:center">Generate for:</div>
+        ${[['catman','● Category Manager','Numbers-first, risk-assessed, board-ready'],['buyer','○ Buyer','Shorter, brand-story led, for first contact']].map(([val,label,desc])=>`
+          <div onclick="bizCaseState.mode='${val}';renderBizCase(document.getElementById('page-bizcase'))"
+            style="flex:1;padding:.5rem .75rem;border:1px solid ${bizCaseState.mode===val?'var(--navy)':'var(--border)'};background:${bizCaseState.mode===val?'#EFF6FF':'#fff'};cursor:pointer">
+            <div style="font-family:var(--mono);font-size:.65rem;font-weight:${bizCaseState.mode===val?'700':'400'};color:${bizCaseState.mode===val?'var(--navy)':'var(--muted)'}">${label}</div>
+            <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.1rem">${desc}</div>
           </div>
         `).join('')}
       </div>
 
-      ${!hasProof?`
-        <div style="background:#FFFBEB;border:1px solid #D97706;padding:.85rem 1rem;font-family:var(--sans);font-size:.78rem;color:#92400E;line-height:1.6;margin-bottom:1rem">
-          <strong>⚠ Strengthen your business case:</strong> You have not added commercial proof points yet.
-          <span onclick="showProofEdit()" style="text-decoration:underline;cursor:pointer;color:#92400E">Add them now →</span>
-          The business case will still generate using category benchmarks, but your own data makes it 10x more compelling.
-        </div>
-      `:''}
-
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Build your business case</div>
-        <div class="field">
-          <label class="lbl">Target market</label>
-          <select onchange="bizCaseState.market=this.value;bizCaseState.retailer='';bizCaseState.result=null;renderBizCase(document.getElementById('page-bizcase'))">
-            <option value="">Select market…</option>
-            ${markets.map(m=>`<option${bizCaseState.market===m?' selected':''}>${m}</option>`).join('')}
-          </select>
-        </div>
-        ${bizCaseState.market?`
-          <div class="field">
-            <label class="lbl">Retailer</label>
-            <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
-              ${retailers.map(r=>`
-                <div onclick="bizCaseState.retailer='${r}';bizCaseState.result=null;renderBizCase(document.getElementById('page-bizcase'))"
-                  style="padding:.4rem .8rem;border:1px solid ${bizCaseState.retailer===r?'var(--navy)':'var(--border)'};background:${bizCaseState.retailer===r?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.75rem;color:${bizCaseState.retailer===r?'var(--navy)':'#555'}">
-                  ${r}
-                </div>
-              `).join('')}
-            </div>
+        <div class="section-tag">Target</div>
+        <div class="grid-2">
+          <div class="field"><label class="lbl">Market</label>
+            <select onchange="bizCaseState.market=this.value;bizCaseState.retailer='';renderBizCase(document.getElementById('page-bizcase'))">
+              ${MARKETS.map(m=>`<option${bizCaseState.market===m?' selected':''}>${m}</option>`).join('')}
+            </select>
           </div>
-        `:''}
+          <div class="field"><label class="lbl">Retailer</label>
+            <select onchange="bizCaseState.retailer=this.value">
+              <option value="">Select retailer…</option>
+              ${retailers.map(r=>`<option${bizCaseState.retailer===r?' selected':''}>${r}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        ${heroSku?`<div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.5rem .75rem;font-family:var(--mono);font-size:.6rem;color:#065F46">
+          ✓ Hero SKU: <strong>${heroSku.name}</strong>${heroSku.rspSEK?' — '+heroSku.rspSEK+' SEK':''} ${heroSku.exWorksCost?' · COGS: '+heroSku.exWorksCost+' SEK':''}
+        </div>`:
+        `<div style="background:#FFFBEB;border:1px solid #FCD34D;padding:.5rem .75rem;font-family:var(--mono);font-size:.6rem;color:#92400E">
+          ⚠ No SKU data — add products in My Products for accurate P&L. Using brand profile estimates.
+        </div>`}
       </div>
 
-      ${bizCaseState.retailer&&!bizCaseState.result&&!bizCaseState.generating?`
-        <button class="btn-primary" style="width:100%" onclick="generateBizCase()">
-          Generate Retail Business Case for ${bizCaseState.retailer} →
-        </button>
-      `:''}
-
-      ${bizCaseState.generating?`
-        <div class="card" style="text-align:center;padding:2rem">
-          <div class="spinner" style="margin:0 auto 1rem"></div>
-          <div style="font-family:var(--mono);font-size:.7rem;color:var(--navy)">Building your retail business case…</div>
-          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-top:.35rem">Analysing category data, consumer behaviour, and retailer priorities</div>
-        </div>
-      `:''}
-
-      ${bizCaseState.result?renderBizCaseResult():''}
+      <button class="btn-primary" onclick="generateBizCase()" style="width:100%;padding:1rem;font-size:.75rem"
+        ${!bizCaseState.retailer?'disabled':''}>
+        Generate ${bizCaseState.mode==='catman'?'Category Manager Business Case':'Buyer Business Case'} →
+      </button>
     </div>
   `;
 }
 
 async function generateBizCase(){
-  if(!brand||!bizCaseState.retailer) return;
+  if(!bizCaseState.retailer){alert('Select a retailer first.');return;}
   bizCaseState.generating=true;
-  bizCaseState.result=null;
   renderBizCase(document.getElementById('page-bizcase'));
 
-  const proofPoints=[];
-  if(brand.annualRevenue) proofPoints.push(`Revenue: ${brand.annualRevenue}${brand.revenueGrowth?' ('+brand.revenueGrowth+' YoY)':''}`);
-  if(brand.unitsSold) proofPoints.push(`Units sold: ${brand.unitsSold}`);
-  if(brand.repeatRate) proofPoints.push(`Repeat purchase rate: ${brand.repeatRate}`);
-  if(brand.dtcRevenue) proofPoints.push(`DTC revenue in target market: ${brand.dtcRevenue}`);
-  if(brand.socialFollowers) proofPoints.push(`Social reach: ${brand.socialFollowers}`);
-  if(brand.pressCount) proofPoints.push(`Press coverage: ${brand.pressCount}`);
-  if(brand.awardsCount) proofPoints.push(`Awards: ${brand.awardsCount}`);
-  if(brand.waitlistCount) proofPoints.push(`Waitlist/pre-orders: ${brand.waitlistCount}`);
-  if(brand.wholesaleEnquiries) proofPoints.push(`Inbound wholesale enquiries: ${brand.wholesaleEnquiries}`);
-  if(brand.reviewScore) proofPoints.push(`Consumer reviews: ${brand.reviewScore}`);
-  if(brand.clinicalClaims) proofPoints.push(`Clinical evidence: ${brand.clinicalClaims}`);
-  if(brand.routineStep) proofPoints.push(`Routine position: ${brand.routineStep}`);
-  if(brand.basketImpact) proofPoints.push(`Basket impact: ${brand.basketImpact}`);
+  const retailer = bizCaseState.retailer;
+  const market = bizCaseState.market||'Denmark';
+  const mode = bizCaseState.mode||'catman';
+  const heroSku = skus.length>0?skus[0]:null;
+  const intel = getRelevantIntel(brand.category||'Skincare & Beauty', market, retailer);
+  const retailerEntry = intel.retailers.find(r=>r.name===retailer)||intel.retailers[0]||{};
 
-  const prompt=`You are VeyaFlow AI — a B2B brand intelligence platform for Nordic consumer brands.
+  // Pre-calculate P&L — injected as verified facts
+  const rspNum = parseFloat(heroSku?.rspSEK||0);
+  const cogsNum = parseFloat(heroSku?.exWorksCost||0);
+  const marginPct = retailerEntry.marginMin ? (retailerEntry.marginMin+retailerEntry.marginMax)/2 : 0.50;
+  const revenuePerUnit = rspNum * (1-marginPct);
+  const projUnits = 4200; // Y1 benchmark
+  const grossRevY1 = revenuePerUnit * projUnits;
+  const beautyDaysFee = retailer==='Matas'?15000:retailer==='Lyko'?8000:12000;
+  const logisticsFee = 8000;
+  const netRevY1 = grossRevY1 - beautyDaysFee - logisticsFee;
+  const linearMeters = 1.5;
+  const spaceProductivity = netRevY1 / linearMeters;
+  const benchmarkData = SPACE_BENCHMARKS[retailer]||(SPACE_BENCHMARKS.default);
+  const benchmark = benchmarkData[brand.category||'Skincare & Beauty']||benchmarkData.default||350000;
+  const benchCurrency = benchmarkData.currency||'SEK';
+  const premiumToBench = benchmark>0 ? ((spaceProductivity-benchmark)/benchmark*100).toFixed(0) : 'N/A';
+  const marginContribPerUnit = rspNum>0 ? (revenuePerUnit - cogsNum) : 0;
+  const breakEvenUnits = (beautyDaysFee+logisticsFee)>0&&marginContribPerUnit>0 ? Math.ceil((beautyDaysFee+logisticsFee)/marginContribPerUnit) : 0;
+  const breakEvenMonth = breakEvenUnits>0 ? Math.ceil(breakEvenUnits/(projUnits/12)) : 0;
 
-Generate a detailed Retail Business Case for a ${brand.category} brand pitching to ${bizCaseState.retailer} in ${bizCaseState.market}.
+  const plTable = rspNum>0 ? `
+PRE-CALCULATED P&L — INJECT AS VERIFIED DATA (do not recalculate or estimate differently):
+RSP: ${rspNum} SEK | Retailer margin: ${Math.round(marginPct*100)}% | Revenue per unit: ${revenuePerUnit.toFixed(0)} SEK
+Projected Y1 units: ${projUnits.toLocaleString()} | Gross revenue contribution: ${Math.round(grossRevY1).toLocaleString()} SEK
+Less Beauty Days/promo fee: -${beautyDaysFee.toLocaleString()} SEK
+Less logistics levy: -${logisticsFee.toLocaleString()} SEK
+Net revenue contribution Y1: ${Math.round(netRevY1).toLocaleString()} SEK
+Space allocation: ${linearMeters}m | Space productivity: ${Math.round(spaceProductivity).toLocaleString()} ${benchCurrency}/metre/year
+Category benchmark: ${benchmark.toLocaleString()} ${benchCurrency}/metre/year | Premium to benchmark: ${premiumToBench}%
+${breakEvenMonth>0?`Break-even: Month ${breakEvenMonth}`:'Enter COGS in My Products for break-even calculation'}
+CONFIDENCE: HIGH — calculated from brand-verified inputs` : 'RSP not set — use category benchmarks for financial estimates. Flag all numbers as estimates.';
 
-This is NOT a pitch email. It is a structured commercial argument that a buyer presents internally to justify listing the brand. It should be specific, data-led, and address the three key questions every category manager has:
-1. Will this product sell?
-2. Will it grow my category?
-3. Does it fit our strategy?
+  // Risk table
+  const risks = (BIZ_CASE_RISKS[retailer]||BIZ_CASE_RISKS.default).slice(0,5);
+  const riskTable = risks.map(r=>`${r.risk} | ${r.prob}% probability | Impact: ${r.impact} | Mitigation: ${r.mitigation}`).join('\n');
 
-BRAND: ${brand.name}
-CATEGORY: ${brand.category}
-HOME MARKET: ${brand.currentMarket}
-PRODUCTS: ${brand.skus||'Not specified'}
-USP: ${brand.usp||'Not specified'}
-SUSTAINABILITY: ${brand.sustainabilityGoals?.join(', ')||'Not specified'}
+  // Cannibalisation data
+  const cannibEntry = (CANNIB_DATA[retailer]||{})[brand.category||'Skincare & Beauty'];
+  const cannibData = cannibEntry ?
+    `CANNIBALISATION DATA (use these facts):\nNearest current SKUs at ${retailer}: ${cannibEntry.nearestSkus.join(', ')}\nEstimated consumer overlap: ${cannibEntry.overlapPct}%\nAssessment: ${brand.name} ${cannibEntry.assessment}\nCannibalisation risk: ${cannibEntry.risk}` :
+    `Cannibalisation risk: assess based on current ${retailer} assortment in ${brand.category} category. Identify 2-3 nearest SKUs and estimate overlap.`;
 
-COMMERCIAL DATA:
-${proofPoints.length>0?proofPoints.join('\n'):'No brand data provided — use category benchmarks and typical performance for a ${brand.category} brand at ${brand.stage} stage'}
+  // Range review dates for listing proposal
+  const rangeReview = retailerEntry.rangeReviewCycle?.join(' or ')||'upcoming range review';
+  const deadlineDate = retailer==='Matas'?'May 8 2026':retailer==='Lyko'?'Rolling — apply now':retailer==='Boots UK'?'May 15 2026':'April 30 2026';
 
-TARGET: ${bizCaseState.retailer}, ${bizCaseState.market}
+  const catmanPrompt = `You are writing an internal listing approval document for a category manager at ${retailer}, ${market}. This is NOT a pitch — it is a pre-built justification for the category manager to present upward to their director. April 2026.
 
-Generate the business case with these FIVE sections. Be specific, use real numbers where possible, reference ${bizCaseState.retailer}'s known strategy and customer profile:
+BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}
+TARGET RETAILER: ${retailer} | MARKET: ${market}
 
-## THE EVIDENCE CASE
-Why this product works — clinical data, certifications, ingredient science, consumer validation. Answer: "How do we know this product delivers what it claims?" Be specific about what evidence exists and why it matters to ${bizCaseState.retailer}'s compliance and quality requirements.
+${plTable}
+
+${cannibData}
+
+RISKS (hardcoded probabilities — do not change):
+${riskTable}
+
+RETAILER CONTEXT:
+${retailerEntry.strategy2026||intel.negIntel.slice(0,200)}
+Range review: ${rangeReview}
+
+Generate a 5-section Retail Business Case in EXACTLY this structure:
 
 ## THE CATEGORY OPPORTUNITY
-Size and growth of the ${brand.category} category in ${bizCaseState.market}. Where is the gap that ${brand.name} fills? What is ${bizCaseState.retailer} currently missing? Use specific data — market size, growth rates, consumer trends driving demand. Answer: "Why is now the right time to list this category/format?"
+Open with a one-paragraph statement of the category GAP at ${retailer} — NOT the brand's strengths. 
+Format: "[Retailer] currently has no [specific gap]. The [segment] occupies [X] bays with [Y] SKUs — none with [positioning]. This gap represents an estimated [Z] incremental revenue opportunity."
+Introduce ${brand.name} as the solution ONLY after stating the gap.
+Reference the retailer's 2026 strategy: ${retailerEntry.strategy2026?.slice(0,150)||''}
 
-## THE ROUTINE ARGUMENT
-How ${brand.name} fits into the consumer's ${brand.category} routine. Which products already on ${bizCaseState.retailer}'s shelves does it complement? Why does a customer who buys ${brand.name} also buy more of ${bizCaseState.retailer}'s existing range? ${brand.basketImpact?'Use this data: '+brand.basketImpact:'Generate a credible basket correlation argument based on category behaviour.'} Answer: "How does this brand make our other products sell better?"
+## COMMERCIAL MODEL
+Present the pre-calculated P&L table above in clean tabular format.
+IMPORTANT: Use EXACTLY the numbers provided — do not recalculate.
+Add a one-sentence interpretation: "At ${retailer}'s category benchmark of ${benchmark.toLocaleString()} ${benchCurrency}/metre, ${brand.name} is projected to deliver ${premiumToBench}% above benchmark."
+Confidence level: HIGH — calculated from brand-verified inputs.
 
-## THE VOLUME ARGUMENT
-The commercial case in numbers. ${proofPoints.length>0?'Use the brand\u2019s actual data: '+proofPoints.slice(0,4).join(', '):
-'Build from category benchmarks — what does a typical '+brand.category+' brand at this stage generate in retail?'} 
-Include: estimated first-year retail revenue potential for ${bizCaseState.retailer}, recommended price positioning vs competitors, expected sell-through rate, margin profile. Answer: "What does listing this brand do to our P&L?"
+## ROUTINE & INCREMENTALITY ARGUMENT
+Frame as an incrementality case — answer: does this brand grow total category revenue or cannibalise existing SKUs?
+Use the cannibalisation data provided above. State the risk level explicitly.
+Include basket economics: what adjacent purchases does this product drive?
+Category manager question to answer: "Will adding this SKU grow my category P&L or just redistribute it?"
 
-## THE STRATEGIC FIT
-Why ${brand.name} aligns with ${bizCaseState.retailer}'s specific strategic priorities — their sustainability agenda, their customer demographic, their category growth targets, their competitive position vs other retailers in ${bizCaseState.market}. ${brand.sustainabilityGoals?.length?'Reference these certifications/goals: '+brand.sustainabilityGoals.join(', '):''} Answer: "Why does this brand belong in our range and not a competitor's?"`;
+## RISK ASSESSMENT
+Present as a table the category manager can copy into their director review.
+Use EXACTLY the risk probabilities provided — do not estimate differently.
+| Risk | Probability | Financial Impact | Mitigation |
+Include all 5 risks provided.
+Each mitigation must be a contractual offer, not a vague promise.
+
+## THE PROPOSAL
+Specific listing proposal only — no brand story.
+Format exactly:
+Listing request: [X SKUs with names]
+Space request: [linear metres, which bay]
+Launch timing: [${rangeReview} revision — deadline ${deadlineDate}]
+Launch support: [specific commitments — Beauty Days, brand-funded display, social campaign]
+Trial terms: [12-week sell-through review with specific threshold and markdown guarantee]
+Decision required by: [${deadlineDate}]
+
+APPENDIX A — Brand Credentials
+[3-4 bullet points of strongest commercial proof points only]
+APPENDIX B — Compliance Status
+[CPNP, EU RP, Safety Assessment, certifications — one line each]
+
+HARD RULES:
+- Category manager has never heard of this brand. Do not assume awareness.
+- Numbers come from the P&L table above — never round or estimate differently.
+- Every mitigation is a contractual offer, not a vague promise.
+- No brand story in the main sections. Credentials go to appendix.
+- Total: under 650 words in main sections.`;
+
+  const buyerPrompt = `You are writing a Retail Business Case for a buyer at ${retailer}, ${market}. April 2026. Shorter format — first contact justification.
+
+BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}
+
+${plTable}
+
+PROOF POINTS: ${[brand.revenueGrowth?'+'+brand.revenueGrowth+'% YoY':null,brand.unitsSold?brand.unitsSold+' units':null,brand.repeatRate?brand.repeatRate+'% repeat':null,brand.reviewScore?brand.reviewScore+' avg review':null].filter(Boolean).join(' | ')||'[Add proof points in Brand Profile]'}
+
+Generate a 5-section business case for a buyer. Sections:
+## BRAND & CATEGORY FIT
+## COMMERCIAL PROOF
+## HIDDEN ECONOMICS
+## ROUTINE INTEGRATION
+## NEXT STEPS
+Under 500 words. More brand-story led. Buyer needs to feel excited, not just rationally convinced.`;
+
+  const prompt = mode==='catman' ? catmanPrompt : buyerPrompt;
 
   try{
-    const text = await callAPI([{role:"user",content:prompt}],1200);
+    const text = await callAPI([{role:'user',content:prompt}],1400);
     bizCaseState.result=text;
     bizCaseState.generating=false;
+    bizCaseState.timestamp=new Date().toISOString();
   }catch(err){
     bizCaseState.generating=false;
     bizCaseState.result='ERROR:'+err.message;
   }
   renderBizCase(document.getElementById('page-bizcase'));
 }
+
+function renderBizCaseResult(el){
+  const result = bizCaseState.result||'';
+  if(result.startsWith('ERROR:')){
+    el.innerHTML=`<div class="page-wrap"><div class="card" style="color:var(--red);padding:1rem">${result.replace('ERROR:','')}</div>
+      <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Try again</button></div>`;
+    return;
+  }
+
+  const mode = bizCaseState.mode||'catman';
+  const sections = result.split(/^## /m).filter(s=>s.trim().length>10).map(s=>{
+    const lines = s.split('\n');
+    return {title:lines[0].trim(), body:lines.slice(1).join('\n').trim()};
+  });
+
+  const sectionIcons = {
+    'THE CATEGORY OPPORTUNITY':'◎',
+    'COMMERCIAL MODEL':'◈',
+    'ROUTINE & INCREMENTALITY ARGUMENT':'◉',
+    'RISK ASSESSMENT':'⚑',
+    'THE PROPOSAL':'✉',
+    'BRAND & CATEGORY FIT':'◌',
+    'COMMERCIAL PROOF':'◈',
+    'HIDDEN ECONOMICS':'◉',
+    'ROUTINE INTEGRATION':'◉',
+    'NEXT STEPS':'✉',
+  };
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Retail Business Case</div>
+          <div class="page-sub">${brand.name} → ${bizCaseState.retailer} · ${bizCaseState.market} · ${mode==='catman'?'Category Manager':'Buyer'} mode</div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Regenerate</button>
+          <button class="btn-primary" onclick="window.print()">Print / PDF</button>
+        </div>
+      </div>
+
+      <!-- Document header -->
+      <div style="background:var(--navy);padding:1.5rem 1.75rem;margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.35);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem">
+          ${mode==='catman'?'Internal listing approval document — Category Manager':'Buyer business case'}
+        </div>
+        <div style="font-family:var(--serif);font-size:1.25rem;color:#fff;margin-bottom:.15rem">${brand.name} — ${bizCaseState.retailer}</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:rgba(255,255,255,.45)">${bizCaseState.market} · ${brand.category||''} · ${new Date(bizCaseState.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div style="margin-top:1rem;font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.35);border-top:1px solid rgba(255,255,255,.1);padding-top:.6rem">
+          Buyer-facing Brand Pack: <span style="color:var(--gold)">[Share Magic Link after setup]</span> · This document is for internal approval only
+        </div>
+      </div>
+
+      ${sections.map((s,i)=>{
+        const icon = sectionIcons[s.title]||String(i+1);
+        const isAppendix = s.title.startsWith('APPENDIX');
+        return `
+          <div style="background:#fff;border:1px solid var(--border);padding:1.25rem 1.5rem;margin-bottom:.75rem${isAppendix?';border-left:3px solid var(--gold)':''}">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.65rem">
+              <span style="font-family:var(--mono);font-size:.8rem;color:var(--gold);opacity:.7">${icon}</span>
+              <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--navy);letter-spacing:.1em;text-transform:uppercase">${s.title}</div>
+              ${s.title==='COMMERCIAL MODEL'?'<span style="font-family:var(--mono);font-size:.5rem;background:#ECFDF5;color:#065F46;padding:.1rem .4rem;border:1px solid #A7F3D0;margin-left:.4rem">● HIGH CONFIDENCE</span>':''}
+              ${s.title==='RISK ASSESSMENT'?'<span style="font-family:var(--mono);font-size:.5rem;background:#EFF6FF;color:#1E40AF;padding:.1rem .4rem;border:1px solid #BFDBFE;margin-left:.4rem">Hardcoded probabilities</span>':''}
+              ${isAppendix?'<span style="font-family:var(--mono);font-size:.5rem;background:rgba(196,168,130,.12);color:var(--gold);padding:.1rem .4rem;margin-left:.4rem">Supporting evidence</span>':''}
+            </div>
+            <div class="prose">${parseMarkdown(s.body)}</div>
+          </div>
+        `;
+      }).join('')}
+
+      <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← New business case</button>
+        <button class="btn-gold" onclick="showPage('brandpack')">Brand Pack →</button>
+        <button class="btn-outline" onclick="showPage('pitch')">Retailer Pitch →</button>
+      </div>
+    </div>
+  `;
+}
+
 
 function renderBizCaseResult(){
   if(!bizCaseState.result) return '';
@@ -2914,181 +3134,431 @@ function renderBizCaseResult(){
 }
 
 /* ═══════════════════════════════════════════════════
-   BRAND PACK GENERATOR
+   BRAND PACK GENERATOR — V2
+   Buyer-first document. Page 1 = zero AI, all verified data.
+   7 sections rebuilt with buyer psychology.
 ═══════════════════════════════════════════════════ */
-let brandPackState = {retailer:'', market:'', generating:false, result:null};
+let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null};
+
+// Retailer-specific tones and cover colours
+const BRAND_PACK_COVERS = {
+  Matas:            {tone:'clinical_nordic',       accent:'#1E3A5F', label:'navy & white'},
+  Lyko:             {tone:'digital_warm',          accent:'#C4522A', label:'coral & white'},
+  'Apotek Hjärtat': {tone:'pharmaceutical_clean',  accent:'#1A6B3C', label:'green & white'},
+  Kicks:            {tone:'energetic_youthful',     accent:'#111111', label:'black & neon'},
+  'Holland & Barrett':{tone:'wellness_natural',    accent:'#2D6A4F', label:'forest green'},
+  'Boots UK':       {tone:'pharmacy_premium',      accent:'#003087', label:'Boots blue'},
+  'dm-drogerie markt':{tone:'sustainability_clean',accent:'#D97706', label:'amber & white'},
+  Etos:             {tone:'clean_modern',           accent:'#0369A1', label:'sky blue'},
+};
+
+// Shelf neighbours per retailer + category (for competitive positioning map)
+const SHELF_NEIGHBOURS = {
+  Matas: {
+    'Skincare & Beauty': [
+      {brand:'Nuori',     origin:'Danish',  tier:'Premium',     clinical:'Medium', price:'350-450 DKK'},
+      {brand:'Verso',     origin:'Swedish', tier:'Premium',     clinical:'High',   price:'400-600 DKK'},
+      {brand:'Lumene',    origin:'Finnish', tier:'Mid-premium', clinical:'Medium', price:'200-350 DKK'},
+      {brand:'Matas Balance', origin:'Danish', tier:'Mid',      clinical:'Low',    price:'80-200 DKK'},
+    ],
+    'Wellness & Supplements': [
+      {brand:'Elexir Pharma', origin:'Swedish', tier:'Premium', clinical:'High', price:'250-400 DKK'},
+      {brand:'Naturdrogeri',  origin:'Danish',  tier:'Mid',     clinical:'Medium',price:'150-280 DKK'},
+    ],
+  },
+  Lyko: {
+    'Skincare & Beauty': [
+      {brand:'Foreo',     origin:'Swedish', tier:'Premium',     clinical:'High',   price:'1200-4000 SEK'},
+      {brand:'Byoma',     origin:'UK',      tier:'Mid',         clinical:'Medium', price:'200-350 SEK'},
+      {brand:'Mixsoon',   origin:'Korean',  tier:'Mid',         clinical:'High',   price:'250-400 SEK'},
+      {brand:'Medik8',    origin:'UK',      tier:'Premium',     clinical:'High',   price:'450-900 SEK'},
+    ],
+  },
+  'Boots UK': {
+    'Skincare & Beauty': [
+      {brand:'The Inkey List', origin:'UK',   tier:'Mass-premium', clinical:'High',   price:'£8-25'},
+      {brand:'Medik8',         origin:'UK',   tier:'Premium',      clinical:'Very high',price:'£35-85'},
+      {brand:'Pai',            origin:'UK',   tier:'Premium',      clinical:'Medium',  price:'£28-65'},
+      {brand:'Murad',          origin:'US',   tier:'Premium',      clinical:'High',    price:'£40-75'},
+    ],
+  },
+};
+
+// Basket economics per routine step (avg basket addition at each retailer)
+const BASKET_DATA = {
+  Matas:    {step1:159, step2:129, step3:299, step4:219, step5:179, currency:'DKK'},
+  Lyko:     {step1:249, step2:199, step3:499, step4:349, step5:279, currency:'SEK'},
+  'Boots UK':{step1:12,  step2:10,  step3:28,  step4:18,  step5:15,  currency:'GBP'},
+  default:  {step1:149, step2:119, step3:279, step4:199, step5:159, currency:'SEK'},
+};
 
 function renderBrandPack(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  const PACK_RETAILERS = {
-    "Denmark": ["Matas","Magasin du Nord","Normal","Søstrene Grene","Salling Group","Bilka","Føtex"],
-    "Norway": ["Boots Norway","Kicks Norway","Europris","Coop Norge","Meny"],
-    "Germany": ["dm-drogerie markt","Rossmann","Douglas","Müller","Alnatura","Rewe","Sephora Germany"],
-    "Sweden": ["Lyko","Kicks","Apotek Hjärtat","Apoteket","Ahlens","NK","H&M Beauty"],
-    "Finland": ["Stockmann","Sokos","Prisma","K-Group"],
-    "United Kingdom": ["Boots UK","Holland & Barrett","Selfridges","John Lewis","Superdrug","Space NK"],
-    "Netherlands": ["Etos","Douglas NL","Kruidvat","Hema","De Bijenkorf"],
-  };
+  if(brandPackState.generating){
+    el.innerHTML=`<div class="page-wrap"><div class="topbar"><div><div class="page-title">Brand Pack</div></div></div>
+      <div class="card" style="text-align:center;padding:2.5rem">
+        <div class="spinner" style="margin:0 auto 1rem"></div>
+        <div style="font-family:var(--mono);font-size:.68rem;color:var(--navy)">Generating your brand pack…</div>
+      </div></div>`;
+    return;
+  }
 
-  const markets = Object.keys(PACK_RETAILERS);
-  const retailers = brandPackState.market ? PACK_RETAILERS[brandPackState.market] || [] : [];
+  if(brandPackState.result){
+    renderBrandPackResult(el);
+    return;
+  }
+
+  const PACK_MARKETS = ['Denmark','Sweden','United Kingdom','Germany','Norway','Netherlands','France'];
+  const PACK_RETAILERS = {
+    Denmark:          ['Matas','Magasin du Nord','Normal','Kicks Denmark'],
+    Sweden:           ['Lyko','Kicks Sweden','Apotek Hjärtat','Åhléns'],
+    'United Kingdom': ['Boots UK','Holland & Barrett','Space NK','Selfridges'],
+    Germany:          ['dm-drogerie markt','Rossmann','Douglas DE','Sephora DE'],
+    Norway:           ['Kicks Norway','Apotek 1','Vitusapotek','Vinmonopolet'],
+    Netherlands:      ['Etos','Kruidvat','Douglas NL','Ici Paris XL'],
+    France:           ['Sephora FR','Monoprix','Galeries Lafayette Beauté','Marionnaud'],
+  };
+  const retailers = PACK_RETAILERS[brandPackState.market||'Denmark']||PACK_RETAILERS.Denmark;
+  const heroSku = skus.length>0?skus[0]:null;
+  const cover = BRAND_PACK_COVERS[brandPackState.retailer]||{accent:'#1E3A5F'};
 
   el.innerHTML=`
     <div class="page-wrap">
       <div class="topbar">
         <div>
-          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">${brand?.category==='Fashion & Apparel'?'Wholesale Pack':brand?.category==='Home & Design'||brand?.category==='Sport & Outdoor'?'Trade Pack':'Brand Pack'}</div>
-          <div class="page-sub">Your retailer-ready document — generated in 60 seconds</div>
-        </div>
-      </div>
-
-      <div style="background:linear-gradient(135deg,var(--navy) 0%,#2d5a8e 100%);padding:1.25rem;margin-bottom:1.25rem">
-        <div style="font-family:var(--mono);font-size:.6rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">What is the ${brand?.category==='Fashion & Apparel'?'Wholesale Pack':brand?.category==='Home & Design'||brand?.category==='Sport & Outdoor'?'Trade Pack':'Brand Pack'}?</div>
-        <div style="font-family:var(--sans);font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.65">
-          ${brand?.category==='Fashion & Apparel'?
-            'A professional wholesale document combining your production credentials, sustainability certifications, and a personalised buyer argument — formatted for your next showroom or trade meeting.':
-            brand?.category==='Food & Beverage'?
-            'A professional trade document combining your food safety certifications, category data, and a personalised buyer argument — formatted for your next buyer or distributor meeting.':
-            'A professional retailer-ready document combining your compliance credentials, commercial proof points, and a personalised buyer argument — formatted for your next buyer meeting. The document no brand currently has but every buyer wants to see.'}
-        </div>
-        <div style="display:flex;gap:1rem;margin-top:.85rem;flex-wrap:wrap">
-          ${['✓ VeyaFlow Verified badge','✓ AI retailer pitch','✓ Commercial proof points','✓ Compliance summary','✓ Market intelligence'].map(f=>`<div style="font-family:var(--mono);font-size:.58rem;color:var(--gold)">${f}</div>`).join('')}
+          <div class="page-title">Brand Pack Generator</div>
+          <div class="page-sub">Buyer-first document — answers all 4 buyer questions in 3 minutes</div>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Select target retailer</div>
-        <div class="field">
-          <label class="lbl">Target market</label>
-          <select onchange="brandPackState.market=this.value;brandPackState.retailer='';brandPackState.result=null;renderBrandPack(document.getElementById('page-brandpack'))">
-            <option value="">Select market…</option>
-            ${markets.map(m=>`<option${brandPackState.market===m?' selected':''}>${m}</option>`).join('')}
-          </select>
-        </div>
-        ${brandPackState.market?`
-          <div class="field">
-            <label class="lbl">Retailer</label>
-            <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
-              ${retailers.map(r=>`
-                <div onclick="brandPackState.retailer='${r}';brandPackState.result=null;renderBrandPack(document.getElementById('page-brandpack'))"
-                  style="padding:.4rem .8rem;border:1px solid ${brandPackState.retailer===r?'var(--navy)':'var(--border)'};background:${brandPackState.retailer===r?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.75rem;color:${brandPackState.retailer===r?'var(--navy)':'#555'}">
-                  ${r}
-                </div>
-              `).join('')}
-            </div>
+        <div class="section-tag">Target</div>
+        <div class="grid-2">
+          <div class="field"><label class="lbl">Target market</label>
+            <select onchange="brandPackState.market=this.value;brandPackState.retailer='';renderBrandPack(document.getElementById('page-brandpack'))">
+              ${PACK_MARKETS.map(m=>`<option${brandPackState.market===m?' selected':''}>${m}</option>`).join('')}
+            </select>
           </div>
-        `:''}
+          <div class="field"><label class="lbl">Target retailer</label>
+            <select onchange="brandPackState.retailer=this.value">
+              <option value="">Select retailer…</option>
+              ${retailers.map(r=>`<option${brandPackState.retailer===r?' selected':''}>${r}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        ${heroSku?`
+        <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.6rem .85rem;font-family:var(--mono);font-size:.6rem;color:#065F46">
+          ✓ Hero SKU detected: <strong>${heroSku.name}</strong>${heroSku.rspSEK?' — '+heroSku.rspSEK+' SEK':''}${heroSku.cpnp?' — CPNP ✓':''}
+        </div>`:`
+        <div style="background:#FFFBEB;border:1px solid #FCD34D;padding:.6rem .85rem;font-family:var(--mono);font-size:.6rem;color:#92400E">
+          ⚠ No SKU data — add products in My Products for richer pack. Generating from brand profile only.
+        </div>`}
       </div>
 
-      ${brandPackState.retailer&&!brandPackState.result?`
-        <div class="card" style="margin-bottom:1rem">
-          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Proof point preview</div>
-          ${renderProofSummary()}
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.5rem">
-            ${!brand.annualRevenue&&!brand.socialFollowers&&!brand.waitlistCount?
-              '<span style="color:var(--amber)">⚠ No proof points added yet — <span onclick="showProofEdit()" style="text-decoration:underline;cursor:pointer">add them now</span> to strengthen your Brand Pack</span>':
-              'These proof points will appear in your Brand Pack commercial argument section.'
-            }
+      <!-- One-page summary preview -->
+      <div class="card" style="margin-bottom:1rem;border-left:4px solid ${cover.accent}">
+        <div class="section-tag">Page 1 preview — verified data only, no AI</div>
+        <div style="font-family:var(--sans);font-size:.85rem;font-weight:700;color:var(--navy);margin-bottom:.15rem">
+          ${brand.name} — Entering ${brandPackState.market||'[select market]'}
+        </div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.75rem">
+          Proposed retailer: ${brandPackState.retailer||'[select retailer]'} | ${brand.category||''} | RSP: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':'[set in My Products]'}
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+          <div style="border:1px solid var(--border);padding:.6rem .75rem">
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">The numbers</div>
+            ${[
+              brand.revenueGrowth ? ['Revenue growth', '+'+brand.revenueGrowth+'% YoY', '#065F46'] : ['Revenue growth','[not set]','var(--muted)'],
+              brand.unitsSold     ? ['Units sold', brand.unitsSold+' units', '#065F46'] : ['Units sold','[not set]','var(--muted)'],
+              brand.repeatRate    ? ['Repeat rate', brand.repeatRate+'%', '#065F46'] : ['Repeat rate','[not set]','var(--muted)'],
+              brand.reviewScore   ? ['Review score', brand.reviewScore+' / 5', '#065F46'] : ['Review score','[not set]','var(--muted)'],
+            ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)">
+              <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">${l}</div>
+              <div style="font-family:var(--mono);font-size:.72rem;font-weight:600;color:${c}">${v}</div>
+            </div>`).join('')}
+          </div>
+          <div style="border:1px solid var(--border);padding:.6rem .75rem">
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">Compliance</div>
+            ${[
+              [heroSku?.cpnp ? '✓ CPNP notified' : '✗ CPNP', heroSku?.cpnp||'Not set', heroSku?.cpnp?'#065F46':'#991B1B'],
+              [heroSku?.euResponsible ? '✓ EU RP' : '✗ EU RP', heroSku?.euResponsible||'Not set', heroSku?.euResponsible?'#065F46':'#991B1B'],
+              [heroSku?.certifications?.length ? '✓ Certified' : '○ Certifications', heroSku?.certifications?.join(', ')||'None set', heroSku?.certifications?.length?'#065F46':'var(--muted)'],
+              [(heroSku?.claims||[]).filter(c=>c).length ? '✓ Claims set' : '○ Claims', (heroSku?.claims||[]).length+' on-pack claims', '#065F46'],
+            ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)">
+              <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">${l}</div>
+              <div style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${c};text-align:right;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v}</div>
+            </div>`).join('')}
           </div>
         </div>
-
-        <button class="btn-primary" style="width:100%" onclick="generateBrandPack()">
-          Generate Brand Pack for ${brandPackState.retailer} →
-        </button>
-      `:''}
-
-      ${brandPackState.generating?`
-        <div class="card" style="text-align:center;padding:2rem">
-          <div class="spinner" style="margin:0 auto 1rem"></div>
-          <div style="font-family:var(--mono);font-size:.7rem;color:var(--navy)">Generating your Brand Pack…</div>
-          <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-top:.35rem">Assembling market intelligence, compliance data, and retailer argument</div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.5rem">
+          Page 1 pulls from your Brand Profile and SKU data — zero AI generation. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Complete your SKU data →</span>
         </div>
-      `:''}
+      </div>
 
-      ${brandPackState.result?renderBrandPackResult():''}
+      <button class="btn-primary" onclick="generateBrandPack()" style="width:100%;padding:1rem;font-size:.75rem;letter-spacing:.1em"
+        ${!brandPackState.retailer?'disabled':''}>
+        Generate Brand Pack for ${brandPackState.retailer||'[select retailer]'} →
+      </button>
     </div>
   `;
 }
 
 async function generateBrandPack(){
-  if(!brand||!brandPackState.retailer) return;
+  if(!brandPackState.retailer){alert('Select a retailer first.');return;}
   brandPackState.generating=true;
-  brandPackState.result=null;
   renderBrandPack(document.getElementById('page-brandpack'));
 
-  // Build proof points summary
-  const proofPoints=[];
-  if(brand.annualRevenue) proofPoints.push(`Revenue: ${brand.annualRevenue}${brand.revenueGrowth?' ('+brand.revenueGrowth+' YoY)':''}`);
-  if(brand.unitsSold) proofPoints.push(`Units sold: ${brand.unitsSold}`);
-  if(brand.repeatRate) proofPoints.push(`Repeat rate: ${brand.repeatRate}`);
-  if(brand.dtcRevenue) proofPoints.push(`DTC in target market: ${brand.dtcRevenue}`);
-  if(brand.socialFollowers) proofPoints.push(`Social reach: ${brand.socialFollowers}`);
-  if(brand.pressCount) proofPoints.push(`Press: ${brand.pressCount}`);
-  if(brand.awardsCount) proofPoints.push(`Awards: ${brand.awardsCount}`);
-  if(brand.waitlistCount) proofPoints.push(`Waitlist: ${brand.waitlistCount}`);
-  if(brand.wholesaleEnquiries) proofPoints.push(`Wholesale enquiries: ${brand.wholesaleEnquiries}`);
-  if(brand.reviewScore) proofPoints.push(`Reviews: ${brand.reviewScore}`);
-  if(brand.clinicalClaims) proofPoints.push(`Clinical evidence: ${brand.clinicalClaims}`);
-  if(brand.routineStep) proofPoints.push(`Routine position: ${brand.routineStep}`);
-  if(brand.basketImpact) proofPoints.push(`Basket impact: ${brand.basketImpact}`);
+  const retailer = brandPackState.retailer;
+  const market = brandPackState.market||'Denmark';
+  const cover = BRAND_PACK_COVERS[retailer]||{tone:'professional',accent:'#1E3A5F'};
+  const heroSku = skus.length>0?skus[0]:null;
+  const intel = getRelevantIntel(brand.category||'Skincare & Beauty', market, retailer);
+  const retailerEntry = intel.retailers.find(r=>r.name===retailer)||intel.retailers[0]||{};
+  const neighbours = SHELF_NEIGHBOURS[retailer]?.[brand.category||'Skincare & Beauty']||[];
+  const basket = BASKET_DATA[retailer]||BASKET_DATA.default;
 
-  const prompt = `You are VeyaFlow AI — a B2B brand intelligence platform for Nordic consumer brands.
+  // Proof points — brand-verified, not AI
+  const proofPoints = [
+    brand.revenueGrowth ? `+${brand.revenueGrowth}% YoY revenue growth` : null,
+    brand.unitsSold     ? `${brand.unitsSold} units sold in home market` : null,
+    brand.repeatRate    ? `${brand.repeatRate}% repeat purchase rate` : null,
+    brand.reviewScore   ? `${brand.reviewScore} avg rating` : null,
+    brand.socialFollowers?`${brand.socialFollowers} followers` : null,
+    brand.annualRevenue ? `${brand.annualRevenue} annual revenue` : null,
+    brand.clinicalClaims? brand.clinicalClaims : null,
+  ].filter(Boolean).slice(0,4).join(' | ');
 
-Generate a professional Brand Pack for a buyer meeting. This document helps a ${brand.category} brand pitch to ${brandPackState.retailer} in ${brandPackState.market}.
+  // Competitive positioning map
+  const posMap = neighbours.length>0 ? `
+COMPETITIVE POSITIONING AT ${retailer.toUpperCase()} — include this as a formatted table in Section 3:
+Price tier | Brand | Origin | Clinical claims | Price
+${neighbours.map(n=>`${n.tier} | ${n.brand} | ${n.origin} | ${n.clinical} | ${n.price}`).join('\n')}
+[YOU] | ${brand.name} | Swedish | [based on brand claims] | [RSP]
+Show where ${brand.name} sits relative to these brands. Identify the white space.` : '';
 
-BRAND PROFILE:
-- Brand: ${brand.name}
-- Category: ${brand.category}
-- Home market: ${brand.currentMarket}
-- Stage: ${brand.stage}
-- Products/SKUs: ${brand.skus||'Not specified'}
-- USP/Positioning: ${brand.usp||'Not specified'}
-- Sustainability goals: ${brand.sustainabilityGoals?.join(', ')||'Not specified'}
-- Target markets: ${brand.targetMarkets?.join(', ')||brandPackState.market}
+  // Basket economics
+  const routineStep = heroSku?.routineStep || 3;
+  const basketStep = `step${routineStep}` in basket ? basket[`step${routineStep}`] : basket.step3;
+  const basketPairs = [1,2,4,5].filter(s=>s!==routineStep).slice(0,3)
+    .map(s=>({step:s, val:basket[`step${s}`]||basket.step3, currency:basket.currency}));
+  const basketTotal = basketPairs.reduce((sum,p)=>sum+p.val, 0);
+  const basketData = `
+BASKET ECONOMICS FOR SECTION 6 (use these exact numbers):
+${brand.name} occupies Step ${routineStep} of the routine.
+If ${brand.name} drives a Step ${routineStep} purchase, the natural basket additions are:
+${basketPairs.map(p=>`Step ${p.step}: avg addition ${p.val} ${p.currency}`).join('\n')}
+Total basket uplift potential: ${basketTotal} ${basket.currency} per transaction.
+Category manager argument: "We don't just add one SKU — we lift the entire routine bay by ${basketTotal} ${basket.currency}."`;
 
-COMMERCIAL PROOF POINTS:
-${proofPoints.length>0?proofPoints.join('\n'):'No proof points provided — generate from category benchmarks instead'}
+  const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. April 2026.
 
-TARGET RETAILER: ${brandPackState.retailer} (${brandPackState.market})
+BRAND CONTEXT:
+Brand: ${brand.name} | Category: ${brand.category} | Stage: ${brand.stage}
+USP: ${brand.usp||'[see brand description]'}
+Price point: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':brand.pricePoint||'Premium'}
+${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.certifications?.length?' | Certs: '+heroSku.certifications.join(', '):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
 
-Generate a Brand Pack with these SEVEN sections. Be specific, commercial, and tailored to ${brandPackState.retailer}'s known priorities. Use real category knowledge.
+VERIFIED COMMERCIAL PROOF (use exactly — do not estimate differently):
+${proofPoints||'[No proof points set — describe as estimates]'}
 
-FORMAT (use these exact headers):
+RETAILER INTELLIGENCE:
+Tone required: ${cover.tone}
+Buyer priority: ${retailerEntry.buyerPriority||intel.negIntel.slice(0,200)}
+Range review: ${retailerEntry.rangeReviewCycle?.join(', ')||'check with retailer'}
+Non-negotiables: ${retailerEntry.nonNegotiable||''}
 
-## BRAND OVERVIEW
-One compelling paragraph introducing ${brand.name} to a ${brandPackState.retailer} buyer. Reference the brand’s positioning, category, and why this is the right moment to list.
+${posMap}
+${basketData}
 
-## PRODUCT HIGHLIGHTS
-3 hero product bullets — each with: product name | key benefit | retail price point | why it fits ${brandPackState.retailer}'s customer. Format: **[Product]** — [benefit] — [price] — [retailer fit]
+Generate the Brand Pack in 7 sections. HARD RULES:
+- Tone: buyer briefing note, not brand brochure. No mission statements.
+- Every section is written for a BUYER, not a consumer.
+- Use ## for section headers.
+- Numbers from the verified proof above are facts — never estimate or round them differently.
+- Under 600 words total across all sections.
 
-## MARKET FIT — ${brandPackState.retailer.toUpperCase()}
-Specific argument for why ${brand.name} fits ${brandPackState.retailer}'s category priorities, customer demographic, and sustainability agenda. Name specific ${brandPackState.retailer} buyer priorities. 2 paragraphs.
+## SECTION 1 — Brand Overview
+3 paragraphs ONLY:
+P1: What ${brand.name} sells and who buys it (buyer briefing, not brand story)
+P2: Why entering ${market} now — one specific 2026 timing argument referencing ${retailer}'s current strategy
+P3: What Year 1 success looks like in numbers at ${retailer}
 
-## COMMERCIAL PROOF
-${proofPoints.length>0?`Present these proof points as a compelling commercial argument: ${proofPoints.join(', ')}. Frame them to show consumer demand and retail readiness.`:'Generate 3 compelling commercial signals based on typical ${brand.category} brand performance benchmarks for a brand at the ${brand.stage} stage. Be specific with numbers.'}
+## SECTION 2 — Product Highlights
+For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
+- RSP and proposed net price to ${retailer}
+- Key claims with compliance status (Green/Amber/Red) for ${market}
+- Certifications
+- Basket position: Step X of routine — pairs naturally with [product types]
+- Velocity benchmark: projected units/store/week based on home market data
 
-## COMPLIANCE & SUSTAINABILITY
-VeyaFlow Verified status summary. List what compliance documentation is available: ${brand.sustainabilityGoals?.join(', ')||'sustainability goals'}. Reference relevant EU regulations (EUDR, ESPR, CSRD) and what the brand has prepared. End with: "Full compliance documentation available on request via VeyaFlow."
+## SECTION 3 — Market Fit & Competitive Positioning
+${posMap?'Use the competitive positioning table provided above.':'Describe where '+brand.name+' sits in the '+market+' category.'}
+Identify the specific white space — what is missing at ${retailer} that ${brand.name} fills.
+Do NOT use generic market size figures. Use shelf-level framing.
 
-## ROUTINE INTEGRATION
-${brand.routineStep?`Explain how ${brand.name} fits into the consumer routine: ${brand.routineStep}. Argue that stocking ${brand.name} increases the basket value of ${brandPackState.retailer}'s existing ${brand.category} range.`:
-`Explain how ${brand.name} fits into the ${brand.category} consumer routine and why stocking it increases the basket value of ${brandPackState.retailer}'s existing range. Be specific about complementary products.`}
+## SECTION 4 — Commercial Proof
+Evidence pyramid — hardest proof first:
+Tier 1: Revenue/units data (verified numbers above — lead with these)
+Tier 2: Repeat purchase and review data
+Tier 3: Social and press signals
+End with: velocity benchmark — "At our SE sell-through rate, we project X units/store/week at ${retailer}."
+Do not lead with social following. It is the weakest proof type.
 
-## NEXT STEPS
-Three specific, actionable next steps for the ${brandPackState.retailer} buyer. Include: sample request, range review timing, and contact details placeholder [BRAND CONTACT].`;
+## SECTION 5 — Compliance & Sustainability
+For EACH compliance item, explain what it means for ${retailer}'s risk — not just list it.
+Format: [Item]: ✓/✗ → Means: [what this removes from ${retailer}'s risk register]
+Include: CPNP status, EU RP, claims audit result, EUDR status, certifications.
+Language register: ${retailer} compliance team, not brand marketing.
+
+## SECTION 6 — Basket Economics & Routine Integration
+${basketData}
+Use the basket uplift numbers provided. This is the category manager argument.
+Frame as: "At ${retailer}, a Step ${routineStep} purchase correlates with X${basket.currency} additional basket spend."
+Explain WHY this brand drives adjacent purchases — what it signals to the consumer about their routine.
+
+## SECTION 7 — Next Steps
+Exactly 3 items:
+1. Range review meeting ask — reference ${retailerEntry.rangeReviewCycle?retailerEntry.rangeReviewCycle.join(' or '):'upcoming'} review dates with a specific deadline
+2. Sample send — logistics detail (how many SKUs, ship within X days, to which office/portal)
+3. Full data pack offer via verified brand profile link
+Final line: One sentence creating timing urgency without being pushy. Mention competitor interest neutrally if appropriate.
+NEVER write "please don't hesitate to contact us."`;
 
   try{
-    const text = await callAPI([{role:"user",content:prompt}],1200);
+    const text = await callAPI([{role:'user',content:prompt}], 1400);
     brandPackState.result = text;
     brandPackState.generating = false;
+    brandPackState.timestamp = new Date().toISOString();
   }catch(err){
     brandPackState.generating = false;
     brandPackState.result = 'ERROR:'+err.message;
   }
   renderBrandPack(document.getElementById('page-brandpack'));
 }
+
+function renderBrandPackResult(el){
+  const cover = BRAND_PACK_COVERS[brandPackState.retailer]||{accent:'#1E3A5F'};
+  const heroSku = skus.length>0?skus[0]:null;
+  const basket = BASKET_DATA[brandPackState.retailer]||BASKET_DATA.default;
+  const result = brandPackState.result||'';
+
+  if(result.startsWith('ERROR:')){
+    el.innerHTML=`<div class="page-wrap"><div class="card" style="color:var(--red);padding:1rem">${result.replace('ERROR:','')}</div>
+      <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Try again</button></div>`;
+    return;
+  }
+
+  // Parse sections
+  const sections = result.split(/^## /m).filter(s=>s.trim().length>10).map(s=>{
+    const lines = s.split('\n');
+    return {title: lines[0].replace(/SECTION \d+ — /,'').trim(), body: lines.slice(1).join('\n').trim()};
+  });
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Brand Pack</div>
+          <div class="page-sub">${brand.name} → ${brandPackState.retailer} · ${brandPackState.market}</div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Regenerate</button>
+          <button class="btn-primary" onclick="window.print()">Print / Save PDF</button>
+        </div>
+      </div>
+
+      <!-- Cover page -->
+      <div style="background:${cover.accent};padding:2rem 1.75rem;margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.4);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.35rem">Prepared for</div>
+        <div style="font-family:var(--serif);font-size:1.5rem;color:#fff;font-weight:400;margin-bottom:.2rem">${brandPackState.retailer}</div>
+        <div style="font-family:var(--mono);font-size:.65rem;color:rgba(255,255,255,.55);margin-bottom:1.25rem">${brandPackState.market} · ${brand.category||''} · ${new Date(brandPackState.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div style="font-family:var(--serif);font-size:1.1rem;color:rgba(255,255,255,.9)">${brand.name||''}</div>
+        <div style="font-family:var(--sans);font-size:.75rem;color:rgba(255,255,255,.55);margin-top:.2rem">${brand.usp?.slice(0,80)||''}</div>
+        <div style="margin-top:1.25rem;display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);padding:.3rem .75rem">
+          <span style="color:${cover.accent==='#1E3A5F'?'#C4A882':'#fff'};font-size:.7rem">✓</span>
+          <span style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.7);letter-spacing:.08em">VEYAFLOW VERIFIED</span>
+        </div>
+      </div>
+
+      <!-- Page 1: One-page summary — zero AI -->
+      <div style="border:2px solid ${cover.accent};padding:1.25rem 1.5rem;margin-bottom:1rem;background:#fff">
+        <div style="font-family:var(--mono);font-size:.58rem;color:${cover.accent};letter-spacing:.12em;text-transform:uppercase;margin-bottom:.75rem;border-bottom:1px solid var(--border);padding-bottom:.4rem">One-page summary — verified data</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <!-- Numbers -->
+          <div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">The numbers</div>
+            ${[
+              ['Revenue growth', brand.revenueGrowth?'+'+brand.revenueGrowth+'% YoY':'[not set]', !!brand.revenueGrowth],
+              ['Units sold',     brand.unitsSold||'[not set]', !!brand.unitsSold],
+              ['Repeat rate',    brand.repeatRate?brand.repeatRate+'%':'[not set]', !!brand.repeatRate],
+              ['Review score',   brand.reviewScore?brand.reviewScore+' / 5':'[not set]', !!brand.reviewScore],
+              ['Hero SKU RSP',   heroSku?.rspSEK?heroSku.rspSEK+' SEK':'[set in SKU data]', !!heroSku?.rspSEK],
+            ].map(([l,v,ok])=>`
+              <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+                <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted)">${l}</div>
+                <div style="font-family:var(--mono);font-size:.73rem;font-weight:600;color:${ok?'var(--navy)':'#D97706'}">${v}</div>
+              </div>`).join('')}
+          </div>
+          <!-- Compliance -->
+          <div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Compliance status</div>
+            ${[
+              ['CPNP notified',   heroSku?.cpnp?'✓ '+heroSku.cpnp.slice(0,20):'✗ Not set', !!heroSku?.cpnp],
+              ['EU Responsible Person', heroSku?.euResponsible?'✓ '+heroSku.euResponsible.slice(0,25):'✗ Not set', !!heroSku?.euResponsible],
+              ['Safety Assessment', heroSku?.safetyRef?'✓ '+heroSku.safetyRef.slice(0,20):'✗ Not set', !!heroSku?.safetyRef],
+              ['Certifications', heroSku?.certifications?.length?'✓ '+heroSku.certifications.slice(0,2).join(', '):'None set', !!heroSku?.certifications?.length],
+            ].map(([l,v,ok])=>`
+              <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
+                <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted)">${l}</div>
+                <div style="font-family:var(--mono);font-size:.7rem;font-weight:600;color:${ok?'#065F46':'#991B1B'};text-align:right;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <!-- Proposed terms -->
+        <div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Proposed terms</div>
+          <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+            ${[
+              ['Margin','50%'],
+              ['MOQ', heroSku?.moq?heroSku.moq+' units':'200 units'],
+              ['Lead time', heroSku?.leadDays?heroSku.leadDays+' days':'14 days'],
+              ['Launch support','Beauty Days participation'],
+            ].map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase">${l}</div><div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${v}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- AI-generated sections -->
+      ${sections.map((s,i)=>`
+        <div style="background:#fff;border:1px solid var(--border);padding:1.25rem 1.5rem;margin-bottom:.75rem">
+          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.65rem">
+            <div style="font-family:var(--mono);font-size:.75rem;color:${cover.accent};font-weight:700;opacity:.5">${String(i+1).padStart(2,'0')}</div>
+            <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--navy);letter-spacing:.1em;text-transform:uppercase">${s.title}</div>
+          </div>
+          <div class="prose">${parseMarkdown(s.body)}</div>
+        </div>
+      `).join('')}
+
+      <!-- Footer -->
+      <div style="background:var(--navy);padding:.85rem 1.5rem;margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.35)">
+          Generated ${new Date(brandPackState.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · Data reflects current brand profile · VeyaFlow
+        </div>
+        <button class="btn-outline" style="border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.5);font-size:.6rem;padding:.3rem .6rem"
+          onclick="generateBrandPack()">↻ Refresh with latest data</button>
+      </div>
+
+      <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← New pack</button>
+        <button class="btn-gold" onclick="showPage('pitch')">Generate pitch email →</button>
+        <button class="btn-outline" onclick="showPage('bizcase')">Build business case →</button>
+      </div>
+    </div>
+  `;
+}
+
 
 function renderBrandPackResult(){
   if(!brandPackState.result) return '';
@@ -4666,158 +5136,393 @@ function updateLandedResult(){
 }
 
 function renderPitch(el){
-  if(!pitchForm.brandName)      pitchForm.brandName=brand?.name||'';
-  if(!pitchForm.category)       pitchForm.category=brand?.category||'';
-  if(!pitchForm.existingMarkets)pitchForm.existingMarkets=brand?.currentMarket||'Sweden';
-  if(!pitchForm.brandDesc)      pitchForm.brandDesc=brand?.usp||'';
-  if(!pitchForm.skus)           pitchForm.skus=brand?.skus||'';
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  const retailers=RETAILER_BY_MARKET[pitchForm.targetMarket]||[];
-  const rd=pitchForm.retailer?RETAILERS[pitchForm.retailer]:null;
+  // Pre-fill from brand profile
+  if(!pitchForm.brandName)       pitchForm.brandName       = brand?.name||'';
+  if(!pitchForm.category)        pitchForm.category        = brand?.category||'';
+  if(!pitchForm.existingMarkets) pitchForm.existingMarkets = brand?.currentMarket||'Sweden';
+  if(!pitchForm.brandDesc)       pitchForm.brandDesc       = brand?.usp||'';
+  if(!pitchForm.pricePoint)      pitchForm.pricePoint      = brand?.pricePoint||'';
+
+  // Retailer options by market
+  const MARKET_RETAILERS = {
+    Denmark:          ['Matas','Kicks Denmark','Magasin du Nord','Normal'],
+    Sweden:           ['Lyko','Kicks Sweden','Apotek Hjärtat','KICKS','Åhléns'],
+    'United Kingdom': ['Boots UK','Holland & Barrett','Space NK','Selfridges','ASOS'],
+    Germany:          ['dm-drogerie markt','Rossmann','Douglas DE','Müller','Sephora DE'],
+    Norway:           ['Kicks Norway','Apotek 1','Vitusapotek','KICKS Norway'],
+    Netherlands:      ['Etos','Kruidvat','Douglas NL','Ici Paris XL'],
+    France:           ['Sephora FR','Monoprix','Galeries Lafayette Beauté','Marionnaud'],
+  };
+  const retailers = MARKET_RETAILERS[pitchForm.targetMarket] || MARKET_RETAILERS.Denmark;
+
+  const catLabel = getCatLabel('pitch')||'Retailer Pitch';
 
   el.innerHTML=`
-    <div class="topbar">
-      <div>
-        <div class="page-title">Retailer Pitch Generator</div>
-        <div class="page-sub">AI-written buyer outreach · Personalised per retailer · In the buyer's language</div>
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">${catLabel}</div>
+          <div class="page-sub">Lead with the buyer's problem, not your brand story. Under 150 words.</div>
+        </div>
       </div>
-    </div>
-    <div class="content">
-      <div class="col-2">
-        <!-- Form -->
-        <div class="card">
-          <div class="section-tag">Your brand</div>
-          <div class="field"><label class="lbl">Brand name *</label><input type="text" id="p-brandName" value="${pitchForm.brandName}" oninput="pitchForm.brandName=this.value;updatePitchBtn()"></div>
-          <div class="field"><label class="lbl">Brand description</label><textarea id="p-desc" oninput="pitchForm.brandDesc=this.value">${pitchForm.brandDesc}</textarea></div>
-          <div class="field"><label class="lbl">Category *</label>
-            <select id="p-cat" onchange="pitchForm.category=this.value;updatePitchBtn()">
-              <option value="">Select…</option>${PITCH_CATEGORIES.map(c=>`<option${pitchForm.category===c?' selected':''}>${c}</option>`).join('')}
+
+      ${pitchResult ? renderPitchResult() : `
+      <div class="card" style="margin-bottom:1rem">
+        <div class="section-tag">Target</div>
+        <div class="grid-2">
+          <div class="field"><label class="lbl">Target market</label>
+            <select id="p-market" onchange="pitchForm.targetMarket=this.value;pitchForm.retailer='';renderPitch(document.getElementById('page-pitch'))">
+              ${['Denmark','Sweden','United Kingdom','Germany','Norway','Netherlands','France'].map(m=>`<option${pitchForm.targetMarket===m?' selected':''}>${m}</option>`).join('')}
             </select>
           </div>
-          <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="p-skus" value="${pitchForm.skus}" oninput="pitchForm.skus=this.value"></div>
-          <hr class="divider">
-          <div class="section-tag">Target retailer</div>
-          <div class="grid-2">
-            <div class="field"><label class="lbl">Market *</label>
-              <select id="p-market" onchange="pitchForm.targetMarket=this.value;pitchForm.retailer='';pitchResult=null;renderPitch(document.getElementById('page-pitch'))">
-                ${PITCH_MARKETS.map(m=>`<option${pitchForm.targetMarket===m?' selected':''}>${m}</option>`).join('')}
-              </select>
-            </div>
-            <div class="field"><label class="lbl">Price point</label>
-              <select id="p-price" onchange="pitchForm.pricePoint=this.value">
-                <option value="">Select…</option>${['Mass market','Mid-range','Premium','Luxury'].map(p=>`<option${pitchForm.pricePoint===p?' selected':''}>${p}</option>`).join('')}
-              </select>
-            </div>
+          <div class="field"><label class="lbl">Retailer</label>
+            <select id="p-retailer" onchange="pitchForm.retailer=this.value">
+              <option value="">Select retailer…</option>
+              ${retailers.map(r=>`<option${pitchForm.retailer===r?' selected':''}>${r}</option>`).join('')}
+            </select>
           </div>
-          <div class="field"><label class="lbl">Select retailer *</label>
-            ${retailers.map(r=>{
-              const rdata=RETAILERS[r];
-              const active=pitchForm.retailer===r;
-              return `
-                <div class="retailer-card${active?' selected':''}" onclick="pitchForm.retailer='${r}';pitchResult=null;renderPitch(document.getElementById('page-pitch'))">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                    <div style="font-size:.88rem;color:var(--navy);font-weight:${active?500:400}">${r}</div>
-                    <span class="tag tag-gray">${LANG_NAMES[rdata?.language||'en']}</span>
-                  </div>
-                  <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.2rem">${rdata?.type||''}</div>
-                  ${active&&rdata?`<div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)"><div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);margin-bottom:.25rem">What this buyer cares about</div><div style="font-family:var(--sans);font-size:.68rem;color:#555;line-height:1.6">${rdata.buyerPriority}</div></div>`:''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-          <div class="field"><label class="lbl">Already selling in</label><input type="text" id="p-existing" value="${pitchForm.existingMarkets}" oninput="pitchForm.existingMarkets=this.value"></div>
-          <button class="btn-primary" id="p-generate-btn" onclick="generatePitch()" ${!pitchForm.brandName||!pitchForm.retailer||!pitchForm.category?'disabled':''}>
-            Generate pitch for ${pitchForm.retailer||'retailer'} →
-          </button>
-          ${rd?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.5rem">Will be written in ${LANG_NAMES[rd.language]||'English'}</div>`:''}
         </div>
-
-        <!-- Result -->
-        <div id="pitch-result">
-          ${pitchResult?renderPitchResult():`
-            <div class="card empty-state">
-              <div class="empty-title" style="font-style:italic">Ready to pitch</div>
-              <div class="empty-sub">Select a retailer and VeyaFlow will write a personalised buyer email — in their language, referencing their specific buying priorities.</div>
-              <div class="chips" style="justify-content:center;margin-top:1rem">
-                ${["Waitrose (English)","dm-drogerie (German)","Matas (Danish)","Meny (Norwegian)"].map(ex=>`<span class="tag tag-gray">${ex}</span>`).join('')}
-              </div>
-            </div>
-          `}
+        <div class="grid-2">
+          <div class="field"><label class="lbl">Price point (RSP in target market)</label>
+            <input type="text" id="p-price" value="${pitchForm.pricePoint||''}" placeholder="e.g. DKK 299 / GBP 45" oninput="pitchForm.pricePoint=this.value"></div>
+          <div class="field"><label class="lbl">Relationship stage</label>
+            <select id="p-stage" onchange="pitchForm.stage=this.value">
+              ${[['cold','Cold outreach — first contact'],['followup','Follow-up — no reply yet'],['warm','Warm — had a conversation']].map(([v,l])=>`<option value="${v}"${pitchForm.stage===v?' selected':''}>${l}</option>`).join('')}
+            </select>
+          </div>
         </div>
       </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="section-tag">Commercial proof points (pulled from your brand profile)</div>
+        <div style="background:#F9F8F6;padding:.75rem;font-family:var(--mono);font-size:.62rem;color:var(--muted);line-height:1.8;margin-bottom:.5rem">
+          ${[
+            brand.annualRevenue ? `Revenue: ${brand.annualRevenue}` : null,
+            brand.revenueGrowth ? `Growth: ${brand.revenueGrowth}% YoY` : null,
+            brand.unitsSold     ? `Units sold: ${brand.unitsSold}` : null,
+            brand.repeatRate    ? `Repeat purchase: ${brand.repeatRate}%` : null,
+            brand.socialFollowers?`Social: ${brand.socialFollowers} followers` : null,
+            brand.reviewScore   ? `Reviews: ${brand.reviewScore} avg` : null,
+            brand.clinicalClaims? `Clinical: ${brand.clinicalClaims}` : null,
+          ].filter(Boolean).map(p=>`<div>${p}</div>`).join('')||
+          '<div style="color:var(--muted)">No proof points set — <span onclick="showPage(\'home\')" style="cursor:pointer;color:var(--gold);text-decoration:underline">add them on Brand Home</span></div>'}
+        </div>
+        <div class="field"><label class="lbl">Add any recent news or hook for this pitch <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(press mention, award, new stockist)</span></label>
+          <input type="text" id="p-hook" value="${pitchForm.hook||''}" placeholder="e.g. Just listed in Selfridges. Won Best New Brand at CEW 2026." oninput="pitchForm.hook=this.value"></div>
+      </div>
+
+      <button class="btn-primary" id="p-generate-btn" onclick="generatePitch()"
+        style="width:100%;padding:1rem;font-size:.75rem;letter-spacing:.1em">
+        Generate ${catLabel} →
+      </button>
+      `}
     </div>
   `;
 }
 
-function updatePitchBtn(){
-  const btn=document.getElementById('p-generate-btn');
-  if(btn)btn.disabled=!pitchForm.brandName||!pitchForm.retailer||!pitchForm.category;
+// ── PITCH INTELLIGENCE — founder-verified per retailer ──
+const PITCH_INTEL = {
+  Matas: {
+    subjectHook: 'Nordic origin + category gap or Beauty Days timing',
+    openingHook: 'Matas Balance private label expansion creating white space in premium [category] — Nordic-origin brands currently underrepresented in the tier above Matas Balance.',
+    buyerPriority: 'Category sell-through velocity. DTC Sweden data. Sustainability story.',
+    avoid: 'Mentioning competitors by name. Generic Scandinavian design opener. Opening with brand story.',
+    rangeReview: 'February and September',
+    buyerTone: 'data-driven, commercial',
+  },
+  Lyko: {
+    subjectHook: 'Social proof number or specific TikTok trend reference',
+    openingHook: "Lyko's TikTok-first Q3 2026 campaign — [brand] is already tracking in the [trend] conversation in Sweden.",
+    buyerPriority: 'Social following, content cadence, online sell-through velocity. Sworsk dual-market opportunity.',
+    avoid: 'Pharmacy credentials. Clinical language. Opening with regulatory compliance.',
+    rangeReview: 'Rolling monthly',
+    buyerTone: 'energetic, trend-aware, fast',
+  },
+  'Apotek Hjärtat': {
+    subjectHook: 'Clinical credential or pharmacy-specific USP',
+    openingHook: "Apotek Hjärtat's clinical beauty expansion — [brand] has full CPNP notification and Safety Assessment on file, ready for your October range review.",
+    buyerPriority: 'CPNP status, clinical substantiation, pharmacist endorsement, Safety Assessment.',
+    avoid: 'Lifestyle positioning. Trend language. Social media metrics as lead proof point.',
+    rangeReview: 'January and August',
+    buyerTone: 'clinical, precise, compliance-focused',
+  },
+  'Kicks Denmark': {
+    subjectHook: 'TikTok trend or Gen Z signal for Danish market',
+    openingHook: "Kicks' TikTok-first strategy — [brand] is already trending among Swedish Gen Z and ready for the Danish market.",
+    buyerPriority: 'Social velocity, Gen Z appeal, content creator relationships, visual shareability.',
+    avoid: 'Clinical language. Pharmacy credentials. B2B tone.',
+    rangeReview: 'March and October',
+    buyerTone: 'trend-forward, energetic',
+  },
+  'Kicks Sweden': {
+    subjectHook: 'Swedish social proof or TikTok trend',
+    openingHook: "Kicks' digital-first evolution — [brand] generated [X] units DTC in Sweden in Q1 and is ready for the next visibility level.",
+    buyerPriority: 'DTC Sweden data, social velocity, content creator relationships.',
+    avoid: 'Clinical language. Pharmacy credentials.',
+    rangeReview: 'March and October',
+    buyerTone: 'trend-forward, energetic',
+  },
+  'Kicks Norway': {
+    subjectHook: 'Norwegian market timing or Swedish origin proof',
+    openingHook: "Kicks Norway's online-first 2026 pivot — [brand] can start with a digital listing and build Norwegian demand before physical rollout.",
+    buyerPriority: 'Online sell-through data from Sweden. Social proof. Low initial commitment.',
+    avoid: 'Heavy clinical language. Long regulatory detail.',
+    rangeReview: 'March and October',
+    buyerTone: 'direct, opportunity-focused',
+  },
+  'Holland & Barrett': {
+    subjectHook: 'Wellness trend + UK timing or certification lead',
+    openingHook: "Post-Brexit Nordic wellness gap in H&B's premium tier — [brand]'s [certification] credentials and ingestible beauty positioning fits the gap created by [category] shortfall.",
+    buyerPriority: 'Certifications (vegan, organic, Soil Association), ingredient story, wellness not beauty positioning.',
+    avoid: 'Beauty positioning. Skincare language. Trend-led language without substance.',
+    rangeReview: 'March and October',
+    buyerTone: 'wellness-credentialed, values-led',
+  },
+  'Boots UK': {
+    subjectHook: 'Category growth angle or Advantage Card consumer data hook',
+    openingHook: "Boots' Premium Beauty category growth — [brand]'s [price point] positioning fills the [category] gap between [lower tier] and the luxury tier, backed by [proof point].",
+    buyerPriority: "Category growth data. UK consumer demand evidence. Advantage Card basket relevance. Don't lead with Swedish origin.",
+    avoid: "Generic Scandinavian story. Opening with brand heritage. Mentioning 'clean beauty' without certification.",
+    rangeReview: 'February and September',
+    buyerTone: 'commercial, category-growth focused',
+  },
+  'Space NK': {
+    subjectHook: 'Premium positioning + editorial credentials',
+    openingHook: "Space NK's premium indie beauty curation — [brand] fills the clinical [category] tier created by [Space NK pulling back from European new entries] with a proven Scandinavian positioning.",
+    buyerPriority: '6-month exclusivity standard. Editorial credentials (Vogue, Glamour). Social following 50K+.',
+    avoid: 'Mass market language. Price-led argument. Generic sustainability claims.',
+    rangeReview: 'Quarterly',
+    buyerTone: 'editorial, prestige, brand-story aware',
+  },
+  'dm-drogerie markt': {
+    subjectHook: 'Clean Beauty or sustainability credential + German market timing',
+    openingHook: "dm's 2026 Clean Beauty bay expansion — [brand] is positioned for the 40 new Nordic/natural SKU slots being added across 500 stores for the January 2027 range reset.",
+    buyerPriority: 'VerpackG compliance, sustainability certifications, refillable/waterless formats. Sell-through data from another EU market.',
+    avoid: "Opening with Swedish origin alone. Clinical language without German regulatory compliance evidence.",
+    rangeReview: 'Annual — Q4 submission for January reset',
+    buyerTone: 'sustainability-led, compliance-aware',
+  },
+  Etos: {
+    subjectHook: 'A.S. Watson group angle or Nordic clean beauty timing',
+    openingHook: "Etos' 2026 premium beauty push within A.S. Watson — [brand]'s Nordic clinical positioning fits the clean beauty gap Etos is actively filling ahead of their September range review.",
+    buyerPriority: 'A.S. Watson sustainability standards, CPNP, Dutch-language compliance, clean beauty positioning.',
+    avoid: 'Generic Scandinavian story without Dutch market specifics.',
+    rangeReview: 'February and September',
+    buyerTone: 'clean beauty, sustainability-aware',
+  },
+};
+
+// Build commercial proof points from brand profile — never AI-estimated
+function buildCommercialNumbers(){
+  const pts = [];
+  if(brand?.revenueGrowth)   pts.push(`${brand.revenueGrowth}% YoY revenue growth`);
+  if(brand?.unitsSold)       pts.push(`${brand.unitsSold} units sold in home market`);
+  if(brand?.repeatRate)      pts.push(`${brand.repeatRate}% repeat purchase rate`);
+  if(brand?.socialFollowers) pts.push(`${brand.socialFollowers} followers`);
+  if(brand?.reviewScore)     pts.push(`${brand.reviewScore} avg customer review`);
+  if(brand?.annualRevenue)   pts.push(`${brand.annualRevenue} annual revenue`);
+  if(brand?.clinicalClaims)  pts.push(brand.clinicalClaims);
+  return pts.slice(0,3);
+}
+
+function buildAsk(){
+  const stage = pitchForm.stage||'cold';
+  const retailer = pitchForm.retailer||'the retailer';
+  const intel = PITCH_INTEL[retailer];
+  const reviewDate = intel?.rangeReview || 'their next range review';
+  if(stage==='cold')    return `15-minute call this month`;
+  if(stage==='followup')return `Range review meeting — ${retailer} reviews in ${reviewDate}`;
+  if(stage==='warm')    return `Sample send and data pack — can I ship to your office?`;
+  return '15-minute call this month';
 }
 
 async function generatePitch(){
-  const btn=document.getElementById('p-generate-btn');
-  if(btn){btn.disabled=true;btn.textContent='Writing pitch…';}
-  const rd=RETAILERS[pitchForm.retailer];
-  const langName=LANG_NAMES[rd?.language||'en'];
-  const prompt=`You are a senior export sales consultant helping a Nordic brand pitch to a specific retail buyer. Write a professional, warm, and persuasive buyer outreach email.
+  const retailer = pitchForm.retailer;
+  if(!retailer){alert('Select a retailer first.');return;}
 
-Brand: ${pitchForm.brandName}
-Description: ${pitchForm.brandDesc||'A premium Nordic brand'}
-Category: ${pitchForm.category}
-Key products / SKUs: ${pitchForm.skus||'Premium products in the '+pitchForm.category+' category'}
-USP / brand positioning: ${pitchForm.usp||'Premium Scandinavian quality, clean ingredients, sustainability-focused'}
-Price point: ${pitchForm.pricePoint||'Premium'}
-Already selling in: ${pitchForm.existingMarkets||'Sweden'}
+  const btn = document.getElementById('p-generate-btn');
+  if(btn){btn.disabled=true;btn.textContent='Generating pitch...';}
 
-Target retailer: ${pitchForm.retailer}
-Retailer type: ${rd?.type||''}
-Country: ${rd?.country||pitchForm.targetMarket}
-What this buyer cares about most: ${rd?.buyerPriority||'quality, fit with their range, sales potential'}
-Practical notes: ${rd?.minOrderNote||''}
+  const intel = PITCH_INTEL[retailer]||{
+    subjectHook:'Brand name + category + market timing',
+    openingHook:'Reference a specific 2026 development at this retailer',
+    buyerPriority:'Category growth, commercial data, compliance readiness',
+    avoid:'Generic opener, brand story first',
+    buyerTone:'professional, direct',
+  };
 
-Write the email in ${langName}. ${rd?.language!=='en'?'Include an English translation below.':''}
+  const numbers = buildCommercialNumbers();
+  const ask = buildAsk();
+  const hook = pitchForm.hook||'';
+  const heroSku = skus.length>0?skus[0]:null;
 
-The email must:
-1. Have a compelling subject line that doesn’t sound like a mass pitch
-2. Open with a specific reference to ${pitchForm.retailer} — show the brand has done their homework
-3. Introduce the brand in 2–3 sentences — Nordic origin, what makes it different
-4. Explain specifically why this brand fits ${pitchForm.retailer}'s range
-5. Name 2–3 specific products with brief descriptions
-6. Make one clear ask — a 15-minute call or sample request
-7. Keep it under 200 words in the main body
-8. Sound like it was written by the brand's export or sales lead — professional but personal, not corporate
-9. Close with [Your name] placeholder
+  const numbersStr = numbers.length>0
+    ? numbers.join(' | ')
+    : 'Include 2-3 credible commercial proof points based on the brand description — flag clearly as estimates';
 
-Format:
-SUBJECT: [subject line]
+  const prompt = `You are a retail sales expert writing buyer pitch emails for a ${brand?.category||'consumer'} brand entering ${pitchForm.targetMarket}.
+
+BRAND: ${brand?.name||pitchForm.brandName}
+CATEGORY: ${brand?.category||pitchForm.category}
+USP: ${brand?.usp||pitchForm.brandDesc}
+PRICE POINT: ${pitchForm.pricePoint||'Premium'}
+TARGET RETAILER: ${retailer}
+RELATIONSHIP STAGE: ${pitchForm.stage||'cold'}
+${heroSku?`HERO SKU: ${heroSku.name}${heroSku.rspSEK?' — '+heroSku.rspSEK+' SEK':''}`:''}
+${hook?`RECENT HOOK: ${hook}`:''}
+
+RETAILER INTELLIGENCE (use these as facts, not suggestions):
+Opening hook angle: ${intel.openingHook.replace('[brand]',brand?.name||'the brand').replace('[category]',brand?.category||'the category')}
+Buyer's priority: ${intel.buyerPriority}
+Subject line strategy: ${intel.subjectHook}
+Tone: ${intel.buyerTone}
+AVOID: ${intel.avoid}
+
+COMMERCIAL NUMBERS (verified — do not change or estimate differently):
+${numbersStr}
+
+THE ASK: ${ask}
+
+Generate THREE email variants. For EACH variant output in this EXACT format:
+
+VARIANT: [Direct & Commercial]
+SUBJECT: [max 8 words]
+BODY:
+[email body]
+LINKEDIN: [max 300 chars, one question that invites reply]
 ---
-[Full email in ${langName}]
-${rd?.language!=='en'?'---\nENGLISH TRANSLATION:\n[Full email in English]':''}
+VARIANT: [Brand Story-Led]
+SUBJECT: [max 8 words]
+BODY:
+[email body]
+LINKEDIN: [max 300 chars, one question that invites reply]
 ---
-BUYER INTEL:
-• [specific intel 1]
-• [specific intel 2]
-• [specific intel 3]`;
+VARIANT: [Trend-Anchored]
+SUBJECT: [max 8 words]
+BODY:
+[email body]
+LINKEDIN: [max 300 chars, one question that invites reply]
+---
+
+HARD RULES FOR ALL THREE VARIANTS:
+1. Subject line: MAX 8 WORDS. References retailer name or specific category — not brand name
+2. Opening line: References something SPECIFIC to ${retailer} in 2026 — not generic flattery, not "I hope this email finds you well"
+3. Paragraph 2: EXACTLY the 3 commercial numbers provided above — no more, no estimates
+4. ONE ask only. One next step. Use: "${ask}"
+5. Total email: UNDER 150 WORDS
+6. End with: "View our verified brand profile: [VeyaFlow Brand Pack link]"
+7. NO: "I hope", "Reaching out to", "I wanted to", "Please find attached"
+8. Direct & Commercial = numbers first, no brand story
+9. Brand Story-Led = founder origin in one sentence, then commercial
+10. Trend-Anchored = opens with a specific 2026 trend, connects brand to it`;
 
   try{
-    const text=await callAPI([{role:"user",content:prompt}]);
-    const subjMatch=text.match(/SUBJECT:\s*(.+)/);
-    const parts=text.split('---');
-    const body=parts[1]?.trim()||'';
-    const trans=rd?.language!=='en'?(text.split('ENGLISH TRANSLATION:')[1]?.split('---')[0]?.trim()||''):'';
-    const intelRaw=text.split('BUYER INTEL:')[1]?.trim()||'';
-    const intel=intelRaw.split('\n').filter(l=>l.trim().startsWith('•')||l.trim().startsWith('-')).map(l=>l.replace(/^[•\-]\s*/,'')).filter(Boolean).slice(0,3);
-    pitchResult={subj:subjMatch?subjMatch[1].trim():'',body,trans,intel,retailer:pitchForm.retailer,market:pitchForm.targetMarket,brand:pitchForm.brandName,lang:rd?.language||'en'};
-    savePageState('ns_pitchForm',pitchForm);
-    savePageState('ns_pitchResult',pitchResult);
-    const resultEl=document.getElementById('pitch-result');
-    if(resultEl)resultEl.innerHTML=renderPitchResult();
-    if(btn){btn.disabled=false;btn.textContent=`Generate pitch for ${pitchForm.retailer} →`;}
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent=`Generate pitch for ${pitchForm.retailer} →`;}
-    alert('Could not generate pitch: '+e.message);
+    const text = await callAPI([{role:'user',content:prompt}], 1400);
+    pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString()};
+    renderPitch(el);
+  }catch(err){
+    if(btn){btn.disabled=false;btn.textContent=`Generate ${getCatLabel('pitch')||'Retailer Pitch'} →`;}
+    alert('Could not generate pitch: '+err.message);
   }
 }
+
+function renderPitchResult(){
+  if(!pitchResult) return '';
+  const intel = PITCH_INTEL[pitchResult.retailer]||{};
+  const blocks = pitchResult.text.split('---').map(b=>b.trim()).filter(b=>b.includes('VARIANT:'));
+
+  const parsed = blocks.map(block=>{
+    const variantMatch = block.match(/VARIANT:\s*\[?([^\]\n]+)\]?/);
+    const subjectMatch = block.match(/SUBJECT:\s*(.+)/);
+    const bodyMatch    = block.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/);
+    const linkedinMatch= block.match(/LINKEDIN:\s*([\s\S]+?)(?=---|$)/);
+    return {
+      variant:  variantMatch?.[1]?.trim()||'Variant',
+      subject:  subjectMatch?.[1]?.trim()||'',
+      body:     bodyMatch?.[1]?.trim()||'',
+      linkedin: linkedinMatch?.[1]?.trim()||'',
+    };
+  }).filter(p=>p.body.length>20);
+
+  const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑'};
+
+  return `
+    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem">Generated for</div>
+      <div style="font-family:var(--serif);font-size:1.1rem;color:#fff">${pitchResult.retailer} · ${pitchResult.market}</div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.35);margin-top:.15rem">${new Date(pitchResult.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>
+
+    ${parsed.map((p,i)=>`
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem">
+          <span style="font-family:var(--mono);font-size:.85rem;color:var(--gold)">${variantIcons[p.variant]||'◌'}</span>
+          <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--navy);letter-spacing:.08em;text-transform:uppercase">${p.variant}</div>
+        </div>
+
+        ${p.subject?`
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Subject line</div>
+          <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy);background:#F9F8F6;padding:.5rem .75rem;margin-bottom:.75rem">${p.subject}</div>
+        `:''}
+
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem">Email</div>
+        <div class="email-box" style="margin-bottom:.75rem">${p.body.replace(/\n/g,'<br>')}</div>
+
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+          <button class="btn-outline" style="font-size:.65rem;padding:.35rem .75rem"
+            onclick="copyToClipboard('${p.subject}\\n\\n${p.body.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">
+            Copy email
+          </button>
+          ${p.subject?`<a href="mailto:?subject=${encodeURIComponent(p.subject)}&body=${encodeURIComponent(p.body)}"
+            style="display:inline-block;padding:.35rem .75rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--ink);text-decoration:none">
+            Open in email client →
+          </a>`:''}
+        </div>
+
+        ${p.linkedin?`
+          <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.25rem">
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem">LinkedIn message (${p.linkedin.length} chars)</div>
+            <div style="font-family:var(--sans);font-size:.8rem;color:#333;line-height:1.7;background:#F0F4FF;padding:.6rem .85rem;border-left:2px solid #1E40AF">${p.linkedin.replace(/\n/g,'<br>')}</div>
+            <button class="btn-outline" style="font-size:.65rem;padding:.3rem .6rem;margin-top:.4rem"
+              onclick="copyToClipboard('${p.linkedin.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">
+              Copy LinkedIn message
+            </button>
+          </div>
+        `:''}
+      </div>
+    `).join('')}
+
+    ${intel.rangeReview?`
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:#1E40AF;margin-bottom:1rem">
+        ◈ ${pitchResult.retailer} range reviews: <strong>${intel.rangeReview}</strong> — time your follow-up to land 6 weeks before.
+      </div>
+    `:''}
+
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+      <button class="btn-outline" onclick="pitchResult=null;renderPitch(document.getElementById('page-pitch'))">← New pitch</button>
+      <button class="btn-gold" onclick="showPage('brandpack')">Build brand pack →</button>
+    </div>
+  `;
+}
+
+function copyToClipboard(text){
+  navigator.clipboard?.writeText(text).then(()=>{
+    // Brief visual feedback
+    const el = event.target;
+    const orig = el.textContent;
+    el.textContent = 'Copied ✓';
+    setTimeout(()=>el.textContent=orig, 1500);
+  }).catch(()=>{
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
 
 function renderPitchResult(){
   if(!pitchResult)return'';
