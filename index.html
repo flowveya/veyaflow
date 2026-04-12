@@ -443,6 +443,7 @@
     <div class="page" id="page-skus"></div>
     <div class="page" id="page-claims"></div>
     <div class="page" id="page-cfo"></div>
+    <div class="page" id="page-crm"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -456,7 +457,7 @@
    DATA
 ═══════════════════════════════════════════════════ */
 
-const CATEGORIES = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor","Other"];
+const CATEGORIES = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"];
 const MARKETS    = ["Denmark","Germany","Netherlands","United Kingdom","Norway","Finland","France","Belgium","Austria","Switzerland","United States","Canada","Australia","Japan","South Korea","UAE","Singapore","New Zealand"];
 const CURRENT_MARKETS = ["Sweden","Norway","Finland","Denmark","Iceland"];
 
@@ -527,25 +528,64 @@ function completeness(s){
   return Math.round((rel.filter(f=>!s.missing.includes(f)).length/rel.length)*100);
 }
 
-// CIRCULAR PARTNERS
+// CIRCULAR PARTNERS V2
 const ESPR_BAN_CATS=["Fashion & Apparel"];
-const ESPR_DISC_CATS=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Home & Design","Electronics & Tech","Baby & Family","Sport & Outdoor"];
-const CIRCULAR_CATEGORIES=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Home & Design","Electronics & Tech","Baby & Family","Sport & Outdoor","Other"];
-const CAT_COLORS={Recycle:"#ECFDF5",Resale:"#EFF6FF",Donation:"#FFFBEB",Repair:"#F5F3FF",Upcycle:"#FDF4FF"};
-const CAT_TEXT={Recycle:"#065F46",Resale:"#1E40AF",Donation:"#92400E",Repair:"#5B21B6",Upcycle:"#86198F"};
+const ESPR_DISC_CATS=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Electronics & Tech"];
+const CIRCULAR_CATEGORIES=["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Electronics & Tech","Food & Beverage"];
+const CAT_COLORS={Recycle:"#ECFDF5",Resale:"#EFF6FF",Donation:"#FFFBEB",Repair:"#F5F3FF",Upcycle:"#FDF4FF","Food Rescue":"#FEF9C3"};
+const CAT_TEXT={Recycle:"#065F46",Resale:"#1E40AF",Donation:"#92400E",Repair:"#5B21B6",Upcycle:"#86198F","Food Rescue":"#713F12"};
+
+// Value hierarchy: resale(1) > upcycle/repair/foodrescue(2) > donation(3) > recycle(4) > disposal(5)
+const ROUTE_HIERARCHY={resale:1,upcycling:2,repair:2,foodrescue:2,donation:3,recycling:4,disposal:5};
+const ROUTE_RECOVERY={resale:0.35,upcycling:0.15,repair:0.25,foodrescue:0.20,donation:0,recycling:0.03,disposal:-0.05};
+const ROUTE_LABELS={resale:"Recommerce / Resale",upcycling:"Upcycle / Rework",repair:"Refurbish / Repair",foodrescue:"Food Rescue Platform",donation:"Charity Donation",recycling:"Material Recycling",disposal:"Responsible Disposal"};
+const ROUTE_COLORS={resale:"#1E40AF",upcycling:"#86198F",repair:"#5B21B6",foodrescue:"#713F12",donation:"#92400E",recycling:"#065F46",disposal:"#6B7280"};
+
+const ESPR_TIMELINE={
+  "Fashion & Apparel":"EU Textile Destruction Ban: July 19, 2026. Routing is legally required for large companies.",
+  "Skincare & Beauty":"ESPR cosmetics packaging requirements: 2027. Article 24 disclosure already active.",
+  "Electronics & Tech":"ESPR ecodesign for electronics: active from 2025. WEEE documentation required.",
+  "Wellness & Supplements":"ESPR Article 24 disclosure required. Near-expiry routing mandatory from 2026.",
+  "Food & Beverage":"EU Food Waste Reduction targets active. Surplus food rescue documentation required.",
+};
+
 const PARTNERS=[
-  {id:1,name:"Renewlane Nordic",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Stockholm",buyback:2.50,espr:true,description:"Recommerce platform for Nordic brands. Resells unsold seasonal stock via curated marketplace."},
-  {id:2,name:"Retextil AB",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Borås",buyback:null,espr:true,description:"Industrial textile recycler. ESPR-compliant documentation included."},
-  {id:3,name:"Myrorna",category:"Donation",productCategories:["Fashion & Apparel","Home & Design"],country:"Sweden",city:"Stockholm",buyback:null,espr:false,description:"Sweden's largest second-hand chain. Social enterprise."},
-  {id:4,name:"Textilkretsen",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",city:"Malmö",buyback:0.60,espr:true,description:"ESPR-registered recycler. Pays buyback for clean sorted stock."},
-  {id:5,name:"Resortecs EU",category:"Upcycle",productCategories:["Fashion & Apparel"],country:"Belgium",city:"Brussels",buyback:1.80,espr:true,description:"High-value upcycling. Highest buyback for quality fabrics."},
-  {id:6,name:"TerraCycle Nordic",category:"Recycle",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Denmark",city:"Copenhagen",buyback:null,espr:true,description:"Hard-to-recycle beauty packaging specialist. ESPR report included."},
-  {id:7,name:"Nordic Beauty Reuse",category:"Resale",productCategories:["Skincare & Beauty"],country:"Sweden",city:"Gothenburg",buyback:1.20,espr:false,description:"Sealed beauty products resold through discount channels. Pays per unit."},
-  {id:8,name:"Giveback Beauty SE",category:"Donation",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Sweden",city:"Stockholm",buyback:null,espr:false,description:"Routes surplus sealed beauty to women's shelters. Donation certificates included."},
-  {id:9,name:"FoodLoop GmbH",category:"Donation",productCategories:["Wellness & Supplements","Food & Beverage"],country:"Germany",city:"Hamburg",buyback:null,espr:true,description:"Near-expiry supplements redistributed to foodbanks across Germany."},
-  {id:10,name:"Återbruk Stockholm",category:"Resale",productCategories:["Home & Design","Electronics & Tech"],country:"Sweden",city:"Stockholm",buyback:1.00,espr:false,description:"Swedish recommerce for home goods and small electronics."},
-  {id:11,name:"Recommerce Solutions",category:"Repair",productCategories:["Electronics & Tech"],country:"Netherlands",city:"Amsterdam",buyback:2.00,espr:true,description:"Refurbishes and resells consumer electronics. High buyback on working devices."},
-  {id:12,name:"Circular Home NL",category:"Recycle",productCategories:["Home & Design"],country:"Netherlands",city:"Rotterdam",buyback:0.30,espr:true,description:"Material recovery for home furnishings. Covers EU ESPR disclosure."},
+  // ── FASHION & APPAREL ────────────────────────────────────────────────
+  {id:1,name:"Sellpy",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE","DK","DE","AT","PL","NL"],city:"Stockholm",valueRecoveryRate:0.32,buyback:null,minimumUnits:10,urgencyCapable:false,espr:true,description:"Sweden's largest recommerce platform. Handles seasonal deadstock and overstock. Strong brand partnerships. Operates across 6 EU markets.",contact:"business@sellpy.se",verifiedDate:"2026-04",insiderNote:"Best for fashion brands. Requires clean sellable condition. 3-4 week setup time."},
+  {id:2,name:"Renewlane Nordic",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE","DK","NO","FI"],city:"Stockholm",valueRecoveryRate:0.30,buyback:2.50,minimumUnits:50,urgencyCapable:true,espr:true,description:"B2B recommerce for Nordic brands. Curated marketplace, fast intake. ESPR disclosure docs included. Pays per unit on resale.",contact:"brands@renewlane.se",verifiedDate:"2026-04",insiderNote:"Strong on Scandinavian streetwear. Handles urgency orders within 2 weeks."},
+  {id:3,name:"Resortecs EU",circularType:"upcycling",category:"Upcycle",productCategories:["Fashion & Apparel"],country:"Belgium",markets:["BE","DE","NL","FR","SE"],city:"Brussels",valueRecoveryRate:0.15,buyback:1.80,minimumUnits:100,urgencyCapable:false,espr:true,description:"High-value upcycling for quality garments. Proprietary dissolvable stitching technology enables full material recovery. Highest buyback for quality fabrics.",contact:"sourcing@resortecs.com",verifiedDate:"2026-04",insiderNote:"Premium fabrics only — cotton, linen, wool. Synthetics accepted but lower rate."},
+  {id:4,name:"Retextil AB",circularType:"recycling",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE","NO","DK","FI"],city:"Borås",valueRecoveryRate:0.03,buyback:null,minimumUnits:50,urgencyCapable:true,espr:true,description:"Industrial textile recycler. Handles mixed fibres including synthetics. ESPR-compliant documentation included with every shipment.",contact:"info@retextil.se",verifiedDate:"2026-04",insiderNote:"Best for damaged or mixed-fibre stock that cannot be resold. Fast intake."},
+  {id:5,name:"Textilkretsen",circularType:"recycling",category:"Recycle",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE","NO","DK"],city:"Malmö",valueRecoveryRate:0.04,buyback:0.60,minimumUnits:20,urgencyCapable:false,espr:true,description:"ESPR-registered recycler. Pays buyback for clean sorted stock. Issues Article 24 disclosure documents.",contact:"kontakt@textilkretsen.se",verifiedDate:"2026-04",insiderNote:"Requires pre-sorting by fibre type for best buyback rate."},
+  {id:6,name:"Myrorna",circularType:"donation",category:"Donation",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE"],city:"Stockholm",valueRecoveryRate:0,buyback:null,minimumUnits:1,urgencyCapable:true,espr:false,description:"Sweden's largest second-hand charity chain. Provides donation certificates. Social impact reporting available for brand sustainability comms.",contact:"foretag@myrorna.se",verifiedDate:"2026-04",insiderNote:"Fast intake, no minimum. Good for mixed condition stock. No ESPR doc."},
+  {id:7,name:"Renewlondon",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"United Kingdom",markets:["UK","IE"],city:"London",valueRecoveryRate:0.28,buyback:null,minimumUnits:30,urgencyCapable:false,espr:false,description:"UK recommerce platform specialising in contemporary brand deadstock. Strong Depop and Vinted channel connections.",contact:"brands@renewlondon.co.uk",verifiedDate:"2026-04",insiderNote:"Best for UK deadstock. Not ESPR registered — supplement with another partner for Article 24."},
+  // ── SKINCARE & BEAUTY ────────────────────────────────────────────────
+  {id:8,name:"Nordic Beauty Reuse",circularType:"resale",category:"Resale",productCategories:["Skincare & Beauty"],country:"Sweden",markets:["SE","DK","NO"],city:"Gothenburg",valueRecoveryRate:0.30,buyback:1.20,minimumUnits:50,urgencyCapable:false,espr:false,description:"Sealed beauty products resold through discount channels and outlet stores. Pays per unit. Strong Scandinavian network.",contact:"hello@nordicbeautyreuse.se",verifiedDate:"2026-04",insiderNote:"Sealed, unexpired stock only. Best within 12 months of expiry."},
+  {id:9,name:"Reconomy Beauty NL",circularType:"resale",category:"Resale",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Netherlands",markets:["NL","BE","DE","FR"],city:"Amsterdam",valueRecoveryRate:0.28,buyback:null,minimumUnits:100,urgencyCapable:false,espr:true,description:"EU beauty recommerce specialist. Routes sealed cosmetics and supplements to discount retailers and outlet channels across Benelux and Germany. ESPR documentation included.",contact:"brands@reconomy-beauty.nl",verifiedDate:"2026-04",insiderNote:"Strong for Dutch/Belgian market entry brands moving overstock. 4-week process."},
+  {id:10,name:"TerraCycle Nordic",circularType:"recycling",category:"Recycle",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Denmark",markets:["DK","SE","NO","FI","DE","NL"],city:"Copenhagen",valueRecoveryRate:0.02,buyback:null,minimumUnits:10,urgencyCapable:false,espr:true,description:"Hard-to-recycle beauty packaging specialist. Accepts pumps, caps, mixed-material packs. ESPR Article 24 report included with each batch.",contact:"nordic@terracycle.com",verifiedDate:"2026-04",insiderNote:"Only recycler that handles mixed-material beauty packaging. No buyback but ESPR docs are thorough."},
+  {id:11,name:"Giveback Beauty SE",circularType:"donation",category:"Donation",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Sweden",markets:["SE"],city:"Stockholm",valueRecoveryRate:0,buyback:null,minimumUnits:10,urgencyCapable:true,espr:false,description:"Routes surplus sealed beauty to women's shelters and refugee support organisations. Donation certificates and impact report included.",contact:"surplus@givebackbeauty.se",verifiedDate:"2026-04",insiderNote:"Strong social impact narrative for brand sustainability reporting. Certificate useful for ESG docs."},
+  {id:12,name:"Close the Loop BE",circularType:"recycling",category:"Recycle",productCategories:["Skincare & Beauty"],country:"Belgium",markets:["BE","NL","FR","DE"],city:"Antwerp",valueRecoveryRate:0.02,buyback:null,minimumUnits:25,urgencyCapable:false,espr:true,description:"Belgian packaging circularity specialist. Handles cosmetics packaging, dispensers, and mixed-plastic beauty stock. Full ESPR chain-of-custody documentation.",contact:"info@closetheloop.be",verifiedDate:"2026-04",insiderNote:"Best in class for Belgian/French market packaging recycling. ESPR doc very thorough."},
+  {id:13,name:"LoopStore DE",circularType:"resale",category:"Resale",productCategories:["Skincare & Beauty","Wellness & Supplements"],country:"Germany",markets:["DE","AT","CH"],city:"Berlin",valueRecoveryRate:0.27,buyback:null,minimumUnits:75,urgencyCapable:false,espr:true,description:"German beauty outlet platform. Routes overstock to outlet channels and discount health stores. Strong dm and Müller secondary channel connections.",contact:"brands@loopstore.de",verifiedDate:"2026-04",insiderNote:"German-language process. Good for brands entering DE who have excess stock from pilot listings."},
+  // ── FOOD & BEVERAGE + SUPPLEMENTS ────────────────────────────────────
+  {id:14,name:"Too Good To Go B2B",circularType:"foodrescue",category:"Food Rescue",productCategories:["Food & Beverage","Wellness & Supplements"],country:"Denmark",markets:["DK","SE","NO","DE","NL","UK","FR","BE"],city:"Copenhagen",valueRecoveryRate:0.18,buyback:null,minimumUnits:20,urgencyCapable:true,espr:true,description:"B2B surplus food and supplement platform. Routes near-expiry stock at 18-20% of RSP via consumer and foodbank channels. Operates in 8 markets. Fastest intake in food rescue.",contact:"b2b@toogoodtogo.com",verifiedDate:"2026-04",insiderNote:"Best for near-expiry stock under 6 months to expiry. Very fast — 1-2 week intake. High volume capacity."},
+  {id:15,name:"Karma SE",circularType:"foodrescue",category:"Food Rescue",productCategories:["Food & Beverage","Wellness & Supplements"],country:"Sweden",markets:["SE","UK"],city:"Stockholm",valueRecoveryRate:0.20,buyback:null,minimumUnits:15,urgencyCapable:true,espr:false,description:"Swedish food rescue app with B2B surplus channel. Supplements and functional food accepted. Consumer-facing app drives fast clearance.",contact:"brands@karma.life",verifiedDate:"2026-04",insiderNote:"Swedish-first. Works for supplement brands clearing pre-expiry stock in SE/UK."},
+  {id:16,name:"Motatos SE",circularType:"resale",category:"Resale",productCategories:["Food & Beverage","Wellness & Supplements"],country:"Sweden",markets:["SE","DK","DE","FI"],city:"Stockholm",valueRecoveryRate:0.22,buyback:null,minimumUnits:50,urgencyCapable:false,espr:false,description:"Scandinavian discount food and supplement platform. Routes overstock and near-expiry products to value-conscious consumers. Strong supplement category.",contact:"sourcing@motatos.se",verifiedDate:"2026-04",insiderNote:"Will accept up to 18 months to expiry. Good for overstocked supplement launches."},
+  {id:17,name:"FoodLoop GmbH",circularType:"donation",category:"Donation",productCategories:["Wellness & Supplements","Food & Beverage"],country:"Germany",markets:["DE","AT","CH","NL"],city:"Hamburg",valueRecoveryRate:0,buyback:null,minimumUnits:20,urgencyCapable:false,espr:true,description:"Near-expiry supplements and food redistributed to foodbanks and social organisations across Germany and Austria. ESPR Article 24 documentation included.",contact:"brands@foodloop.de",verifiedDate:"2026-04",insiderNote:"Good for CSR narrative. Accepts 2-6 months to expiry. German-language process."},
+  {id:18,name:"Wefood DK",circularType:"donation",category:"Donation",productCategories:["Food & Beverage","Wellness & Supplements"],country:"Denmark",markets:["DK"],city:"Copenhagen",valueRecoveryRate:0,buyback:null,minimumUnits:10,urgencyCapable:true,espr:false,description:"Danish surplus food social enterprise. Routes near-expiry and cosmetically-imperfect food and supplements to low-income households. Donation certificate issued.",contact:"overskud@wefood.dk",verifiedDate:"2026-04",insiderNote:"Denmark-only. Very fast intake. Good for brands clearing Danish market overstock with ESG narrative."},
+  // ── ELECTRONICS & TECH ────────────────────────────────────────────────
+  {id:19,name:"Recommerce Solutions",circularType:"repair",category:"Repair",productCategories:["Electronics & Tech"],country:"Netherlands",markets:["NL","BE","DE","FR","UK"],city:"Amsterdam",valueRecoveryRate:0.28,buyback:2.00,minimumUnits:10,urgencyCapable:false,espr:true,description:"Consumer electronics refurbishment and resale. High buyback on working devices. WEEE compliance and ESPR disclosure included. EU-wide channel.",contact:"b2b@recommerce.com",verifiedDate:"2026-04",insiderNote:"Best rate for working devices. Non-functional devices go to recycling stream at reduced rate."},
+  {id:20,name:"Back Market B2B",circularType:"resale",category:"Resale",productCategories:["Electronics & Tech"],country:"France",markets:["FR","DE","UK","NL","BE","ES","IT"],city:"Paris",valueRecoveryRate:0.32,buyback:null,minimumUnits:5,urgencyCapable:false,espr:true,description:"Europe's largest refurbished electronics marketplace. B2B intake programme for brand deadstock and returns. Strong ESPR documentation.",contact:"b2b@backmarket.com",verifiedDate:"2026-04",insiderNote:"Works for beauty devices, LED tools, and electronic wellness devices. Very broad EU reach."},
+  {id:21,name:"WEEE Nordic",circularType:"recycling",category:"Recycle",productCategories:["Electronics & Tech"],country:"Sweden",markets:["SE","NO","DK","FI"],city:"Stockholm",valueRecoveryRate:0.02,buyback:null,minimumUnits:1,urgencyCapable:true,espr:true,description:"WEEE-compliant electronics recycler for Nordic brands. Handles all electrical products. Full WEEE take-back documentation and ESPR Article 24 disclosure.",contact:"info@weee-nordic.se",verifiedDate:"2026-04",insiderNote:"Mandatory for electrical product destruction. Use when devices are non-functional or regulatory non-compliant."},
+  // ── HOME & DESIGN ────────────────────────────────────────────────────
+  {id:22,name:"Återbruk Stockholm",circularType:"resale",category:"Resale",productCategories:["Electronics & Tech"],country:"Sweden",markets:["SE"],city:"Stockholm",valueRecoveryRate:0.25,buyback:1.00,minimumUnits:5,urgencyCapable:true,espr:false,description:"Stockholm recommerce marketplace for home goods and small electronics. Fast intake, city-level logistics. Good for low-volume brand overstock.",contact:"foretag@aterbruk.se",verifiedDate:"2026-04",insiderNote:"Stockholm-only logistics. Good for small batches under 200 units. No ESPR doc."},
+  {id:23,name:"ReTuna SE",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE"],city:"Eskilstuna",valueRecoveryRate:0.20,buyback:null,minimumUnits:10,urgencyCapable:false,espr:false,description:"World's first recycling mall. Accepts home goods, fashion, and accessories. Social enterprise model. Donation + resale hybrid.",contact:"inkop@retuna.se",verifiedDate:"2026-04",insiderNote:"Good for mixed home/lifestyle stock. PR value for brand as 'world's first recycling mall' partner."},
+  // ── PACKAGING ────────────────────────────────────────────────────────
+  {id:25,name:"DS Smith Circularity",circularType:"recycling",category:"Recycle",productCategories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],country:"United Kingdom",markets:["UK","DE","NL","BE","FR","SE","DK"],city:"London",valueRecoveryRate:0.02,buyback:null,minimumUnits:50,urgencyCapable:false,espr:true,description:"Major EU/UK packaging recycler. Accepts cardboard, paper, and mixed packaging materials. Full ESPR chain-of-custody. Strong in branded packaging recycling.",contact:"circular@dssmith.com",verifiedDate:"2026-04",insiderNote:"Best for large batches of packaging material. Not for product stock — packaging only."},
+  {id:26,name:"Veolia Packaging EU",circularType:"recycling",category:"Recycle",productCategories:["Skincare & Beauty","Food & Beverage","Electronics & Tech","Wellness & Supplements"],country:"France",markets:["FR","DE","NL","BE","UK","SE"],city:"Paris",valueRecoveryRate:0.02,buyback:null,minimumUnits:100,urgencyCapable:false,espr:true,description:"Major EU waste management and recycling operator. Handles complex multi-material packaging streams. Full ESPR Article 24 documentation. Preferred for large-volume brands.",contact:"circular@veolia.com",verifiedDate:"2026-04",insiderNote:"Minimum 100 units. Best for scale. Thorough ESPR documentation — useful for retailer sustainability audits."},
+  // ── MULTI-CATEGORY ────────────────────────────────────────────────────
+  {id:27,name:"Ifixit Nordic",circularType:"repair",category:"Repair",productCategories:["Electronics & Tech"],country:"Sweden",markets:["SE","NO","DK"],city:"Gothenburg",valueRecoveryRate:0.20,buyback:null,minimumUnits:5,urgencyCapable:true,espr:false,description:"Nordic repair network. Refurbishes and resells returned or defective devices and tools. Pays for working and semi-working units.",contact:"brands@ifixit-nordic.se",verifiedDate:"2026-04",insiderNote:"Good for beauty devices with minor defects. Fast turnaround. No ESPR doc — supplement with WEEE Nordic if needed."},
+  {id:28,name:"Blocket Företag",circularType:"resale",category:"Resale",productCategories:["Electronics & Tech"],country:"Sweden",markets:["SE"],city:"Stockholm",valueRecoveryRate:0.28,buyback:null,minimumUnits:1,urgencyCapable:true,espr:false,description:"Sweden's largest classifieds marketplace. B2B listing tool for brand surplus stock. Very low friction, no minimum. Good for mixed small batches.",contact:"foretag@blocket.se",verifiedDate:"2026-04",insiderNote:"SE only. Best for ad-hoc small batches. No ESPR doc. Fast clearance on high-demand items."},
+  {id:29,name:"Vinted Go B2B",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"Lithuania",markets:["SE","DK","DE","NL","UK","FR","BE","PL"],city:"Vilnius",valueRecoveryRate:0.25,buyback:null,minimumUnits:20,urgencyCapable:false,espr:false,description:"Vinted's B2B surplus channel. Routes brand deadstock through Europe's largest secondhand app. Strong in fashion, baby, and lifestyle categories.",contact:"business@vinted.com",verifiedDate:"2026-04",insiderNote:"Broad EU reach. No ESPR doc — combine with a recycler for Article 24. Best for sellable condition stock."},
+  {id:30,name:"Loopify EU",circularType:"donation",category:"Donation",productCategories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],country:"Netherlands",markets:["NL","BE","DE","DK","SE"],city:"Amsterdam",valueRecoveryRate:0,buyback:null,minimumUnits:10,urgencyCapable:true,espr:true,description:"EU surplus donation platform connecting brands to verified charities. Handles beauty, supplements, baby, and food categories. Issues donation certificate and ESPR Article 24 summary.",contact:"brands@loopify.eu",verifiedDate:"2026-04",insiderNote:"Only donation partner that provides ESPR-compatible documentation. Good for brands needing both social impact and Article 24 coverage."},
 ];
 
 // MANUFACTURERS
@@ -572,9 +612,7 @@ const MANUFACTURERS=[
   {id:15,name:"Armedangels Mfg Partner",country:"Portugal",region:"EU",city:"Porto",type:"Contract Manufacturer",categories:["Fashion & Apparel"],specialties:["Organic cotton","GOTS knitwear","Fair trade","Low MOQ fashion"],certifications:["GOTS","Fairtrade","OEKO-TEX","ISO 14001"],moq:200,leadWeeks:14,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"500K units",description:"Portuguese GOTS-certified knitwear specialist. Low MOQ for fashion brands. Preferred for brands targeting German sustainable retail.",contact:"sourcing@ptmfg.pt",website:"ptmfg.pt"},
   {id:16,name:"Remake Textiles",country:"Latvia",region:"EU",city:"Riga",type:"Contract Manufacturer",categories:["Fashion & Apparel"],specialties:["Upcycled fabric","Deadstock production","Circular fashion","Low waste"],certifications:["GOTS","OEKO-TEX","ISO 14001","Vegan Society"],moq:100,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"200K units",description:"Baltic circular fashion specialist. Uses deadstock and upcycled fabrics. ESPR-aligned from day one.",contact:"hello@remaketextiles.lv",website:"remaketextiles.lv"},
   {id:17,name:"Boras Cotton Mill",country:"Sweden",region:"EU",city:"Borås",type:"Fabric Supplier",categories:["Fashion & Apparel"],specialties:["Swedish cotton","Organic weaves","EU-made fabric","Sustainable fibres"],certifications:["GOTS","OEKO-TEX","Nordic Swan","ISO 14001"],moq:500,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"1M meters",description:"Classic Swedish textile mill. GOTS and Nordic Swan certified. Preferred fabric source for Nordic premium fashion brands.",contact:"fabric@borasmills.se",website:"borasmills.se"},
-  {id:18,name:"Koala Baby Organics",country:"Germany",region:"EU",city:"Munich",type:"Contract Manufacturer",categories:["Baby & Family","Skincare & Beauty"],specialties:["Baby skincare","COSMOS baby","Gentle formulations","Derma-tested"],certifications:["COSMOS Organic","ISO 22716","GMP","Vegan Society","Cruelty Free"],moq:300,leadWeeks:10,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"2M units",description:"German COSMOS Organic baby skincare specialist. All formulations dermatologically tested. Strict EU compliance.",contact:"info@koalababyorganics.de",website:"koalababyorganics.de"},
-  {id:19,name:"ActiveFab Sportswear",country:"Portugal",region:"EU",city:"Braga",type:"Contract Manufacturer",categories:["Sport & Outdoor","Fashion & Apparel"],specialties:["Technical sportswear","Recycled polyester","Performance fabrics"],certifications:["OEKO-TEX","ISO 14001","GRS","Bluesign"],moq:500,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"1M units",description:"Portuguese technical sportswear manufacturer. Bluesign and GRS certified. Uses recycled ocean plastic. Strong with Scandinavian outdoor brands.",contact:"sourcing@activefab.pt",website:"activefab.pt"},
-  {id:20,name:"Ceramics Europe BV",country:"Netherlands",region:"EU",city:"Eindhoven",type:"Contract Manufacturer",categories:["Home & Design"],specialties:["Ceramics","Tableware","Home accessories","Sustainable glazes"],certifications:["ISO 14001","ISO 9001","Cradle to Cradle"],moq:200,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands","France"],eudrScope:false,annualCapacity:"500K units",description:"Dutch ceramics specialist with Cradle to Cradle certification. Lead-free glazes. Ideal for premium home brands.",contact:"info@ceramicseurope.nl",website:"ceramicseurope.nl"},
+  {id:19,name:"ActiveFab Sportswear",country:"Portugal",region:"EU",city:"Braga",type:"Contract Manufacturer",categories:["Fashion & Apparel"],specialties:["Technical sportswear","Recycled polyester","Performance fabrics"],certifications:["OEKO-TEX","ISO 14001","GRS","Bluesign"],moq:500,leadWeeks:12,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"1M units",description:"Portuguese technical sportswear manufacturer. Bluesign and GRS certified. Uses recycled ocean plastic. Strong with Scandinavian outdoor brands.",contact:"sourcing@activefab.pt",website:"activefab.pt"},
   {id:21,name:"PackRight AB",country:"Sweden",region:"EU",city:"Gothenburg",type:"Packaging Supplier",categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],specialties:["Glass packaging","Aluminium","Refillable","Low MOQ packaging"],certifications:["FSC","ISO 14001","ISO 9001"],moq:200,leadWeeks:4,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom"],eudrScope:false,annualCapacity:"5M units",description:"Swedish packaging specialist. Low MOQ glass and aluminium packaging. Fast turnaround. Good entry-level option for brands scaling from 0 to 10K units.",contact:"hello@packright.se",website:"packright.se"},
   {id:22,name:"Healblend GmbH",country:"Germany",region:"EU",city:"Hamburg",type:"Contract Manufacturer",categories:["Wellness & Supplements"],specialties:["Sports nutrition","Protein powders","Capsules","EU compliance"],certifications:["ISO 22716","GMP","Vegan Society","Halal"],moq:500,leadWeeks:8,sustainability:"MEDIUM",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","Netherlands"],eudrScope:false,annualCapacity:"10M units",description:"German GMP supplement manufacturer. Halal and vegan certified. Strong in sports nutrition and protein blends.",contact:"info@healblend.de",website:"healblend.de"},
   {id:23,name:"Naturellement Bio",country:"France",region:"EU",city:"Bordeaux",type:"Contract Manufacturer",categories:["Food & Beverage","Wellness & Supplements"],specialties:["Organic food","Superfoods","Plant-based protein","Snacks"],certifications:["Ecocert","Soil Association Organic","Vegan Society","Fairtrade"],moq:300,leadWeeks:8,sustainability:"HIGH",markets:["Germany","Denmark","Norway","Sweden","United Kingdom","France"],eudrScope:true,annualCapacity:"3M units",description:"French organic food specialist. Fairtrade and EUDR compliant supply chain. Ideal for premium food brands entering Germany, UK and Nordics.",contact:"info@naturellementbio.fr",website:"naturellementbio.fr"},
@@ -605,7 +643,7 @@ const RETAILERS={
 };
 const RETAILER_BY_MARKET={"United Kingdom":["Waitrose","Holland & Barrett","Planet Organic"],"Denmark":["Matas","Salling Group"],"Germany":["dm-drogerie markt","Alnatura","Rossmann"],"Norway":["Meny"],"United States":["Whole Foods Market"]};
 const PITCH_MARKETS=["United Kingdom","Denmark","Germany","Norway","Sweden","Netherlands","France","United States","Australia","Japan","South Korea","UAE","Canada","Singapore"];
-const PITCH_CATEGORIES=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel","Home & Design"];
+const PITCH_CATEGORIES=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel"];
 
 // COMPARE page data
 const COMPARE_MARKETS=["Denmark","Germany","United Kingdom","Norway","Sweden","Netherlands","France","Belgium","Austria","United States","Canada","Australia","Japan","South Korea","UAE","Singapore"];
@@ -624,7 +662,7 @@ let compareForm  = {brandName:'',category:'',markets:[],stage:'trading'};
 let compareResult= null;
 let pitchForm    = {brandName:'',brandDesc:'',category:'',targetMarket:'Denmark',retailer:'',skus:'',usp:'',pricePoint:'',existingMarkets:'Sweden',stage:'cold',hook:''};
 let pitchResult  = null;
-let circularForm = {productName:'',materials:'',units:'',category:'',reason:'End_of_season_overstock',preferredCat:''};
+let circularForm = {productName:'',materials:'',units:'',rsp:'',category:'',reason:'End_of_season_overstock',condition:'sellable',location:'SE',timeline:'standard',confirmedRoute:null};
 let circularResult = null;
 let findForm     = {category:'',targetMarket:'',sustainability:'',maxMoq:'',mfrType:'',query:''};
 let supplierFilter = {query:'',status:'',missing:'',type:'',region:'',tier:'',eudr:''};
@@ -664,7 +702,7 @@ function loadState(){
     if(pf){ const v=JSON.parse(pf); Object.assign(pitchForm,v); }
     if(pr) pitchResult=JSON.parse(pr);
     if(cirf){ const v=JSON.parse(cirf); Object.assign(circularForm,v); }
-    if(cir) circularResult=JSON.parse(cir);
+    if(cir){ const _cr=JSON.parse(cir); if(_cr&&Array.isArray(_cr.routes)&&_cr.routes[0]?.routeType) circularResult=_cr; else localStorage.removeItem('ns_circularResult'); }
     if(ff){ const v=JSON.parse(ff); Object.assign(findForm,v); }
     const sk=localStorage.getItem('ns_skus');
     if(sk) skus=JSON.parse(sk);
@@ -715,8 +753,8 @@ async function callAPI(messages,maxTokens=1200){
    NAV
 ═══════════════════════════════════════════════════ */
 // Category groups for nav filtering
-const RETAIL_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor"];
-const COMPLIANCE_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel","Baby & Family"];
+const RETAIL_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"];
+const COMPLIANCE_CATS = ["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"];
 
 // Category-specific labels for modules
 const CAT_LABELS = {
@@ -724,9 +762,6 @@ const CAT_LABELS = {
   "Wellness & Supplements": {pitch:"Buyer Pitch", bizcase:"Retail Business Case", find:"Find Manufacturer", report:"Market Report"},
   "Food & Beverage":    {pitch:"Buyer Pitch",     bizcase:"Retail Business Case", find:"Find Co-Packer",    report:"Market Report"},
   "Fashion & Apparel":  {pitch:"Wholesale Pitch", bizcase:"Wholesale Business Case", find:"Find Manufacturer", report:"Market Report"},
-  "Home & Design":      {pitch:"Trade Pitch",     bizcase:"Trade Business Case",  find:"Find Manufacturer", report:"Market Report"},
-  "Baby & Family":      {pitch:"Buyer Pitch",     bizcase:"Retail Business Case", find:"Find Manufacturer", report:"Market Report"},
-  "Sport & Outdoor":    {pitch:"Trade Pitch",     bizcase:"Trade Business Case",  find:"Find Manufacturer", report:"Market Report"},
 };
 
 function getCatLabel(id){
@@ -741,6 +776,7 @@ const NAV=[
   {id:"find",    icon:"◌", label:"Source",                stages:["idea","product","trading","expanding","scaling"], cats:null},
   {id:"report",  icon:"◎", label:"Market Report",         stages:["idea","product","trading","expanding","scaling"], cats:null},
   {id:"compare", icon:"⇄", label:"Compare Markets",       stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"crm",     icon:"⊞", label:"Retailer CRM",         stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"pitch",   icon:"✉", label:"Retailer Pitch",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"brandpack",icon:"◫",label:"Brand Pack",            stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
   {id:"bizcase", icon:"◉", label:"Retail Business Case",  stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
@@ -766,7 +802,7 @@ function getVisibleNav(){
   });
 }
 
-const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
 function buildNav(){
   var visibleNav = getVisibleNav();
@@ -776,7 +812,7 @@ function buildNav(){
   var currentStage = brand&&brand.stage?brand.stage:'trading';
   var html='';
   if(brand){
-    var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion').replace('Home & Design','Home').replace('Baby & Family','Baby').replace('Sport & Outdoor','Sport');
+    var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion');
     html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
   visibleNav.forEach(function(n){
@@ -871,6 +907,7 @@ function renderPage(id){
   else if(id==='skus')renderSkus(el);
   else if(id==='claims')renderClaims(el);
   else if(id==='cfo')renderCFO(el);
+  else if(id==='crm'){ loadCRM(); renderCRM(el); }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1215,6 +1252,393 @@ function completeOnboard(){
   renderPage('home');
 }
 
+
+/* ═══════════════════════════════════════════════════
+   MARKET READINESS SCORE + EXPANSION SEQUENCER
+═══════════════════════════════════════════════════ */
+
+// ── Intelligence objects ──────────────────────────
+
+const READINESS_WEIGHTS = {
+  compliance:35, commercial:28, brandStrength:20, productData:10, logistics:7
+};
+
+const MARKET_PAIRS = {
+  SE:{DK:0.90,NO:0.85,FI:0.88,NL:0.80,DE:0.75,BE:0.80,FR:0.70,UK:0.45,JP:0.20,KR:0.20,UAE:0.30},
+  DK:{NO:0.88,SE:0.90,FI:0.85,NL:0.78,DE:0.73,BE:0.78,FR:0.68,UK:0.45,JP:0.20,KR:0.20,UAE:0.28},
+};
+
+const RETAILER_LEVERAGE = {
+  DK:{unlocks:['NO'],reason:'Matas/Kicks unified Nordic buying desk — DK listing accelerates Norway conversation at near-zero cost.'},
+  NL:{unlocks:['BE'],reason:'Kruidvat buyer covers both NL and BE — one listing conversation opens 1,100+ stores across two markets.'},
+  DE:{unlocks:['AT','CH'],reason:'dm and Rossmann operate across DACH — DE listing reviewed by AT/CH buyers simultaneously.'},
+  NO:{unlocks:['DK'],reason:'Kicks Norway buyer has visibility to DK pipeline — NO traction accelerates DK timing.'},
+  UK:{unlocks:[],reason:'UK is standalone post-Brexit — no direct leverage to EU markets.'},
+  FR:{unlocks:['BE'],reason:'French-language presence supports Wallonia (BE) approach with minimal extra effort.'},
+};
+
+const MARKET_ENTRY_COSTS = {
+  DK:{'Skincare & Beauty':15000,'Food & Beverage':25000,'Fashion & Apparel':20000,'Wellness & Supplements':18000},
+  NO:{'Skincare & Beauty':12000,'Food & Beverage':20000,'Fashion & Apparel':15000,'Wellness & Supplements':14000},
+  NL:{'Skincare & Beauty':18000,'Food & Beverage':30000,'Fashion & Apparel':22000,'Wellness & Supplements':20000},
+  DE:{'Skincare & Beauty':35000,'Food & Beverage':55000,'Fashion & Apparel':40000,'Wellness & Supplements':40000},
+  UK:{'Skincare & Beauty':85000,'Food & Beverage':120000,'Fashion & Apparel':95000,'Wellness & Supplements':90000},
+  FR:{'Skincare & Beauty':45000,'Food & Beverage':60000,'Fashion & Apparel':50000,'Wellness & Supplements':48000},
+};
+
+const BLOCKER_RESOLUTION = {
+  cpnpMissing:    {days:14, cost:'0 SEK',          fix:'File at portal.cpnp.eu — allow 2 weeks for processing.'},
+  ceMarkingMissing:{days:60,cost:'5,000–15,000 SEK',fix:'Engage a notified body (CE marking for your device category).'},
+  redClaim:       {days:1,  cost:'0 SEK',          fix:'Rephrase — see claim localizer for approved alternatives.'},
+  amberClaim:     {days:3,  cost:'0 SEK',          fix:'Add substantiation reference or rephrase for target market.'},
+  labelMissing:   {days:7,  cost:'2,000–5,000 SEK',fix:'Translate label to target market language.'},
+  eanMissing:     {days:3,  cost:'0 SEK',          fix:'Register at GS1.'},
+  imageBelowSpec: {days:2,  cost:'0 SEK',          fix:'Reshoot or export at 900px+ minimum.'},
+  noSku:          {days:0,  cost:'0 SEK',          fix:'Add at least one product in My Products.'},
+  noProof:        {days:1,  cost:'0 SEK',          fix:'Add revenue, social, or review data in Brand Home.'},
+  marginTooLow:   {days:30, cost:'variable',       fix:'Negotiate net price or increase RSP for this market.'},
+  moqTooHigh:     {days:30, cost:'variable',       fix:'Negotiate MOQ with manufacturer or find lower-MOQ partner.'},
+  ukCMR:          {days:21, cost:'3,000–8,000 SEK',  fix:'Review all CMR substances against UK Amending Instrument SI 2026/23. Engage a UK regulatory consultant.', partner:'UK Regulatory Consultant', partnerUrl:'https://veyaflow.com/verified-partners'},
+  ediMatas:       {days:14, cost:'0 SEK',             fix:'Contact your 3PL to set up Matas EDI codes for Taastrup hub. Does not affect pilot stores.'},
+  noRpUK:         {days:14, cost:'5,000–15,000 SEK/yr',fix:'Appoint a UK Responsible Person (RP) with a UK address. Required before any UK listing.', partner:'UK Responsible Person — from £1,200/year', partnerUrl:'https://veyaflow.com/verified-partners'},
+};
+
+// ── Readiness scoring engine ──────────────────────
+
+function scoreReadiness(brand, sku, marketCode, retailerId){
+  const market = MARKET_REGISTRY[marketCode]||MARKET_REGISTRY.DK;
+  const retailer = RETAILER_REGISTRY.find(r=>r.id===retailerId)||RETAILER_REGISTRY[0];
+  const blockers = [];
+  const greens = [];
+  let dims = {};
+
+  // 1. COMPLIANCE (35) — only binary blocker, highest weight
+  let comp = 0;
+  if(sku){
+    // CPNP — EU cosmetics
+    if(sku.productType==='cosmetic'&&market.euMember){
+      if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
+      else{ blockers.push({id:'cpnpMissing',level:'red',label:'CPNP notification missing',impact:'Blocks all EU pharmacy and beauty retail listings.'}); }
+    } else { comp+=12; }
+    // CE marking — devices
+    if(sku.productType==='device'){
+      if(sku.ceMarking){ comp+=12; greens.push('CE marking on file'); }
+      else{ blockers.push({id:'ceMarkingMissing',level:'red',label:'CE marking missing',impact:'Blocks electronics/device listings across all EU markets.'}); }
+    } else { comp+=12; }
+    // UK RP — UK market
+    if(marketCode==='UK'){
+      if(sku.ukResponsiblePerson||brand.ukRP){ comp+=0; greens.push('UK Responsible Person on file'); }
+      else{ blockers.push({id:'noRpUK',level:'red',label:'No UK Responsible Person',impact:'This blocks your UK listing entirely — required before any UK retail conversation.',partner:true}); }
+    }
+    // UK CMR Audit — UK cosmetics
+    if(marketCode==='UK'&&sku.productType==='cosmetic'){
+      blockers.push({id:'ukCMR',level:'red',label:'UK CMR Audit required — SI 2026/23 (August 2026)',impact:'All cosmetics sold in UK must be audited against the August 2026 CMR Amending Instrument. Affects Boots, Space NK, H&B.',partner:true});
+    }
+    // Claims
+    const redClaims=(sku.claims||[]).filter(cl=>{ const r=CLAIMS_RULES[cl.toLowerCase()]; return r&&(r[marketCode]==='red'); });
+    const amberClaims=(sku.claims||[]).filter(cl=>{ const r=CLAIMS_RULES[cl.toLowerCase()]; return r&&r[marketCode]==='amber'; });
+    if(redClaims.length===0&&amberClaims.length===0){ comp+=11; greens.push('All claims clear for '+market.name); }
+    else if(redClaims.length>0){ blockers.push({id:'redClaim',level:'red',label:`${redClaims.length} claim${redClaims.length>1?'s':''} flagged RED for ${market.name}`,impact:'Must rephrase before pitching — regulatory risk.'}); }
+    else if(amberClaims.length>0){ blockers.push({id:'amberClaim',level:'amber',label:`${amberClaims.length} claim${amberClaims.length>1?'s':''} need review for ${market.name}`,impact:'Amber claims need substantiation or market-specific rephrasing.'}); comp+=5; }
+  } else {
+    blockers.push({id:'noSku',level:'red',label:'No product added',impact:'Add at least one SKU to calculate compliance score.'});
+  }
+  dims.compliance = {score:Math.min(comp,35), max:35};
+
+  // 2. COMMERCIAL (28)
+  let comm = 0;
+  if(sku&&retailer){
+    const rsp = parseFloat(sku.rspDKK||sku.rspGBP||sku.rspEUR||sku.rspSEK||0);
+    const net = parseFloat(sku.netPriceSEK||0);
+    const moq = parseInt(sku.moq||0);
+    const lead = parseInt(sku.leadDays||0);
+    if(rsp>0&&net>0){
+      const margin = (rsp-net)/rsp;
+      if(margin>=(retailer.marginMin||0.45)){ comm+=10; greens.push(`Margin ≥ ${Math.round((retailer.marginMin||0.45)*100)}% — within ${retailer.name} range`); }
+      else if(margin>=(retailer.marginMin||0.45)-0.05){ comm+=5; blockers.push({id:'marginTooLow',level:'amber',label:'Margin slightly below '+retailer.name+' minimum',impact:'Buyer may push back. Tighten net price or adjust RSP.'}); }
+      else{ blockers.push({id:'marginTooLow',level:'red',label:'Margin below '+retailer.name+' minimum ('+Math.round(margin*100)+'% vs '+Math.round((retailer.marginMin||0.45)*100)+'% required)',impact:'Listing unlikely at current net price.'}); }
+    } else { comm+=5; }
+    if(moq>0&&retailer.moq){
+      if(moq<=retailer.moq){ comm+=10; greens.push('MOQ within '+retailer.name+' standard range'); }
+      else if(moq<=retailer.moq*1.5){ comm+=5; blockers.push({id:'moqTooHigh',level:'amber',label:'MOQ slightly above '+retailer.name+' standard',impact:'Negotiable — mention flexibility in pitch.'}); }
+      else{ blockers.push({id:'moqTooHigh',level:'red',label:'MOQ exceeds '+retailer.name+' threshold',impact:'Renegotiate with manufacturer or offer consignment.'}); }
+    } else { comm+=5; }
+    if(sku.exWorksCost){ comm+=4; greens.push('Ex-works cost entered — CFO View active'); }
+    if(lead>0&&lead<=21){ comm+=4; greens.push('Lead time ≤ 21 days'); }
+    else if(lead>21&&lead<=45){ comm+=2; blockers.push({id:'leadTime',level:'amber',label:'Lead time '+lead+' days — above premium buyer preference',impact:'Some buyers want ≤21 days for reorder agility.'}); }
+    else { comm+=2; }
+  }
+  dims.commercial = {score:Math.min(comm,28), max:28};
+
+  // 3. BRAND STRENGTH (20)
+  let bs = 0;
+  if(brand.annualRevenue){ bs+=8; greens.push('Annual revenue on file'); }
+  else if(brand.unitsSold){ bs+=5; greens.push('Units sold data on file'); }
+  else{ blockers.push({id:'noProof',level:'amber',label:'No revenue or sales data',impact:'Buyers ask — have a number ready even if estimated.'}); }
+  const followers = parseInt((brand.socialFollowers||'0').replace(/\D/g,''))||0;
+  if(followers>=10000){ bs+=4; greens.push('Social following ≥ 10K'); }
+  else if(followers>=5000){ bs+=2; blockers.push({id:'socialLow',level:'amber',label:'Social following below 10K',impact:'Lyko and Kicks require active content calendar.'}); }
+  else if(followers>0){ blockers.push({id:'socialLow',level:'amber',label:'Social following below 5K',impact:'Build to 10K before approaching social-first retailers.'}); }
+  const press = parseInt((brand.pressCount||'0').replace(/\D/g,''))||0;
+  if(press>=3){ bs+=4; greens.push('3+ press mentions on file'); }
+  else if(press>=1){ bs+=2; }
+  const repeat = parseFloat((brand.repeatRate||'0').replace(/[^0-9.]/g,''))||0;
+  if(repeat>=30){ bs+=4; greens.push('Repeat rate ≥ 30% — strong loyalty signal'); }
+  else if(repeat>=20){ bs+=2; greens.push('Repeat rate on file'); }
+  dims.brandStrength = {score:Math.min(bs,20), max:20};
+
+  // 4. PRODUCT DATA (10)
+  let pd = 0;
+  if(sku){
+    if(sku.ean){ pd+=3; greens.push('EAN barcode on file'); }
+    else{ blockers.push({id:'eanMissing',level:'amber',label:'EAN barcode missing',impact:'Required for all retail listing systems.'}); }
+    if(sku.inci||sku.ingredients){ pd+=4; greens.push('INCI / ingredients list on file'); }
+    else if(sku.productType==='cosmetic'){ blockers.push({id:'inciMissing',level:'amber',label:'INCI list missing',impact:'Mandatory for EU cosmetics listings and PIF.'}); }
+    if(sku.descEN||sku.descSV){ pd+=3; greens.push('Product description on file'); }
+  }
+  dims.productData = {score:Math.min(pd,10), max:10};
+
+  // 5. LOGISTICS / EDI (7)
+  let log = 0;
+  if(retailer){
+    if(retailer.id==='matas_dk'){
+      if(brand.ediReady||sku?.ediReady){ log+=7; greens.push('EDI configured for Matas Taastrup hub'); }
+      else{ blockers.push({id:'ediMatas',level:'amber',label:'EDI not configured for Matas Taastrup hub',impact:'Required for national rollout — pilot unaffected. Contact your 3PL.'}); log+=3; }
+    } else {
+      // Non-EDI retailers — check warehouse/logistics field
+      if(sku?.warehouse||brand.logisticsPartner){ log+=7; greens.push('Logistics partner on file'); }
+      else{ log+=4; }
+    }
+  }
+  dims.logistics = {score:Math.min(log,7), max:7};
+
+  const total = Math.min(Object.values(dims).reduce((s,d)=>s+d.score,0), 100);
+  const maxDays = blockers.filter(b=>BLOCKER_RESOLUTION[b.id]).reduce((m,b)=>Math.max(m,BLOCKER_RESOLUTION[b.id]?.days||0),0);
+
+  let status, statusColor, pitchReady, listingReady;
+  if(total>=85){ status='LISTING READY'; statusColor='#065F46'; pitchReady=true; listingReady=true; }
+  else if(total>=70){ status='PITCH READY'; statusColor='#1E40AF'; pitchReady=true; listingReady=false; }
+  else if(total>=50){ status='NEARLY READY'; statusColor='#92400E'; pitchReady=false; listingReady=false; }
+  else { status='NOT READY'; statusColor='#991B1B'; pitchReady=false; listingReady=false; }
+
+  return {total, dims, blockers, greens, status, statusColor, pitchReady, listingReady, maxDays, market, retailer};
+}
+
+// ── Expansion Sequencer engine ─────────────────────
+
+function scoreMarketForSequencer(marketCode, brand, sku){
+  const market = MARKET_REGISTRY[marketCode];
+  if(!market||marketCode===brand.currentMarket?.slice(0,2)) return null;
+  const homeCode = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'}[brand.currentMarket]||'SE';
+  const overlap = (MARKET_PAIRS[homeCode]||MARKET_PAIRS.SE)[marketCode]||0.5;
+  const leverage = RETAILER_LEVERAGE[marketCode];
+  const unlockScore = (leverage?.unlocks||[]).length>0?1:0;
+  const cat = brand.category||'Skincare & Beauty';
+  const entryCost = (MARKET_ENTRY_COSTS[marketCode]||{})[cat]||50000;
+  const costScore = entryCost<20000?1:entryCost<50000?0.6:entryCost<100000?0.3:0.1;
+  const originMap={VERY_POSITIVE:1,POSITIVE:0.7,NEUTRAL:0.35,HOME_MARKET:0,NEGATIVE:0};
+  const originScore = originMap[market.nordicsOriginSignal]||0.35;
+  const total = Math.round(overlap*30 + unlockScore*25 + costScore*25 + originScore*20);
+  const keyRetailers = RETAILER_REGISTRY.filter(r=>r.market===marketCode&&(r.categories||[]).includes(cat)).slice(0,2).map(r=>r.name);
+  return {marketCode, market, total, overlap, costScore, originScore, unlockScore, entryCost, keyRetailers, leverage};
+}
+
+// ── State ─────────────────────────────────────────
+let readinessState = {
+  marketCode: null,
+  retailerId: null,
+};
+
+// ── Render: Market Readiness Score ────────────────
+
+function renderReadinessScore(){
+  const sku = skus[0]||null;
+  const allMarkets = Object.keys(MARKET_REGISTRY).filter(k=>k!==({Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'}[brand?.currentMarket||'Sweden']||'SE'));
+  if(!readinessState.marketCode) readinessState.marketCode = allMarkets[0]||'DK';
+  const marketRetailers = RETAILER_REGISTRY.filter(r=>r.market===readinessState.marketCode&&(r.categories||[]).includes(brand?.category||''));
+  if(!readinessState.retailerId||!marketRetailers.find(r=>r.id===readinessState.retailerId)){
+    readinessState.retailerId = marketRetailers[0]?.id||RETAILER_REGISTRY[0]?.id;
+  }
+  const rs = scoreReadiness(brand||{}, sku||{}, readinessState.marketCode, readinessState.retailerId);
+  const redBlockers = rs.blockers.filter(b=>b.level==='red');
+  const amberBlockers = rs.blockers.filter(b=>b.level==='amber');
+  const barW = Math.round(rs.total);
+  const barColor = rs.total>=85?'#10B981':rs.total>=70?'#1E40AF':rs.total>=50?'#F59E0B':'#EF4444';
+
+  return `
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
+        <div>
+          <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem">Market Readiness</div>
+          <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy)">${brand?.name||'Your brand'}</div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <select onchange="readinessState.marketCode=this.value;readinessState.retailerId=null;document.getElementById('readiness-panel').outerHTML=renderReadinessScore()"
+            style="padding:.3rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+            ${allMarkets.map(m=>`<option value="${m}"${readinessState.marketCode===m?' selected':''}>${MARKET_REGISTRY[m]?.name||m}</option>`).join('')}
+          </select>
+          <select onchange="readinessState.retailerId=this.value;document.getElementById('readiness-panel').outerHTML=renderReadinessScore()"
+            style="padding:.3rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+            ${marketRetailers.length?marketRetailers.map(r=>`<option value="${r.id}"${readinessState.retailerId===r.id?' selected':''}>${r.name}</option>`).join(''):'<option>No retailers for this category</option>'}
+          </select>
+        </div>
+      </div>
+
+      <!-- Score bar -->
+      <div style="margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem">
+          <span style="font-family:var(--serif);font-size:2rem;color:${barColor};line-height:1">${rs.total}</span>
+          <span style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:${rs.statusColor};padding:.2rem .6rem;background:${rs.total>=85?'#ECFDF5':rs.total>=70?'#EFF6FF':rs.total>=50?'#FFFBEB':'#FEF2F2'}">${rs.status}</span>
+        </div>
+        <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;margin-bottom:.3rem">
+          <div style="background:${barColor};height:8px;border-radius:4px;width:${barW}%;transition:width .6s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.52rem;color:var(--muted)">
+          <span>Not ready</span><span style="color:#92400E">50 — Nearly ready</span><span style="color:#1E40AF">70 — Pitch ready</span><span style="color:#065F46">85 — Listing ready</span>
+        </div>
+      </div>
+
+      <!-- Dimension breakdown -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-bottom:1rem">
+        ${Object.entries(rs.dims).map(([k,d])=>{
+          const pct=Math.round((d.score/d.max)*100);
+          const labels={compliance:'Compliance',commercial:'Commercial',brandStrength:'Brand strength',productData:'Product data',logistics:'Logistics'};
+          return `<div style="padding:.45rem .5rem;background:#F9F8F6;border:1px solid var(--border)">
+            <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">${labels[k]||k}</div>
+            <div style="font-family:var(--mono);font-size:.75rem;font-weight:700;color:${pct>=80?'#065F46':pct>=50?'#1E40AF':'#991B1B'}">${d.score}<span style="font-size:.5rem;font-weight:400;color:var(--muted)">/${d.max}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Blockers -->
+      ${redBlockers.length||amberBlockers.length?`
+      <div style="margin-bottom:.75rem">
+        <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem">Blockers</div>
+        ${redBlockers.map(b=>{
+          const res=BLOCKER_RESOLUTION[b.id]||{};
+          return `<div style="display:flex;gap:.6rem;padding:.5rem .65rem;background:#FEF2F2;border-left:3px solid #EF4444;margin-bottom:.3rem">
+            <span style="color:#EF4444;font-size:.8rem;flex-shrink:0">●</span>
+            <div style="flex:1">
+              <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:#7F1D1D">${b.label}</div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#991B1B;margin-top:.1rem">${b.impact}</div>
+              ${res.fix?`<div style="font-family:var(--mono);font-size:.58rem;color:#7F1D1D;margin-top:.2rem">Fix: ${res.fix}${res.days?` · ~${res.days} days`:''}</div>`:''}
+              ${res.partner?`<div style="margin-top:.4rem"><span style="font-family:var(--mono);font-size:.58rem;background:#1E3A5F;color:var(--gold);padding:.15rem .5rem;cursor:pointer">◈ VeyaFlow Verified Partner — ${res.partner} →</span></div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+        ${amberBlockers.map(b=>{
+          const res=BLOCKER_RESOLUTION[b.id]||{};
+          return `<div style="display:flex;gap:.6rem;padding:.5rem .65rem;background:#FFFBEB;border-left:3px solid #F59E0B;margin-bottom:.3rem">
+            <span style="color:#F59E0B;font-size:.8rem;flex-shrink:0">◐</span>
+            <div style="flex:1">
+              <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:#78350F">${b.label}</div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#92400E;margin-top:.1rem">${b.impact}</div>
+              ${res.fix?`<div style="font-family:var(--mono);font-size:.58rem;color:#78350F;margin-top:.2rem">Fix: ${res.fix}${res.days?` · ~${res.days} days`:''}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`:''}
+
+      <!-- Greens -->
+      ${rs.greens.length?`
+      <div style="margin-bottom:.75rem">
+        <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem">Ready ✓</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+          ${rs.greens.map(g=>`<span style="font-family:var(--mono);font-size:.57rem;background:#ECFDF5;color:#065F46;padding:.2rem .55rem;border:1px solid #A7F3D0">✓ ${g}</span>`).join('')}
+        </div>
+      </div>`:''}
+
+      <!-- Time estimate -->
+      ${rs.maxDays>0?`<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.75rem">
+        Pitch-ready in: <strong style="color:var(--navy)">~${rs.maxDays} days</strong> (longest blocker — parallel tasks can run simultaneously)
+      </div>`:`<div style="font-family:var(--mono);font-size:.6rem;color:#065F46;margin-bottom:.75rem">No blocking issues — ready to proceed.</div>`}
+
+      <!-- CTAs -->
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn-primary" onclick="brandPackState.retailer='${rs.retailer?.name||''}';brandPackState.market='${rs.market?.name||''}';showPage('brandpack')" style="font-size:.68rem;padding:.45rem .9rem">Generate Brand Pack →</button>
+        <button class="btn-outline" onclick="pitchForm.retailer='${rs.retailer?.name||''}';pitchForm.targetMarket='${rs.market?.name||''}';showPage('pitch')" style="font-size:.68rem;padding:.45rem .9rem">Start Retailer Pitch →</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Render: Expansion Sequencer ───────────────────
+
+function renderExpansionSequencer(){
+  const sku = skus[0]||null;
+  const allMarkets = Object.keys(MARKET_REGISTRY);
+  const scored = allMarkets
+    .map(m=>scoreMarketForSequencer(m,brand||{},sku||{}))
+    .filter(Boolean)
+    .sort((a,b)=>b.total-a.total);
+
+  // Group into year bands
+  const year1 = scored.filter(m=>m.total>=80);
+  const year2 = scored.filter(m=>m.total>=60&&m.total<80);
+  const year3 = scored.filter(m=>m.total>=40&&m.total<60);
+  const notRec = scored.filter(m=>m.total<40);
+
+  const renderMarketRow = (m,idx,showYear) => {
+    const originLabels={VERY_POSITIVE:'★★ Very positive',POSITIVE:'★ Positive',NEUTRAL:'Neutral',NEGATIVE:'Challenging'};
+    const costSEK = m.entryCost?`~${(m.entryCost/1000).toFixed(0)}K SEK`:'—';
+    const parallelNote = m.leverage?.unlocks?.length
+      ? `<span style="font-family:var(--mono);font-size:.55rem;background:#EFF6FF;color:#1E40AF;padding:.15rem .4rem;margin-left:.4rem">Unlocks ${m.leverage.unlocks.join(', ')}</span>`:'';
+    return `
+      <div style="background:#fff;border:1px solid var(--border);border-left:3px solid ${m.total>=80?'#10B981':m.total>=60?'#1E40AF':m.total>=40?'#F59E0B':'#9A9489'};padding:.85rem 1rem;margin-bottom:.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.35rem;margin-bottom:.45rem">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--muted)">${idx+1}</span>
+            <span style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${m.market.name}</span>
+            ${parallelNote}
+          </div>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${m.total>=80?'#065F46':m.total>=60?'#1E40AF':'#92400E'}">${m.total}/100</span>
+            <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${costSEK} entry</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.3rem;margin-bottom:.45rem">
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Regulatory overlap: <strong style="color:var(--navy)">${Math.round(m.overlap*100)}%</strong></div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Nordic signal: <strong style="color:var(--navy)">${originLabels[m.market.nordicsOriginSignal]||'—'}</strong></div>
+        </div>
+        ${m.keyRetailers.length?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.35rem">Key retailers: <strong style="color:var(--navy)">${m.keyRetailers.join(', ')}</strong></div>`:''}
+        <div style="font-family:var(--sans);font-size:.67rem;color:#555;line-height:1.55">${m.market.timingHook2026||''}</div>
+        ${m.leverage?.unlocks?.length?`<div style="font-family:var(--mono);font-size:.57rem;color:#1E40AF;margin-top:.35rem">↳ ${m.leverage.reason}</div>`:''}
+        <div style="margin-top:.5rem">
+          <button class="btn-outline" style="font-size:.6rem;padding:.22rem .55rem"
+            onclick="readinessState.marketCode='${m.marketCode}';document.getElementById('readiness-panel').outerHTML=renderReadinessScore();document.getElementById('readiness-panel').scrollIntoView({behavior:'smooth'})">
+            Check readiness →
+          </button>
+        </div>
+      </div>
+    `;
+  };
+
+  const renderGroup = (markets, title, color) => markets.length===0?'': `
+    <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${color};margin-bottom:.5rem;margin-top:1rem">${title}</div>
+    ${markets.map((m,i)=>renderMarketRow(m,i,true)).join('')}
+  `;
+
+  return `
+    <div class="card">
+      <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem">Expansion Sequencer</div>
+      <div style="font-family:var(--serif);font-size:1rem;color:var(--navy);margin-bottom:.25rem">Where should ${brand?.name||'you'} go next?</div>
+      <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-bottom:1rem">Ranked by regulatory overlap, entry cost, retailer leverage, and Nordic origin signal — based on your specific profile.</div>
+      ${renderGroup(year1,'Year 1 — Start here','#065F46')}
+      ${renderGroup(year2,'Year 2 — Once proven','#1E40AF')}
+      ${renderGroup(year3,'Year 3 — Longer term','#92400E')}
+      ${notRec.length?`
+        <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9A9489;margin-top:1rem;margin-bottom:.4rem">Not recommended yet</div>
+        ${notRec.map(m=>`<div style="padding:.5rem .75rem;border:1px solid var(--border);margin-bottom:.3rem;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-family:var(--sans);font-size:.75rem;color:var(--muted)">${m.market.name}</span>
+          <span style="font-family:var(--mono);font-size:.58rem;color:#9A9489">${m.total}/100 — revisit after EU base established</span>
+        </div>`).join('')}`:''}
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.75rem;padding-top:.6rem;border-top:1px solid var(--border)">
+        Sequence logic: regulatory overlap minimises setup cost → retailer leverage maximises each pitch → entry cost matched to stage → Nordic origin rewarded.
+      </div>
+    </div>
+  `;
+}
+
 function renderDashboard(el){
   const stage=BRAND_STAGES.find(s=>s.id===brand.stage)||BRAND_STAGES[2];
   const steps=NEXT_STEPS[brand.stage]||NEXT_STEPS.trading;
@@ -1241,6 +1665,12 @@ function renderDashboard(el){
         <div style="display:flex;gap:.6rem;flex-wrap:wrap">
           ${steps.map(n=>`<button class="nav-banner-btn" onclick="showPage('${n.page}')">${n.icon} ${n.label}</button>`).join('')}
         </div>
+      </div>
+
+      <!-- READINESS + SEQUENCER — full width above col-2 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem" id="readiness-sequencer-row">
+        <div id="readiness-panel">${renderReadinessScore()}</div>
+        <div id="sequencer-panel">${renderExpansionSequencer()}</div>
       </div>
 
       <div class="col-2">
@@ -1367,7 +1797,16 @@ function deleteReport(id){
   updateSidebarBrand();
   renderPage('home');
 }
-function expandReport(id){ /* future: show expanded report */ }
+function expandReport(id){
+  const r=savedReports.find(x=>x.id===id);
+  if(!r)return;
+  reportState={loading:false,result:r,sections:r.sections||[]};
+  reportForm.brandName=r.brandName||'';
+  reportForm.category=r.category||'';
+  reportForm.targetMarket=r.targetMarket||'';
+  reportForm.currentMarket=r.currentMarket||'Sweden';
+  showPage('report');
+}
 
 /* ═══════════════════════════════════════════════════
    MARKET REPORT PAGE
@@ -1544,7 +1983,7 @@ const MARKET_REGISTRY = {
     eudrEnforcement:"December 30 2026",
     entryComplexity:"LOW",
     nordicsOriginSignal:"POSITIVE",
-    timingHook2026:"Ici Paris XL executing 2026 premiumisation strategy post-A.S. Watson merger, actively replacing mid-tier brands with premium Nordic entrants. Category review open until September 2026.",
+    timingHook2026:"Dutch consumers at Etos and Kruidvat are Western Europe's highest adopters of Preventative Wellness — LED devices and supplements over-index vs EU average. Ici Paris XL executing 2026 premiumisation, replacing mid-tier brands with premium Nordic entrants. Category review open until September 2026.",
     verifiedDate:"2026-04", verifiedBy:"Research",
   },
   FR: {
@@ -1564,7 +2003,7 @@ const RETAILER_REGISTRY = [
   // ── DENMARK ──────────────────────────────────────
   {
     id:"matas_dk", name:"Matas", market:"DK", marketName:"Denmark",
-    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    categories:["Skincare & Beauty","Wellness & Supplements"],
     type:"pharmacy_beauty", storeCount:290, onlinePresence:"HIGH",
     strategy2026:"Win the Nordics — unified Matas+Kicks buying desk. Clinical Confidence and Eco-Evaluation as twin pillars. Growing Matas Balance private label. Automating Taastrup logistics centre.",
     buyerPriority:"Dermocosmetic brands bridging science and sustainability. Brands with Danish consumer data.",
@@ -1616,7 +2055,7 @@ const RETAILER_REGISTRY = [
   },
   {
     id:"apotek_hjartat_se", name:"Apotek Hjärtat", market:"SE", marketName:"Sweden",
-    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    categories:["Skincare & Beauty","Wellness & Supplements"],
     type:"pharmacy", storeCount:390, onlinePresence:"HIGH",
     strategy2026:"Clinical beauty expansion. Sustainability credibility. Nordic Swan and COSMOS preferred. In-house pharmacist-led product evaluation.",
     buyerPriority:"Clinical efficacy. Complete PIF and CPNP documentation. Pharmacy-channel exclusive SKUs. Dermatologist or pharmacist recommendation.",
@@ -1634,7 +2073,7 @@ const RETAILER_REGISTRY = [
   // ── GERMANY ──────────────────────────────────────
   {
     id:"dm_de", name:"dm-drogerie markt", market:"DE", marketName:"Germany",
-    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Baby & Family","Home & Design"],
+    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
     type:"drugstore", storeCount:2100, onlinePresence:"MEDIUM",
     strategy2026:"2026 Clean Beauty bay expansion — 40 new SKU slots across 500 stores for Nordic and natural brands. Sustainability certification fast-track. Growing private label Alverde.",
     buyerPriority:"Certified natural/organic. Refillable and waterless formats on fast-track. Nordic provenance positive. VerpackG compliance mandatory.",
@@ -1652,7 +2091,7 @@ const RETAILER_REGISTRY = [
   // ── UNITED KINGDOM ────────────────────────────────
   {
     id:"boots_uk", name:"Boots UK", market:"UK", marketName:"United Kingdom",
-    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family"],
+    categories:["Skincare & Beauty","Wellness & Supplements"],
     type:"pharmacy_beauty", storeCount:2200, onlinePresence:"HIGH",
     strategy2026:"Premium Beauty category expansion. Boots Beauty incubator for emerging brands. Advantage Card data-driven ranging. Online-first entry route increasingly available.",
     buyerPriority:"UK consumer demand evidence. Advantage Card basket correlation. Premium positioning GBP 15-40. Clinical claims with UK substantiation.",
@@ -1705,7 +2144,7 @@ const RETAILER_REGISTRY = [
   // ── NETHERLANDS (Research Verified) ──────────────
   {
     id:"etos_nl", name:"Etos", market:"NL", marketName:"Netherlands",
-    categories:["Skincare & Beauty","Wellness & Supplements","Baby & Family","Personal Care"],
+    categories:["Skincare & Beauty","Wellness & Supplements","Personal Care"],
     type:"pharmacy_drugstore", storeCount:520, onlinePresence:"HIGH",
     strategy2026:"Premium beauty expansion within A.S. Watson group. Sustainability push. Seeking Nordic and natural brands to fill Clean Beauty gaps.",
     buyerPriority:"Natural/organic. Sustainability. Clinical efficacy. Premium mid-range positioning EUR 10-25.",
@@ -1722,7 +2161,7 @@ const RETAILER_REGISTRY = [
   },
   {
     id:"kruidvat_nl", name:"Kruidvat", market:"NL", marketName:"Netherlands",
-    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Baby & Family"],
+    categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
     type:"drugstore", storeCount:1100, onlinePresence:"HIGH",
     strategy2026:"Value-positioned but Clean Beauty growing. A.S. Watson group. Largest drugstore network in Netherlands and Belgium combined.",
     buyerPriority:"Mass-premium positioning EUR 5-15. High velocity. Promotions-friendly.",
@@ -1773,9 +2212,6 @@ const CATEGORY_MARKET_MATRIX = [
   {category:"Food & Beverage", market:"DK", retailerIds:[], distributors:"NMC Nordic FMCG, Sahva food division"},
   {category:"Food & Beverage", market:"UK", retailerIds:["holland_barrett_uk"], distributors:"Suma Wholesale, Tree of Life UK"},
   {category:"Food & Beverage", market:"DE", retailerIds:["dm_de"], distributors:"Terra Naturkost, Biofresh"},
-  {category:"Baby & Family", market:"DK", retailerIds:["matas_dk"], distributors:"Scandinavian Premium"},
-  {category:"Baby & Family", market:"SE", retailerIds:["apotek_hjartat_se"], distributors:"Direct"},
-  {category:"Baby & Family", market:"UK", retailerIds:["boots_uk"], distributors:"CLF Distribution"},
 ];
 
 // ── SELECTIVE INJECTION FUNCTION ─────────────────
@@ -2072,9 +2508,6 @@ async function generateReport(){
   const isFood = cat==='Food & Beverage';
   const isWellness = cat==='Wellness & Supplements';
   const isFashion = cat==='Fashion & Apparel';
-  const isHome = cat==='Home & Design';
-  const isBaby = cat==='Baby & Family';
-  const isSport = cat==='Sport & Outdoor';
 
   // Category-specific distributor lookup
 
@@ -2116,30 +2549,6 @@ async function generateReport(){
       "Japan": "FOSHU approval for functional claims. Very strict — most EU claims not transferable.",
       "Canada": "Health Canada NPN licence (3-12 months). English + French.",
       "UAE": "Ministry of Health registration. Halal preferred.",
-    },
-    "Home & Design": {
-      base: "EU General Product Safety Regulation (GPSR) 2023 — replaces GPSD from December 2024. CE marking for electronics/electrical. REACH regulation for chemical substances in products. ESPR Ecodesign: durability, repairability requirements coming. FSC or PEFC for wood products.",
-      "Germany": "GS mark (Geprufte Sicherheit) — voluntary but increases retail acceptance. VerpackG packaging. German safety requirements.",
-      "United Kingdom": "UKCA mark replacing CE for UK market. UK REACH.",
-      "Denmark": "Danish labelling. Nordic Swan for furniture/home. FSC for wood.",
-      "Japan": "PSE mark mandatory for electrical products (Ministry of Economy). Japanese labelling. JIS standards.",
-      "United States": "CPSC (Consumer Product Safety Commission) compliance. California Prop 65 for chemical substances. ASTM standards for furniture.",
-    },
-    "Baby & Family": {
-      base: "EU Toy Safety Directive 2011/65/EU (EN 71 standard): CE marking mandatory for toys. EU Baby Products: very strict safety standards. REACH restriction on certain chemicals in children's products. ESPR applies. EN 1888 for prams/pushchairs.",
-      "Germany": "TÜV or GS certification strongly recommended for retail access. VerpackG. Strict German safety enforcement.",
-      "United Kingdom": "UKCA mark for toys. UK Toy Safety Regs. UKCA replacing CE.",
-      "Denmark": "Danish labelling. Very strict baby product safety enforcement by SKAT/DCEA.",
-      "Japan": "ST mark (Safety Toy Japan) for toys. PSE for electrical baby products. Extremely strict import checks.",
-      "United States": "CPSC mandatory testing for children's products. ASTM F963 toy safety. California Prop 65.",
-    },
-    "Sport & Outdoor": {
-      base: "EU General Product Safety Regulation (GPSR). CE marking for relevant products. REACH for chemicals in textiles/equipment. ISO standards relevant to specific sport categories. Bluesign or OEKO-TEX for performance textiles.",
-      "Germany": "TÜV testing recommended. VerpackG. German safety standards. Intersport DE supplier requirements.",
-      "United Kingdom": "UKCA replacing CE. UK REACH.",
-      "Norway": "NSF certification for some outdoor categories. XXL supplier requirements: full REACH compliance, test reports.",
-      "Japan": "SGS-Japan testing. Japanese labelling. JIS standards for protective equipment.",
-      "United States": "CPSC. ASTM standards. FTC Care Labeling for apparel. California Prop 65.",
     },
   };
 
@@ -3078,62 +3487,6 @@ function renderBizCaseResult(el){
 }
 
 
-function renderBizCaseResult(){
-  if(!bizCaseState.result) return '';
-  const isError = bizCaseState.result.startsWith('ERROR:');
-  if(isError) return `<div style="color:var(--red);padding:1rem;background:#FEF2F2;font-family:var(--sans);font-size:.82rem">${bizCaseState.result.replace('ERROR:','')}</div>`;
-
-  const sections = bizCaseState.result.split(/^##\s/m).filter(s=>s.trim());
-  const sectionColors = ['#EFF6FF','#ECFDF5','#FFFBEB','#F5F3FF','#EFF6FF'];
-  const sectionIcons = ['🔬','📊','💆','📈','🎯'];
-
-  return `
-    <div style="border:2px solid var(--navy);margin-bottom:1rem">
-      <div style="background:var(--navy);padding:1.25rem 1.5rem">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.35rem">Retail Business Case</div>
-        <div style="font-family:var(--serif);font-size:1.2rem;color:#fff">${brand.name} × ${bizCaseState.retailer}</div>
-        <div style="font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.5);margin-top:.25rem">${brand.category} · ${bizCaseState.market} · Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
-      </div>
-
-      <div style="padding:0 1.5rem 1.5rem">
-        ${sections.map((section,i)=>{
-          const lines=section.split('\n');
-          const title=lines[0].trim();
-          const body=lines.slice(1).join('\n').trim();
-          const formatted=body
-            .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
-            .replace(/^[-•] (.+)$/gm,`<div style="display:flex;gap:.5rem;padding:.3rem 0;margin:.1rem 0"><span style="color:var(--gold);flex-shrink:0">—</span><span style="font-family:var(--sans);font-size:.8rem;line-height:1.6">$1</span></div>`)
-            .replace(/\n\n/g,'</p><p style="margin:.5rem 0">')
-            .replace(/\n/g,'<br>');
-          return `
-            <div style="margin-top:1.25rem;padding:1rem;background:${sectionColors[i%5]};border-left:3px solid var(--navy)">
-              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
-                <span style="font-size:1rem">${sectionIcons[i%5]}</span>
-                <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);font-weight:700">${title}</div>
-              </div>
-              <div style="font-family:var(--sans);font-size:.82rem;line-height:1.75;color:#333"><p style="margin:.5rem 0">${formatted}</p></div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-
-      <div style="background:var(--navy);padding:.85rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-        <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.5)">VeyaFlow · veyaflow.com · Confidential</div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold)">◫ VeyaFlow Verified Brand</div>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
-      <button class="btn-primary" onclick="window.print()" style="flex:1">Print / Save as PDF ↓</button>
-      <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.retailer='';renderBizCase(document.getElementById('page-bizcase'))" style="flex:0 0 auto">New business case →</button>
-    </div>
-
-    <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.85rem 1rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.6">
-      <strong>💡 How to use this:</strong> Share with the buyer before your meeting so they can build the internal case to their category manager. The more data you add to your proof points, the stronger each section becomes.
-      ${!brand.annualRevenue&&!brand.clinicalClaims?` <span onclick="showProofEdit()" style="text-decoration:underline;cursor:pointer">Add your proof points now →</span>`:''}
-    </div>
-  `;
-}
 
 /* ═══════════════════════════════════════════════════
    BRAND PACK GENERATOR — V2
@@ -3562,66 +3915,6 @@ function renderBrandPackResult(el){
 }
 
 
-function renderBrandPackResult(){
-  if(!brandPackState.result) return '';
-  const isError = brandPackState.result.startsWith('ERROR:');
-  if(isError) return `<div style="color:var(--red);padding:1rem;background:#FEF2F2;font-family:var(--sans);font-size:.82rem">${brandPackState.result.replace('ERROR:','')}</div>`;
-
-  // Parse sections
-  const raw = brandPackState.result;
-  const sections = raw.split(/^##\s/m).filter(s=>s.trim());
-
-  return `
-    <div style="border:2px solid var(--navy);margin-bottom:1rem">
-      <!-- Header -->
-      <div style="background:var(--navy);padding:1.25rem 1.5rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-        <div>
-          <div style="font-family:var(--serif);font-size:1.3rem;color:#fff;margin-bottom:.2rem">${brand.name}</div>
-          <div style="font-family:var(--mono);font-size:.6rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase">${brand.category} · Brand Pack for ${brandPackState.retailer}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.08em">◫ VEYAFLOW VERIFIED</div>
-          <div style="font-family:var(--mono);font-size:.5rem;color:rgba(255,255,255,.4);margin-top:.15rem">${new Date().toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</div>
-        </div>
-      </div>
-
-      <!-- Sections -->
-      <div style="padding:1.25rem 1.5rem">
-        ${sections.map(section=>{
-          const lines = section.split('\n');
-          const title = lines[0].trim();
-          const body = lines.slice(1).join('\n').trim();
-          const formatted = body
-            .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
-            .replace(/^[-•] (.+)$/gm,'<div style="padding:.3rem 0 .3rem 1rem;border-left:2px solid var(--gold);margin:.2rem 0;font-family:var(--sans);font-size:.8rem;line-height:1.6">$1</div>')
-            .replace(/\n\n/g,'</p><p style="margin:.5rem 0">')
-            .replace(/\n/g,'<br>');
-          return `
-            <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)">
-              <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);font-weight:700;margin-bottom:.5rem">${title}</div>
-              <div style="font-family:var(--sans);font-size:.82rem;line-height:1.7;color:#333"><p style="margin:.5rem 0">${formatted}</p></div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-
-      <!-- Footer -->
-      <div style="background:var(--navy);padding:.85rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-        <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.5)">Generated by VeyaFlow · veyaflow.com · ${new Date().toLocaleDateString('en-GB')}</div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold)">◫ Full compliance documentation available on request</div>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
-      <button class="btn-primary" onclick="window.print()" style="flex:1">Print / Save as PDF ↓</button>
-      <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.retailer='';renderBrandPack(document.getElementById('page-brandpack'))" style="flex:0 0 auto">Generate another →</button>
-    </div>
-
-    <div style="background:#FFFBEB;border:1px solid #D97706;padding:.85rem 1rem;font-family:var(--sans);font-size:.75rem;color:#92400E;line-height:1.6">
-      <strong>💡 Tip:</strong> To save as PDF — click Print, then select "Save as PDF" as the destination. The Brand Pack is formatted to print cleanly on A4.
-    </div>
-  `;
-}
 
 
 /* ═══════════════════════════════════════════════════
@@ -3729,7 +4022,6 @@ const PRODUCT_TYPES = [
   {id:'supplement',  label:'Supplement / Ingestible',icon:'⊕', desc:'Vitamins, collagen, powders, capsules'},
   {id:'food',        label:'Food & Beverage',        icon:'◉', desc:'Functional food, drinks, snacks'},
   {id:'garment',     label:'Garment / Apparel',      icon:'◫', desc:'Clothing, swimwear, activewear'},
-  {id:'home',        label:'Home & Living',          icon:'⌂', desc:'Candles, diffusers, home accessories'},
 ];
 
 // ── CLAIMS RULES — per product type ───────────────
@@ -3958,21 +4250,6 @@ const CLAIM_RULES = {
   'collagen boosting':  {SE:'amber',DK:'amber',DE:'amber',UK:'amber',note:'Acceptable as cosmetic claim with substantiation'},
 };
 
-function getClaimLight(claim){
-  const key = claim.toLowerCase().trim();
-  const rule = CLAIM_RULES[key];
-  if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before printing on pack'};
-  const markets = brand?.targetMarkets||[];
-  const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
-  let worst = 'green';
-  markets.forEach(m=>{
-    const code = codes[m]||'SE';
-    const val = rule[code]||'amber';
-    if(val==='red') worst='red';
-    else if(val==='amber'&&worst!=='red') worst='amber';
-  });
-  return {light:worst, note:rule.note||''};
-}
 
 
 
@@ -4787,6 +5064,44 @@ function toggleSuitableFor(s){
   renderSkuEdit(document.getElementById('page-skus'));
 }
 
+function skuTypeFeedbackState(){
+  if(localStorage.getItem('ns_sku_type_submitted')==='1')
+    return '<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ Logged — thank you</span>';
+  return '<span onclick="showSkuTypeFeedback()" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-decoration:underline;cursor:pointer;display:inline-block;margin-top:.1rem">My product type isn\'t listed — tell us what you sell</span>';
+}
+
+function showSkuTypeFeedback(){
+  const wrap = document.getElementById('sku-type-feedback-wrap');
+  if(!wrap) return;
+  wrap.innerHTML = `
+    <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.1rem">
+      <input type="text" id="sku-type-input" placeholder="e.g. Essential oil blend, Wax melt, Reed diffuser…"
+        style="padding:.3rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--navy);flex:1;min-width:160px">
+      <button onclick="submitSkuTypeFeedback()"
+        style="padding:.3rem .7rem;background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer">
+        Submit
+      </button>
+      <button onclick="document.getElementById('sku-type-feedback-wrap').innerHTML=skuTypeFeedbackState()"
+        style="padding:.3rem .5rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">
+        Cancel
+      </button>
+    </div>
+  `;
+  setTimeout(()=>document.getElementById('sku-type-input')?.focus(), 50);
+}
+
+function submitSkuTypeFeedback(){
+  const input = document.getElementById('sku-type-input');
+  const v = input?.value?.trim();
+  if(!v){ alert('Please enter a product type.'); return; }
+  const existing = JSON.parse(localStorage.getItem('ns_sku_type_suggestions')||'[]');
+  existing.push({value:v, ts:new Date().toISOString()});
+  localStorage.setItem('ns_sku_type_suggestions', JSON.stringify(existing));
+  localStorage.setItem('ns_sku_type_submitted','1');
+  const wrap = document.getElementById('sku-type-feedback-wrap');
+  if(wrap) wrap.innerHTML = '<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ Logged — thank you</span>';
+}
+
 function renderSkuEdit(el){
   const r = skuReadiness(skuForm);
   const isNew = skuEditId === 'new';
@@ -4844,6 +5159,9 @@ function renderSkuEdit(el){
                 <div style="font-family:var(--sans);font-size:.72rem;font-weight:${skuForm.productType===pt.id?'600':'400'};color:${skuForm.productType===pt.id?'var(--navy)':'#555'}">${pt.label}</div>
                 <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.1rem">${pt.desc}</div>
               </div>`).join('')}
+          </div>
+          <div id="sku-type-feedback-wrap" style="margin-top:.35rem">
+            ${skuTypeFeedbackState()}
           </div>
         </div>
         <div class="card">
@@ -5299,7 +5617,7 @@ function downloadBlob(content, filename, mimeType){
    CLAIM LOCALIZER
    Paste Swedish copy → AI flags issues per target market
 ═══════════════════════════════════════════════════ */
-let claimsState = {input:'', result:null, loading:false};
+let claimsState = {input:'', result:null, loading:false, selectedMarkets:[]};
 
 function renderClaims(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
@@ -5334,7 +5652,7 @@ function renderClaims(el){
           <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem">
             ${['Denmark','Germany','United Kingdom','Norway','Netherlands','France','Sweden'].map(m=>`
               <div class="market-chip${(brand.targetMarkets||[]).includes(m)||m==='Denmark'?' selected':''}"
-                onclick="this.classList.toggle('selected')" data-market="${m}">${m}</div>
+                onclick="claimsState.selectedMarkets=claimsState.selectedMarkets.includes('${m}')?claimsState.selectedMarkets.filter(x=>x!=='${m}'):[...claimsState.selectedMarkets,'${m}'];this.classList.toggle('selected')" data-market="${m}">${m}</div>
             `).join('')}
           </div>
         </div>
@@ -5359,7 +5677,7 @@ async function runClaimLocalizer(){
   const input = document.getElementById('claims-input')?.value||'';
   if(!input.trim()){alert('Paste some claims first.');return;}
 
-  const selectedMarkets = [...document.querySelectorAll('.market-chip.selected')].map(el=>el.dataset.market).filter(Boolean);
+  const selectedMarkets = claimsState.selectedMarkets.length ? claimsState.selectedMarkets : [...document.querySelectorAll('.market-chip.selected')].map(el=>el.dataset.market).filter(Boolean);
   if(!selectedMarkets.length){alert('Select at least one target market.');return;}
 
   claimsState = {input, result:null, loading:true};
@@ -5749,7 +6067,7 @@ function renderLandedTab(){
         <div class="field">
           <label class="lbl">Product category</label>
           <select data-landed="category">
-            ${['Skincare & Beauty','Wellness & Supplements','Food & Beverage','Fashion & Apparel','Home & Design','Sport & Outdoor'].map(c=>`<option${s.category===c?' selected':''}>${c}</option>`).join('')}
+            ${['Skincare & Beauty','Wellness & Supplements','Food & Beverage','Fashion & Apparel'].map(c=>`<option${s.category===c?' selected':''}>${c}</option>`).join('')}
           </select>
         </div>
         <div class="field">
@@ -6269,47 +6587,7 @@ function copyToClipboard(text){
 }
 
 
-function renderPitchResult(){
-  if(!pitchResult)return'';
-  const r=pitchResult;
-  const retailers=RETAILER_BY_MARKET[r.market]||[];
-  return `
-    <div>
-      <div style="background:var(--navy);padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-        <div>
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.25rem">Buyer pitch · ${r.retailer}</div>
-          <div style="font-size:.95rem;color:#fff">${r.brand} → ${r.retailer}</div>
-          <div style="font-family:var(--sans);font-size:.65rem;color:rgba(255,255,255,.4);margin-top:.1rem">${r.market} · ${LANG_NAMES[r.lang]||'English'}</div>
-        </div>
-        <div style="display:flex;gap:.5rem">
-          <button id="copy-btn" onclick="copyCurrentPitch()" style="padding:.45rem .9rem;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-family:var(--mono);font-size:.6rem;cursor:pointer">Copy email</button>
-          <button onclick="pitchResult=null;renderPitch(document.getElementById('page-pitch'))" style="padding:.45rem .9rem;background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);font-family:var(--mono);font-size:.6rem;cursor:pointer">New pitch</button>
-        </div>
-      </div>
-      <div style="padding:.65rem 1.1rem;background:#fff;border:1px solid var(--border);border-top:none;display:flex;gap:.75rem;align-items:center">
-        <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);min-width:3rem">Subject</span>
-        <span style="font-size:.85rem;color:var(--ink);font-weight:500">${r.subj}</span>
-      </div>
-      <div class="email-box" style="border-top:none">${r.body}</div>
-      ${r.lang!=='en'&&r.trans?`
-        <div style="padding:1rem 1.25rem;background:rgba(196,168,130,.03);border:1px solid rgba(196,168,130,.15);border-top:none">
-          <div style="font-family:var(--mono);font-size:.55rem;color:rgba(196,168,130,.6);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem">English translation</div>
-          <div style="font-family:var(--sans);font-size:.78rem;color:#888;line-height:1.9;white-space:pre-wrap">${r.trans}</div>
-        </div>
-      `:''}
-      ${r.intel?.length?`
-        <div style="padding:1rem 1.25rem;background:#FFFBEB;border:1px solid #FDE68A;border-top:none">
-          <div style="font-family:var(--mono);font-size:.58rem;color:#92400E;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem">★ Buyer intel — know this before you hit send</div>
-          ${r.intel.map(tip=>`<div style="display:flex;gap:.65rem;align-items:flex-start;margin-bottom:.45rem"><span style="color:var(--gold);font-family:var(--mono);font-size:.68rem;flex-shrink:0">→</span><div style="font-family:var(--sans);font-size:.76rem;color:#555;line-height:1.65">${tip}</div></div>`).join('')}
-        </div>
-      `:''}
-      <div style="padding:.85rem 1.1rem;background:var(--cream);border:1px solid var(--border);border-top:none;display:flex;gap:.65rem;flex-wrap:wrap;align-items:center">
-        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Generate for another:</span>
-        ${retailers.filter(r2=>r2!==r.retailer).map(r2=>`<button onclick="pitchForm.retailer='${r2}';generatePitch()" style="padding:.3rem .7rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;cursor:pointer">${r2} →</button>`).join('')}
-      </div>
-    </div>
-  `;
-}
+
 
 function copyCurrentPitch(){
   if(!pitchResult)return;
@@ -6509,70 +6787,159 @@ Keep it under 150 words. ${lang!=="English"?"Then provide an English translation
 }
 
 /* ═══════════════════════════════════════════════════
-   CIRCULAR GPS PAGE
+   CIRCULAR GPS V2 PAGE
 ═══════════════════════════════════════════════════ */
 
 let circularLoading=false;
 
+// Pre-AI value recovery calculator
+function calcValueRecovery(units,rsp,routeType){
+  const rate=ROUTE_RECOVERY[routeType]||0;
+  const storagePerUnit=8;
+  const months=3;
+  const recoveryValue=Math.round(units*rsp*rate);
+  const storageSaving=Math.round(units*storagePerUnit*months);
+  return{recoveryValue,storageSaving,total:recoveryValue+storageSaving};
+}
+
+// Build route hierarchy based on category + condition + reason
+function getRouteHierarchy(category,reason,condition){
+  const routes=[];
+  const isFood=['Wellness & Supplements','Food & Beverage'].includes(category);
+  const isFashion=['Fashion & Apparel'].includes(category);
+  const isElec=['Electronics & Tech'].includes(category);
+  const canResell=!['Quality_defect_major','Regulatory_non_compliance'].includes(reason)&&condition!=='damaged';
+  const canFoodRescue=isFood&&!['Quality_defect_major','Regulatory_non_compliance'].includes(reason);
+  if(canResell) routes.push('resale');
+  if(isFashion) routes.push('upcycling');
+  if(canFoodRescue) routes.push('foodrescue');
+  if(isElec) routes.push('repair');
+  routes.push('donation');
+  routes.push('recycling');
+  routes.push('disposal');
+  return [...new Set(routes)];
+}
+
+// Get matched partners for a route type + category
+function getPartnersForRoute(routeType,category){
+  return PARTNERS.filter(p=>
+    p.circularType===routeType&&
+    p.productCategories.includes(category)
+  ).sort((a,b)=>b.valueRecoveryRate-a.valueRecoveryRate).slice(0,3);
+}
+
+// Generate ESPR Article 24 declaration .txt download
+function generateESPRDeclaration(){
+  if(!circularResult)return;
+  const partner=circularResult.confirmedPartner||circularResult.routes[0]?.partners[0];
+  if(!partner){alert('Select a partner first.');return;}
+  const d=new Date();
+  const dateStr=d.toLocaleDateString('sv-SE');
+  const doc=`ESPR ARTICLE 24 — END-OF-LIFE ROUTING DECLARATION\n==================================================\nDate: ${dateStr}\nBrand / Product: ${circularForm.productName||'[Product Name]'}\nCategory: ${circularForm.category}\nUnits routed: ${circularResult.units}\nReason: ${(circularForm.reason||'').replace(/_/g,' ')}\nCondition: ${circularForm.condition}\n\nROUTING DECISION\nRoute type: ${ROUTE_LABELS[partner.circularType]||partner.circularType}\nPartner: ${partner.name}\nPartner location: ${partner.city}, ${partner.country}\nPartner markets: ${(partner.markets||[]).join(', ')}\nESPR registered: ${partner.espr?'Yes':'No — supplementary documentation required'}\n\nVALUE RECOVERY\nEstimated recovery value: ${circularResult.valueRecovery?circularResult.valueRecovery.total+' SEK':'N/A — RSP not provided'}\nStorage cost avoided: ${circularResult.valueRecovery?circularResult.valueRecovery.storageSaving+' SEK':'N/A'}\n\nCOMPLIANCE STATEMENT\nThis routing decision was made in accordance with EU Ecodesign for Sustainable Products Regulation (ESPR) Article 24 requirements. The selected circular economy partner has been verified for ${circularResult.category} product routing.\n\n${partner.espr?'Partner ESPR documentation: On file via '+partner.name+' ('+partner.contact+').':'NOTE: Selected partner does not provide ESPR documentation. Supplementary chain-of-custody documentation required.'}\n\nSigned: ________________________________\nName: __________________________________\nRole: ___________________________________\nDate: ${dateStr}\n\nGenerated by VeyaFlow · veyaflow.com`;
+  const blob=new Blob([doc],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`ESPR_Declaration_${(circularForm.productName||'routing').replace(/\s+/g,'_')}_${dateStr}.txt`;
+  a.click();URL.revokeObjectURL(url);
+}
+
 function renderCircular(el){
   const isBan=ESPR_BAN_CATS.includes(circularForm.category);
   const isDisc=ESPR_DISC_CATS.includes(circularForm.category);
-  const relPartners=PARTNERS.filter(p=>!circularForm.category||p.productCategories.includes(circularForm.category)||p.productCategories.includes("Other"));
+  const catCount=PARTNERS.filter(p=>!circularForm.category||p.productCategories.includes(circularForm.category)).length;
+  const esprtip=circularForm.category?ESPR_TIMELINE[circularForm.category]:'';
+  const canGenerate=circularForm.productName&&circularForm.units&&circularForm.category&&parseInt(circularForm.units)>0;
 
   el.innerHTML=`
     <div class="topbar">
       <div>
         <div class="page-title">Circular GPS</div>
-        <div class="page-sub">Route unsold stock across all product categories · ESPR Article 24 disclosure</div>
+        <div class="page-sub">Value recovery engine · ESPR Article 24 · ${PARTNERS.length} verified partners</div>
       </div>
     </div>
     <div class="content">
       <div class="col-2">
-        <!-- Form -->
         <div class="card">
           <div class="section-tag">Route unsold stock</div>
-          <div class="field"><label class="lbl">Product name *</label><input type="text" id="c-prod" value="${circularForm.productName}" placeholder="e.g. Autumn serum, LED face masks…" oninput="circularForm.productName=this.value"></div>
+          <div class="field"><label class="lbl">Product name *</label>
+            <input type="text" id="c-prod" value="${circularForm.productName}" placeholder="e.g. Night cream 50ml, LED face mask, Protein powder 500g" oninput="circularForm.productName=this.value">
+          </div>
           <div class="field"><label class="lbl">Product category *</label>
-            <select id="c-cat" onchange="circularForm.category=this.value;renderCircular(document.getElementById('page-circular'))">
-              <option value="">Select category…</option>${CIRCULAR_CATEGORIES.map(c=>`<option${circularForm.category===c?' selected':''}>${c}</option>`).join('')}
+            <select id="c-cat" onchange="circularForm.category=this.value;circularResult=null;renderCircular(document.getElementById('page-circular'))">
+              <option value="">Select category\u2026</option>
+              ${CIRCULAR_CATEGORIES.map(c=>`<option${circularForm.category===c?' selected':''}>${c}</option>`).join('')}
             </select>
           </div>
-          ${circularForm.category?`
+          ${circularForm.category&&esprtip?`
             <div class="espr-banner ${isBan?'espr-red':isDisc?'espr-amber':'espr-green'}" style="margin-bottom:1rem">
               <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${isBan?'#991B1B':isDisc?'#92400E':'#065F46'};margin-bottom:.2rem">
-                ${isBan?'⚠ Destruction ban — July 19, 2026':isDisc?'◎ ESPR disclosure required':'✓ No hard ban — circular routing recommended'}
+                ${isBan?'\u26a0 Destruction ban \u2014 July 19, 2026':isDisc?'\u25ce ESPR disclosure required':'\u2713 No hard ban'}
               </div>
-              <div style="font-family:var(--sans);font-size:.65rem;color:${isBan?'#7F1D1D':isDisc?'#78350F':'#14532D'};line-height:1.5">
-                ${isBan?'Large companies may not destroy unsold apparel/footwear. Routing is legally mandatory.':isDisc?'You must disclose how unsold products in this category are handled annually under ESPR Article 24.':'Circular routing supports your brand sustainability positioning.'}
-              </div>
+              <div style="font-family:var(--sans);font-size:.63rem;color:${isBan?'#7F1D1D':isDisc?'#78350F':'#14532D'};line-height:1.5">${esprtip}</div>
             </div>
           `:''}
-          <div class="field"><label class="lbl">Materials / contents</label><input type="text" id="c-mat" value="${circularForm.materials}" placeholder="e.g. Glass bottles, hyaluronic acid, plastic pumps" oninput="circularForm.materials=this.value"></div>
           <div class="grid-2">
-            <div class="field"><label class="lbl">Units *</label><input type="number" id="c-units" value="${circularForm.units}" placeholder="e.g. 200" oninput="circularForm.units=this.value"></div>
-            <div class="field"><label class="lbl">Preferred route</label>
-              <select id="c-pref" onchange="circularForm.preferredCat=this.value">
-                <option value="">Any</option>${["Recycle","Resale","Donation","Repair","Upcycle"].map(c=>`<option${circularForm.preferredCat===c?' selected':''}>${c}</option>`).join('')}
+            <div class="field"><label class="lbl">Units *</label>
+              <input type="number" id="c-units" value="${circularForm.units}" placeholder="e.g. 500" oninput="circularForm.units=this.value" min="1">
+            </div>
+            <div class="field"><label class="lbl">RSP per unit (SEK)</label>
+              <input type="number" id="c-rsp" value="${circularForm.rsp}" placeholder="e.g. 299" oninput="circularForm.rsp=this.value" min="0">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Stock condition</label>
+              <select onchange="circularForm.condition=this.value">
+                ${[['sellable','Sellable \u2014 full condition'],['near-expiry','Near expiry (3\u20136 months)'],['damaged','Damaged / seconds'],['packaging-issue','Packaging issue only']].map(([v,l])=>`<option value="${v}"${circularForm.condition===v?' selected':''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="lbl">Timeline</label>
+              <select onchange="circularForm.timeline=this.value">
+                ${[['urgent','Urgent (under 4 weeks)'],['standard','Standard (1\u20133 months)'],['planning','Planning ahead (3+ months)']].map(([v,l])=>`<option value="${v}"${circularForm.timeline===v?' selected':''}>${l}</option>`).join('')}
               </select>
             </div>
           </div>
-          <div class="field"><label class="lbl">Discard reason (ESPR Article 24)</label>
-            <select onchange="circularForm.reason=this.value">
-              ${["End_of_season_overstock","Customer_returns","Quality_defect_minor","Quality_defect_major","Regulatory_non_compliance","Packaging_damage","Labelling_update_required","Sample_or_testing_stock","Near_expiry_date","Reformulation_or_discontinuation","Other"].map(r=>`<option value="${r}"${circularForm.reason===r?' selected':''}>${r.replace(/_/g,' ')}</option>`).join('')}
-            </select>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Stock location</label>
+              <select onchange="circularForm.location=this.value">
+                ${[['SE','Sweden'],['DK','Denmark'],['NO','Norway'],['DE','Germany'],['NL','Netherlands'],['UK','United Kingdom'],['BE','Belgium'],['FR','France'],['FI','Finland'],['Other','Other EU']].map(([v,l])=>`<option value="${v}"${circularForm.location===v?' selected':''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label class="lbl">Discard reason (ESPR)</label>
+              <select onchange="circularForm.reason=this.value">
+                ${["End_of_season_overstock","Customer_returns","Quality_defect_minor","Quality_defect_major","Regulatory_non_compliance","Packaging_damage","Labelling_update_required","Sample_or_testing_stock","Near_expiry_date","Reformulation_or_discontinuation","Other"].map(r=>`<option value="${r}"${circularForm.reason===r?' selected':''}>${r.replace(/_/g,' ')}</option>`).join('')}
+              </select>
+            </div>
           </div>
-          <button class="btn-primary" id="c-btn" onclick="generateCircularRoutes()" ${!circularForm.productName||!circularForm.units||!circularForm.category?'disabled':''}>Find circular routes →</button>
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.5rem">${relPartners.length} verified partners for ${circularForm.category||'your category'}</div>
+          <div class="field"><label class="lbl">Materials / contents</label>
+            <input type="text" id="c-mat" value="${circularForm.materials}" placeholder="e.g. Glass, HDPE pump, hyaluronic acid, cardboard outer" oninput="circularForm.materials=this.value">
+          </div>
+          <button class="btn-primary" id="c-btn" onclick="generateCircularRoutes()" ${canGenerate?'':'disabled'}>
+            Calculate value recovery \u2192
+          </button>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.4rem">
+            ${catCount} verified partners \u00b7 Routes ranked by value recovered \u00b7 ESPR declaration download
+          </div>
         </div>
 
-        <!-- Results -->
         <div id="circular-results">
           ${circularResult?renderCircularResults():`
             <div class="card empty-state">
-              <div class="empty-title">Works for every product branch</div>
-              <div class="empty-sub">From unsold skincare serums to end-of-season apparel to surplus supplements — route any unsold stock and generate your ESPR disclosure.</div>
-              <div class="chips" style="justify-content:center;margin-top:1rem">
-                ${["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Electronics & Tech","Home & Design"].map(c=>`<span class="market-chip" onclick="circularForm.category='${c}';renderCircular(document.getElementById('page-circular'))">${c}</span>`).join('')}
+              <div class="empty-title">Value recovery \u2014 not just compliance</div>
+              <div class="empty-sub">Enter your stock details to see how much value you can recover. Routes ranked highest to lowest value. ESPR Article 24 declaration downloads after you confirm a partner.</div>
+              <div style="margin-top:1.2rem">
+                <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.5rem">QUICK START</div>
+                <div class="chips" style="justify-content:center">
+                  ${["Fashion & Apparel","Skincare & Beauty","Wellness & Supplements","Electronics & Tech","Food & Beverage"].map(c=>`<span class="market-chip" onclick="circularForm.category='${c}';circularResult=null;renderCircular(document.getElementById('page-circular'))">${c}</span>`).join('')}
+                </div>
+              </div>
+              <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
+                <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.6rem">VALUE HIERARCHY</div>
+                ${[['resale','Recommerce / Resale','Up to 35% of RSP'],['upcycling','Upcycle / Rework','Up to 15% of RSP (fashion)'],['foodrescue','Food Rescue','Up to 20% of RSP (food/supplements)'],['repair','Refurbish / Repair','Up to 25% of RSP (electronics)'],['donation','Charity Donation','0 financial + ESG value'],['recycling','Material Recycling','\u223c3% material value'],['disposal','Responsible Disposal','Cost only \u2014 last resort']].map(([t,l,s])=>`
+                  <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.35rem">
+                    <span style="font-family:var(--mono);font-size:.56rem;background:#F5F3EE;color:${ROUTE_COLORS[t]};padding:.15rem .45rem;border-radius:2px;white-space:nowrap;min-width:120px">${l}</span>
+                    <span style="font-family:var(--sans);font-size:.63rem;color:var(--muted)">${s}</span>
+                  </div>
+                `).join('')}
               </div>
             </div>
           `}
@@ -6584,86 +6951,395 @@ function renderCircular(el){
 
 async function generateCircularRoutes(){
   const btn=document.getElementById('c-btn');
-  if(btn){btn.disabled=true;btn.textContent='Finding routes…';}
+  if(btn){btn.disabled=true;btn.textContent='Calculating\u2026';}
   circularLoading=true;
 
+  const units=parseInt(circularForm.units)||0;
+  const rsp=parseFloat(circularForm.rsp)||0;
   const isBan=ESPR_BAN_CATS.includes(circularForm.category);
   const isDisc=ESPR_DISC_CATS.includes(circularForm.category);
-  const relPartners=PARTNERS.filter(p=>!circularForm.category||p.productCategories.includes(circularForm.category));
 
-  const prompt=`You are the VeyaFlow Circular GPS. Route ${circularForm.units} units of "${circularForm.productName}" (category: ${circularForm.category}, materials: ${circularForm.materials||'unspecified'}) to circular partners.
+  const hierarchy=getRouteHierarchy(circularForm.category,circularForm.reason,circularForm.condition);
 
-${isBan?'CRITICAL: This product is subject to the EU July 2026 Textile Destruction Ban — routing is legally mandatory.':isDisc?'Note: ESPR Article 24 disclosure is required for this product category.':'Note: Circular routing is best practice for sustainability positioning.'}
+  const routesWithCalc=hierarchy.map(routeType=>{
+    let partners=getPartnersForRoute(routeType,circularForm.category);
+    if(circularForm.timeline==='urgent') partners=[...partners.filter(p=>p.urgencyCapable),...partners.filter(p=>!p.urgencyCapable)].slice(0,3);
+    const vr=calcValueRecovery(units,rsp,routeType);
+    return{routeType,partners,valueRecovery:vr,label:ROUTE_LABELS[routeType],color:ROUTE_COLORS[routeType]};
+  }).filter(r=>r.partners.length>0||r.routeType==='disposal');
 
-Discard reason: ${circularForm.reason?.replace(/_/g,' ')}
-Preferred route: ${circularForm.preferredCat||'Any'}
-
-Available partners:
-${relPartners.map(p=>`- ${p.name} (${p.city}, ${p.country}): ${p.category}, ESPR registered: ${p.espr}, buyback: ${p.buyback?'€'+p.buyback+'/unit':'none'}. ${p.description}`).join('\n')}
-
-Recommend top 3 partners. For each:
-1. Why it is the best fit for this specific product
-2. Estimated carbon saved vs landfill (kg CO2e — use 2.1kg/unit baseline)
-3. ESPR compliance documentation they provide
-4. Routing recommendation: LEAD, SECONDARY, or HOLD
-
-Format as 3 numbered recommendations.`;
-
+  const topRoute=routesWithCalc[0];
+  const topPartner=topRoute?.partners[0];
+  let aiAnalysis='';
   try{
-    const text=await callAPI([{role:"user",content:prompt}]);
-    const parts=text.split(/\n(?=\d+\.\s)/g).filter(s=>s.trim().length>20).slice(0,3);
-    const routes=parts.map((p,i)=>{
-      const partner=relPartners[i]||relPartners[0]||PARTNERS[0];
-      return{partner,analysis:p.replace(/^\d+\.\s/,'').trim(),carbonSaved:Math.round(parseInt(circularForm.units||100)*(1.8+i*0.3)*10)/10,recommendation:["LEAD","SECONDARY","HOLD"][i]};
-    });
-    circularResult={routes,units:circularForm.units,category:circularForm.category,isBan,isDisc};
-    savePageState('ns_circularForm',circularForm);
-    savePageState('ns_circularResult',circularResult);
-  }catch(e){
-    circularResult=null;
-    alert('Could not find routes: '+e.message);
-  }
+    if(topPartner){
+      const pr=`You are VeyaFlow Circular GPS. Write a 3-sentence analysis of routing ${units} units of "${circularForm.productName}" (${circularForm.category}, condition: ${circularForm.condition}, reason: ${circularForm.reason?.replace(/_/g,' ')}) via ${topPartner.name} (${topPartner.city}, ${topPartner.country}). Partner: ${topPartner.description} Insider note: ${topPartner.insiderNote||''} ${isBan?'CRITICAL: EU Textile Destruction Ban applies.':isDisc?'ESPR Article 24 disclosure required.':''} Cover: why this partner fits, practical next step, compliance note. Max 70 words.`;
+      aiAnalysis=await callAPI([{role:"user",content:pr}]);
+    }
+  }catch(e){aiAnalysis='Contact partner directly to confirm intake capacity and timeline.';}
+
+  const topVR=topRoute?calcValueRecovery(units,rsp,topRoute.routeType):null;
+  circularResult={routes:routesWithCalc,topAIAnalysis:aiAnalysis,units,rsp,category:circularForm.category,isBan,isDisc,valueRecovery:topVR,confirmedPartner:null,timestamp:new Date().toISOString()};
+  savePageState('ns_circularForm',circularForm);
+  savePageState('ns_circularResult',circularResult);
+
   circularLoading=false;
-  if(btn){btn.disabled=false;btn.textContent='Find circular routes →';}
+  if(btn){btn.disabled=false;btn.textContent='Calculate value recovery \u2192';}
   const resEl=document.getElementById('circular-results');
-  if(resEl)resEl.innerHTML=circularResult?renderCircularResults():'';
+  if(resEl)resEl.innerHTML=renderCircularResults();
+}
+
+function confirmCircularPartner(partnerId){
+  if(!circularResult)return;
+  const allPartners=circularResult.routes.flatMap(r=>r.partners);
+  circularResult.confirmedPartner=allPartners.find(p=>p.id===partnerId)||null;
+  savePageState('ns_circularResult',circularResult);
+  const resEl=document.getElementById('circular-results');
+  if(resEl)resEl.innerHTML=renderCircularResults();
 }
 
 function renderCircularResults(){
   if(!circularResult)return'';
   const r=circularResult;
-  const REC_COLORS={LEAD:"#10B981",SECONDARY:"#F59E0B",HOLD:"#9A9489"};
-  const totalCO2=r.routes.reduce((a,x)=>a+x.carbonSaved,0).toFixed(1);
-  let selectedRoute=null;
+  const units=r.units||0;
+  const rsp=r.rsp||0;
+  const hasRSP=rsp>0;
+  const topRoute=r.routes[0];
+  const topVR=topRoute?calcValueRecovery(units,rsp,topRoute.routeType):{recoveryValue:0,storageSaving:0,total:0};
+  const worstRoute=r.routes[r.routes.length-1];
+  const worstVR=worstRoute?calcValueRecovery(units,rsp,worstRoute.routeType):{total:0};
+  const uplift=topVR.total-worstVR.total;
+  const totalCO2=(units*2.1).toFixed(0);
 
   return `
     <div class="grid-3" style="margin-bottom:1rem">
-      <div class="stat-card" style="color:var(--navy)"><div class="stat-num" style="color:var(--navy)">${r.units}</div><div class="stat-label">Units routed</div></div>
-      <div class="stat-card" style="color:var(--green)"><div class="stat-num" style="color:var(--green)">${totalCO2}kg</div><div class="stat-label">CO₂ saved</div></div>
-      <div class="stat-card" style="color:var(--green)"><div class="stat-num" style="color:var(--green)" style="font-size:1.2rem">${r.isBan?'Ban ✓':r.isDisc?'Disc ✓':'Best ✓'}</div><div class="stat-label">ESPR status</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--navy)">${units.toLocaleString('sv-SE')}</div><div class="stat-label">Units to route</div></div>
+      ${hasRSP?`
+      <div class="stat-card"><div class="stat-num" style="color:var(--green);font-size:1rem">${topVR.total.toLocaleString('sv-SE')} SEK</div><div class="stat-label">Best case recovery</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--gold);font-size:1rem">${uplift>0?'+':''}${uplift.toLocaleString('sv-SE')} SEK</div><div class="stat-label">vs disposal</div></div>
+      `:`
+      <div class="stat-card"><div class="stat-num" style="color:var(--green)">${totalCO2}kg</div><div class="stat-label">CO\u2082 saved vs landfill</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:${r.isBan?'#991B1B':r.isDisc?'#92400E':'#065F46'};font-size:.9rem">${r.isBan?'Ban \u2713':r.isDisc?'Disclosure req.':'Best practice'}</div><div class="stat-label">ESPR status</div></div>
+      `}
     </div>
-    ${r.routes.map((rt,i)=>`
-      <div style="border:1px solid var(--border);border-left:3px solid ${REC_COLORS[rt.recommendation]};background:#fff;padding:1rem 1.1rem;margin-bottom:.65rem;cursor:pointer" onclick="this.querySelector('.route-detail').style.display=this.querySelector('.route-detail').style.display==='none'?'block':'none'">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem">
-          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <span class="tag" style="background:${CAT_COLORS[rt.partner.category]||'#EDE9E1'};color:${CAT_TEXT[rt.partner.category]||'#333'}">${rt.partner.category}</span>
-            <span style="font-size:.9rem;color:var(--navy)">${rt.partner.name}</span>
+
+    ${r.topAIAnalysis?`
+    <div class="card" style="margin-bottom:1rem;border-left:3px solid var(--navy)">
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.35rem">LEAD ROUTE ANALYSIS</div>
+      <div style="font-family:var(--sans);font-size:.73rem;color:var(--text);line-height:1.65">${r.topAIAnalysis}</div>
+    </div>`:''}
+
+    ${r.routes.map((route,ri)=>{
+      const vr=calcValueRecovery(units,rsp,route.routeType);
+      const isTop=ri===0;
+      const rp=route.partners||[];
+      return `
+        <div style="margin-bottom:1.1rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
+            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;background:${isTop?route.color:'#F5F3EE'};color:${isTop?'#fff':route.color};padding:.2rem .55rem;border-radius:2px">${isTop?'\u2605 ':ri===1?'\u2715 ':''} ${route.label}</span>
+            ${hasRSP?`<span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${vr.recoveryValue>=0?'+':''}${vr.recoveryValue.toLocaleString('sv-SE')} SEK &middot; <strong style="color:${vr.total>=0?'var(--green)':'#EF4444'}">${vr.total>=0?'+':''}${vr.total.toLocaleString('sv-SE')} SEK total</strong></span>`:''}
           </div>
-          <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap">
-            ${rt.partner.buyback?`<span class="tag tag-green">+€${rt.partner.buyback}/unit</span>`:''}
-            ${rt.partner.espr?`<span class="tag tag-blue">ESPR ✓</span>`:''}
-            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${REC_COLORS[rt.recommendation]}">${rt.recommendation}</span>
-          </div>
+          ${rp.length>0?rp.map((p,pi)=>{
+            const isConf=r.confirmedPartner&&r.confirmedPartner.id===p.id;
+            return`
+              <div style="border:1px solid ${isConf?route.color:'var(--border)'};border-left:3px solid ${pi===0?route.color:'var(--border)'};background:${isConf?'#F0FDF4':'#fff'};padding:.85rem 1rem;margin-bottom:.35rem">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.3rem;margin-bottom:.35rem">
+                  <div>
+                    <span style="font-weight:600;color:var(--navy);font-size:.85rem">${p.name}</span>
+                    <span style="font-family:var(--sans);font-size:.63rem;color:var(--muted);margin-left:.4rem">${p.city}, ${p.country}</span>
+                  </div>
+                  <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+                    ${p.urgencyCapable&&circularForm.timeline==='urgent'?`<span class="tag" style="background:#FEF9C3;color:#713F12">\u26a1 Urgent OK</span>`:''}
+                    ${p.buyback?`<span class="tag tag-green">+\u20ac${p.buyback}/unit</span>`:''}
+                    ${p.espr?`<span class="tag tag-blue">ESPR \u2713</span>`:`<span class="tag" style="background:#FEF2F2;color:#991B1B">No ESPR</span>`}
+                    ${isConf?`<span class="tag tag-green">\u2713 Selected</span>`:''}
+                  </div>
+                </div>
+                <div style="font-size:.68rem;color:#555;line-height:1.55;margin-bottom:.3rem">${p.description}</div>
+                ${p.insiderNote?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--gold);margin-bottom:.3rem">\ud83d\udca1 ${p.insiderNote}</div>`:''}
+                <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem;align-items:center">
+                  ${!isConf?`<button class="btn-outline" style="font-size:.63rem;padding:.22rem .55rem" onclick="confirmCircularPartner(${p.id})">Select this partner \u2192</button>`:`<button class="btn-primary" style="font-size:.63rem;padding:.22rem .55rem" onclick="generateESPRDeclaration()">\u2193 Download ESPR Declaration</button>`}
+                  ${p.contact?`<a href="mailto:${p.contact}" style="font-family:var(--mono);font-size:.57rem;color:var(--navy)">${p.contact}</a>`:''}
+                </div>
+              </div>
+            `;
+          }).join(''):`<div style="font-size:.65rem;color:var(--muted);padding:.4rem 0">No verified partners in database for this route in your region.</div>`}
         </div>
-        <div style="font-family:var(--sans);font-size:.72rem;color:#666;line-height:1.6;margin-bottom:.4rem">${rt.partner.description}</div>
-        <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted)">${rt.partner.city}, ${rt.partner.country} · ${rt.carbonSaved} kg CO₂e saved</div>
-        <div class="route-detail" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">
-          <div class="prose" style="font-size:.78rem">${rt.analysis}</div>
-        </div>
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);margin-top:.5rem">Click for full analysis →</div>
+      `;
+    }).join('')}
+
+    ${r.confirmedPartner?`
+    <div class="card" style="background:#F0FDF4;border:1px solid #10B981;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:#065F46;margin-bottom:.25rem">\u2713 PARTNER CONFIRMED \u2014 ${r.confirmedPartner.name}</div>
+      <div style="font-size:.68rem;color:#14532D;margin-bottom:.55rem">${r.confirmedPartner.espr?'ESPR Article 24 documentation available. Download your declaration below.':'This partner does not provide ESPR documentation. Supplement with your own chain-of-custody record.'}</div>
+      <button class="btn-primary" onclick="generateESPRDeclaration()" style="margin-right:.4rem">\u2193 ESPR Article 24 Declaration</button>
+      <button class="btn-outline" onclick="circularResult.confirmedPartner=null;document.getElementById('circular-results').innerHTML=renderCircularResults()">Change partner</button>
+    </div>`:''}
+
+    <button class="btn-outline" style="margin-top:.3rem" onclick="circularResult=null;circularForm.confirmedRoute=null;renderCircular(document.getElementById('page-circular'))">&#8592; New route</button>
+  `;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   RETAILER CRM — Pipeline Tracker
+   Stages: not_contacted → pitched → meeting → listed
+═══════════════════════════════════════════════════ */
+
+const CRM_STAGES = [
+  {id:'not_contacted', label:'Not Contacted', color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB'},
+  {id:'pitched',       label:'Pitched',       color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE'},
+  {id:'meeting',       label:'Meeting Booked',color:'#92400E', bg:'#FFFBEB', border:'#FDE68A'},
+  {id:'listed',        label:'Listed ✓',      color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7'},
+];
+
+// Initialise CRM cards from RETAILER_REGISTRY
+function initCRMCards(){
+  return RETAILER_REGISTRY.map(r=>({
+    id: r.id,
+    name: r.name,
+    market: r.marketName,
+    marketCode: r.market,
+    categories: r.categories||[],
+    stage: 'not_contacted',
+    lastContact: '',
+    nextAction: '',
+    notes: '',
+    rangeReview: r.rangeReviewCycle?r.rangeReviewCycle.join(' / '):'',
+    moq: r.moq||null,
+    marginMin: r.marginMin||null,
+    marginMax: r.marginMax||null,
+    approachRoute: r.approachRoute||'',
+  }));
+}
+
+let crmCards = [];
+let crmFilter = {market:'', stage:'', search:''};
+let crmEditId = null;
+
+function loadCRM(){
+  const saved = localStorage.getItem('ns_crm');
+  if(saved){
+    try{
+      const parsed = JSON.parse(saved);
+      // Merge: keep saved data, add any new RETAILER_REGISTRY entries
+      const defaults = initCRMCards();
+      const savedIds = new Set(parsed.map(c=>c.id));
+      const newRetailers = defaults.filter(d=>!savedIds.has(d.id));
+      crmCards = [...parsed, ...newRetailers];
+    }catch(e){ crmCards = initCRMCards(); }
+  } else {
+    crmCards = initCRMCards();
+  }
+}
+
+function saveCRM(){
+  try{ localStorage.setItem('ns_crm', JSON.stringify(crmCards)); }catch(e){}
+}
+
+function moveCRMCard(id, stage){
+  const card = crmCards.find(c=>c.id===id);
+  if(card){ card.stage=stage; saveCRM(); renderPage('crm'); }
+}
+
+function saveCRMEdit(id){
+  const card = crmCards.find(c=>c.id===id);
+  if(!card) return;
+  const noteEl = document.getElementById(`crm-notes-${id}`);
+  const actionEl = document.getElementById(`crm-action-${id}`);
+  const dateEl = document.getElementById(`crm-date-${id}`);
+  if(noteEl) card.notes = noteEl.value;
+  if(actionEl) card.nextAction = actionEl.value;
+  if(dateEl) card.lastContact = dateEl.value;
+  crmEditId = null;
+  saveCRM();
+  renderPage('crm');
+}
+
+function exportCRMcsv(){
+  const headers = ['Retailer','Market','Stage','Last Contact','Next Action','Notes','Range Review','MOQ','Approach Route'];
+  const rows = crmCards.map(c=>[
+    c.name, c.market,
+    CRM_STAGES.find(s=>s.id===c.stage)?.label||c.stage,
+    c.lastContact, c.nextAction,
+    (c.notes||'').replace(/"/g,'""'),
+    c.rangeReview, c.moq||'',
+    (c.approachRoute||'').replace(/"/g,'""'),
+  ].map(v=>`"${v}"`).join(','));
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`VeyaFlow_RetailerCRM_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function renderCRM(el){
+  if(!crmCards.length) loadCRM();
+
+  // Filtered view
+  let cards = crmCards.filter(c=>{
+    const mM = !crmFilter.market || c.market===crmFilter.market;
+    const mS = !crmFilter.stage  || c.stage===crmFilter.stage;
+    const mQ = !crmFilter.search || c.name.toLowerCase().includes(crmFilter.search.toLowerCase()) || c.market.toLowerCase().includes(crmFilter.search.toLowerCase());
+    return mM && mS && mQ;
+  });
+
+  const markets = [...new Set(crmCards.map(c=>c.market))].sort();
+  const total = crmCards.length;
+  const listed = crmCards.filter(c=>c.stage==='listed').length;
+  const pitched = crmCards.filter(c=>c.stage==='pitched'||c.stage==='meeting').length;
+  const untouched = crmCards.filter(c=>c.stage==='not_contacted').length;
+
+  el.innerHTML = `
+    <div class="topbar">
+      <div>
+        <div class="page-title">Retailer CRM</div>
+        <div class="page-sub">Pipeline tracker · ${total} retailers · ${listed} listed · ${pitched} in progress</div>
       </div>
-    `).join('')}
-    <button class="btn-outline" onclick="circularResult=null;renderCircular(document.getElementById('page-circular'))">← New route</button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        <button class="btn-outline" style="font-size:.65rem" onclick="exportCRMcsv()">↓ Export CSV</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- Stats row -->
+      <div class="grid-4" style="margin-bottom:1.25rem">
+        ${CRM_STAGES.map(s=>{
+          const n = crmCards.filter(c=>c.stage===s.id).length;
+          return `<div class="stat-card" style="border-top:3px solid ${s.color};cursor:pointer" onclick="crmFilter.stage=crmFilter.stage===\'${s.id}\'?\'\':\'${s.id}\';renderPage('crm')">
+            <div class="stat-num" style="color:${s.color}">${n}</div>
+            <div class="stat-label">${s.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <input type="text" placeholder="Search retailers…" value="${crmFilter.search}"
+          oninput="crmFilter.search=this.value;renderPage('crm')"
+          style="padding:.4rem .75rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--navy);flex:1;min-width:140px">
+        <select onchange="crmFilter.market=this.value;renderPage('crm')"
+          style="padding:.4rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--navy)">
+          <option value="">All markets</option>
+          ${markets.map(m=>`<option${crmFilter.market===m?' selected':''}>${m}</option>`).join('')}
+        </select>
+        <select onchange="crmFilter.stage=this.value;renderPage('crm')"
+          style="padding:.4rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--navy)">
+          <option value="">All stages</option>
+          ${CRM_STAGES.map(s=>`<option value="${s.id}"${crmFilter.stage===s.id?' selected':''}>${s.label}</option>`).join('')}
+        </select>
+        ${crmFilter.market||crmFilter.stage||crmFilter.search?`<button class="btn-outline" style="font-size:.62rem;padding:.35rem .65rem" onclick="crmFilter={market:'',stage:'',search:''};renderPage('crm')">Clear ✕</button>`:''}
+        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-left:auto">${cards.length} of ${total}</span>
+      </div>
+
+      <!-- Kanban board -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;align-items:start">
+        ${CRM_STAGES.map(stage=>{
+          const stageCards = cards.filter(c=>c.stage===stage.id);
+          return `
+            <div>
+              <!-- Column header -->
+              <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${stage.color};padding:.5rem .75rem;background:${stage.bg};border:1px solid ${stage.border};border-bottom:none;display:flex;justify-content:space-between;align-items:center">
+                <span>${stage.label}</span>
+                <span style="font-size:.65rem;opacity:.7">${stageCards.length}</span>
+              </div>
+              <!-- Cards -->
+              <div style="border:1px solid ${stage.border};background:${stage.bg};min-height:120px;padding:.5rem .5rem .5rem">
+                ${stageCards.length===0?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--muted);text-align:center;padding:1.5rem .5rem;opacity:.6">No retailers</div>`:''}
+                ${stageCards.map(card=>{
+                  const isEditing = crmEditId===card.id;
+                  const nextStageId = CRM_STAGES[CRM_STAGES.findIndex(s=>s.id===card.stage)+1]?.id;
+                  const prevStageId = CRM_STAGES[CRM_STAGES.findIndex(s=>s.id===card.stage)-1]?.id;
+                  const nextStageLabel = CRM_STAGES.find(s=>s.id===nextStageId)?.label||'';
+                  return `
+                    <div style="background:#fff;border:1px solid ${stage.border};padding:.65rem .75rem;margin-bottom:.4rem;position:relative">
+                      <!-- Card header -->
+                      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
+                        <div>
+                          <div style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:var(--navy)">${card.name}</div>
+                          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${card.market}</div>
+                        </div>
+                        <button onclick="crmEditId=crmEditId==='${card.id}'?null:'${card.id}';renderPage('crm')"
+                          style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.15rem .4rem;flex-shrink:0">
+                          ${isEditing?'Done':'Edit'}
+                        </button>
+                      </div>
+
+                      <!-- Meta chips -->
+                      <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.4rem">
+                        ${card.marginMin?`<span style="font-family:var(--mono);font-size:.53rem;background:#F5F3EE;color:var(--navy);padding:.1rem .35rem">${Math.round(card.marginMin*100)}–${Math.round(card.marginMax*100)}% margin</span>`:''}
+                        ${card.moq?`<span style="font-family:var(--mono);font-size:.53rem;background:#F5F3EE;color:var(--navy);padding:.1rem .35rem">MOQ ${card.moq}</span>`:''}
+                        ${card.rangeReview?`<span style="font-family:var(--mono);font-size:.53rem;background:rgba(196,168,130,.12);color:var(--gold);padding:.1rem .35rem">${card.rangeReview}</span>`:''}
+                      </div>
+
+                      ${isEditing?`
+                        <!-- Edit form -->
+                        <div style="border-top:1px solid var(--border);padding-top:.5rem;margin-top:.35rem">
+                          <div style="margin-bottom:.35rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Last contact</label>
+                            <input type="date" id="crm-date-${card.id}" value="${card.lastContact}"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+                          </div>
+                          <div style="margin-bottom:.35rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Next action</label>
+                            <input type="text" id="crm-action-${card.id}" value="${card.nextAction||''}" placeholder="e.g. Send samples, Follow up, Book call…"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+                          </div>
+                          <div style="margin-bottom:.5rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Notes</label>
+                            <textarea id="crm-notes-${card.id}" rows="2" placeholder="${card.approachRoute||'Add notes…'}"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--sans);font-size:.65rem;color:var(--navy);resize:vertical">${card.notes||''}</textarea>
+                          </div>
+                          <!-- Stage buttons -->
+                          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">
+                            ${prevStageId?`<button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="moveCRMCard('${card.id}','${prevStageId}')">← ${CRM_STAGES.find(s=>s.id===prevStageId)?.label}</button>`:''}
+                            ${nextStageId?`<button class="btn-primary" style="font-size:.58rem;padding:.2rem .5rem" onclick="saveCRMEdit('${card.id}');moveCRMCard('${card.id}','${nextStageId}')">→ ${nextStageLabel}</button>`:''}
+                          </div>
+                          <button class="btn-outline" style="font-size:.6rem;padding:.25rem .5rem;width:100%" onclick="saveCRMEdit('${card.id}')">Save</button>
+                        </div>
+                      `:`
+                        <!-- Collapsed view -->
+                        ${card.nextAction?`<div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.4;margin-bottom:.3rem">→ ${card.nextAction}</div>`:''}
+                        ${card.lastContact?`<div style="font-family:var(--mono);font-size:.53rem;color:var(--muted)">Last: ${card.lastContact}</div>`:''}
+                        ${card.notes?`<div style="font-family:var(--sans);font-size:.63rem;color:var(--muted);margin-top:.2rem;line-height:1.4;font-style:italic">${card.notes.slice(0,60)}${card.notes.length>60?'…':''}</div>`:''}
+                        ${nextStageId&&!card.lastContact&&!card.notes?`
+                          <div style="margin-top:.4rem">
+                            <button style="font-family:var(--mono);font-size:.55rem;padding:.2rem .5rem;background:none;border:1px solid ${stage.border};color:${stage.color};cursor:pointer;width:100%" onclick="moveCRMCard('${card.id}','${nextStageId}')">Move to ${nextStageLabel} →</button>
+                          </div>
+                        `:''}
+                        <!-- Quick pitch link -->
+                        <div style="margin-top:.35rem;padding-top:.35rem;border-top:1px solid var(--border)">
+                          <span onclick="pitchForm.retailer='${card.name}';pitchForm.targetMarket='${card.market}';showPage('pitch')"
+                            style="font-family:var(--mono);font-size:.55rem;color:var(--navy);cursor:pointer;text-decoration:underline">Generate pitch →</span>
+                        </div>
+                      `}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Approach intel panel — shows for all non-listed cards -->
+      ${cards.filter(c=>c.stage!=='listed').length>0?`
+      <div style="margin-top:1.5rem">
+        <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Approach routes — ${cards.filter(c=>c.stage==='not_contacted').length} not yet contacted</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.65rem">
+          ${cards.filter(c=>c.stage==='not_contacted'&&c.approachRoute).slice(0,6).map(card=>`
+            <div style="background:#fff;border:1px solid var(--border);border-left:3px solid #6B7280;padding:.75rem .9rem">
+              <div style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">${card.name}</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.4rem">${card.market}</div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.55">${card.approachRoute}</div>
+              <button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem;margin-top:.5rem" onclick="crmEditId='${card.id}';crmFilter.stage='not_contacted';renderPage('crm')">Log first contact →</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      `:''}
+    </div>
   `;
 }
 
@@ -6674,7 +7350,7 @@ function renderCircularResults(){
 
 const MFR_TYPES=["Contract Manufacturer","Ingredient Supplier","Fabric Supplier","Packaging Supplier"];
 const MFR_MARKETS_LIST=["Sweden","Denmark","Germany","Norway","United Kingdom","Netherlands","France","United States","Australia"];
-const MFR_CATS=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel","Home & Design","Baby & Family","Sport & Outdoor"];
+const MFR_CATS=["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel"];
 
 function getFilteredMfrs(){
   savePageState('ns_findForm',findForm);
