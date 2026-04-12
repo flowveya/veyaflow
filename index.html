@@ -398,6 +398,7 @@
   }
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- jsPDF loaded lazily on first PDF export -->
 </head>
 <body>
 
@@ -3444,7 +3445,7 @@ function renderBizCaseResult(el){
         </div>
         <div style="display:flex;gap:.5rem">
           <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Regenerate</button>
-          <button class="btn-primary" onclick="window.print()">Print / PDF</button>
+          <button class="btn-primary" onclick="generateBizCasePDF()">↓ Download PDF</button>
         </div>
       </div>
 
@@ -3820,7 +3821,7 @@ function renderBrandPackResult(el){
         </div>
         <div style="display:flex;gap:.5rem">
           <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Regenerate</button>
-          <button class="btn-primary" onclick="window.print()">Print / Save PDF</button>
+          <button class="btn-primary" onclick="generateBrandPackPDF()">↓ Download PDF</button>
         </div>
       </div>
 
@@ -7626,6 +7627,402 @@ Use manufacturer names throughout. Be direct.`;
 /* ═══════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════
+   PROFESSIONAL PDF GENERATOR
+   Uses jsPDF loaded lazily from cdnjs
+═══════════════════════════════════════════════════ */
+
+let _jsPDFLoaded = false;
+
+function loadJsPDF(){
+  return new Promise((resolve, reject) => {
+    if(window.jspdf){ _jsPDFLoaded=true; resolve(); return; }
+    if(_jsPDFLoaded){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => { _jsPDFLoaded=true; resolve(); };
+    s.onerror = () => reject(new Error('Could not load PDF library'));
+    document.head.appendChild(s);
+  });
+}
+
+// ── Shared PDF helpers ────────────────────────────
+
+function pdfSetFont(doc, type){
+  // type: 'heading' | 'subheading' | 'label' | 'body' | 'mono' | 'small'
+  const map = {
+    heading:    ['helvetica','bold',   16],
+    subheading: ['helvetica','bold',   11],
+    label:      ['helvetica','bold',    8],
+    body:       ['helvetica','normal',  9],
+    mono:       ['courier', 'normal',  7.5],
+    small:      ['helvetica','normal',  7.5],
+    footer:     ['helvetica','normal',  7],
+  };
+  const [font, style, size] = map[type]||map.body;
+  doc.setFont(font, style);
+  doc.setFontSize(size);
+}
+
+function pdfColor(doc, hex){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  doc.setTextColor(r,g,b);
+}
+
+function pdfColorFill(doc, hex){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  doc.setFillColor(r,g,b);
+}
+
+function pdfDrawLine(doc, x1,y1,x2,y2, color='#E5E7EB', lw=0.3){
+  doc.setDrawColor(...color.slice(1).match(/../g).map(h=>parseInt(h,16)));
+  doc.setLineWidth(lw);
+  doc.line(x1,y1,x2,y2);
+}
+
+function pdfWrap(doc, text, x, y, maxW, lineH){
+  // Returns new Y after wrapped text
+  if(!text) return y;
+  const lines = doc.splitTextToSize(String(text), maxW);
+  doc.text(lines, x, y);
+  return y + lines.length * lineH;
+}
+
+function pdfHeader(doc, title, subtitle, accentHex, pageW){
+  // Full-width navy header block
+  pdfColorFill(doc, '#1E3A5F');
+  doc.rect(0, 0, pageW, 28, 'F');
+  // Accent stripe
+  pdfColorFill(doc, accentHex||'#C4A882');
+  doc.rect(0, 28, pageW, 2, 'F');
+  // Title
+  pdfSetFont(doc, 'heading');
+  pdfColor(doc, '#FFFFFF');
+  doc.text(title, 14, 12);
+  // Subtitle
+  pdfSetFont(doc, 'small');
+  pdfColor(doc, 'rgba(255,255,255,0.6)');
+  doc.setTextColor(180,190,200);
+  doc.text(subtitle||'', 14, 19);
+  // VeyaFlow mark
+  pdfSetFont(doc, 'footer');
+  doc.setTextColor(150,160,170);
+  doc.text('VeyaFlow · veyaflow.com', pageW-14, 10, {align:'right'});
+  doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), pageW-14, 15, {align:'right'});
+}
+
+function pdfFooter(doc, pageNum, totalPages, pageW, pageH){
+  pdfDrawLine(doc, 14, pageH-10, pageW-14, pageH-10, '#E5E7EB', 0.3);
+  pdfSetFont(doc, 'footer');
+  doc.setTextColor(160,160,160);
+  doc.text(`Page ${pageNum} of ${totalPages}`, pageW/2, pageH-5, {align:'center'});
+  doc.text('Confidential — prepared by VeyaFlow', 14, pageH-5);
+}
+
+function pdfSectionHeader(doc, title, x, y, pageW){
+  pdfColorFill(doc, '#F5F3EE');
+  doc.rect(x-2, y-4, pageW-x*2+4, 8, 'F');
+  pdfSetFont(doc, 'label');
+  pdfColor(doc, '#1E3A5F');
+  doc.text(title.toUpperCase(), x, y);
+  return y + 7;
+}
+
+function pdfKeyValue(doc, label, value, x, y, labelW){
+  pdfSetFont(doc, 'label');
+  doc.setTextColor(120,120,120);
+  doc.text(label, x, y);
+  pdfSetFont(doc, 'body');
+  doc.setTextColor(30,30,30);
+  doc.text(String(value||'—'), x+labelW, y);
+  return y + 5.5;
+}
+
+// Strip markdown from AI text for PDF
+function stripMd(text){
+  if(!text) return '';
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^#{1,4}\s/gm, '')
+    .replace(/^[-•]\s/gm, '• ')
+    .trim();
+}
+
+// ── Brand Pack PDF ────────────────────────────────
+
+async function generateBrandPackPDF(){
+  const btn = event?.target;
+  if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
+  try{
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
+    const retailer = brandPackState.retailer||'Retailer';
+    const market = brandPackState.market||'Market';
+    const cover = BRAND_PACK_COVERS[retailer]||{accent:'#1E3A5F'};
+    const heroSku = skus[0]||null;
+    const sections = (brandPackState.result||'').split(/^## /m).filter(s=>s.trim().length>10).map(s=>{
+      const lines=s.split('\n'); return {title:lines[0].replace(/SECTION \d+ — /,'').trim(), body:stripMd(lines.slice(1).join('\n').trim())};
+    });
+
+    // ── PAGE 1: Cover ──
+    pdfColorFill(doc, cover.accent||'#1E3A5F');
+    doc.rect(0, 0, pageW, pageH, 'F');
+    // Diagonal accent
+    pdfColorFill(doc, '#FFFFFF');
+    doc.setFillColor(255,255,255);
+    doc.triangle(0, pageH*0.55, pageW, pageH*0.7, 0, pageH, 'F');
+    // Brand name
+    pdfSetFont(doc, 'heading');
+    doc.setFontSize(28);
+    pdfColor(doc, '#FFFFFF');
+    doc.text(brand?.name||'Brand', margin, 60);
+    // Subtitle
+    pdfSetFont(doc, 'subheading');
+    doc.setFontSize(13);
+    doc.setTextColor(220,220,220);
+    doc.text('Retail Brand Pack', margin, 72);
+    // Retailer
+    pdfSetFont(doc, 'body');
+    doc.setFontSize(10);
+    doc.setTextColor(200,210,220);
+    doc.text(`Prepared for ${retailer} · ${market}`, margin, 82);
+    // Date
+    doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}), margin, 90);
+    // VeyaFlow logo area (bottom of cover)
+    pdfColor(doc, '#FFFFFF');
+    doc.setFontSize(8);
+    doc.text('Generated by VeyaFlow · veyaflow.com', pageW/2, pageH-15, {align:'center'});
+    doc.setTextColor(180,190,200);
+    doc.text('Confidential — not for distribution', pageW/2, pageH-9, {align:'center'});
+
+    // ── PAGE 2: Brand Overview ──
+    doc.addPage();
+    pdfHeader(doc, `${brand?.name||'Brand'} — Brand Pack`, `${retailer} · ${market} · ${brand?.category||''}`, cover.accent, pageW);
+    let y = 38;
+
+    // Brand snapshot 2-col
+    y = pdfSectionHeader(doc, 'Brand Snapshot', margin, y, pageW);
+    const col1x=margin, col2x=pageW/2+4, colW=contentW/2-4;
+    const snapRows=[
+      ['Category', brand?.category||'—'],
+      ['Home market', brand?.currentMarket||'—'],
+      ['Target market', market],
+      ['Stage', brand?.stage||'—'],
+      ['Website', brand?.website||'—'],
+    ];
+    const snapRows2=[
+      ['Annual revenue', brand?.annualRevenue||'Not disclosed'],
+      ['Units sold', brand?.unitsSold||'—'],
+      ['Repeat rate', brand?.repeatRate||'—'],
+      ['Social following', brand?.socialFollowers||'—'],
+      ['Press mentions', brand?.pressCount||'—'],
+    ];
+    let y1=y, y2=y;
+    snapRows.forEach(([l,v])=>{ y1=pdfKeyValue(doc,l,v,col1x,y1,32); });
+    snapRows2.forEach(([l,v])=>{ y2=pdfKeyValue(doc,l,v,col2x,y2,32); });
+    y = Math.max(y1,y2)+4;
+    pdfDrawLine(doc,margin,y,pageW-margin,y);
+    y+=6;
+
+    // Brand positioning
+    if(brand?.usp){
+      y = pdfSectionHeader(doc, 'Brand Positioning', margin, y, pageW);
+      pdfSetFont(doc, 'body');
+      doc.setTextColor(50,50,50);
+      doc.setFontSize(9);
+      doc.setFont('helvetica','italic');
+      y = pdfWrap(doc, `"${brand.usp}"`, margin, y, contentW, 5)+6;
+    }
+
+    // Hero SKU
+    if(heroSku){
+      y = pdfSectionHeader(doc, 'Hero SKU', margin, y, pageW);
+      pdfKeyValue(doc,'Product',heroSku.name||'—',margin,y,30); y+=5.5;
+      pdfKeyValue(doc,'EAN',heroSku.ean||'—',margin,y,30);
+      pdfKeyValue(doc,'RSP (SE)',heroSku.rspSEK?heroSku.rspSEK+' SEK':'—',pageW/2,y,30); y+=5.5;
+      if(heroSku.rspDKK||heroSku.rspEUR||heroSku.rspGBP){
+        pdfKeyValue(doc,'RSP (target)',heroSku.rspDKK?heroSku.rspDKK+' DKK':heroSku.rspEUR?heroSku.rspEUR+' EUR':heroSku.rspGBP?heroSku.rspGBP+' GBP':'—',margin,y,30); y+=5.5;
+      }
+      if(heroSku.moq) { pdfKeyValue(doc,'MOQ',heroSku.moq+' units',margin,y,30); y+=5.5; }
+      if(heroSku.leadDays) { pdfKeyValue(doc,'Lead time',heroSku.leadDays+' days',margin,y,30); y+=5.5; }
+      y+=3;
+    }
+
+    // Compliance
+    if(heroSku){
+      y = pdfSectionHeader(doc, 'Compliance Status', margin, y, pageW);
+      const compRows = [
+        ['CPNP', heroSku.cpnp||heroSku.cpnpNumber||'Not filed', !!(heroSku.cpnp||heroSku.cpnpNumber)],
+        ['EU Responsible Person', heroSku.euResponsible||'Not set', !!heroSku.euResponsible],
+        ['Safety Assessment', heroSku.safetyRef||'Not set', !!heroSku.safetyRef],
+        ['Certifications', (heroSku.certifications||[]).join(', ')||'None', !!(heroSku.certifications?.length)],
+      ];
+      compRows.forEach(([l,v,ok])=>{
+        pdfSetFont(doc,'label'); doc.setTextColor(120,120,120); doc.text(l,margin,y);
+        pdfSetFont(doc,'body'); doc.setTextColor(ok?5:153, ok?95:27, ok?70:27); doc.text((ok?'✓ ':'')+String(v).slice(0,45), margin+38, y);
+        y+=5.5;
+      });
+      y+=3;
+    }
+
+    pdfFooter(doc, 2, sections.length+2, pageW, pageH);
+
+    // ── AI CONTENT PAGES ──
+    sections.forEach((section, idx)=>{
+      doc.addPage();
+      pdfHeader(doc, section.title, `${brand?.name||'Brand'} · ${retailer} · ${market}`, cover.accent, pageW);
+      let sy = 40;
+      pdfSetFont(doc, 'body');
+      doc.setTextColor(40,40,40);
+      // Split body into paragraphs
+      const paras = section.body.split(/\n\n+/);
+      paras.forEach(para=>{
+        if(sy>pageH-20){ doc.addPage(); pdfHeader(doc,section.title,`${brand?.name||'Brand'} · continued`,cover.accent,pageW); sy=40; }
+        if(para.startsWith('• ')){
+          const lines=para.split('\n').filter(Boolean);
+          lines.forEach(line=>{
+            if(sy>pageH-20){ doc.addPage(); pdfHeader(doc,section.title,'continued',cover.accent,pageW); sy=40; }
+            pdfSetFont(doc,'body'); doc.setTextColor(40,40,40);
+            doc.text('•', margin, sy);
+            sy = pdfWrap(doc, line.replace(/^•\s*/,''), margin+5, sy, contentW-5, 5);
+          });
+          sy+=2;
+        } else {
+          sy = pdfWrap(doc, para, margin, sy, contentW, 5)+4;
+        }
+      });
+      pdfFooter(doc, idx+3, sections.length+2, pageW, pageH);
+    });
+
+    const filename = `VeyaFlow_BrandPack_${(brand?.name||'brand').replace(/\s+/g,'_')}_${retailer.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(filename);
+  } catch(err){
+    alert('PDF generation failed: '+err.message+'\n\nFallback: use Print → Save as PDF');
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='↓ Download PDF'; }
+  }
+}
+
+// ── Retail Business Case PDF ──────────────────────
+
+async function generateBizCasePDF(){
+  const btn = event?.target;
+  if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
+  try{
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
+    const retailer=bizCaseState.retailer||'Retailer';
+    const market=bizCaseState.market||'Market';
+    const mode=bizCaseState.mode||'catman';
+    const heroSku=skus[0]||null;
+    const sections=(bizCaseState.result||'').split(/^## /m).filter(s=>s.trim().length>10).map(s=>{
+      const lines=s.split('\n'); return {title:lines[0].trim(), body:stripMd(lines.slice(1).join('\n').trim())};
+    });
+
+    const accent = '#1E3A5F';
+
+    // ── PAGE 1: Cover / Executive summary ──
+    pdfColorFill(doc, accent);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    // Gold stripe
+    pdfColorFill(doc, '#C4A882');
+    doc.rect(0, pageH*0.6, pageW, 3, 'F');
+    // Label
+    pdfSetFont(doc, 'mono');
+    doc.setFontSize(7);
+    doc.setTextColor(150,160,170);
+    doc.text(mode==='catman'?'INTERNAL LISTING APPROVAL DOCUMENT':'RETAIL BUSINESS CASE', margin, 30);
+    // Brand name
+    pdfSetFont(doc, 'heading');
+    doc.setFontSize(26);
+    pdfColor(doc, '#FFFFFF');
+    doc.text(brand?.name||'Brand', margin, 48);
+    // × retailer
+    pdfSetFont(doc, 'subheading');
+    doc.setFontSize(14);
+    doc.setTextColor(180,190,200);
+    doc.text(`× ${retailer}`, margin, 59);
+    // Details
+    doc.setFontSize(9);
+    doc.setTextColor(150,165,180);
+    doc.text(`${market} · ${brand?.category||''} · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`, margin, 68);
+    if(mode==='catman'){
+      doc.setFontSize(8);
+      doc.setTextColor(120,135,150);
+      doc.text('For internal use only — not for distribution to brand', margin, 76);
+    }
+    // Commercial snapshot box
+    if(heroSku){
+      pdfColorFill(doc, '#162D4A');
+      doc.roundedRect(margin, 90, contentW, 40, 2, 2, 'F');
+      pdfSetFont(doc,'label'); doc.setFontSize(6.5); doc.setTextColor(150,165,180); doc.text('KEY COMMERCIAL METRICS', margin+6, 98);
+      const metrics=[
+        ['RSP', heroSku.rspSEK?heroSku.rspSEK+' SEK':(heroSku.rspDKK?heroSku.rspDKK+' DKK':'—')],
+        ['MOQ', heroSku.moq?heroSku.moq+' units':'—'],
+        ['Lead time', heroSku.leadDays?heroSku.leadDays+' days':'—'],
+        ['Category', brand?.category?.split(' &')[0]||'—'],
+      ];
+      const mW = contentW/metrics.length;
+      metrics.forEach(([l,v],i)=>{
+        const mx=margin+6+i*mW;
+        pdfSetFont(doc,'label'); doc.setFontSize(6); doc.setTextColor(130,145,160); doc.text(l, mx, 108);
+        pdfSetFont(doc,'subheading'); doc.setFontSize(11); doc.setTextColor(200,210,220); doc.text(v, mx, 118);
+      });
+    }
+    // VeyaFlow
+    pdfColor(doc, '#C4A882');
+    doc.setFontSize(8);
+    doc.text('◈ VeyaFlow', pageW/2, pageH-15, {align:'center'});
+    doc.setTextColor(150,165,180);
+    doc.setFontSize(7);
+    doc.text('veyaflow.com', pageW/2, pageH-9, {align:'center'});
+
+    // ── AI CONTENT PAGES ──
+    sections.forEach((section, idx)=>{
+      doc.addPage();
+      pdfHeader(doc, section.title, `${brand?.name||'Brand'} × ${retailer} · ${market}`, '#C4A882', pageW);
+      let sy = 40;
+
+      // Section number badge
+      pdfColorFill(doc, '#F5F3EE');
+      doc.rect(margin, sy-4, 8, 8, 'F');
+      pdfSetFont(doc,'label'); doc.setFontSize(8); doc.setTextColor(196,168,130);
+      doc.text(String(idx+1), margin+4, sy+1, {align:'center'});
+      sy += 8;
+
+      const paras = section.body.split(/\n\n+/);
+      paras.forEach(para=>{
+        if(sy>pageH-20){ doc.addPage(); pdfHeader(doc,section.title,'continued','#C4A882',pageW); sy=40; }
+        pdfSetFont(doc,'body'); doc.setTextColor(40,40,40);
+        if(para.startsWith('• ')){
+          para.split('\n').filter(Boolean).forEach(line=>{
+            if(sy>pageH-20){ doc.addPage(); pdfHeader(doc,section.title,'continued','#C4A882',pageW); sy=40; }
+            doc.text('•', margin, sy);
+            sy = pdfWrap(doc, line.replace(/^•\s*/,''), margin+5, sy, contentW-5, 5);
+          });
+          sy+=2;
+        } else {
+          sy = pdfWrap(doc, para, margin, sy, contentW, 5)+4;
+        }
+      });
+      pdfFooter(doc, idx+2, sections.length+1, pageW, pageH);
+    });
+
+    const filename = `VeyaFlow_BizCase_${(brand?.name||'brand').replace(/\s+/g,'_')}_${retailer.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(filename);
+  } catch(err){
+    alert('PDF generation failed: '+err.message+'\n\nFallback: use Print → Save as PDF');
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='↓ Download PDF'; }
+  }
+}
+
 function init(){
   loadState();
   buildNav();
