@@ -64,6 +64,31 @@
   .nav-item.active .nav-label { color: var(--gold); }
   .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; }
 
+  /* Nav section tabs */
+  .nav-section-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+  .nav-section-tab {
+    flex: 1; padding: .45rem .25rem; text-align: center;
+    font-family: var(--mono); font-size: .52rem; letter-spacing: .06em; text-transform: uppercase;
+    color: rgba(255,255,255,.3); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .nav-section-tab:hover { color: rgba(255,255,255,.55); background: rgba(255,255,255,.03); }
+  .nav-section-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(196,168,130,.07); }
+  .nav-section-tab.locked { color: rgba(255,255,255,.18); cursor: default; }
+  .nav-section-tab.locked:hover { background: none; color: rgba(255,255,255,.18); }
+
+  /* Nav section group label */
+  .nav-group-label {
+    padding: .6rem 1.25rem .25rem;
+    font-family: var(--mono); font-size: .5rem; letter-spacing: .12em;
+    text-transform: uppercase; color: rgba(255,255,255,.22);
+  }
+
+  /* Locked section placeholder */
+  .nav-locked-section { padding: 1.25rem; text-align: center; }
+  .nav-locked-title { font-family: var(--mono); font-size: .62rem; color: rgba(255,255,255,.25); margin-bottom: .3rem; }
+  .nav-locked-sub { font-family: var(--sans); font-size: .65rem; color: rgba(255,255,255,.15); line-height: 1.5; }
+
   .s-footer { padding: .85rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
   .s-footer-text { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.25); }
 
@@ -115,10 +140,11 @@
   /* FORMS */
   .field { margin-bottom: 1rem; }
   label.lbl { display: block; font-family: var(--mono); font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #333; margin-bottom: .35rem; }
-  input[type=text], input[type=number], input[type=email], select, textarea {
+  input[type=text], input[type=number], input[type=email], input[type=date], select, textarea {
     width: 100%; padding: .7rem .9rem; border: 1px solid #DDD;
-    background: var(--cream); font-family: var(--sans); font-size: .9rem;
+    background: var(--cream); font-family: var(--sans); font-size: 1rem;
     color: var(--ink); outline: none; appearance: none; resize: vertical;
+    min-height: 44px; box-sizing: border-box;
   }
   input:focus, select:focus, textarea:focus { border-color: var(--navy); }
 
@@ -320,36 +346,89 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 680px) {
+    /* Layout */
     #sidebar { display: none; }
     #app { flex-direction: column; }
-    #main { flex: 1; min-height: 0; }
+    #main { flex: 1; min-height: 0; overflow: hidden; }
+    .content { padding: .85rem; padding-bottom: 5.5rem; overflow-x: hidden; }
+    .topbar { padding: .75rem .85rem; flex-wrap: wrap; gap: .4rem; }
+    .page-title { font-size: 1.05rem; }
+    .page-sub { font-size: .62rem; }
 
-    .content { padding: 1rem; padding-bottom: 5rem; }
-    .topbar { padding: .85rem 1rem; flex-wrap: wrap; gap: .5rem; }
-    .page-title { font-size: 1.1rem; }
-
-    /* Collapse all grids to single column */
-    .grid-2, .grid-3, .grid-4, .col-2, .col-filter { grid-template-columns: 1fr !important; }
-
-    /* Stats: 2 columns on mobile */
+    /* Grids */
+    .grid-2, .grid-3, .col-2, .col-filter { grid-template-columns: 1fr !important; }
     .grid-4 { grid-template-columns: 1fr 1fr !important; gap: .5rem !important; }
 
-    .card { padding: .85rem 1rem; }
-    .nav-banner { padding: .85rem 1rem; flex-direction: column; align-items: flex-start; gap: .6rem; }
-    .nav-banner-btn { font-size: .6rem; padding: .45rem .7rem; }
+    /* Typography — minimum 16px body, 14px secondary */
+    body { font-size: 16px; }
+    .prose { font-size: 1rem !important; line-height: 1.7 !important; }
+    .email-box { font-size: 1rem !important; line-height: 1.7 !important; }
+
+    /* Inputs — 16px prevents iOS zoom */
+    input[type=text], input[type=number], input[type=email], input[type=date],
+    select, textarea { font-size: 16px !important; min-height: 44px; }
+
+    /* Buttons — 44px touch targets */
+    .btn-primary { padding: .85rem 1.25rem; font-size: .72rem; min-height: 44px; }
+    .btn-outline { padding: .65rem .9rem; min-height: 44px; font-size: .65rem; }
+    .btn-gold { min-height: 44px; }
+    .nav-banner-btn { min-height: 44px; padding: .5rem .75rem; }
+    .topbar .btn-primary, .topbar .btn-outline { min-height: 40px; width: auto; font-size: .62rem; }
+
+    /* Cards */
+    .card { padding: .85rem; }
+    .empty-state { padding: 1.75rem 1rem; }
+    .empty-sub { font-size: .85rem; }
+    .stat-card { padding: .75rem; }
+    .stat-num { font-size: 1.3rem; }
+
+    /* Nav */
+    .nav-banner { padding: .85rem; flex-direction: column; align-items: flex-start; gap: .5rem; }
+
+    /* Reports */
     .report-header { padding: 1rem; }
     .report-brand { font-size: 1.2rem; }
-    .report-meta-row { gap: .85rem; }
-    .onboard-wrap { padding: 1rem; align-items: flex-start; }
-    .email-box { font-size: .8rem; }
+    .report-meta-row { gap: .75rem; flex-wrap: wrap; }
+    .report-section { padding: 1rem .85rem; }
+
+    /* Onboarding */
+    .onboard-wrap { padding: .85rem; align-items: flex-start; }
+    .onboard-title { font-size: 1.2rem; }
+    .onboard-sub { font-size: .85rem; }
+    .cat-option { padding: .65rem .75rem; font-size: .78rem; min-height: 44px; }
+    .stage-option { padding: .85rem; min-height: 44px; }
+    .goal-chip { min-height: 44px; }
+    .market-chip { min-height: 36px; padding: .4rem .75rem; display: inline-flex; align-items: center; }
+
+    /* Dashboard */
+    #readiness-sequencer-row { grid-template-columns: 1fr !important; gap: .85rem !important; }
+
+    /* CRM kanban — stack vertically */
+    .crm-kanban { grid-template-columns: 1fr !important; }
+
+    /* Compare */
     .compare-table { font-size: .7rem; }
     .compare-table th, .compare-table td { padding: .5rem .65rem; }
 
-    /* Reg strip: horizontal scroll */
-    .reg-strip { flex-wrap: nowrap; overflow-x: auto; gap: .85rem; padding: .4rem 1rem; }
+    /* Chips + tags */
+    .chips { gap: .3rem; }
+    .tag { font-size: .6rem; padding: .2rem .5rem; }
+    .market-chip { font-size: .62rem; }
 
-    /* Jump nav: horizontal scroll */
+    /* Reg strip + section nav: horizontal scroll */
+    .reg-strip { flex-wrap: nowrap; overflow-x: auto; gap: .85rem; padding: .4rem .85rem; }
     #section-jump { overflow-x: auto; flex-wrap: nowrap !important; }
+
+    /* Tables: horizontal scroll */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Mobile-only visible / hidden helpers */
+    .mob-only { display: inline-flex !important; }
+    .mob-hide { display: none !important; }
+
+    /* PDF buttons: hide download, show print */
+    .pdf-btn-desktop { display: none !important; }
+    .pdf-btn-mobile { display: inline-flex !important; }
   }
 
   /* MOBILE BOTTOM NAV */
@@ -365,20 +444,19 @@
     background: linear-gradient(to right, transparent, rgba(30,58,95,.9));
   }
   #mobile-nav-inner {
-    display: flex; overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    display: flex; width: 100%;
     scrollbar-width: none;
   }
   #mobile-nav-inner::-webkit-scrollbar { display: none; }
   .mob-nav-item {
-    display: flex; flex-direction: column; align-items: center;
-    padding: .45rem .4rem .35rem; cursor: pointer; min-width: 52px;
-    flex-shrink: 0; position: relative; transition: background .15s;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: .5rem .25rem .4rem; cursor: pointer; flex: 1;
+    min-height: 54px; position: relative; transition: background .15s;
   }
   .mob-nav-item.active { background: rgba(196,168,130,.15); }
-  .mob-nav-icon { font-size: .8rem; color: rgba(255,255,255,.4); line-height: 1; }
+  .mob-nav-icon { font-size: 1.1rem; color: rgba(255,255,255,.4); line-height: 1; }
   .mob-nav-item.active .mob-nav-icon { color: var(--gold); }
-    .mob-nav-label { font-family: var(--mono); font-size: .42rem; color: rgba(255,255,255,.4); margin-top: .1rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
+  .mob-nav-label { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.4); margin-top: .15rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
   .mob-nav-item.active .mob-nav-label { color: var(--gold); }
   .mob-badge { position: absolute; top: .35rem; right: .6rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 4px; font-family: var(--mono); font-size: .42rem; }
 
@@ -445,6 +523,7 @@
     <div class="page" id="page-claims"></div>
     <div class="page" id="page-cfo"></div>
     <div class="page" id="page-crm"></div>
+    <div class="page" id="page-dpp"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -739,12 +818,12 @@ async function callAPI(messages,maxTokens=1200){
     });
     clearTimeout(timeout);
   }catch(networkErr){
-    if(networkErr.name==='AbortError') throw new Error("Request timed out after 24 seconds. Try again — the report generates in 4 steps and each step should complete within 10 seconds.");
-    throw new Error("Connection error. Check your internet connection and try again.");
+    if(networkErr.name==='AbortError') throw new Error("timeout — Request took too long. Your data is saved — try again.");
+    throw new Error("connection — No internet connection detected. Your data is saved locally — reconnect and try again.");
   }
   if(res.status===401)throw new Error("401 — API key missing. Deploy via Netlify proxy.");
-  if(res.status===504)throw new Error("504 — Request timed out. Your Netlify plan may need upgrading, or try again in a moment.");
-  if(res.status===529)throw new Error("529 — AI overloaded. Try again in a moment.");
+  if(res.status===504)throw new Error("504");
+  if(res.status===529)throw new Error("529");
   if(!res.ok)throw new Error("API error "+res.status);
   const d=await res.json();
   return(d.content||[]).map(b=>b.text||"").join("");
@@ -773,19 +852,22 @@ function getCatLabel(id){
 }
 
 const NAV=[
-  {id:"home",    icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"find",    icon:"◌", label:"Source",                stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"report",  icon:"◎", label:"Market Report",         stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"compare", icon:"⇄", label:"Compare Markets",       stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"crm",     icon:"⊞", label:"Retailer CRM",         stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"pitch",   icon:"✉", label:"Retailer Pitch",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"brandpack",icon:"◫",label:"Brand Pack",            stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
-  {id:"bizcase", icon:"◉", label:"Retail Business Case",  stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS, badge:"New"},
-  {id:"suppliers",icon:"◈",label:"Supplier Nudge",        stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
-  {id:"circular",icon:"◉", label:"Circular GPS",          stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"skus",    icon:"▦",  label:"My Products",            stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"claims",  icon:"⚑",  label:"Claim Localizer",        stages:["trading","expanding","scaling"],                  cats:null, badge:"New"},
-  {id:"cfo",     icon:"◈",  label:"CFO View",               stages:["trading","expanding","scaling"],                  cats:null, badge:"New"},
+  // ── BRAND section ──────────────────────────────
+  {id:"home",     sec:"brand", icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"skus",     sec:"brand", icon:"▦", label:"My Products",          stages:["product","trading","expanding","scaling"],        cats:null},
+  {id:"report",   sec:"brand", icon:"◎", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"compare",  sec:"brand", icon:"⇄", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"claims",   sec:"brand", icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"pitch",    sec:"brand", icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"brandpack",sec:"brand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"bizcase",  sec:"brand", icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"crm",      sec:"brand", icon:"⊞", label:"Retailer CRM",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
+  // ── SOURCE section ─────────────────────────────
+  {id:"find",     sec:"source", icon:"◌", label:"Manufacturer Finder", stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"suppliers",sec:"source", icon:"◈", label:"Supplier Nudge",      stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"circular", sec:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
 ];
 
 // Returns nav items visible for current brand stage
@@ -805,37 +887,70 @@ function getVisibleNav(){
 
 const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
+function switchNavSection(sec){
+  if(sec==='retail') return; // locked
+  navSection=sec;
+  buildNav();
+}
+
 function buildNav(){
-  var visibleNav = getVisibleNav();
+  var allVisible = getVisibleNav();
   var nav=document.getElementById('sidebar-nav');
-  var stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
-  var stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
   var currentStage = brand&&brand.stage?brand.stage:'trading';
+  var stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
+  var stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
+
+  var sectionItems = allVisible.filter(function(n){ return n.sec===navSection; });
+
   var html='';
+
+  // Stage label
   if(brand){
     var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion');
-    html+='<div style="padding:.5rem 1rem .35rem;font-family:var(--mono);font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.25rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
+    html+='<div style="padding:.4rem 1rem .3rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.15rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
-  visibleNav.forEach(function(n){
-    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
-    html+='<span class="nav-icon">'+n.icon+'</span>';
-    html+='<span class="nav-label">'+n.label+'</span>';
-    if(n.badge) html+='<span style="font-family:var(--mono);font-size:.48rem;background:var(--gold);color:var(--navy);padding:.1rem .3rem;letter-spacing:.04em;font-weight:700">'+n.badge+'</span>';
-    if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
-    if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
-    html+='</div>';
-  });
+
+  // Section tabs
+  html+='<div class="nav-section-tabs">';
+  html+='<div class="nav-section-tab'+(navSection==='brand'?' active':'')+'" data-sec="brand" onclick="switchNavSection(this.dataset.sec)">Brand</div>';
+  html+='<div class="nav-section-tab'+(navSection==='source'?' active':'')+'" data-sec="source" onclick="switchNavSection(this.dataset.sec)">Source</div>';
+  html+='<div class="nav-section-tab locked" title="Coming soon">Retail</div>';
+  html+='</div>';
+
+  if(navSection==='retail'){
+    html+='<div class="nav-locked-section"><div class="nav-locked-title">🔒 Retail</div><div class="nav-locked-sub">Retailer portal integrations, live buyer data, and automated order management — coming in V2.</div></div>';
+  } else {
+    sectionItems.forEach(function(n){
+      html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
+      html+='<span class="nav-icon">'+n.icon+'</span>';
+      html+='<span class="nav-label">'+n.label+'</span>';
+      if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
+      if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+      html+='</div>';
+    });
+  }
+
   nav.innerHTML=html;
 
+  // Mobile nav — show current section items + section switcher
   var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
+    var mobTabs=[
+      {id:'home',  icon:'\u2302', label:'Home'},
+      {id:'report',icon:'\u25ce', label:'Reports'},
+      {id:'find',  icon:'\u25cc', label:'Source'},
+      {id:'crm',   icon:'\u229e', label:'CRM'},
+      {id:'skus',  icon:'\u2586', label:'Products'},
+    ];
+    var brandPages=['report','compare','pitch','brandpack','bizcase','claims','cfo'];
+    var sourcePages=['find','suppliers','circular'];
     var mobHtml='';
-    visibleNav.forEach(function(n){
-      mobHtml+='<div class="mob-nav-item" id="mobnav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
+    mobTabs.forEach(function(n){
+      var active=currentPage===n.id||(n.id==='report'&&brandPages.includes(currentPage))||(n.id==='find'&&sourcePages.includes(currentPage));
+      mobHtml+='<div class="mob-nav-item'+(active?' active':'')+'" data-id="'+n.id+'" onclick="showPage(this.dataset.id)">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
-      if(n.id==='suppliers') mobHtml+='<span class="mob-badge">2</span>';
       mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
-      mobHtml+='<span class="mob-nav-label">'+(MOB_NAV_LABELS[n.id]||n.label)+'</span>';
+      mobHtml+='<span class="mob-nav-label">'+n.label+'</span>';
       mobHtml+='</div>';
     });
     mobnav.innerHTML=mobHtml;
@@ -843,15 +958,21 @@ function buildNav(){
 }
 
 let currentPage='home';
+let navSection='brand'; // 'brand' | 'source' | 'retail'
 function showPage(id){
   currentPage=id;
+  // Auto-switch section tab to match the page being shown
+  var navItem = NAV.find(function(n){ return n.id===id; });
+  if(navItem&&navItem.sec&&navItem.sec!=='retail') navSection=navItem.sec;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id)?.classList.add('active');
+  buildNav(); // rebuild so active tab + item are in sync
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('mobnav-'+id)?.classList.add('active');
   document.getElementById('reg-strip').style.display=(brand&&id!=='home')?'flex':'none';
+  setDeepLink(id);
   renderPage(id);
 }
 
@@ -909,13 +1030,14 @@ function renderPage(id){
   else if(id==='claims')renderClaims(el);
   else if(id==='cfo')renderCFO(el);
   else if(id==='crm'){ loadCRM(); renderCRM(el); }
+  else if(id==='dpp'){ loadDPP(); renderDPP(el); }
 }
 
 /* ═══════════════════════════════════════════════════
    HOME PAGE
 ═══════════════════════════════════════════════════ */
 let onboardStep=1;
-let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:'',heroSkuName:'',heroSkuEan:'',heroSkuRsp:'',heroSkuCpnp:''};
+let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:'',heroSkuName:'',heroSkuType:'cosmetic',heroSkuEan:'',heroSkuRsp:'',heroSkuCpnp:''};
 
 function renderHome(el){
   if(!brand){
@@ -943,13 +1065,13 @@ function renderOnboardStep(){
     inner.innerHTML=`
       <div class="onboard-title">Set up your brand workspace</div>
       <div class="onboard-sub">VeyaFlow uses this to personalise every report, manufacturer match, and retailer pitch to your brand, category, and target markets.</div>
-      <div class="field"><label class="lbl">Brand name *</label><input type="text" id="ob-name" value="${onboardForm.name}" placeholder="e.g. Cloud & Glow" oninput="onboardForm.name=this.value"></div>
+      <div class="field"><label class="lbl">Brand name *</label><input type="text" id="ob-name" value="${onboardForm.name}" placeholder="e.g. Cloud & Glow" oninput="onboardForm.name=this.value;var b=document.getElementById('ob-continue-1');if(b)b.disabled=!onboardForm.name||!onboardForm.category"></div>
       <div class="field"><label class="lbl">Website</label><input type="text" id="ob-web" value="${onboardForm.website}" placeholder="e.g. cloudandglow.com" oninput="onboardForm.website=this.value"></div>
       <div class="field"><label class="lbl">Product category *</label>
         <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="onboardForm.category='${c}';renderOnboardStep()">${c}</div>`).join('')}</div>
       </div>
       <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
-      <button class="btn-primary" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
+      <button id="ob-continue-1" class="btn-primary" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
     `;
   } else if(onboardStep===2){
     inner.innerHTML=`
@@ -985,9 +1107,6 @@ function renderOnboardStep(){
       </div>
       <div class="field"><label class="lbl">Key products / SKUs</label><input type="text" id="ob-skus" value="${onboardForm.skus}" placeholder="e.g. LED Face Mask, Overnight Lip Tape, Silk Pillowcase" oninput="onboardForm.skus=this.value"></div>
       <div class="field"><label class="lbl">Your name</label><input type="text" id="ob-username" value="${onboardForm.userName||''}" placeholder="e.g. Charlotte" oninput="onboardForm.userName=this.value"></div>
-      <div style="padding:.6rem .85rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);font-family:var(--mono);font-size:.58rem;color:var(--gold);line-height:1.6">
-        ◈ Multi-user workspace — coming in V2. Your workspace is currently single-user. Team invites will be added once the Supabase backend is live.
-      </div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=2;renderPage('home')">← Back</button>
         <button class="btn-primary" style="flex:1" onclick="onboardStep=4;renderPage('home')">Continue →</button>
@@ -1005,61 +1124,39 @@ function renderOnboardStep(){
       <div class="onboard-title">Your commercial proof points</div>
       <div class="onboard-sub">This data powers the Brand Pack — the retailer-ready document VeyaFlow generates for your buyer meetings. Add what you have. Everything is optional. You can update it anytime from Brand Home.</div>
 
-      <div style="margin-bottom:1.25rem">
-        <label class="lbl" style="margin-bottom:.5rem;display:block">What evidence do you have?</label>
-        <div class="grid-2">
-          ${proofTypes.map(pt=>`
-            <div class="cat-option${onboardForm.proofType===pt.id?' selected':''}" onclick="onboardForm.proofType='${pt.id}';renderOnboardStep()" style="text-align:left;padding:.75rem">
-              <div style="font-size:1.1rem;margin-bottom:.2rem">${pt.icon}</div>
-              <div style="font-weight:600;font-size:.8rem;color:var(--navy)">${pt.label}</div>
-              <div style="font-size:.68rem;color:var(--muted);margin-top:.1rem">${pt.desc}</div>
-            </div>
-          `).join('')}
-        </div>
+      <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-bottom:1rem">Add what you have — all fields optional. This data powers your Brand Pack and Readiness Score.</div>
+
+      <div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Sales & revenue</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Annual revenue (SEK/EUR)</label>
+          <input type="text" placeholder="e.g. 1,200,000 SEK" value="${onboardForm.annualRevenue||''}" oninput="onboardForm.annualRevenue=this.value"></div>
+        <div class="field"><label class="lbl">Year-on-year growth</label>
+          <input type="text" placeholder="e.g. +38%" value="${onboardForm.revenueGrowth||''}" oninput="onboardForm.revenueGrowth=this.value"></div>
+        <div class="field"><label class="lbl">Units sold (last 12 months)</label>
+          <input type="text" placeholder="e.g. 4,200" value="${onboardForm.unitsSold||''}" oninput="onboardForm.unitsSold=this.value"></div>
+        <div class="field"><label class="lbl">Repeat purchase rate</label>
+          <input type="text" placeholder="e.g. 42%" value="${onboardForm.repeatRate||''}" oninput="onboardForm.repeatRate=this.value"></div>
       </div>
 
-      ${onboardForm.proofType==='revenue'?`
-        <div class="field"><label class="lbl">Annual revenue <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(SEK or EUR, optional)</span></label>
-          <input type="text" placeholder="e.g. 1,200,000 SEK" value="${onboardForm.annualRevenue||''}" oninput="onboardForm.annualRevenue=this.value"></div>
-        <div class="field"><label class="lbl">Year-on-year growth <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. +38%" value="${onboardForm.revenueGrowth||''}" oninput="onboardForm.revenueGrowth=this.value"></div>
-        <div class="field"><label class="lbl">Units sold (last 12 months) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. 4,200" value="${onboardForm.unitsSold||''}" oninput="onboardForm.unitsSold=this.value"></div>
-        <div class="field"><label class="lbl">Repeat purchase rate <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. 42%" value="${onboardForm.repeatRate||''}" oninput="onboardForm.repeatRate=this.value"></div>
-        <div class="field"><label class="lbl">DTC revenue in target market <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(proves demand before retail entry)</span></label>
-          <input type="text" placeholder="e.g. 180,000 SEK in Germany" value="${onboardForm.dtcRevenue||''}" oninput="onboardForm.dtcRevenue=this.value"></div>
-      `:''}
-
-      ${onboardForm.proofType==='social'?`
-        <div class="field"><label class="lbl">Social media followers <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(combined, optional)</span></label>
+      <div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:.75rem 0 .5rem">Social & press</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Social media followers</label>
           <input type="text" placeholder="e.g. 28,000 Instagram + 12,000 TikTok" value="${onboardForm.socialFollowers||''}" oninput="onboardForm.socialFollowers=this.value"></div>
-        <div class="field"><label class="lbl">Press coverage <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(publications, optional)</span></label>
-          <input type="text" placeholder="e.g. Vogue Scandinavia, Damernas Värld, Byrdie" value="${onboardForm.pressCount||''}" oninput="onboardForm.pressCount=this.value"></div>
-        <div class="field"><label class="lbl">Awards & recognitions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. Beauty Shortlist Winner 2025, CEW Finalist" value="${onboardForm.awardsCount||''}" oninput="onboardForm.awardsCount=this.value"></div>
-      `:''}
+        <div class="field"><label class="lbl">Press coverage</label>
+          <input type="text" placeholder="e.g. Vogue Scandinavia, Byrdie" value="${onboardForm.pressCount||''}" oninput="onboardForm.pressCount=this.value"></div>
+        <div class="field"><label class="lbl">Awards & recognitions</label>
+          <input type="text" placeholder="e.g. Beauty Shortlist Winner 2025" value="${onboardForm.awardsCount||''}" oninput="onboardForm.awardsCount=this.value"></div>
+        <div class="field"><label class="lbl">Review score & count</label>
+          <input type="text" placeholder="e.g. 4.8/5 from 340 reviews" value="${onboardForm.reviewScore||''}" oninput="onboardForm.reviewScore=this.value"></div>
+      </div>
 
-      ${onboardForm.proofType==='demand'?`
-        <div class="field"><label class="lbl">Waitlist or pre-order signups <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. 2,400 people signed up before launch" value="${onboardForm.waitlistCount||''}" oninput="onboardForm.waitlistCount=this.value"></div>
-        <div class="field"><label class="lbl">Inbound wholesale enquiries <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. 14 retailers contacted us without pitching" value="${onboardForm.wholesaleEnquiries||''}" oninput="onboardForm.wholesaleEnquiries=this.value"></div>
-      `:''}
-
-      ${onboardForm.proofType==='reviews'?`
-        <div class="field"><label class="lbl">Review score & count <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-          <input type="text" placeholder="e.g. 4.8/5 from 340 reviews on Trustpilot" value="${onboardForm.reviewScore||''}" oninput="onboardForm.reviewScore=this.value"></div>
-      `:''}
-
-      <div class="field" style="margin-top:.5rem"><label class="lbl">Clinical / efficacy claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-        <input type="text" placeholder="e.g. Clinically tested to reduce fine lines by 23% after 8 weeks" value="${onboardForm.clinicalClaims||''}" oninput="onboardForm.clinicalClaims=this.value"></div>
-
-      <div class="field"><label class="lbl">Routine / protocol position <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-        <input type="text" placeholder="e.g. Step 5 of the overnight ritual — amplifies the serum" value="${onboardForm.routineStep||''}" oninput="onboardForm.routineStep=this.value"></div>
-
-      <div class="field"><label class="lbl">Basket impact claim <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
-        <input type="text" placeholder="e.g. Customers who buy our LED mask spend 3x more on serums" value="${onboardForm.basketImpact||''}" oninput="onboardForm.basketImpact=this.value"></div>
+      <div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:.75rem 0 .5rem">Demand signals</div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">Waitlist / pre-order signups</label>
+          <input type="text" placeholder="e.g. 2,400 signups before launch" value="${onboardForm.waitlistCount||''}" oninput="onboardForm.waitlistCount=this.value"></div>
+        <div class="field"><label class="lbl">Inbound wholesale enquiries</label>
+          <input type="text" placeholder="e.g. 14 retailers reached out" value="${onboardForm.wholesaleEnquiries||''}" oninput="onboardForm.wholesaleEnquiries=this.value"></div>
+      </div>
 
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=3;renderPage('home')">← Back</button>
@@ -1074,6 +1171,14 @@ function renderOnboardStep(){
 
       <div class="field"><label class="lbl">Product name *</label>
         <input type="text" id="ob-sku-name" placeholder="e.g. Cloud & Glow LED Face Mask" value="${onboardForm.heroSkuName||''}" oninput="onboardForm.heroSkuName=this.value"></div>
+      <div class="field"><label class="lbl">Product type *</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem">
+          ${PRODUCT_TYPES.map(pt=>`<div class="cat-option${(onboardForm.heroSkuType||'cosmetic')===pt.id?' selected':''}" onclick="onboardForm.heroSkuType='${pt.id}';renderOnboardStep()" style="padding:.5rem .6rem">
+            <div style="font-size:.85rem;margin-bottom:.1rem">${pt.icon}</div>
+            <div style="font-size:.65rem;font-weight:600;color:var(--navy)">${pt.label.split('/')[0].trim()}</div>
+          </div>`).join('')}
+        </div>
+      </div>
 
       <div class="grid-2">
         <div class="field"><label class="lbl">EAN-13 barcode</label>
@@ -1196,7 +1301,7 @@ function showProofEdit(){
       </div>
       <div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1rem;line-height:1.6">These proof points appear in your Brand Pack — the retailer-ready document for buyer meetings. All fields are optional.</div>
       <div id="proof-modal-fields"></div>
-      <button class="btn-primary" style="width:100%;margin-top:.5rem" onclick="saveProofPoints('${'' /* will be set */}')">Save proof points</button>
+      <button class="btn-primary" style="width:100%;margin-top:.5rem" onclick="saveProofPoints()">Save proof points</button>
     </div>
   `;
   document.body.appendChild(modal);
@@ -1236,8 +1341,12 @@ function completeOnboardWithSku(){
   if(onboardForm.heroSkuName){
     const heroSku = newSkuForm();
     heroSku.name = onboardForm.heroSkuName;
+    // Map brand category to SKU productType
+    const _catTypeMap={'Skincare & Beauty':'cosmetic','Wellness & Supplements':'supplement','Food & Beverage':'food','Fashion & Apparel':'garment'};
+    heroSku.productType = onboardForm.heroSkuType||_catTypeMap[onboardForm.category]||'cosmetic';
     heroSku.ean = onboardForm.heroSkuEan||'';
-    heroSku.rspSEK = onboardForm.heroSkuRsp||'';
+    heroSku.rspSEK = (onboardForm.heroSkuRsp||'')
+      .replace(/[^0-9.]/g,'')||'';
     heroSku.cpnp = onboardForm.heroSkuCpnp||'';
     skus = [heroSku];
     saveSkus();
@@ -1302,6 +1411,10 @@ const BLOCKER_RESOLUTION = {
   ukCMR:          {days:21, cost:'3,000–8,000 SEK',  fix:'Review all CMR substances against UK Amending Instrument SI 2026/23. Engage a UK regulatory consultant.', partner:'UK Regulatory Consultant', partnerUrl:'https://veyaflow.com/verified-partners'},
   ediMatas:       {days:14, cost:'0 SEK',             fix:'Contact your 3PL to set up Matas EDI codes for Taastrup hub. Does not affect pilot stores.'},
   noRpUK:         {days:14, cost:'5,000–15,000 SEK/yr',fix:'Appoint a UK Responsible Person (RP) with a UK address. Required before any UK listing.', partner:'UK Responsible Person — from £1,200/year', partnerUrl:'https://veyaflow.com/verified-partners'},
+  netPriceMissing:{days:1,  cost:'0 SEK',             fix:'Open My Products → select your SKU → Commercial tab → enter Net Price (SEK).'},
+  leadTime:       {days:0,  cost:'0 SEK',             fix:'Negotiate faster delivery schedule with your manufacturer, or find an EU-based co-packer.'},
+  socialLow:      {days:0,  cost:'0 SEK',             fix:'Focus on TikTok content — 10K followers unlocks Lyko, Kicks, and social-first retailers.'},
+  inciMissing:    {days:1,  cost:'0 SEK',             fix:'Add your INCI ingredient list in My Products → Compliance tab. Required for EU retail listings.'},
 };
 
 // ── Readiness scoring engine ──────────────────────
@@ -1315,7 +1428,8 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
 
   // 1. COMPLIANCE (35) — only binary blocker, highest weight
   let comp = 0;
-  if(sku){
+  const skuValid = sku && (sku.name||sku.ean||sku.inci||sku.rspSEK);
+  if(skuValid){
     // CPNP — EU cosmetics
     if(sku.productType==='cosmetic'&&market.euMember){
       if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
@@ -1342,13 +1456,13 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
     else if(redClaims.length>0){ blockers.push({id:'redClaim',level:'red',label:`${redClaims.length} claim${redClaims.length>1?'s':''} flagged RED for ${market.name}`,impact:'Must rephrase before pitching — regulatory risk.'}); }
     else if(amberClaims.length>0){ blockers.push({id:'amberClaim',level:'amber',label:`${amberClaims.length} claim${amberClaims.length>1?'s':''} need review for ${market.name}`,impact:'Amber claims need substantiation or market-specific rephrasing.'}); comp+=5; }
   } else {
-    blockers.push({id:'noSku',level:'red',label:'No product added',impact:'Add at least one SKU to calculate compliance score.'});
+    blockers.push({id:'noSku',level:'red',label:'No product added yet',impact:'Your compliance score activates once you add a product. <span onclick="showPage(\"skus\")" style="text-decoration:underline;cursor:pointer;color:#991B1B">Add your first product →</span>'});
   }
   dims.compliance = {score:Math.min(comp,35), max:35};
 
   // 2. COMMERCIAL (28)
   let comm = 0;
-  if(sku&&retailer){
+  if(skuValid&&retailer){
     const rsp = parseFloat(sku.rspDKK||sku.rspGBP||sku.rspEUR||sku.rspSEK||0);
     const net = parseFloat(sku.netPriceSEK||0);
     const moq = parseInt(sku.moq||0);
@@ -1358,7 +1472,10 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(margin>=(retailer.marginMin||0.45)){ comm+=10; greens.push(`Margin ≥ ${Math.round((retailer.marginMin||0.45)*100)}% — within ${retailer.name} range`); }
       else if(margin>=(retailer.marginMin||0.45)-0.05){ comm+=5; blockers.push({id:'marginTooLow',level:'amber',label:'Margin slightly below '+retailer.name+' minimum',impact:'Buyer may push back. Tighten net price or adjust RSP.'}); }
       else{ blockers.push({id:'marginTooLow',level:'red',label:'Margin below '+retailer.name+' minimum ('+Math.round(margin*100)+'% vs '+Math.round((retailer.marginMin||0.45)*100)+'% required)',impact:'Listing unlikely at current net price.'}); }
-    } else { comm+=5; }
+    } else if(rsp>0){
+      comm+=4;
+      blockers.push({id:'netPriceMissing',level:'amber',label:'Net price not set — margin cannot be calculated',impact:'Add your net price in My Products → Commercial tab to unlock margin scoring.'});
+    } else { comm+=3; }
     if(moq>0&&retailer.moq){
       if(moq<=retailer.moq){ comm+=10; greens.push('MOQ within '+retailer.name+' standard range'); }
       else if(moq<=retailer.moq*1.5){ comm+=5; blockers.push({id:'moqTooHigh',level:'amber',label:'MOQ slightly above '+retailer.name+' standard',impact:'Negotiable — mention flexibility in pitch.'}); }
@@ -1380,7 +1497,9 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   if(followers>=10000){ bs+=4; greens.push('Social following ≥ 10K'); }
   else if(followers>=5000){ bs+=2; blockers.push({id:'socialLow',level:'amber',label:'Social following below 10K',impact:'Lyko and Kicks require active content calendar.'}); }
   else if(followers>0){ blockers.push({id:'socialLow',level:'amber',label:'Social following below 5K',impact:'Build to 10K before approaching social-first retailers.'}); }
-  const press = parseInt((brand.pressCount||'0').replace(/\D/g,''))||0;
+  // pressCount may be a number string ("3") or text ("Vogue, Byrdie, Damernas")
+  const _pressRaw = brand.pressCount||'';
+  const press = _pressRaw ? (parseInt(_pressRaw)||0) || (_pressRaw.length>3 ? Math.min((_pressRaw.split(/[,;]+/).length), 10) : 0) : 0;
   if(press>=3){ bs+=4; greens.push('3+ press mentions on file'); }
   else if(press>=1){ bs+=2; }
   const repeat = parseFloat((brand.repeatRate||'0').replace(/[^0-9.]/g,''))||0;
@@ -1390,7 +1509,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
 
   // 4. PRODUCT DATA (10)
   let pd = 0;
-  if(sku){
+  if(skuValid){
     if(sku.ean){ pd+=3; greens.push('EAN barcode on file'); }
     else{ blockers.push({id:'eanMissing',level:'amber',label:'EAN barcode missing',impact:'Required for all retail listing systems.'}); }
     if(sku.inci||sku.ingredients){ pd+=4; greens.push('INCI / ingredients list on file'); }
@@ -1407,7 +1526,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       else{ blockers.push({id:'ediMatas',level:'amber',label:'EDI not configured for Matas Taastrup hub',impact:'Required for national rollout — pilot unaffected. Contact your 3PL.'}); log+=3; }
     } else {
       // Non-EDI retailers — check warehouse/logistics field
-      if(sku?.warehouse||brand.logisticsPartner){ log+=7; greens.push('Logistics partner on file'); }
+      if(skuValid?.warehouse||brand.logisticsPartner){ log+=7; greens.push('Logistics partner on file'); }
       else{ log+=4; }
     }
   }
@@ -1467,6 +1586,7 @@ function renderReadinessScore(){
   const barColor = rs.total>=85?'#10B981':rs.total>=70?'#1E40AF':rs.total>=50?'#F59E0B':'#EF4444';
 
   return `
+    <div id="readiness-panel">
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem">
         <div>
@@ -1560,6 +1680,7 @@ function renderReadinessScore(){
         <button class="btn-outline" onclick="pitchForm.retailer='${rs.retailer?.name||''}';pitchForm.targetMarket='${rs.market?.name||''}';showPage('pitch')" style="font-size:.68rem;padding:.45rem .9rem">Start Retailer Pitch →</button>
       </div>
     </div>
+    </div>
   `;
 }
 
@@ -1640,7 +1761,43 @@ function renderExpansionSequencer(){
   `;
 }
 
+
+function saveProofPoints(){
+  const currentType = document.querySelector('[name="proof-type"]:checked')?.value||brand.proofType||'revenue';
+  brand.proofType = currentType;
+  // Read all possible fields from modal
+  const readVal = id => document.getElementById(id)?.value||'';
+  if(currentType==='revenue'){
+    brand.annualRevenue  = readVal('pf-revenue');
+    brand.revenueGrowth  = readVal('pf-growth');
+    brand.unitsSold      = readVal('pf-units');
+    brand.repeatRate     = readVal('pf-repeat');
+    brand.dtcRevenue     = readVal('pf-dtc');
+  }
+  if(currentType==='social'){
+    brand.socialFollowers = readVal('pf-social');
+    brand.pressCount      = readVal('pf-press');
+    brand.awardsCount     = readVal('pf-awards');
+  }
+  if(currentType==='demand'){
+    brand.waitlistCount      = readVal('pf-waitlist');
+    brand.wholesaleEnquiries = readVal('pf-wholesale');
+  }
+  if(currentType==='reviews'){
+    brand.reviewScore = readVal('pf-review');
+  }
+  brand.clinicalClaims = readVal('pf-clinical');
+  brand.routineStep    = readVal('pf-routine');
+  brand.basketImpact   = readVal('pf-basket');
+  saveBrandState();
+  document.getElementById('proof-modal')?.remove();
+  const ps = document.getElementById('proof-summary');
+  if(ps) ps.innerHTML = renderProofSummary();
+}
+
 function renderDashboard(el){
+  // Mark readiness score as viewed for setup tracker
+  if(brand) localStorage.setItem('ns_readiness_viewed','1');
   const stage=BRAND_STAGES.find(s=>s.id===brand.stage)||BRAND_STAGES[2];
   const steps=NEXT_STEPS[brand.stage]||NEXT_STEPS.trading;
   const reports=savedReports.slice(0,5);
@@ -1668,9 +1825,12 @@ function renderDashboard(el){
         </div>
       </div>
 
+      <!-- SETUP TRACKER -->
+      ${renderSetupTracker()}
+
       <!-- READINESS + SEQUENCER — full width above col-2 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem" id="readiness-sequencer-row">
-        <div id="readiness-panel">${renderReadinessScore()}</div>
+        ${renderReadinessScore()}
         <div id="sequencer-panel">${renderExpansionSequencer()}</div>
       </div>
 
@@ -1682,11 +1842,7 @@ function renderDashboard(el){
             <button class="btn-outline" onclick="showPage('report')">+ New report</button>
           </div>
           ${reports.length===0?`
-            <div class="card empty-state">
-              <div class="empty-title">No reports yet</div>
-              <div class="empty-sub">Generate a market entry report to get a full intelligence brief on any market — retail landscape, compliance requirements, pricing, and a 90-day action plan.</div>
-              <button class="btn-primary" style="margin-top:1rem;width:auto;padding:.6rem 1.25rem" onclick="showPage('report')">Generate report →</button>
-            </div>
+${smartEmpty("report")}
           `:reports.map(r=>`
             <div class="saved-report" onclick="expandReport('${r.id}')">
               <div style="display:flex;justify-content:space-between">
@@ -1832,7 +1988,7 @@ function renderReport(el){
     <div class="content">
       ${reportState.loading?`
         <div style="padding:1.25rem">
-          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Generating market entry report — 4 modules</div>
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;position:sticky;top:0;background:#fff;padding-top:.5rem;z-index:5">Generating market entry report — 4 modules</div>
           <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.75rem">
             <div id="r-progress" style="background:var(--gold);height:6px;border-radius:3px;width:5%;transition:width .8s ease"></div>
           </div>
@@ -1874,9 +2030,12 @@ function renderReportForm(){
         <div id="r-status" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;margin-top:.5rem;min-height:1rem"></div>
       </div>
       <div>
-        <div class="card empty-state">
-          <div class="empty-title">Market intelligence brief</div>
-          <div class="empty-sub">Fill in your brand details and select a target market. VeyaFlow generates a detailed brief: named retailers and their buyer requirements, full regulatory compliance checklist, pricing benchmarks, distributor recommendations, and a 90-day market entry plan — the equivalent of a market entry consultant engagement.</div>
+        <div class="card" style="padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">What you get</div>
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            ${['Named retailers and buyer requirements','Full compliance checklist for this market','Pricing benchmarks and margin analysis','Distributor recommendations','90-day market entry action plan'].map(item=>`<div style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--gold);flex-shrink:0;margin-top:.1rem">→</span><span style="font-family:var(--sans);font-size:.73rem;color:#555;line-height:1.5">${item}</span></div>`).join('')}
+          </div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)">Equivalent to a market entry consultant engagement — generated in 60 seconds.</div>
         </div>
       </div>
     </div>
@@ -2793,7 +2952,7 @@ Full 3-year total: LOW — HIGH | Payback: X months from first listing`
       console.error('Module failed:', mod.title, err.message);
       completedSections.push({
         title: mod.title,
-        content: `Generation error for this section: ${err.message}. The other sections completed successfully.`
+        content: `We hit an issue generating this section — the other sections completed successfully. Try regenerating to fill this in.`
       });
     }
   }
@@ -2956,35 +3115,199 @@ function renderReportResult(){
 ═══════════════════════════════════════════════════ */
 
 
-function renderCompare(el){
-  if(!compareForm.brandName) compareForm.brandName=brand?.name||'';
-  if(!compareForm.category)  compareForm.category=brand?.category||'';
-  el.innerHTML=`
-    <div class="topbar">
-      <div>
-        <div class="page-title">Compare Markets</div>
-        <div class="page-sub">Side-by-side market analysis · Opportunity scoring · Pick the right market first</div>
-      </div>
-    </div>
-    <div class="content">
-      ${compareResult?renderCompareResult():renderCompareForm()}
-    </div>
-  `;
-  if(!compareResult) bindCompareForm();
+
+/* ═══════════════════════════════════════════════════
+   COMPARE MARKETS V2
+   Personalised · Six dimensions · Recommendation
+═══════════════════════════════════════════════════ */
+
+// ── Intelligence constants ────────────────────────
+
+const COMPARISON_DIMENSIONS = [
+  {id:'regulatoryOverlap', label:'Regulatory overlap',   weight:20, desc:'How much of your existing compliance transfers directly'},
+  {id:'entryCost',         label:'Cost to enter',        weight:20, desc:'Total estimated setup cost (SEK)'},
+  {id:'retailerFit',       label:'Retailer fit',         weight:20, desc:'Quality of retailer options for your category'},
+  {id:'nordicReception',   label:'Nordic brand reception',weight:15, desc:'How consumers respond to Scandinavian brands'},
+  {id:'marketTiming',      label:'2026 timing window',   weight:15, desc:'Market-specific opportunity open right now'},
+  {id:'revenueY1',         label:'Year 1 revenue (est.)',weight:10, desc:'Estimated net revenue at your RSP and category'},
+];
+
+// Category velocity benchmarks — units/store/week in pilot phase
+const CATEGORY_VELOCITY = {
+  'Skincare & Beauty':    {DK:2.2, NO:1.8, NL:2.0, DE:1.5, UK:1.8, FR:1.4, SE:2.5},
+  'Wellness & Supplements':{DK:1.8,NO:1.5, NL:1.6, DE:1.2, UK:1.6, FR:1.1, SE:2.0},
+  'Food & Beverage':      {DK:3.0, NO:2.5, NL:2.8, DE:2.0, UK:2.4, FR:2.0, SE:3.2},
+  'Fashion & Apparel':    {DK:1.5, NO:1.2, NL:1.4, DE:1.0, UK:1.3, FR:0.9, SE:1.8},
+};
+
+// Retailer phase-1 store counts (pilot rollout)
+const PHASE1_STORES = {
+  matas_dk:15, lyko_se:1, kicks_se:20, apotek_hjartat_se:30,
+  dm_de:50, boots_uk:25, holland_barrett_uk:30, kicks_no:10,
+  etos_nl:20, kruidvat_nl:30, douglas_nl:8,
+};
+
+// ── Per-market dimension scoring (pre-AI) ─────────
+
+function scoreMarketDimension(dim, marketCode, brand, sku){
+  const market = MARKET_REGISTRY[marketCode];
+  const homeCode = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'}[brand?.currentMarket||'Sweden']||'SE';
+  const cat = brand?.category||'Skincare & Beauty';
+
+  if(dim==='regulatoryOverlap'){
+    const overlap = (MARKET_PAIRS[homeCode]||MARKET_PAIRS.SE||{})[marketCode]||0.5;
+    return {score:Math.round(overlap*100), display:`${Math.round(overlap*100)}%`, detail:_regulatoryDetail(marketCode, homeCode, sku, market)};
+  }
+  if(dim==='entryCost'){
+    const cost = (MARKET_ENTRY_COSTS[marketCode]||{})[cat]||50000;
+    const score = cost<15000?100:cost<25000?80:cost<45000?60:cost<90000?35:15;
+    return {score, display:`~${Math.round(cost/1000)}K SEK`, rawCost:cost, detail:_costDetail(marketCode, cat, cost)};
+  }
+  if(dim==='retailerFit'){
+    const retailers = RETAILER_REGISTRY.filter(r=>r.market===marketCode&&(r.categories||[]).includes(cat));
+    const score = retailers.length>=3?95:retailers.length===2?75:retailers.length===1?50:15;
+    const fitLabel = score>=90?'HIGH':score>=70?'MEDIUM':'LOW';
+    return {score, display:fitLabel, detail:_retailerDetail(marketCode, cat, retailers)};
+  }
+  if(dim==='nordicReception'){
+    const map={VERY_POSITIVE:100,POSITIVE:72,NEUTRAL:45,HOME_MARKET:100,NEGATIVE:15};
+    const score = map[market?.nordicsOriginSignal]||45;
+    const labels={VERY_POSITIVE:'VERY POSITIVE',POSITIVE:'POSITIVE',NEUTRAL:'NEUTRAL',HOME_MARKET:'HOME',NEGATIVE:'NEGATIVE'};
+    return {score, display:labels[market?.nordicsOriginSignal]||'—', detail:`Nordic/Scandinavian brand origin signal is ${labels[market?.nordicsOriginSignal]||'neutral'} in ${market?.name||marketCode}.`};
+  }
+  if(dim==='marketTiming'){
+    const timingMap={LOW:35,MEDIUM:60,HIGH:90};
+    // Map from MARKET_REGISTRY data
+    const complexityInverse={LOW:90,MEDIUM:65,HIGH:40};
+    const base = complexityInverse[market?.entryComplexity]||60;
+    // Boost if timingHook exists (verified 2026 window)
+    const score = market?.timingHook2026 ? Math.min(base+15,100) : base;
+    const label = score>=80?'STRONG':score>=55?'MODERATE':'WEAK';
+    return {score, display:label, detail:market?.timingHook2026||'No specific 2026 timing signal identified.'};
+  }
+  if(dim==='revenueY1'){
+    const rsp = parseFloat(sku?.rspDKK||sku?.rspGBP||sku?.rspEUR||sku?.rspSEK||0);
+    const vatRate = {DK:0.25,DE:0.19,UK:0.20,NO:0.25,NL:0.21,FR:0.20,SE:0.25}[marketCode]||0.25;
+    const topRetailer = RETAILER_REGISTRY.find(r=>r.market===marketCode&&(r.categories||[]).includes(cat));
+    const margin = topRetailer?.marginMin||0.48;
+    const velocity = (CATEGORY_VELOCITY[cat]||{})[marketCode]||1.5;
+    const phase1 = topRetailer?PHASE1_STORES[topRetailer.id]||15:15;
+    const netPerUnit = rsp>0 ? rsp*(1-margin)/(1+vatRate) : 0;
+    const unitsY1 = Math.round(velocity*phase1*40);
+    const revY1 = Math.round(netPerUnit*unitsY1);
+    const score = revY1>400000?95:revY1>250000?80:revY1>120000?60:revY1>50000?40:rsp===0?50:20;
+    const conf = sku?.exWorksCost?'HIGH':'EST';
+    const display = revY1>0?`${Math.round(revY1/1000)}K SEK`:'—';
+    return {score, display, revY1, unitsY1, conf, detail:`Est. ${unitsY1.toLocaleString()} units × ${topRetailer?.name||'retailer'} pilot (${phase1} stores). Net/unit after margin & VAT: ${netPerUnit>0?Math.round(netPerUnit)+' SEK':'enter RSP for exact figure'}. Confidence: ${conf}.`};
+  }
+  return {score:50, display:'—', detail:''};
 }
 
+function _regulatoryDetail(marketCode, homeCode, sku, market){
+  const overlap = (MARKET_PAIRS[homeCode]||MARKET_PAIRS.SE||{})[marketCode]||0.5;
+  const gaps = [];
+  if(marketCode==='UK'){ gaps.push('UK Responsible Person required (~£1,200/yr)'); gaps.push('UKCA marking for devices'); gaps.push('Full English relabel'); }
+  else if(market?.euMember){ if(overlap<0.85) gaps.push('Local language label required'); if(marketCode==='DE') gaps.push('Claims review — stricter DE environment'); if(marketCode==='FR') gaps.push('French-language label mandatory'); }
+  const days = marketCode==='UK'?56:marketCode==='DE'?21:marketCode==='FR'?21:14;
+  const cost = marketCode==='UK'?85000:marketCode==='DE'?8000:marketCode==='FR'?6000:2000;
+  return `${Math.round(overlap*100)}% of your existing compliance transfers. ${gaps.length?'Additional: '+gaps.join(', ')+'.':''} Est. time to compliant: ~${days} days. Est. cost: ~${cost.toLocaleString()} SEK.`;
+}
+
+function _costDetail(marketCode, cat, cost){
+  const items = {
+    DK:['CPNP (covered)','Danish label translation (~2,000 SEK)','Beauty Days budget (~8,000 SEK)'],
+    DE:['CPNP (covered)','German label + claims review (~6,000 SEK)','VerpackG registration (~1,500 SEK)','Local marketing (~15,000 SEK)'],
+    UK:['UK Responsible Person (~8,500 SEK/yr)','UKCA marking for devices','Full English relabel (~5,000 SEK)'],
+    NO:['CPNP (covered)','Norwegian label (~1,500 SEK)','Mattilsynet notification if applicable'],
+    NL:['CPNP (covered)','Dutch label (~2,000 SEK)','Minor compliance work'],
+    FR:['CPNP (covered)','French label (~3,000 SEK)','French distributor setup'],
+  };
+  return (items[marketCode]||[`~${cost.toLocaleString()} SEK total estimated`]).join(' · ');
+}
+
+function _retailerDetail(marketCode, cat, retailers){
+  if(!retailers.length) return `No retailers in VeyaFlow registry for ${cat} in this market.`;
+  return retailers.map(r=>`${r.name} (MOQ ${r.moq||'—'}, margin ${r.marginMin?Math.round(r.marginMin*100)+'%':'—'}, range review: ${(r.rangeReviewCycle||[]).join('/')||'—'})`).join(' · ');
+}
+
+// ── Full market score ─────────────────────────────
+
+function scoreMarketFull(marketCode, brand, sku){
+  const dims = {};
+  let total = 0;
+  COMPARISON_DIMENSIONS.forEach(d=>{
+    const result = scoreMarketDimension(d.id, marketCode, brand, sku);
+    const weighted = Math.round(result.score * d.weight / 100);
+    dims[d.id] = {...result, weighted, dimWeight:d.weight};
+    total += weighted;
+  });
+  return {marketCode, market:MARKET_REGISTRY[marketCode], dims, total};
+}
+
+// ── Parallel entry detection ──────────────────────
+
+function detectParallelEntry(markets){
+  const pairs = [];
+  markets.forEach(m1 => {
+    const mc1 = _nameToCode(m1);
+    const lev = RETAILER_LEVERAGE[mc1];
+    if(!lev?.unlocks?.length) return;
+    lev.unlocks.forEach(uc => {
+      const m2name = _codeToName(uc);
+      if(m2name && markets.includes(m2name)){
+        const saving = Math.round(((MARKET_ENTRY_COSTS[mc1]||{})[brand?.category||'Skincare & Beauty']||20000)*0.25);
+        pairs.push({market1:m1, market2:m2name, reason:lev.reason, saving});
+      }
+    });
+  });
+  return pairs;
+}
+
+function _nameToCode(name){
+  return {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Norway:'NO',Sweden:'SE',Netherlands:'NL',France:'FR',Belgium:'BE',Finland:'FI'}[name]||name.slice(0,2).toUpperCase();
+}
+function _codeToName(code){
+  return {DK:'Denmark',DE:'Germany',UK:'United Kingdom',NO:'Norway',SE:'Sweden',NL:'Netherlands',FR:'France',BE:'Belgium',FI:'Finland'}[code]||null;
+}
+
+// ── Compliance delta ──────────────────────────────
+
+function complianceDelta(markets, brand, sku){
+  if(markets.length<2) return [];
+  // Baseline = first (highest-scored) market
+  const baseCode = _nameToCode(markets[0]);
+  return markets.slice(1).map(m=>{
+    const mc = _nameToCode(m);
+    const cost = (MARKET_ENTRY_COSTS[mc]||{})[brand?.category||'Skincare & Beauty']||30000;
+    const baseCost = (MARKET_ENTRY_COSTS[baseCode]||{})[brand?.category||'Skincare & Beauty']||15000;
+    const marginal = Math.max(0, cost - baseCost*0.6);
+    const days = mc==='UK'?56:mc==='JP'?120:mc==='DE'?21:mc==='FR'?21:14;
+    return {market:m, marginal:Math.round(marginal), days};
+  });
+}
+
+// ── State ─────────────────────────────────────────
+
+let compareExpandedDim = null; // which dimension row is expanded
+
+// ── Render: Form ──────────────────────────────────
+
 function renderCompareForm(){
+  const preMarkets = brand?.targetMarkets?.slice(0,4)||[];
   return `
-    <div class="card" style="max-width:560px;margin:0 auto">
-      ${brand?`<div style="padding:.5rem .75rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--gold)">◎ Pre-filled from ${brand.name}'s profile</div>`:''}
-      <div class="field"><label class="lbl">Brand name *</label><input type="text" id="cm-brand" value="${compareForm.brandName}" oninput="compareForm.brandName=this.value;updateCompareBtn()"></div>
+    <div class="card" style="max-width:600px;margin:0 auto">
+      ${brand?`<div style="padding:.5rem .75rem;background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--gold)">◎ Pre-filled from ${brand.name}'s profile — select up to 4 markets</div>`:''}
+      <div class="field"><label class="lbl">Brand name *</label>
+        <input type="text" id="cm-brand" value="${compareForm.brandName}" oninput="compareForm.brandName=this.value;updateCompareBtn()">
+      </div>
       <div class="field"><label class="lbl">Category *</label>
         <select id="cm-cat" onchange="compareForm.category=this.value;updateCompareBtn()">
           <option value="">Select…</option>${CATEGORIES.map(c=>`<option${compareForm.category===c?' selected':''}>${c}</option>`).join('')}
         </select>
       </div>
-      <div class="field"><label class="lbl">Select 2–3 markets to compare *</label>
+      <div class="field"><label class="lbl">Markets to compare (2–4) *</label>
         <div class="chips">${COMPARE_MARKETS.map(m=>`<span class="market-chip${compareForm.markets.includes(m)?' selected':''}" onclick="toggleCompareMarket('${m}')">${m}</span>`).join('')}</div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem">${compareForm.markets.length}/4 selected${compareForm.markets.length>=4?' — maximum reached':''}</div>
       </div>
       <button class="btn-primary" id="cm-btn" onclick="runCompare()" disabled>Compare markets →</button>
     </div>
@@ -2999,180 +3322,187 @@ function updateCompareBtn(){
 function toggleCompareMarket(m){
   const i=compareForm.markets.indexOf(m);
   if(i>=0)compareForm.markets.splice(i,1);
-  else if(compareForm.markets.length<3)compareForm.markets.push(m);
+  else if(compareForm.markets.length<4)compareForm.markets.push(m);
   renderCompare(document.getElementById('page-compare'));
 }
 
+// ── Run: pre-calculate scores, single AI call for qualitative detail ──
+
 async function runCompare(){
   const btn=document.getElementById('cm-btn');
-  if(btn){btn.disabled=true;btn.textContent='Analysing markets…';}
-  const prompt=`You are VeyaFlow AI. Compare these markets for a Nordic brand.
+  if(btn){btn.disabled=true;btn.textContent='Analysing…';}
 
-Brand: ${compareForm.brandName}
-Category: ${compareForm.category}
-Markets to compare: ${compareForm.markets.join(', ')}
+  const sku = skus[0]||null;
+  const scores = compareForm.markets.map(m=>scoreMarketFull(_nameToCode(m), brand||{name:compareForm.brandName,category:compareForm.category,currentMarket:'Sweden'}, sku));
+  scores.sort((a,b)=>b.total-a.total);
+  const winner = scores[0];
+  const parallel = detectParallelEntry(compareForm.markets);
+  const delta = complianceDelta(scores.map(s=>s.market?.name||s.marketCode), brand||{category:compareForm.category}, sku);
 
-For each market provide a structured comparison. Format as:
-
-WINNER
-[Which market should they enter first and why — 2 sentences]
-
-${compareForm.markets.map(m=>`MARKET: ${m}
-Opportunity score: [X/10]
-Market size: [specific figure]
-Consumer fit: [2 sentences on how well this brand fits]
-Retail landscape: [2–3 key retailers for this category]
-Regulatory burden: [LOW/MEDIUM/HIGH with brief explanation]
-Time to first sale: [estimated weeks/months]
-Key risk: [one specific risk]
-Verdict: [one sentence recommendation]`).join('\n\n')}
-
-RECOMMENDATION
-[Specific sequencing recommendation — which market first, which second, why]
-
-Be specific. Use real numbers and named retailers.`;
-
+  // Short AI call — qualitative "what would it take" for rank 2 market only
+  const rank2 = scores[1];
+  let aiWhatItTakes = '';
   try{
-    const text=await callAPI([{role:"user",content:prompt}],1500);
-    compareResult={text,markets:compareForm.markets,brand:compareForm.brandName,category:compareForm.category};
-    savePageState('ns_compareForm',compareForm);
-    savePageState('ns_compareResult',compareResult);
-    renderCompare(document.getElementById('page-compare'));
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='Compare markets →';}
-    alert('Could not compare markets: '+e.message);
-  }
+    const prompt = `You are VeyaFlow. A Nordic ${compareForm.category} brand (${compareForm.brandName}) is comparing markets.\n\nThey should enter ${winner.market?.name||winner.marketCode} first (score ${winner.total}/100).\n\n"What would it take" to enter ${rank2?.market?.name||rank2?.marketCode} (score ${rank2?.total}/100)?\n\nList 2-3 specific blockers with: what needs to change, time estimate, cost estimate. Format as:\n1. [Blocker]: [Fix] | Time: X | Cost: Y SEK\n2. ...\n\nEnd with one sentence: total additional investment and whether it is Year 1 viable. Be specific. Max 80 words.`;
+    aiWhatItTakes = await callAPI([{role:'user',content:prompt}], 500);
+  }catch(e){ aiWhatItTakes = 'Contact VeyaFlow for a detailed market entry assessment.'; }
+
+  compareResult = {scores, winner:winner.marketCode, markets:compareForm.markets, brand:compareForm.brandName, category:compareForm.category, aiWhatItTakes, parallel, delta, timestamp:new Date().toISOString()};
+  savePageState('ns_compareForm', compareForm);
+  savePageState('ns_compareResult', compareResult);
+  renderCompare(document.getElementById('page-compare'));
 }
 
+// ── Render: Results ───────────────────────────────
+
 function renderCompareResult(){
-  const r=compareResult;
-  const sections=["WINNER",...r.markets.map(m=>"MARKET: "+m),"RECOMMENDATION"];
-  const SECTION_COLORS={"WINNER":"#1E3A5F","RECOMMENDATION":"#C4A882"};
-
-  // Parse winner and recommendation
-  const winnerMatch=r.text.match(/WINNER\s*\n([\s\S]*?)(?=\nMARKET:|$)/);
-  const recMatch=r.text.match(/RECOMMENDATION\s*\n([\s\S]*?)$/);
-
-  // Parse each market block
-  const marketBlocks=r.markets.map(m=>{
-    const regex=new RegExp(`MARKET:\\s*${m}\\s*\\n([\\s\\S]*?)(?=\\nMARKET:|\\nRECOMMENDATION|$)`);
-    const match=r.text.match(regex);
-    return{market:m,content:match?match[1].trim():''};
-  });
+  const r = compareResult;
+  const scores = r.scores;
+  const winner = scores[0];
+  const mCount = scores.length;
+  const colW = Math.floor(100/mCount);
+  const sku = skus[0]||null;
 
   return `
-    ${winnerMatch?`
-      <div class="card" style="border-left:3px solid var(--navy);margin-bottom:1.25rem">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy);font-weight:600;margin-bottom:.35rem">★ WINNER</div>
-        <div class="prose">${winnerMatch[1].trim()}</div>
+    <!-- Recommendation banner -->
+    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">VeyaFlow Recommendation</div>
+      <div style="font-family:var(--serif);font-size:1.05rem;color:#fff;margin-bottom:.25rem">
+        Enter <strong>${winner.market?.name||winner.marketCode}</strong> first — ${winner.total}/100
+        ${scores[1]?`· <span style="opacity:.6">${scores[1].market?.name||scores[1].marketCode} in Year ${scores[1].total>=75?'1-2':'2'} (${scores[1].total}/100)</span>`:''}
       </div>
-    `:''}
-
-    <div style="display:grid;grid-template-columns:repeat(${r.markets.length},1fr);gap:1rem;margin-bottom:1.25rem">
-      ${marketBlocks.map(b=>`
-        <div class="card" style="margin-bottom:0">
-          <div style="font-family:var(--serif);font-size:1rem;color:var(--navy);margin-bottom:.85rem">${b.market}</div>
-          <div class="prose" style="font-size:.78rem">${b.content||'No data'}</div>
-        </div>
-      `).join('')}
+      <div style="font-family:var(--sans);font-size:.7rem;color:rgba(255,255,255,.65)">${r.brand} · ${r.category} · ${mCount} markets compared</div>
     </div>
 
-    ${recMatch?`
-      <div class="card" style="border-left:3px solid var(--gold)">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);font-weight:600;margin-bottom:.35rem">RECOMMENDATION</div>
-        <div class="prose">${recMatch[1].trim()}</div>
+    <!-- Score table -->
+    <div class="card" style="margin-bottom:1rem;overflow-x:auto">
+      <!-- Market headers -->
+      <div style="display:grid;grid-template-columns:160px ${scores.map(()=>`1fr`).join(' ')};gap:.5rem;margin-bottom:.75rem;padding-bottom:.6rem;border-bottom:2px solid var(--border)">
+        <div></div>
+        ${scores.map((s,i)=>`
+          <div style="text-align:center">
+            <div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${s.market?.name||s.marketCode}</div>
+            <div style="font-family:var(--serif);font-size:1.4rem;font-weight:400;color:${i===0?'#065F46':i===1?'#1E40AF':'#92400E'}">${s.total}</div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:${i===0?'#065F46':i===1?'#1E40AF':'#9A9489'}">${i===0?'★ ENTER FIRST':i===1?'YEAR 2':'YEAR 3+'}</div>
+          </div>
+        `).join('')}
       </div>
-    `:''}
 
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem;padding-bottom:1.5rem">
-      <button class="btn-outline" onclick="compareResult=null;renderCompare(document.getElementById('page-compare'))">← New comparison</button>
-      <button class="btn-outline" onclick="showPage('report')">Generate full report →</button>
+      <!-- Dimension rows -->
+      ${COMPARISON_DIMENSIONS.map(dim=>{
+        const isExpanded = compareExpandedDim===dim.id;
+        return `
+          <div style="margin-bottom:.1rem">
+            <div style="display:grid;grid-template-columns:160px ${scores.map(()=>'1fr').join(' ')};gap:.5rem;align-items:center;padding:.4rem 0;cursor:pointer;border-bottom:1px solid ${isExpanded?'var(--navy)':'var(--border)'}"
+              onclick="compareExpandedDim=compareExpandedDim==='${dim.id}'?null:'${dim.id}';document.getElementById('compare-results').innerHTML=renderCompareResult()">
+              <div>
+                <div style="font-family:var(--mono);font-size:.6rem;color:var(--navy);font-weight:600">${dim.label}</div>
+                <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${dim.weight}% weight</div>
+              </div>
+              ${scores.map((s,si)=>{
+                const d = s.dims[dim.id];
+                const barW = d?.score||0;
+                const barCol = barW>=80?'#10B981':barW>=55?'#1E40AF':barW>=35?'#F59E0B':'#EF4444';
+                return `<div style="text-align:center">
+                  <div style="background:#F5F3EE;height:5px;border-radius:2px;margin-bottom:.25rem;overflow:hidden">
+                    <div style="background:${barCol};height:5px;width:${barW}%;transition:width .4s ease"></div>
+                  </div>
+                  <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${si===0?'var(--navy)':'#555'}">${d?.display||'—'}</div>
+                </div>`;
+              }).join('')}
+            </div>
+            ${isExpanded?`
+              <div style="background:#F9F8F6;border:1px solid var(--border);border-top:none;padding:.7rem 1rem;margin-bottom:.35rem">
+                <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.08em">${dim.desc}</div>
+                <div style="display:grid;grid-template-columns:${scores.map(()=>'1fr').join(' ')};gap:.75rem">
+                  ${scores.map(s=>`
+                    <div>
+                      <div style="font-family:var(--mono);font-size:.57rem;font-weight:700;color:var(--navy);margin-bottom:.2rem">${s.market?.name||s.marketCode}</div>
+                      <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.55">${s.dims[dim.id]?.detail||'—'}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `:''}
+          </div>
+        `;
+      }).join('')}
+
+      <!-- Total row -->
+      <div style="display:grid;grid-template-columns:160px ${scores.map(()=>'1fr').join(' ')};gap:.5rem;padding-top:.6rem;border-top:2px solid var(--border);margin-top:.25rem">
+        <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--navy);align-self:center">TOTAL SCORE</div>
+        ${scores.map((s,i)=>`
+          <div style="text-align:center">
+            <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.3rem;overflow:hidden">
+              <div style="background:${i===0?'#10B981':i===1?'#1E40AF':'#9A9489'};height:6px;width:${s.total}%;transition:width .5s ease"></div>
+            </div>
+            <div style="font-family:var(--serif);font-size:1.1rem;color:${i===0?'#065F46':i===1?'#1E40AF':'#9A9489'}">${s.total}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Parallel entry panel -->
+    ${r.parallel?.length?`
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.85rem 1rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:#1E40AF;margin-bottom:.3rem">💡 Parallel Entry Opportunity</div>
+      ${r.parallel.map(p=>`
+        <div style="font-family:var(--sans);font-size:.72rem;color:#1E3A5F;line-height:1.55;margin-bottom:.3rem">
+          <strong>${p.market1} + ${p.market2}</strong> can be entered simultaneously — saves ~${p.saving.toLocaleString()} SEK.
+          <span style="font-family:var(--sans);font-size:.68rem;color:#3B82F6"> ${p.reason}</span>
+        </div>
+      `).join('')}
+    </div>`:''}
+
+    <!-- What would it take -->
+    ${r.aiWhatItTakes&&scores[1]?`
+    <div class="card" style="margin-bottom:1rem;border-left:3px solid var(--gold)">
+      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--gold);margin-bottom:.4rem">What would it take to enter ${scores[1].market?.name||scores[1].marketCode} now?</div>
+      <div style="font-family:var(--sans);font-size:.72rem;color:#555;line-height:1.65;white-space:pre-line">${r.aiWhatItTakes}</div>
+    </div>`:''}
+
+    <!-- Compliance delta -->
+    ${r.delta?.length?`
+    <div class="card" style="margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">Compliance delta — if already compliant for ${scores[0].market?.name||scores[0].marketCode}</div>
+      ${r.delta.map(d=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border)">
+          <div style="font-family:var(--sans);font-size:.72rem;color:var(--navy)">Adding ${d.market}</div>
+          <div style="display:flex;gap:.75rem">
+            <span style="font-family:var(--mono);font-size:.58rem;color:#555">+~${d.marginal.toLocaleString()} SEK</span>
+            <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">~${d.days} days</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>`:''}
+
+    <!-- Forward CTAs -->
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;padding-bottom:1.5rem">
+      <button class="btn-primary" onclick="readinessState.marketCode='${winner.marketCode}';showPage('home')" style="font-size:.68rem">Check ${winner.market?.name||winner.marketCode} readiness →</button>
+      <button class="btn-outline" onclick="brandPackState.market='${winner.market?.name||winner.marketCode}';showPage('brandpack')" style="font-size:.68rem">Generate ${winner.market?.name||winner.marketCode} Brand Pack →</button>
+      <button class="btn-outline" onclick="showPage('home')" style="font-size:.68rem">View Expansion Sequencer →</button>
+      <button class="btn-outline" onclick="compareResult=null;renderCompare(document.getElementById('page-compare'))" style="font-size:.68rem">← New comparison</button>
     </div>
   `;
 }
 
-/* ═══════════════════════════════════════════════════
-   RETAILER PITCH PAGE
-═══════════════════════════════════════════════════ */
+function renderCompare(el){
+  if(!compareForm.brandName) compareForm.brandName=brand?.name||'';
+  if(!compareForm.category)  compareForm.category=brand?.category||'';
+  el.innerHTML=`
+    <div class="topbar">
+      <div>
+        <div class="page-title">Compare Markets</div>
+        <div class="page-sub">Personalised · Six dimensions · VeyaFlow picks the winner</div>
+      </div>
+    </div>
+    <div class="content" id="compare-results">
+      ${compareResult?renderCompareResult():renderCompareForm()}
+    </div>
+  `;
+  if(!compareResult) bindCompareForm();
+}
 
-let pitchCopied=false;
-
-const LANG_NAMES={en:"English",da:"Danish",de:"German",no:"Norwegian"};
-
-
-
-/* ═══════════════════════════════════════════════════
-   RETAIL BUSINESS CASE — V2
-   Audience: Category Manager (internal listing approval)
-   Not a pitch — a pre-approved justification document.
-═══════════════════════════════════════════════════ */
-let bizCaseState = {
-  retailer:'', market:'', mode:'catman', generating:false, result:null, timestamp:null
-};
-
-// Risk probabilities hardcoded per situation — not AI-estimated
-const BIZ_CASE_RISKS = {
-  default: [
-    {risk:'Low initial sell-through', prob:30, impact:'brand funds 50% markdown on slow SKUs', mitigation:'8-week review trigger with brand-funded markdown guarantee'},
-    {risk:'CPNP/compliance issue discovered post-listing', prob:5, impact:'listing withdrawal and delisting cost', mitigation:'Full PIF and CPNP documentation verified pre-listing — on file'},
-    {risk:'Brand social presence drops below threshold', prob:20, impact:'slower consumer pull-through', mitigation:'Brand commits to minimum 4 posts/month tagging retailer during launch quarter'},
-    {risk:'Competitor launches similar SKU within 6 months', prob:25, impact:'estimated 15% category share pressure', mitigation:'Brand has 18-month product roadmap — exclusivity clause available for discussion'},
-    {risk:'Supply chain disruption — late delivery', prob:15, impact:'out-of-stock during key sales period', mitigation:'Brand holds 90-day safety stock at 3PL — delivery within 14 days of order'},
-    {risk:'EUDR non-compliance by December 30 2026', prob:10, impact:'forced delisting of affected SKUs', mitigation:'Palm-free formulation — EUDR scope confirmed as out-of-scope'},
-  ],
-  Matas: [
-    {risk:'Low initial sell-through at Matas flagship', prob:25, impact:'−180,000 DKK margin contribution Y1', mitigation:'8-week sell-through review with brand-funded markdown. Strøget pilot before national rollout.'},
-    {risk:'Beauty Days fee erodes margin contribution', prob:40, impact:'−15,000 DKK/year fixed cost', mitigation:'Brand accepts Beauty Days as cost of listing — pre-agreed in commercial terms'},
-    {risk:'Matas Balance private label expansion displaces SKU', prob:20, impact:'shelf space reallocation Q3 2027', mitigation:'Position in Clean Clinical bay — Matas Balance targets mass-mid tier only'},
-    {risk:'EUDR documentation not complete by Dec 2026', prob:10, impact:'Matas compliance team requests delisting', mitigation:'EUDR due diligence completed — documentation available on request'},
-    {risk:'Buyer team change at Matas post-acquisition', prob:30, impact:'relationship reset — re-pitch required', mitigation:'Category performance data makes the case regardless of buyer relationship'},
-    {risk:'Competitor BOGO promotion during launch window', prob:35, impact:'estimated −20% launch month sell-through', mitigation:'Launch co-ordinated around Beauty Days to benefit from promotional uplift'},
-  ],
-  Lyko: [
-    {risk:'Social metrics drop below Lyko minimum', prob:20, impact:'de-prioritised in algorithm, lower visibility', mitigation:'Brand commits to weekly TikTok content minimum throughout listing period'},
-    {risk:'Low online sell-through in first 60 days', prob:30, impact:'de-listing at 90-day review', mitigation:'Brand funds promotional bundle offer for first 60 days — Lyko co-funded option available'},
-    {risk:'Sworsk dual-market launch delays', prob:25, impact:'Norway revenue delayed 6 months', mitigation:'SE listing confirmed regardless — NO listing follows independently'},
-    {risk:'Returns rate above Lyko threshold', prob:15, impact:'margin erosion + de-listing risk', mitigation:'Brand accepts returns above 5% threshold — refund policy confirmed'},
-    {risk:'Algorithm change deprioritises category', prob:20, impact:'reduced organic visibility', mitigation:'Brand invests in Lyko paid placement for 90-day launch window'},
-    {risk:'Competitor flash sale in same category', prob:35, impact:'estimated −25% sell-through during event', mitigation:'Pre-agreed promotional response — brand can match within 48 hours'},
-  ],
-};
-
-// Cannibalisation assessment data per retailer + category
-const CANNIB_DATA = {
-  Matas: {
-    'Skincare & Beauty': {
-      nearestSkus: ['Nuori Vitamin Complex Serum (399 DKK)','Verso Super Eye Serum (495 DKK)','Lumene Valo Serum (219 DKK)'],
-      overlapPct: '15–20',
-      assessment: 'primarily recruits from the "no current evening routine product" consumer segment and LED device buyers — not from existing serum purchasers. Nuori and Verso target a different positioning (ingredient-led vs technology-led). Category incrementality: HIGH.',
-      risk: 'LOW',
-    },
-  },
-  Lyko: {
-    'Skincare & Beauty': {
-      nearestSkus: ['Byoma Moisturising Gel Cream (249 SEK)','Medik8 Crystal Retinal (645 SEK)'],
-      overlapPct: '10–15',
-      assessment: 'primarily attracts the TikTok-influenced consumer segment active in the LED/device category. Byoma and Medik8 target different price tiers and consumer motivations. Incremental category revenue: HIGH.',
-      risk: 'LOW',
-    },
-  },
-  'Boots UK': {
-    'Skincare & Beauty': {
-      nearestSkus: ['The Inkey List Retinol Serum (£10)','Pai Rosehip Bioregenerate Oil (£38)'],
-      overlapPct: '20–25',
-      assessment: 'targets the clinical-premium consumer not well served in the £28–45 tier. Some overlap with Pai on premium natural positioning, but LED technology differentiates clearly. Net incrementality: MEDIUM-HIGH.',
-      risk: 'LOW-MEDIUM',
-    },
-  },
-};
-
-// Space productivity benchmarks per category at key retailers
-const SPACE_BENCHMARKS = {
-  Matas:     {'Skincare & Beauty':380000, 'Wellness & Supplements':290000, default:320000, currency:'DKK'},
-  Lyko:      {'Skincare & Beauty':520000, 'Wellness & Supplements':380000, default:440000, currency:'SEK'},
-  'Boots UK':{'Skincare & Beauty':450000, 'Wellness & Supplements':340000, default:380000, currency:'GBP'},
-  default:   {default:350000, currency:'SEK'},
-};
 
 function renderBizCase(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
@@ -3257,7 +3587,13 @@ function renderBizCase(el){
 }
 
 async function generateBizCase(){
-  if(!bizCaseState.retailer){alert('Select a retailer first.');return;}
+  if(!bizCaseState.retailer){
+    const sel = document.getElementById('bc-retailer-err')||document.createElement('div');
+    sel.id='bc-retailer-err'; sel.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
+    sel.textContent='Select a retailer and market above first.';
+    const btn2=document.getElementById('bc-generate-btn'); if(btn2?.parentElement&&!document.getElementById('bc-retailer-err')) btn2.parentElement.insertBefore(sel, btn2);
+    return;
+  }
   bizCaseState.generating=true;
   renderBizCase(document.getElementById('page-bizcase'));
 
@@ -3412,8 +3748,9 @@ Under 500 words. More brand-story led. Buyer needs to feel excited, not just rat
 function renderBizCaseResult(el){
   const result = bizCaseState.result||'';
   if(result.startsWith('ERROR:')){
-    el.innerHTML=`<div class="page-wrap"><div class="card" style="color:var(--red);padding:1rem">${result.replace('ERROR:','')}</div>
-      <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Try again</button></div>`;
+    const errMsg = result.replace('ERROR:','');
+    const cl = classifyApiError({message:errMsg});
+    el.innerHTML=`<div class="page-wrap">${errCard(cl.headline,cl.sub,'Try again',"bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))")}</div>`;
     return;
   }
 
@@ -3445,7 +3782,7 @@ function renderBizCaseResult(el){
         </div>
         <div style="display:flex;gap:.5rem">
           <button class="btn-outline" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Regenerate</button>
-          <button class="btn-primary" onclick="generateBizCasePDF()">↓ Download PDF</button>
+          <button class="btn-primary pdf-btn-desktop" onclick="generateBizCasePDF()">↓ Download PDF</button><button class="btn-outline pdf-btn-mobile" onclick="window.print()" style="display:none">Print / Save PDF</button>
         </div>
       </div>
 
@@ -3662,7 +3999,13 @@ function renderBrandPack(el){
 }
 
 async function generateBrandPack(){
-  if(!brandPackState.retailer){alert('Select a retailer first.');return;}
+  if(!brandPackState.retailer){
+    const sel2 = document.getElementById('bp-retailer-err')||document.createElement('div');
+    sel2.id='bp-retailer-err'; sel2.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
+    sel2.textContent='Select a target retailer above first.';
+    const btn3=document.getElementById('bp-generate-btn'); if(btn3?.parentElement&&!document.getElementById('bp-retailer-err')) btn3.parentElement.insertBefore(sel2, btn3);
+    return;
+  }
   brandPackState.generating=true;
   renderBrandPack(document.getElementById('page-brandpack'));
 
@@ -3766,6 +4109,7 @@ Do not lead with social following. It is the weakest proof type.
 For EACH compliance item, explain what it means for ${retailer}'s risk — not just list it.
 Format: [Item]: ✓/✗ → Means: [what this removes from ${retailer}'s risk register]
 Include: CPNP status, EU RP, claims audit result, EUDR status, certifications.
+${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
 Language register: ${retailer} compliance team, not brand marketing.
 
 ## SECTION 6 — Basket Economics & Routine Integration
@@ -3801,8 +4145,9 @@ function renderBrandPackResult(el){
   const result = brandPackState.result||'';
 
   if(result.startsWith('ERROR:')){
-    el.innerHTML=`<div class="page-wrap"><div class="card" style="color:var(--red);padding:1rem">${result.replace('ERROR:','')}</div>
-      <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Try again</button></div>`;
+    const errMsg = result.replace('ERROR:','');
+    const cl = classifyApiError({message:errMsg});
+    el.innerHTML=`<div class="page-wrap">${errCard(cl.headline,cl.sub,'Try again',"brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))")}</div>`;
     return;
   }
 
@@ -3821,7 +4166,7 @@ function renderBrandPackResult(el){
         </div>
         <div style="display:flex;gap:.5rem">
           <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Regenerate</button>
-          <button class="btn-primary" onclick="generateBrandPackPDF()">↓ Download PDF</button>
+          <button class="btn-primary pdf-btn-desktop" onclick="generateBrandPackPDF()">↓ Download PDF</button><button class="btn-outline pdf-btn-mobile" onclick="window.print()" style="display:none">Print / Save PDF</button>
         </div>
       </div>
 
@@ -4329,6 +4674,9 @@ function renderSkus(el){
                     </div>
                     <div style="font-family:var(--mono);font-size:.62rem;color:${barC};font-weight:700;flex-shrink:0">${r.pct}%</div>
                   </div>
+                  <div style="display:flex;align-items:center;gap:.5rem;margin-top:.3rem">
+                    ${(function(){var dr=dppReadiness(sku);var dc=dr.pct>=80?'#10B981':dr.pct>=50?'#F59E0B':'#EF4444';return '<div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);width:90px">DPP</div><div style="flex:1;background:var(--border);height:4px;border-radius:2px"><div style="background:'+dc+';height:4px;border-radius:2px;width:'+dr.pct+'%"></div></div><div style="font-family:var(--mono);font-size:.55rem;color:'+dc+';font-weight:700;margin-left:.5rem">'+dr.pct+'%</div><span onclick="dppActiveSkuId=\"'+sku.id+'\";dppStep=\"fill\";showPage(\"dpp\")" style="font-family:var(--mono);font-size:.5rem;color:var(--gold);cursor:pointer;margin-left:.5rem;white-space:nowrap">'+(dr.pct<100?'Complete \u2192':'View \u2192')+'</span>';})()}
+                  </div>
                   <div style="display:flex;gap:.35rem;flex-wrap:wrap">
                     ${r.ready.map(rt=>`<span style="font-family:var(--mono);font-size:.5rem;background:var(--green-lt,#ECFDF5);color:#065F46;padding:.1rem .4rem;border:1px solid #A7F3D0">✓ ${rt}</span>`).join('')}
                     ${r.notReady.slice(0,3).map(rt=>`<span style="font-family:var(--mono);font-size:.5rem;background:#FEF2F2;color:#991B1B;padding:.1rem .4rem;border:1px solid #FCA5A5">✗ ${rt}</span>`).join('')}
@@ -4446,7 +4794,7 @@ function handleSkuFileUpload(input){
 
   function processData(parsed){
     if(!parsed||!parsed.rows||parsed.rows.length===0){
-      if(errEl) errEl.textContent='Could not read file. Ensure headers are in row 1.';
+      if(errEl) errEl.innerHTML='<strong>Could not read this file.</strong><br>Make sure column headers are in row 1 and the file has data rows.';
       if(statEl) statEl.textContent='';
       return;
     }
@@ -4472,7 +4820,7 @@ function handleSkuFileUpload(input){
   // Excel files — use SheetJS
   if(['xlsx','xls'].includes(ext)){
     if(typeof XLSX==='undefined'){
-      if(errEl) errEl.textContent='Excel parser not loaded. Please refresh the page and try again.';
+      if(errEl) errEl.innerHTML='<strong>Excel reader not loaded.</strong><br>Refresh the page and try uploading again.';
       if(statEl) statEl.textContent='';
       return;
     }
@@ -4486,14 +4834,14 @@ function handleSkuFileUpload(input){
         // Convert to array of arrays first to get headers + rows
         var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
         if(!aoa||aoa.length<2){
-          if(errEl) errEl.textContent='Excel file appears empty or has no data rows.';
+          if(errEl) errEl.innerHTML='<strong>This file appears to be empty.</strong><br>Check that the file has data rows below the header row.';
           if(statEl) statEl.textContent='';
           return;
         }
         // First non-empty row = headers
         var headers=aoa[0].map(function(h){return String(h).trim();}).filter(function(h){return h.length>0;});
         if(headers.length===0){
-          if(errEl) errEl.textContent='No header row found. Ensure row 1 contains column names.';
+          if(errEl) errEl.innerHTML='<strong>No header row found.</strong><br>Make sure row 1 contains column names like Product Name, EAN, RSP.';
           return;
         }
         var rows=aoa.slice(1).map(function(row){
@@ -4504,7 +4852,7 @@ function handleSkuFileUpload(input){
         if(statEl) statEl.textContent='Sheet: "'+wsName+'" — '+rows.length+' rows';
         processData({headers:headers,rows:rows});
       }catch(err){
-        if(errEl) errEl.textContent='Could not read Excel file: '+err.message;
+        if(errEl) errEl.innerHTML='<strong>Could not read this Excel file.</strong><br>Try saving it as .xlsx from Excel or Numbers and uploading again.';
         if(statEl) statEl.textContent='';
       }
     };
@@ -4514,7 +4862,7 @@ function handleSkuFileUpload(input){
 
   // CSV / TSV / TXT
   if(!['csv','txt','tsv'].includes(ext)){
-    if(errEl) errEl.textContent='Unsupported file type. Upload .xlsx, .xls, .csv, or .tsv';
+    if(errEl) errEl.innerHTML='<strong>This file type isn\'t supported.</strong><br>Upload a .xlsx, .xls, .csv, or .tsv file.';
     if(statEl) statEl.textContent='';
     return;
   }
@@ -4707,6 +5055,17 @@ function editSku(id){
 }
 
 function saveSkuForm(){
+  // EAN validation — must be 13 digits if provided
+  if(skuForm.ean && !/^\d{13}$/.test(skuForm.ean.replace(/\s/g,''))){
+    const eanEl = document.getElementById('sku-ean-field');
+    if(eanEl){ eanEl.style.borderColor='#EF4444'; }
+    const eanErr = document.getElementById('sku-ean-err')||document.createElement('div');
+    eanErr.id='sku-ean-err'; eanErr.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.2rem';
+    eanErr.textContent='EAN must be exactly 13 digits. Check the barcode on your packaging.';
+    if(eanEl?.parentElement&&!document.getElementById('sku-ean-err')) eanEl.parentElement.appendChild(eanErr);
+    return;
+  }
+  document.getElementById('sku-ean-err')?.remove();
   skuForm.updatedAt = new Date().toISOString();
   if(skuEditId==='new'){
     skus.unshift({...skuForm});
@@ -4726,7 +5085,10 @@ function cancelSkuEdit(){
 
 async function formatInci(){
   const raw = skuForm.inci;
-  if(!raw||raw.trim().length<10){alert('Paste your ingredient list first.');return;}
+  if(!raw||raw.trim().length<10){
+    const ia=document.getElementById('inci-area'); if(ia){ia.style.borderColor='#EF4444'; ia.placeholder='Paste your ingredient list here first'; setTimeout(()=>{ia.style.borderColor='';ia.placeholder='e.g. Aqua, Glycerin, Niacinamide...';},2500);}
+    return;
+  }
   const btn = document.getElementById('inci-format-btn');
   if(btn){btn.disabled=true;btn.textContent='Formatting...';}
   try{
@@ -4737,12 +5099,17 @@ async function formatInci(){
     if(btn){btn.disabled=false;btn.textContent='✓ Formatted';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Format INCI';}
-    alert('Could not format: '+e.message);
+    const ib = document.getElementById('inci-format-btn');
+    const ip = ib?.parentElement;
+    if(ip){ const ed=document.createElement('div'); ed.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem'; ed.textContent='Could not format — check connection and try again.'; ip.appendChild(ed); setTimeout(()=>ed.remove(),4000); }
   }
 }
 
 async function generateSkuDesc(lang){
-  if(!brand?.usp&&!skuForm.name){alert('Add a product name first.');return;}
+  if(!brand?.usp&&!skuForm.name){
+    const ni=document.getElementById('sku-name'); if(ni){ni.style.borderColor='#EF4444'; ni.placeholder='Add a product name first'; setTimeout(()=>{ni.style.borderColor='';ni.placeholder='e.g. Cloud & Glow LED Face Mask';},2500);}
+    return;
+  }
   const btn = document.getElementById('desc-gen-'+lang);
   if(btn){btn.disabled=true;btn.textContent='Generating...';}
   try{
@@ -4755,7 +5122,7 @@ async function generateSkuDesc(lang){
     if(btn){btn.disabled=false;btn.textContent='✓ Generated';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Generate';}
-    alert('Could not generate: '+e.message);
+    const db3=btn?.parentElement; if(db3){const de3=document.createElement('div'); de3.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem'; de3.textContent='Could not generate — check connection and try again.'; db3.appendChild(de3); setTimeout(()=>de3.remove(),4000);}
   }
 }
 
@@ -5094,7 +5461,10 @@ function showSkuTypeFeedback(){
 function submitSkuTypeFeedback(){
   const input = document.getElementById('sku-type-input');
   const v = input?.value?.trim();
-  if(!v){ alert('Please enter a product type.'); return; }
+  if(!v){
+    const ti=document.getElementById('sku-type-input'); if(ti){ti.style.borderColor='#EF4444'; ti.placeholder='Please enter a product type'; setTimeout(()=>{ti.style.borderColor='';},2000);}
+    return;
+  }
   const existing = JSON.parse(localStorage.getItem('ns_sku_type_suggestions')||'[]');
   existing.push({value:v, ts:new Date().toISOString()});
   localStorage.setItem('ns_sku_type_suggestions', JSON.stringify(existing));
@@ -5173,7 +5543,7 @@ function renderSkuEdit(el){
             <div class="field"><label class="lbl">Internal article number</label>
               <input type="text" value="${skuForm.articleNo||''}" placeholder="e.g. CG-001" oninput="skuForm.articleNo=this.value"></div>
             <div class="field"><label class="lbl">EAN-13 barcode</label>
-              <input type="text" value="${skuForm.ean||''}" placeholder="13 digits" oninput="skuForm.ean=this.value"></div>
+              <input id="sku-ean-field" type="text" value="${skuForm.ean||''}" placeholder="13 digits" oninput="skuForm.ean=this.value;document.getElementById('sku-ean-err')?.remove();this.style.borderColor=''"></div>
           </div>
           <div class="grid-2">
             <div class="field"><label class="lbl">Net content</label>
@@ -5676,10 +6046,23 @@ function renderClaims(el){
 
 async function runClaimLocalizer(){
   const input = document.getElementById('claims-input')?.value||'';
-  if(!input.trim()){alert('Paste some claims first.');return;}
+  if(!input.trim()){
+    const ci=document.getElementById('claims-input'); if(ci){ci.style.borderColor='#EF4444';}
+    const ce=document.getElementById('claims-err')||document.createElement('div');
+    ce.id='claims-err'; ce.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
+    ce.textContent='Paste your product copy above first.';
+    if(ci?.parentElement&&!document.getElementById('claims-err')) ci.parentElement.appendChild(ce);
+    return;
+  }
 
   const selectedMarkets = claimsState.selectedMarkets.length ? claimsState.selectedMarkets : [...document.querySelectorAll('.market-chip.selected')].map(el=>el.dataset.market).filter(Boolean);
-  if(!selectedMarkets.length){alert('Select at least one target market.');return;}
+  if(!selectedMarkets.length){
+    const me=document.getElementById('market-err')||document.createElement('div');
+    me.id='market-err'; me.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
+    me.textContent='Select at least one target market above.';
+    const chips=document.querySelector('.market-chip'); if(chips?.parentElement&&!document.getElementById('market-err')) chips.parentElement.after(me);
+    return;
+  }
 
   claimsState = {input, result:null, loading:true};
   renderClaims(document.getElementById('page-claims'));
@@ -5730,7 +6113,10 @@ Be specific and actionable. Every RED must have a clear recommended change.`;
 
 function renderClaimsResult(){
   if(!claimsState.result) return '';
-  if(claimsState.result.startsWith('ERROR:')) return `<div style="color:var(--red);padding:1rem;background:#FEF2F2;font-family:var(--sans);font-size:.82rem">${claimsState.result.replace('ERROR:','')}</div>`;
+  if(claimsState.result.startsWith('ERROR:')){
+    const cl = classifyApiError({message:claimsState.result.replace('ERROR:','')});
+    return errCard(cl.headline, cl.sub, 'Try again', "claimsState.result=null;claimsState.loading=false;runClaimLocalizer()");
+  }
 
   const blocks = claimsState.result.split('---').map(b=>b.trim()).filter(b=>b.length>20);
   let green=0, amber=0, red=0;
@@ -6233,6 +6619,9 @@ function renderPitch(el){
       </div>
 
       ${pitchResult ? renderPitchResult() : `
+      <div style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)">
+        ◎ Lead with the buyer's problem, not your brand story. Under 150 words. Three tone variants generated at once.
+      </div>
       <div class="card" style="margin-bottom:1rem">
         <div class="section-tag">Target</div>
         <div class="grid-2">
@@ -6281,6 +6670,7 @@ function renderPitch(el){
         style="width:100%;padding:1rem;font-size:.75rem;letter-spacing:.1em">
         Generate ${catLabel} →
       </button>
+      <div id="pitch-error"></div>
       `}
     </div>
   `;
@@ -6404,7 +6794,10 @@ function buildAsk(){
 
 async function generatePitch(){
   const retailer = pitchForm.retailer;
-  if(!retailer){alert('Select a retailer first.');return;}
+  if(!retailer){
+    const rse=document.getElementById('pitch-error'); if(rse) rse.innerHTML='<div style="font-family:var(--mono);font-size:.6rem;color:#991B1B;padding:.3rem 0">Select a retailer above first.</div>';
+    return;
+  }
 
   const btn = document.getElementById('p-generate-btn');
   if(btn){btn.disabled=true;btn.textContent='Generating pitch...';}
@@ -6488,7 +6881,9 @@ HARD RULES FOR ALL THREE VARIANTS:
     renderPitch(el);
   }catch(err){
     if(btn){btn.disabled=false;btn.textContent=`Generate ${getCatLabel('pitch')||'Retailer Pitch'} →`;}
-    alert('Could not generate pitch: '+err.message);
+    const classified = classifyApiError(err);
+    const errDiv = document.getElementById('pitch-error');
+    if(errDiv) errDiv.innerHTML = errCard(classified.headline, classified.sub, classified.cta, classified.cta?`generatePitch()`:null);
   }
 }
 
@@ -6572,19 +6967,30 @@ function renderPitchResult(){
 }
 
 function copyToClipboard(text){
-  navigator.clipboard?.writeText(text).then(()=>{
-    // Brief visual feedback
-    const el = event.target;
-    const orig = el.textContent;
-    el.textContent = 'Copied ✓';
-    setTimeout(()=>el.textContent=orig, 1500);
-  }).catch(()=>{
-    // Fallback
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
+  const el = event&&event.target;
+  const orig = el&&el.textContent;
+  if(navigator.share&&window.innerWidth<=680){
+    navigator.share({text:text}).catch(function(){});
+    if(el){el.textContent='Shared ✓'; setTimeout(function(){if(el)el.textContent=orig;},1500);}
+    return;
+  }
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(function(){
+      if(el){el.textContent='Copied ✓'; setTimeout(function(){if(el)el.textContent=orig;},1500);}
+    }).catch(function(){
+      var ta=document.createElement('textarea');
+      ta.value=text; ta.style.cssText='position:fixed;top:-9999px';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(el){el.textContent='Copied ✓'; setTimeout(function(){if(el)el.textContent=orig;},1500);}
+    });
+  } else {
+    var ta=document.createElement('textarea');
+    ta.value=text; ta.style.cssText='position:fixed;top:-9999px';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
-  });
+    if(el){el.textContent='Copied ✓'; setTimeout(function(){if(el)el.textContent=orig;},1500);}
+  }
 }
 
 
@@ -6745,7 +7151,7 @@ function renderNudgePanel(s){
   if(!nudgeResult) return `<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Generating nudge email…</div>`;
   return `
     <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem">★ Nudge email</div>
-    <div class="email-box" style="font-size:.78rem;margin-bottom:.75rem">${nudgeResult}</div>
+    <div class="email-box" style="font-size:.78rem;margin-bottom:.75rem">${nudgeResult==='__ERROR__'?'<span style="color:#991B1B;font-family:var(--mono);font-size:.65rem">Could not generate — check connection and try again.</span>':nudgeResult}</div>
     <div style="display:flex;gap:.65rem;flex-wrap:wrap">
       <a href="mailto:${s.contact}?subject=Compliance+data+request&body=${encodeURIComponent(nudgeResult)}" style="padding:.45rem .9rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">Open in email →</a>
       <button onclick="generateNudge(SUPPLIERS.find(x=>x.id===${s.id}))" style="padding:.45rem .9rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;cursor:pointer">Regenerate</button>
@@ -6780,7 +7186,7 @@ Keep it under 150 words. ${lang!=="English"?"Then provide an English translation
     const text=await callAPI([{role:"user",content:prompt}],800);
     nudgeResult=text;
   }catch(e){
-    nudgeResult="Could not generate nudge. Check connection.";
+    nudgeResult="__ERROR__";
   }
   nudgeLoading=false;
   const panel=document.getElementById(`nudge-panel-${s.id}`);
@@ -6833,7 +7239,11 @@ function getPartnersForRoute(routeType,category){
 function generateESPRDeclaration(){
   if(!circularResult)return;
   const partner=circularResult.confirmedPartner||circularResult.routes[0]?.partners[0];
-  if(!partner){alert('Select a partner first.');return;}
+  if(!partner){
+    const pr=document.getElementById('circular-results');
+    if(pr) pr.insertAdjacentHTML('beforeend','<div style="font-family:var(--mono);font-size:.62rem;color:#991B1B;padding:.35rem 0">Select a partner above to generate the declaration.</div>');
+    return;
+  }
   const d=new Date();
   const dateStr=d.toLocaleDateString('sv-SE');
   const doc=`ESPR ARTICLE 24 — END-OF-LIFE ROUTING DECLARATION\n==================================================\nDate: ${dateStr}\nBrand / Product: ${circularForm.productName||'[Product Name]'}\nCategory: ${circularForm.category}\nUnits routed: ${circularResult.units}\nReason: ${(circularForm.reason||'').replace(/_/g,' ')}\nCondition: ${circularForm.condition}\n\nROUTING DECISION\nRoute type: ${ROUTE_LABELS[partner.circularType]||partner.circularType}\nPartner: ${partner.name}\nPartner location: ${partner.city}, ${partner.country}\nPartner markets: ${(partner.markets||[]).join(', ')}\nESPR registered: ${partner.espr?'Yes':'No — supplementary documentation required'}\n\nVALUE RECOVERY\nEstimated recovery value: ${circularResult.valueRecovery?circularResult.valueRecovery.total+' SEK':'N/A — RSP not provided'}\nStorage cost avoided: ${circularResult.valueRecovery?circularResult.valueRecovery.storageSaving+' SEK':'N/A'}\n\nCOMPLIANCE STATEMENT\nThis routing decision was made in accordance with EU Ecodesign for Sustainable Products Regulation (ESPR) Article 24 requirements. The selected circular economy partner has been verified for ${circularResult.category} product routing.\n\n${partner.espr?'Partner ESPR documentation: On file via '+partner.name+' ('+partner.contact+').':'NOTE: Selected partner does not provide ESPR documentation. Supplementary chain-of-custody documentation required.'}\n\nSigned: ________________________________\nName: __________________________________\nRole: ___________________________________\nDate: ${dateStr}\n\nGenerated by VeyaFlow · veyaflow.com`;
@@ -7235,7 +7645,7 @@ function renderCRM(el){
       </div>
 
       <!-- Kanban board -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;align-items:start">
+      <div class="crm-kanban" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;align-items:start">
         ${CRM_STAGES.map(stage=>{
           const stageCards = cards.filter(c=>c.stage===stage.id);
           return `
@@ -7247,7 +7657,7 @@ function renderCRM(el){
               </div>
               <!-- Cards -->
               <div style="border:1px solid ${stage.border};background:${stage.bg};min-height:120px;padding:.5rem .5rem .5rem">
-                ${stageCards.length===0?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--muted);text-align:center;padding:1.5rem .5rem;opacity:.6">No retailers</div>`:''}
+                ${stageCards.length===0?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--muted);text-align:center;padding:1.5rem .5rem;opacity:.6">${stage.id==='not_contacted'&&ri===0?'Move retailers here from Not Contacted':'No retailers in this stage'}</div>`:''}
                 ${stageCards.map(card=>{
                   const isEditing = crmEditId===card.id;
                   const nextStageId = CRM_STAGES[CRM_STAGES.findIndex(s=>s.id===card.stage)+1]?.id;
@@ -7443,7 +7853,7 @@ function renderFindList(filtered,compareItems){
 
       <!-- Results -->
       <div>
-        ${filtered.length===0?`<div class="card empty-state"><div class="empty-title">No matches</div><div class="empty-sub">Try broadening your filters</div></div>`:''}
+        ${filtered.length===0?`<div class="card empty-state"><div class="empty-title">No manufacturers match these filters</div><div class="empty-sub">Try widening your MOQ range, removing a certification filter, or changing the category. If you need a specific manufacturer type not listed, <a href="mailto:support@veyaflow.com?subject=Manufacturer%20request" style="color:var(--gold)">contact support</a> to request coverage.</div></div>`:''}
         ${filtered.map(mfr=>{
           const score=calcSusScore(mfr);
           const readiness=calcReadiness(mfr,findForm.targetMarket);
@@ -7702,7 +8112,6 @@ function pdfHeader(doc, title, subtitle, accentHex, pageW){
   doc.text(title, 14, 12);
   // Subtitle
   pdfSetFont(doc, 'small');
-  pdfColor(doc, 'rgba(255,255,255,0.6)');
   doc.setTextColor(180,190,200);
   doc.text(subtitle||'', 14, 19);
   // VeyaFlow mark
@@ -7771,10 +8180,9 @@ async function generateBrandPackPDF(){
     // ── PAGE 1: Cover ──
     pdfColorFill(doc, cover.accent||'#1E3A5F');
     doc.rect(0, 0, pageW, pageH, 'F');
-    // Diagonal accent
-    pdfColorFill(doc, '#FFFFFF');
+    // White band (lower third)
     doc.setFillColor(255,255,255);
-    doc.triangle(0, pageH*0.55, pageW, pageH*0.7, 0, pageH, 'F');
+    doc.rect(0, pageH*0.68, pageW, pageH*0.32, 'F');
     // Brand name
     pdfSetFont(doc, 'heading');
     doc.setFontSize(28);
@@ -7792,11 +8200,11 @@ async function generateBrandPackPDF(){
     doc.text(`Prepared for ${retailer} · ${market}`, margin, 82);
     // Date
     doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}), margin, 90);
-    // VeyaFlow logo area (bottom of cover)
-    pdfColor(doc, '#FFFFFF');
+    // VeyaFlow logo area (bottom of cover — on white band)
     doc.setFontSize(8);
+    doc.setTextColor(150,150,150);
     doc.text('Generated by VeyaFlow · veyaflow.com', pageW/2, pageH-15, {align:'center'});
-    doc.setTextColor(180,190,200);
+    doc.setTextColor(180,180,180);
     doc.text('Confidential — not for distribution', pageW/2, pageH-9, {align:'center'});
 
     // ── PAGE 2: Brand Overview ──
@@ -7901,7 +8309,12 @@ async function generateBrandPackPDF(){
     const filename = `VeyaFlow_BrandPack_${(brand?.name||'brand').replace(/\s+/g,'_')}_${retailer.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(filename);
   } catch(err){
-    alert('PDF generation failed: '+err.message+'\n\nFallback: use Print → Save as PDF');
+    const cl = classifyApiError(err);
+    const pdfErrDiv = document.createElement('div');
+    pdfErrDiv.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;max-width:320px';
+    pdfErrDiv.innerHTML = errCard('PDF could not be generated', cl.sub + ' As a fallback, use your browser Print → Save as PDF.', 'Close', 'this.closest(\'[style*=fixed]\').remove()');
+    document.body.appendChild(pdfErrDiv);
+    setTimeout(()=>pdfErrDiv.remove(), 8000);
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='↓ Download PDF'; }
   }
@@ -8017,14 +8430,1070 @@ async function generateBizCasePDF(){
     const filename = `VeyaFlow_BizCase_${(brand?.name||'brand').replace(/\s+/g,'_')}_${retailer.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(filename);
   } catch(err){
-    alert('PDF generation failed: '+err.message+'\n\nFallback: use Print → Save as PDF');
+    const cl3=classifyApiError(err);
+    const pdfE2=document.createElement('div'); pdfE2.style.cssText='position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;max-width:320px';
+    pdfE2.innerHTML=errCard('PDF could not be generated',cl3.sub+' As a fallback, use your browser Print → Save as PDF.','Close','this.closest(\'[style*=fixed]\').remove()');
+    document.body.appendChild(pdfE2); setTimeout(()=>pdfE2.remove(),8000);
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='↓ Download PDF'; }
   }
 }
 
+
+/* ═══════════════════════════════════════════════════
+   GUIDED SETUP + SMART EMPTY STATES + DEEP LINKING
+═══════════════════════════════════════════════════ */
+
+// ── Setup completion tracker ──────────────────────
+
+function getSetupSteps(){
+  const sku = skus[0]||null;
+  return [
+    {
+      id:'profile',
+      label:'Complete brand profile',
+      done:!!(brand?.name&&brand?.category&&brand?.currentMarket&&brand?.targetMarkets?.length),
+      cta:'Edit workspace',
+      action:()=>{ onboardStep=1; brand=null; renderPage('home'); },
+    },
+    {
+      id:'sku',
+      label:'Add your hero SKU',
+      done:!!(sku&&sku.name),
+      cta:'Add product',
+      action:()=>showPage('skus'),
+    },
+    {
+      id:'report',
+      label:'Run your first Market Entry Report',
+      done:savedReports.length>0,
+      cta:'Generate report',
+      action:()=>showPage('report'),
+    },
+    {
+      id:'readiness',
+      label:'Review your Readiness Score',
+      done:!!(brand && (localStorage.getItem('ns_readiness_viewed')==='1')),
+      cta:'View score',
+      action:()=>{ localStorage.setItem('ns_readiness_viewed','1'); showPage('home'); },
+    },
+  ];
+}
+
+function getSetupPct(){
+  const steps = getSetupSteps();
+  return Math.round((steps.filter(s=>s.done).length/steps.length)*100);
+}
+
+function markReadinessViewed(){
+  localStorage.setItem('ns_readiness_viewed','1');
+}
+
+function renderSetupTracker(){
+  const steps = getSetupSteps();
+  const done = steps.filter(s=>s.done).length;
+  const pct = Math.round((done/steps.length)*100);
+  if(pct===100) return ''; // hide when complete
+
+  return `
+    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.15rem">Getting started</div>
+          <div style="font-family:var(--serif);font-size:.95rem;color:#fff">${done} of ${steps.length} steps complete</div>
+        </div>
+        <div style="font-family:var(--serif);font-size:1.5rem;color:var(--gold);line-height:1">${pct}%</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);height:5px;border-radius:3px;margin-bottom:.85rem;overflow:hidden">
+        <div style="background:var(--gold);height:5px;width:${pct}%;transition:width .5s ease;border-radius:3px"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.35rem">
+        ${steps.map((s,i)=>`
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:${s.done?'rgba(16,185,129,.12)':'rgba(255,255,255,.05)'};cursor:${s.done?'default':'pointer'}" ${s.done?'':` onclick="getSetupSteps()[${i}].action()"`}>
+            <span style="font-size:.75rem;flex-shrink:0">${s.done?'✓':'○'}</span>
+            <span style="font-family:var(--sans);font-size:.67rem;color:${s.done?'rgba(255,255,255,.5)':'#fff'};${s.done?'text-decoration:line-through;':''}">${s.label}</span>
+            ${!s.done?`<span style="margin-left:auto;font-family:var(--mono);font-size:.53rem;color:var(--gold);white-space:nowrap">${s.cta} →</span>`:''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ── Smart empty state helper ──────────────────────
+// Returns a contextual empty state card personalised to brand data
+
+function smartEmpty(moduleId){
+  const sku = skus[0]||null;
+  // Get first recommended market from sequencer scores
+  const topMarket = brand ? (()=>{
+    const codes = Object.keys(MARKET_REGISTRY);
+    const homeCode = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'}[brand.currentMarket||'Sweden']||'SE';
+    const scored = codes.filter(c=>c!==homeCode).map(c=>scoreMarketForSequencer(c,brand,sku||{})).filter(Boolean).sort((a,b)=>b.total-a.total);
+    return scored[0];
+  })() : null;
+  const topMarketName = topMarket?.market?.name||'Denmark';
+  const topRetailer = topMarket ? RETAILER_REGISTRY.find(r=>r.market===topMarket.marketCode&&(r.categories||[]).includes(brand?.category||'')) : RETAILER_REGISTRY[0];
+  const topRetailerName = topRetailer?.name||'Matas';
+
+  const configs = {
+    report: {
+      icon: '◎',
+      title: `No reports yet`,
+      sub: `Generate your first Market Entry Report for ${topMarketName} — retail landscape, compliance checklist, pricing benchmarks, and a 90-day action plan.`,
+      cta: `Generate ${topMarketName} report →`,
+      action: `reportForm.targetMarket='${topMarketName}';showPage('report')`,
+    },
+    compare: {
+      icon: '⇄',
+      title: 'No comparisons run yet',
+      sub: `Compare ${topMarketName} vs another market to see which one you should enter first — scored on regulatory overlap, entry cost, retailer fit, and 2026 timing.`,
+      cta: `Compare ${topMarketName} vs Germany →`,
+      action: `compareForm.markets=['${topMarketName}','Germany'];compareForm.brandName=brand?.name||'';compareForm.category=brand?.category||'';runCompare()`,
+    },
+    pitch: {
+      icon: '✉',
+      title: 'No pitches generated yet',
+      sub: `Write your first buyer pitch email for ${topRetailerName}. Three tone variants in one click — Direct & Commercial, Brand Story-Led, Trend-Anchored.`,
+      cta: `Generate ${topRetailerName} pitch →`,
+      action: `pitchForm.retailer='${topRetailerName}';pitchForm.targetMarket='${topMarketName}';generatePitch()`,
+    },
+    brandpack: {
+      icon: '◫',
+      title: 'No Brand Pack generated yet',
+      sub: `Create your retailer-ready Brand Pack for ${topRetailerName} — one-page verified summary, competitive positioning, and AI buyer briefing sections.`,
+      cta: `Generate ${topRetailerName} Brand Pack →`,
+      action: `brandPackState.retailer='${topRetailerName}';brandPackState.market='${topMarketName}';showPage('brandpack')`,
+    },
+    bizcase: {
+      icon: '◉',
+      title: 'No business case built yet',
+      sub: `Build the internal listing approval document for ${topRetailerName} — P&L model, category gap analysis, risk assessment with hardcoded probabilities.`,
+      cta: `Build ${topRetailerName} business case →`,
+      action: `bizCaseState.retailer='${topRetailerName}';bizCaseState.market='${topMarketName}';showPage('bizcase')`,
+    },
+    crm: {
+      icon: '⊞',
+      title: 'Pipeline empty — ready to fill',
+      sub: `Your Expansion Sequencer suggests starting with ${topRetailerName} in ${topMarketName}. Add them to your pipeline and track your pitch progress.`,
+      cta: `Add ${topRetailerName} to pipeline →`,
+      action: `moveCRMCard('${topRetailer?.id||'matas_dk'}','pitched');renderPage('crm')`,
+    },
+    claims: {
+      icon: '⚑',
+      title: 'No claims analysed yet',
+      sub: `Paste your product copy to check whether each claim is legally safe in Denmark, Germany, and the UK before you print packaging or send a pitch deck.`,
+      cta: 'Analyse my claims →',
+      action: `showPage('claims')`,
+    },
+    circular: {
+      icon: '◉',
+      title: 'No stock routed yet',
+      sub: `Route unsold inventory to verified circular partners and generate your ESPR Article 24 declaration. Routes ranked by value recovered — not just compliance.`,
+      cta: 'Route my first batch →',
+      action: `showPage('circular')`,
+    },
+    suppliers: {
+      icon: '◈',
+      title: 'No suppliers tracked yet',
+      sub: `Add your manufacturers and ingredient suppliers to track EUDR compliance, audit status, and data gaps — before your retailers ask for it.`,
+      cta: 'View supplier dashboard →',
+      action: `showPage('suppliers')`,
+    },
+    find: {
+      icon: '◌',
+      title: 'Find your next manufacturer',
+      sub: `Search ${sku?'for a manufacturer for '+sku.name:'verified contract manufacturers'} — filtered by category, market, MOQ, and sustainability certifications.`,
+      cta: 'Search manufacturers →',
+      action: `showPage('find')`,
+    },
+    skus: {
+      icon: '▦',
+      title: 'No products added yet',
+      sub: `Add your hero SKU — name, EAN, RSP, INCI list. VeyaFlow stores all product data in one place and exports it in any retailer's required format.`,
+      cta: 'Add first product →',
+      action: `startNewSku()`,
+    },
+    cfo: {
+      icon: '◈',
+      title: 'CFO View — private calculations',
+      sub: `Run the Margin Stress-Tester and Landed Cost Calculator. All calculations stay in your browser — never sent to the API.`,
+      cta: 'Open CFO View →',
+      action: `showPage('cfo')`,
+    },
+  };
+
+  const cfg = configs[moduleId]||{icon:'◎',title:'Nothing here yet',sub:'Use this module to get started.',cta:'Get started →',action:`showPage('home')`};
+
+  return `
+    <div class="card empty-state" style="padding:2.5rem 2rem">
+      <div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">${cfg.icon}</div>
+      <div class="empty-title">${cfg.title}</div>
+      <div class="empty-sub" style="margin-bottom:1.25rem">${cfg.sub}</div>
+      <button class="btn-primary" style="width:auto;padding:.6rem 1.25rem;font-size:.72rem" onclick="${cfg.action}">${cfg.cta}</button>
+    </div>
+  `;
+}
+
+// ── Deep linking via URL hash ─────────────────────
+
+function handleDeepLink(){
+  try{
+  const hash = window.location.hash; // e.g. #crm/matas_dk or #report or #skus
+  if(!hash||hash==='#') return;
+  const parts = hash.slice(1).split('/');
+  const page = parts[0];
+  const param = parts[1];
+
+  const validPages = ['home','find','report','compare','pitch','brandpack','bizcase','suppliers','circular','skus','claims','cfo','crm'];
+  if(!validPages.includes(page)) return;
+
+  // Handle param-specific deep links
+  if(page==='crm'&&param){
+    // Open CRM with specific card expanded: #crm/matas_dk
+    showPage('crm');
+    setTimeout(()=>{ crmEditId=param; renderPage('crm'); }, 100);
+    return;
+  }
+  if(page==='pitch'&&param){
+    // Pre-fill retailer: #pitch/Matas
+    pitchForm.retailer = decodeURIComponent(param);
+    showPage('pitch');
+    return;
+  }
+  if(page==='report'&&param){
+    // Pre-fill target market: #report/Denmark
+    reportForm.targetMarket = decodeURIComponent(param);
+    showPage('report');
+    return;
+  }
+  showPage(page);
+  }catch(e){ /* sandboxed */ }
+}
+
+function setDeepLink(page, param){
+  try{
+    const hash = param ? `#${page}/${encodeURIComponent(param)}` : `#${page}`;
+    if(window.location.hash !== hash){
+      window.history.replaceState(null,'',hash);
+    }
+  }catch(e){ /* sandboxed iframe — ignore */ }
+}
+
+/* ═══════════════════════════════════════════════════
+   UNIFIED ERROR SYSTEM
+═══════════════════════════════════════════════════ */
+
+function errCard(headline, sub, primaryCta, primaryAction, secondaryCta, secondaryAction){
+  return `
+    <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-left:4px solid #EF4444;padding:1.25rem 1.5rem;margin-bottom:1rem">
+      <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:#7F1D1D;margin-bottom:.3rem">${headline}</div>
+      <div style="font-family:var(--sans);font-size:.75rem;color:#991B1B;line-height:1.6;margin-bottom:.85rem">${sub}</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        ${primaryCta?`<button class="btn-primary" style="font-size:.7rem;padding:.4rem .9rem" onclick="${primaryAction}">${primaryCta}</button>`:''}
+        ${secondaryCta||primaryCta?`<a href="mailto:support@veyaflow.com?subject=VeyaFlow%20issue" style="display:inline-flex;align-items:center;padding:.4rem .9rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--muted);text-decoration:none">${secondaryCta||'Contact support →'}</a>`:''}
+      </div>
+    </div>
+  `;
+}
+
+function classifyApiError(err){
+  const msg = (err?.message||'').toLowerCase();
+  if(msg.includes('abort')||msg.includes('timed out')||msg.includes('timeout')){
+    return {headline:'This took longer than expected',sub:'The AI took too long to respond. Your data is saved — try again below.',cta:'Try again'};
+  }
+  if(msg.includes('connection')||msg.includes('network')||msg.includes('fetch')){
+    return {headline:'No internet connection detected',sub:'Your data is saved locally. Reconnect and try again.',cta:'Try again'};
+  }
+  if(msg.includes('504')){
+    return {headline:'Server timeout',sub:'The server took too long to respond. This sometimes happens under load — try again in a moment.',cta:'Try again'};
+  }
+  if(msg.includes('529')||msg.includes('overload')){
+    return {headline:'AI is busy right now',sub:'Too many requests at once. Wait a few seconds and try again.',cta:'Try again'};
+  }
+  if(msg.includes('401')||msg.includes('api key')){
+    return {headline:'API connection issue',sub:'Something went wrong with the connection. This is a platform issue — contact support.',cta:null};
+  }
+  return {headline:'Something went wrong',sub:'An unexpected error occurred. Try again — if it keeps happening, contact support.',cta:'Try again'};
+}
+
+/* ═══════════════════════════════════════════════════
+   DPP GENERATOR — Digital Product Passport
+   Source section · Per-SKU · Living versioned record
+═══════════════════════════════════════════════════ */
+
+// ── Intelligence constants ────────────────────────
+
+const CATEGORY_EMISSION_FACTORS = {
+  // kg CO2e per unit — EU published average data per category
+  cosmetic_s:   0.6,   // <30ml / small format
+  cosmetic_m:   0.9,   // 30–100ml
+  cosmetic_l:   1.4,   // >100ml
+  device_small: 3.5,   // LED mask, microcurrent, rollers
+  device_large: 7.2,   // professional devices
+  textile_acc:  1.8,   // pillowcase, eye mask, accessories
+  supplement_s: 1.2,   // 30-day supply capsules
+  supplement_l: 1.6,   // 60-day / powder formats
+  food_s:       0.5,   // <250ml / small
+  food_m:       0.8,   // 250–500ml
+  garment_top:  5.8,   // t-shirts, tops
+  garment_heavy:9.4,   // denim, outerwear
+};
+
+const MFR_COUNTRY_MULTIPLIER = {
+  CN:1.45, IN:1.30, TR:1.15, VN:1.25, BD:1.30, ID:1.20,
+  SE:0.85, DE:0.88, FR:0.88, IT:0.90, ES:0.90, PL:0.95,
+  UK:0.92, US:1.05, KR:1.10, JP:1.00,
+};
+
+// ESPR_TIMELINE defined in Circular GPS constants above
+
+// ── State ─────────────────────────────────────────
+
+let dppData = {}; // keyed by sku.id → {fields, versions, generatedAt}
+let dppActiveSkuId = null;
+let dppStep = 'list'; // 'list' | 'fill' | 'view'
+
+// ── localStorage ──────────────────────────────────
+
+function loadDPP(){
+  try{ const d=localStorage.getItem('ns_dpp'); if(d) dppData=JSON.parse(d); }catch(e){}
+}
+function saveDPP(){
+  try{ localStorage.setItem('ns_dpp',JSON.stringify(dppData)); }catch(e){}
+}
+
+// ── DPP Readiness per SKU ─────────────────────────
+
+function dppReadiness(sku){
+  const d = dppData[sku.id]||{fields:{}};
+  const f = d.fields||{};
+
+  const checks = [
+    // From SKU data — already captured
+    {id:'identity',  label:'Product identity',  done:!!(sku.name&&sku.ean),         source:'SKU'},
+    {id:'inci',      label:'Materials/INCI',     done:!!(sku.inci||sku.materialComposition||sku.ingredientList), source:'SKU'},
+    {id:'mfr',       label:'Country of manufacture', done:!!sku.countryOfMfr,       source:'SKU'},
+    {id:'cpnp',      label:'CPNP/regulatory ref',done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
+    {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
+    {id:'circular',  label:'End-of-life routing',done:!!(sku.productType),           source:'SKU'},
+    // DPP-specific gaps
+    {id:'carbon',    label:'Carbon footprint',   done:!!(f.carbonKg||f.carbonEstimated), source:'DPP'},
+    {id:'recycled',  label:'Recycled content %', done:!!(f.recycledProduct!==undefined&&f.recycledProduct!==''), source:'DPP'},
+    {id:'recyclability',label:'Recyclability',   done:!!(f.recyclability),            source:'DPP'},
+    {id:'takeback',  label:'Take-back scheme',   done:!!(f.takeback),                 source:'DPP'},
+  ];
+
+  const done = checks.filter(c=>c.done).length;
+  const pct  = Math.round((done/checks.length)*100);
+  const gaps = checks.filter(c=>!c.done);
+  const complete = checks.filter(c=>c.done);
+  return {pct, done, total:checks.length, gaps, complete, checks};
+}
+
+// ── Carbon estimator ──────────────────────────────
+
+function estimateCarbon(sku){
+  const type = sku.productType||'cosmetic';
+  const net  = parseFloat(sku.netContent)||50;
+
+  let base = 0.9; // default
+  if(type==='cosmetic')      base = net<30?0.6:net<100?0.9:1.4;
+  else if(type==='device')   base = net<200?3.5:7.2;
+  else if(type==='textile')  base = 1.8;
+  else if(type==='supplement')base = net<50?1.2:1.6;
+  else if(type==='food')     base = net<250?0.5:0.8;
+  else if(type==='garment')  base = net>300?9.4:5.8;
+
+  const mfrCode = (sku.countryOfMfr||'').toUpperCase().slice(0,2);
+  const mMult = MFR_COUNTRY_MULTIPLIER[mfrCode]||1.0;
+  const wMult = (sku.warehouse||'').toLowerCase().includes('sw')||mfrCode==='SE'?1.0:1.15;
+
+  const estimate = Math.round(base * mMult * wMult * 10)/10;
+  return {estimate, confidence:'LOW', note:'Category-average estimate. Replace with verified LCA for full compliance.'};
+}
+
+// ── Unique DPP ID ──────────────────────────────────
+
+function getDPPId(skuId){
+  if(dppData[skuId]?.dppId) return dppData[skuId].dppId;
+  return 'vf-'+skuId+'-'+Date.now().toString(36);
+}
+
+// ── Render: DPP page (list of all SKUs) ──────────
+
+function renderDPP(el){
+  loadDPP();
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+
+  if(dppStep==='fill'&&dppActiveSkuId) { renderDPPFill(el); return; }
+  if(dppStep==='view'&&dppActiveSkuId) { renderDPPView(el); return; }
+
+  const timeline = Object.entries(ESPR_TIMELINE);
+  const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title">DPP Generator</div>
+          <div class="page-sub">Digital Product Passport — EU ESPR compliance · QR code · Living record</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <!-- ESPR Timeline banner -->
+        <div style="background:var(--navy);padding:.85rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:200px">
+            <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.2rem">ESPR — Ecodesign for Sustainable Products</div>
+            <div style="font-family:var(--sans);font-size:.78rem;color:rgba(255,255,255,.8);line-height:1.5">Every product sold in the EU will require a machine-readable DPP. The QR code on your packaging links to this record.</div>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            ${timeline.filter(([k])=>['garment','device','cosmetic'].includes(k)).map(([k,v])=>`
+              <div style="padding:.4rem .6rem;background:rgba(255,255,255,.07);font-family:var(--mono);font-size:.52rem;line-height:1.5">
+                <div style="color:${urgencyColor[v.urgency]};font-weight:700">${k.charAt(0).toUpperCase()+k.slice(1)}</div>
+                <div style="color:rgba(255,255,255,.5)">${v.label}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- SKU list with DPP scores -->
+        ${skus.length===0?`
+          <div class="card empty-state">
+            <div class="empty-title">No products yet</div>
+            <div class="empty-sub" style="margin-bottom:1rem">Add your hero SKU in My Products — VeyaFlow already captures 60% of DPP required fields.</div>
+            <button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage('skus')">Add products →</button>
+          </div>
+        `:`
+          <div class="card" style="margin-bottom:1rem">
+            <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Your products — DPP status</div>
+            ${skus.map(sku=>{
+              const r = dppReadiness(sku);
+              const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+              const barC = r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444';
+              const dppGenerated = !!(dppData[sku.id]?.generatedAt);
+              return `
+                <div style="padding:.85rem 0;border-bottom:1px solid var(--border)">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">
+                    <div style="flex:1;min-width:180px">
+                      <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}</div>
+                      <div style="font-family:var(--mono);font-size:.55rem;color:${urgencyColor[espr.urgency]};margin-top:.2rem">${espr.label}</div>
+                    </div>
+                    <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+                      ${dppGenerated?`
+                        <button class="btn-outline" style="font-size:.65rem;padding:.3rem .7rem;color:#065F46;border-color:#A7F3D0" onclick="dppActiveSkuId='${sku.id}';dppStep='view';renderDPP(document.getElementById('page-dpp'))">View DPP ↗</button>
+                      `:''}
+                      <button class="btn-primary" style="font-size:.65rem;padding:.35rem .8rem" onclick="dppActiveSkuId='${sku.id}';dppStep='fill';renderDPP(document.getElementById('page-dpp'))">${r.pct===100?'Update DPP':'Complete DPP →'}</button>
+                    </div>
+                  </div>
+                  <div style="margin-top:.6rem">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem">
+                      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);width:90px">DPP Readiness</div>
+                      <div style="flex:1;background:var(--border);height:5px;border-radius:3px">
+                        <div style="background:${barC};height:5px;border-radius:3px;width:${r.pct}%;transition:width .5s"></div>
+                      </div>
+                      <div style="font-family:var(--mono);font-size:.62rem;color:${barC};font-weight:700;flex-shrink:0">${r.pct}%</div>
+                    </div>
+                    <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">
+                      ${r.complete.map(ch=>`<span style="font-family:var(--mono);font-size:.48rem;background:#ECFDF5;color:#065F46;padding:.1rem .4rem;border:1px solid #A7F3D0">✓ ${ch.label}</span>`).join('')}
+                      ${r.gaps.map(ch=>`<span style="font-family:var(--mono);font-size:.48rem;background:#FEF2F2;color:#991B1B;padding:.1rem .4rem;border:1px solid #FCA5A5">✗ ${ch.label}</span>`).join('')}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+
+        <!-- What VeyaFlow captures vs gaps -->
+        <div class="card" style="border-left:3px solid var(--gold)">
+          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">Your VeyaFlow data advantage</div>
+          <div style="font-family:var(--sans);font-size:.75rem;color:#555;line-height:1.6;margin-bottom:.5rem">VeyaFlow already captures ~65% of mandatory DPP fields from your SKU data. The four gaps are sustainability-specific fields most brands haven't documented yet.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;font-family:var(--mono);font-size:.58rem">
+            ${['Product identity + EAN','INCI / materials list','Country of manufacture','CPNP / CE / regulatory refs','Certifications (COSMOS, GOTS…)','Circular routing (Circular GPS)'].map(f=>`<div style="padding:.3rem .5rem;background:#ECFDF5;color:#065F46">✓ ${f}</div>`).join('')}
+            ${['Carbon footprint (kg CO2e)','Recycled content %','Recyclability declaration','Take-back scheme'].map(f=>`<div style="padding:.3rem .5rem;background:#FEF2F2;color:#991B1B">✗ ${f}</div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Render: DPP Fill (gap-filling flow) ──────────
+
+function renderDPPFill(el){
+  const sku = skus.find(s=>s.id===dppActiveSkuId);
+  if(!sku){dppStep='list';renderDPP(el);return;}
+
+  const existing = dppData[dppActiveSkuId]||{fields:{}};
+  const f = existing.fields||{};
+  const r = dppReadiness(sku);
+  const carbon = estimateCarbon(sku);
+  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title" style="font-size:1rem">DPP — ${sku.name}</div>
+          <div class="page-sub">${r.pct}% complete · ${r.gaps.length} field${r.gaps.length!==1?'s':''} remaining</div>
+        </div>
+        <button class="btn-outline" onclick="dppStep='list';renderDPP(document.getElementById('page-dpp'))">← Back</button>
+      </div>
+      <div class="content">
+
+        <!-- Already captured -->
+        <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.75rem 1rem;margin-bottom:1.25rem">
+          <div style="font-family:var(--mono);font-size:.55rem;font-weight:700;color:#065F46;margin-bottom:.35rem">✓ Already captured from your brand profile</div>
+          <div style="font-family:var(--sans);font-size:.72rem;color:#065F46;line-height:1.6">${r.complete.map(c=>c.label).join(' · ')}</div>
+        </div>
+
+        ${r.gaps.length===0?`
+          <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:1rem 1.25rem;margin-bottom:1rem;text-align:center">
+            <div style="font-family:var(--serif);font-size:1.1rem;color:#065F46;margin-bottom:.35rem">DPP 100% complete</div>
+            <div style="font-family:var(--sans);font-size:.75rem;color:#065F46">All required fields filled. Generate your DPP below.</div>
+          </div>
+        `:`
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Still needed — ${r.gaps.length} item${r.gaps.length!==1?'s':''}</div>
+        `}
+
+        <!-- CARBON -->
+        ${r.checks.find(c=>c.id==='carbon')&&!r.checks.find(c=>c.id==='carbon').done?`
+          <div class="card" style="margin-bottom:1rem;border-left:3px solid #F59E0B">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:.5rem">
+              <div>
+                <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy)">1. Carbon footprint</div>
+                <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">Total Scope 1+2 in kg CO₂e per unit shipped</div>
+              </div>
+              <span style="font-family:var(--mono);font-size:.5rem;background:#FFFBEB;color:#92400E;padding:.2rem .5rem;border:1px solid #FDE68A;white-space:nowrap">Required</span>
+            </div>
+
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.6rem .85rem;margin-bottom:.75rem">
+              <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:#92400E;margin-bottom:.15rem">VeyaFlow Estimate — LOW confidence</div>
+              <div style="font-family:var(--serif);font-size:1.4rem;color:#92400E;line-height:1">${carbon.estimate} <span style="font-size:.75rem;font-weight:400">kg CO₂e</span></div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#92400E;margin-top:.2rem">${carbon.note}</div>
+              <button class="btn-outline" style="margin-top:.5rem;font-size:.62rem;padding:.3rem .7rem" onclick="useCarbonEstimate()">Use this estimate →</button>
+            </div>
+
+            <div class="field">
+              <label class="lbl">Enter verified figure <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(kg CO₂e per unit — optional, replaces estimate)</span></label>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <input type="number" id="dpp-carbon" placeholder="${carbon.estimate}" value="${f.carbonKg||''}" min="0" step="0.1" oninput="" style="flex:1;max-width:160px">
+                <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">kg CO₂e/unit</span>
+              </div>
+            </div>
+            <button class="btn-outline" style="font-size:.62rem;padding:.3rem .7rem" onclick="requestCarbonFromMfr('${sku.id}','${sku.name}')">Request from manufacturer →</button>
+          </div>
+        `:''}
+
+        <!-- RECYCLED CONTENT -->
+        ${r.checks.find(c=>c.id==='recycled')&&!r.checks.find(c=>c.id==='recycled').done?`
+          <div class="card" style="margin-bottom:1rem;border-left:3px solid #F59E0B">
+            <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.2rem">2. Recycled content</div>
+            <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-bottom:.75rem">Percentage of recycled materials in product and packaging</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+              <div class="field">
+                <label class="lbl">Product content</label>
+                <div style="display:flex;gap:.4rem;align-items:center">
+                  <input type="number" id="dpp-recycled-product" placeholder="0" value="${f.recycledProduct||''}" min="0" max="100" style="flex:1">
+                  <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">%</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="lbl">Packaging</label>
+                <div style="display:flex;gap:.4rem;align-items:center">
+                  <input type="number" id="dpp-recycled-pack" placeholder="0" value="${f.recycledPackaging||''}" min="0" max="100" style="flex:1">
+                  <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `:''}
+
+        <!-- RECYCLABILITY -->
+        ${r.checks.find(c=>c.id==='recyclability')&&!r.checks.find(c=>c.id==='recyclability').done?`
+          <div class="card" style="margin-bottom:1rem;border-left:3px solid #F59E0B">
+            <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.2rem">3. Recyclability</div>
+            <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-bottom:.65rem">Can your packaging be recycled by consumers?</div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem">
+              ${['Fully recyclable','Partially recyclable','Not recyclable'].map(opt=>`
+                <label style="display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border:1px solid var(--border);cursor:pointer;min-height:40px;font-family:var(--sans);font-size:.75rem">
+                  <input type="radio" name="dpp-recyclability" value="${opt}" ${f.recyclability===opt?'checked':''} style="width:auto;min-height:auto">
+                  ${opt}
+                </label>
+              `).join('')}
+            </div>
+            <div class="field">
+              <label class="lbl">Packaging material <span style="font-weight:400;text-transform:none;letter-spacing:0">(e.g. Glass, PCR plastic, Aluminium)</span></label>
+              <input type="text" id="dpp-pack-material" placeholder="e.g. PCR HDPE bottle + FSC cardboard outer" value="${f.packagingMaterial||''}">
+            </div>
+          </div>
+        `:''}
+
+        <!-- TAKE-BACK -->
+        ${r.checks.find(c=>c.id==='takeback')&&!r.checks.find(c=>c.id==='takeback').done?`
+          <div class="card" style="margin-bottom:1rem;border-left:3px solid #F59E0B">
+            <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.2rem">4. Take-back scheme</div>
+            <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-bottom:.65rem">Do you offer product take-back or end-of-life recycling?</div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem">
+              ${['Yes','No','In development'].map(opt=>`
+                <label style="display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border:1px solid var(--border);cursor:pointer;min-height:40px;font-family:var(--sans);font-size:.75rem">
+                  <input type="radio" name="dpp-takeback" value="${opt}" ${f.takeback===opt?'checked':''} style="width:auto;min-height:auto">
+                  ${opt}
+                </label>
+              `).join('')}
+            </div>
+            <div class="field" id="dpp-takeback-desc-wrap">
+              <label class="lbl">Describe scheme <span style="font-weight:400;text-transform:none;letter-spacing:0">(if yes)</span></label>
+              <input type="text" id="dpp-takeback-desc" placeholder="e.g. Return to any Apotek Hjärtat for recycling" value="${f.takebackDesc||''}">
+            </div>
+          </div>
+        `:''}
+
+        <!-- Show already-filled gap fields for editing -->
+        ${r.checks.filter(c=>c.id==='carbon'&&c.done).length?`
+          <div class="card" style="margin-bottom:.5rem;background:#F9F8F6">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy)">✓ Carbon footprint: <strong>${f.carbonKg||f.carbonEstimated} kg CO₂e</strong>${f.carbonEstimated&&!f.carbonKg?' (estimated)':''}</div>
+              <button class="btn-outline" style="font-size:.58rem;padding:.25rem .5rem" onclick="dppData['${sku.id}'].fields.carbonKg='';dppData['${sku.id}'].fields.carbonEstimated='';saveDPP();renderDPP(document.getElementById('page-dpp'))">Edit</button>
+            </div>
+          </div>
+        `:''}
+
+        <!-- Save + Generate -->
+        <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:1rem;padding-bottom:1.5rem">
+          <button class="btn-primary" style="flex:1;min-width:180px" onclick="saveDPPFields('${sku.id}')">
+            ${r.pct===100?'Update & Generate DPP →':'Save progress & Generate DPP →'}
+          </button>
+          <button class="btn-outline" onclick="dppStep='list';renderDPP(document.getElementById('page-dpp'))">Save for later</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center">Your DPP data is saved locally and generates a QR code, JSON export, and PDF declaration.</div>
+      </div>
+    </div>
+  `;
+}
+
+function useCarbonEstimate(){
+  const sku = skus.find(s=>s.id===dppActiveSkuId);
+  if(!sku) return;
+  const est = estimateCarbon(sku);
+  if(!dppData[dppActiveSkuId]) dppData[dppActiveSkuId]={fields:{}};
+  dppData[dppActiveSkuId].fields.carbonEstimated = est.estimate;
+  saveDPP();
+  renderDPP(document.getElementById('page-dpp'));
+}
+
+function requestCarbonFromMfr(skuId, skuName){
+  // Extend supplier nudge as DPP data request
+  const subject = encodeURIComponent('DPP Carbon Data Request — '+skuName);
+  const body = encodeURIComponent(
+    'Dear supplier,\n\nAs part of our EU Digital Product Passport (ESPR) compliance, we need the carbon footprint data for:\n\nProduct: '+skuName+'\nData required: Scope 1+2 emissions in kg CO2e per unit\n\nPlease provide this data within 14 days.\n\nThank you.'
+  );
+  window.location.href = 'mailto:?subject='+subject+'&body='+body;
+}
+
+function saveDPPFields(skuId){
+  if(!dppData[skuId]) dppData[skuId]={fields:{},versions:[]};
+  const f = dppData[skuId].fields;
+
+  const carbonInput = document.getElementById('dpp-carbon');
+  if(carbonInput?.value) f.carbonKg = parseFloat(carbonInput.value);
+
+  const recycledProduct = document.getElementById('dpp-recycled-product');
+  if(recycledProduct) f.recycledProduct = recycledProduct.value||'0';
+  const recycledPack = document.getElementById('dpp-recycled-pack');
+  if(recycledPack) f.recycledPackaging = recycledPack.value||'0';
+
+  const recyclability = document.querySelector('[name="dpp-recyclability"]:checked');
+  if(recyclability) f.recyclability = recyclability.value;
+  const packMat = document.getElementById('dpp-pack-material');
+  if(packMat?.value) f.packagingMaterial = packMat.value;
+
+  const takeback = document.querySelector('[name="dpp-takeback"]:checked');
+  if(takeback) f.takeback = takeback.value;
+  const takebackDesc = document.getElementById('dpp-takeback-desc');
+  if(takebackDesc?.value) f.takebackDesc = takebackDesc.value;
+
+  // Version history
+  const versionNote = 'Updated '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  if(!dppData[skuId].versions) dppData[skuId].versions=[];
+  const vNum = 'v1.'+dppData[skuId].versions.length;
+  dppData[skuId].versions.unshift({version:vNum, date:new Date().toISOString(), note:versionNote});
+
+  if(!dppData[skuId].generatedAt){
+    dppData[skuId].dppId = getDPPId(skuId);
+    dppData[skuId].generatedAt = new Date().toISOString();
+  } else {
+    dppData[skuId].updatedAt = new Date().toISOString();
+  }
+
+  saveDPP();
+  dppStep='view';
+  renderDPP(document.getElementById('page-dpp'));
+}
+
+// ── Render: DPP View (outputs + downloads) ────────
+
+function renderDPPView(el){
+  const sku = skus.find(s=>s.id===dppActiveSkuId);
+  if(!sku){dppStep='list';renderDPP(el);return;}
+
+  const d = dppData[dppActiveSkuId]||{fields:{}};
+  const f = d.fields||{};
+  const r = dppReadiness(sku);
+  const dppId = d.dppId||getDPPId(dppActiveSkuId);
+  const dppUrl = 'https://veyaflow.com/dpp/'+dppId;
+  const versions = d.versions||[];
+  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+  const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
+
+  el.innerHTML=`
+    <div class="page-wrap">
+      <div class="topbar">
+        <div>
+          <div class="page-title" style="font-size:1rem">DPP — ${sku.name}</div>
+          <div class="page-sub">${r.pct}% complete · ${dppId}</div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-outline" style="font-size:.65rem" onclick="dppActiveSkuId='${sku.id}';dppStep='fill';renderDPP(document.getElementById('page-dpp'))">Edit fields</button>
+          <button class="btn-outline" style="font-size:.65rem" onclick="dppStep='list';renderDPP(document.getElementById('page-dpp'))">← All DPPs</button>
+        </div>
+      </div>
+      <div class="content">
+
+        <!-- Status bar -->
+        <div style="background:${r.pct===100?'#ECFDF5':'#FFFBEB'};border:1px solid ${r.pct===100?'#A7F3D0':'#FDE68A'};padding:.75rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+          <div>
+            <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${r.pct===100?'#065F46':'#92400E'}">${r.pct===100?'DPP COMPLETE':'DPP IN PROGRESS — '+r.pct+'%'}</div>
+            <div style="font-family:var(--mono);font-size:.55rem;color:${urgencyColor[espr.urgency]};margin-top:.15rem">${espr.label}</div>
+          </div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">ID: ${dppId}</div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:1rem">
+
+          <!-- QR Code output -->
+          <div class="card">
+            <div class="section-tag">QR Code</div>
+            <div id="dpp-qr-container" style="width:140px;height:140px;margin:.5rem auto;background:#F9F8F6;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)">
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center">Loading QR…</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-bottom:.65rem;word-break:break-all">${dppUrl}</div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button class="btn-primary" style="flex:1;font-size:.62rem;padding:.5rem" onclick="downloadDPPQR('${dppId}')">↓ Download QR (PNG)</button>
+            </div>
+            <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.4rem">Min print size: 10×10mm · Error correction: Level Q</div>
+          </div>
+
+          <!-- Data summary -->
+          <div class="card">
+            <div class="section-tag">DPP Data Summary</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem">
+              ${[
+                ['Product',sku.name],
+                ['EAN',sku.ean||'—'],
+                ['Category',sku.productType||'—'],
+                ['Made in',sku.countryOfMfr||'—'],
+                ['Carbon',(f.carbonKg||f.carbonEstimated)?(f.carbonKg||f.carbonEstimated)+' kg CO₂e'+(f.carbonEstimated&&!f.carbonKg?' (est.)':''):'—'],
+                ['Recycled content',f.recycledProduct!==undefined?f.recycledProduct+'% product / '+(f.recycledPackaging||'0')+'% pack':'—'],
+                ['Recyclability',f.recyclability||'—'],
+                ['Take-back',f.takeback||'—'],
+                ['Certifications',(sku.certifications||[]).join(', ')||'—'],
+                ['CPNP',sku.cpnp||'—'],
+              ].map(([k,v])=>`
+                <div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.58rem">
+                  <span style="color:var(--muted)">${k}</span>
+                  <span style="color:var(--navy);font-weight:${v==='—'?'400':'600'};opacity:${v==='—'?'.4':'1'}">${v}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Downloads -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="section-tag">Download formats</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-top:.5rem">
+            <div style="padding:.85rem;border:1px solid var(--border);text-align:center">
+              <div style="font-size:1.2rem;margin-bottom:.3rem">⬛</div>
+              <div style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">QR Code</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.5rem">PNG + SVG · Print-ready</div>
+              <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.4rem" onclick="downloadDPPQR('${dppId}')">↓ Download</button>
+            </div>
+            <div style="padding:.85rem;border:1px solid var(--border);text-align:center">
+              <div style="font-size:1.2rem;margin-bottom:.3rem">{}</div>
+              <div style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">JSON</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.5rem">EU DPP data model · Machine-readable</div>
+              <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.4rem" onclick="downloadDPPJson('${sku.id}')">↓ Download</button>
+            </div>
+            <div style="padding:.85rem;border:1px solid var(--border);text-align:center">
+              <div style="font-size:1.2rem;margin-bottom:.3rem">📄</div>
+              <div style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">PDF Declaration</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.5rem">Compliance document · Dated + branded</div>
+              <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.4rem pdf-btn-desktop" onclick="generateDPPPdf('${sku.id}')">↓ Download</button>
+              <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.4rem pdf-btn-mobile" onclick="window.print()" style="display:none">Print PDF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retailer integration note -->
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.75rem 1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.6">
+          <strong>Brand Pack integration:</strong> Your DPP link is automatically added to Section 5 (Compliance) of any Brand Pack generated for this product.
+          <span style="font-family:var(--mono);font-size:.6rem;color:#3B82F6;display:block;margin-top:.2rem">veyaflow.com/dpp/${dppId}</span>
+        </div>
+
+        <!-- Version history -->
+        ${versions.length?`
+          <div class="card">
+            <div class="section-tag">Version history</div>
+            ${versions.map(v=>`
+              <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.58rem">
+                <span style="color:var(--navy);font-weight:600">${v.version}</span>
+                <span style="color:var(--muted)">${v.note}</span>
+                <span style="color:var(--muted)">${new Date(v.date).toLocaleDateString('en-GB')}</span>
+              </div>
+            `).join('')}
+          </div>
+        `:''}
+
+      </div>
+    </div>
+  `;
+
+  // Generate QR code
+  setTimeout(()=>renderDPPQrCode(dppUrl), 100);
+}
+
+// ── QR code generation ─────────────────────────────
+
+function renderDPPQrCode(url){
+  const container = document.getElementById('dpp-qr-container');
+  if(!container) return;
+
+  // Use qrcode-generator lib from CDN — load lazily
+  if(typeof qrcode === 'undefined'){
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = ()=>_renderQR(container, url);
+    s.onerror = ()=>{container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:1rem">QR code loads on veyaflow.com</div>';};
+    document.head.appendChild(s);
+  } else {
+    _renderQR(container, url);
+  }
+}
+
+function _renderQR(container, url){
+  try{
+    container.innerHTML = '';
+    new QRCode(container, {
+      text: url,
+      width: 140, height: 140,
+      colorDark: '#1E3A5F',
+      colorLight: '#FFFFFF',
+      correctLevel: QRCode.CorrectLevel.Q,
+    });
+  }catch(e){
+    container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:1rem">QR preview on veyaflow.com</div>';
+  }
+}
+
+function downloadDPPQR(dppId){
+  const canvas = document.querySelector('#dpp-qr-container canvas');
+  if(!canvas){
+    // Fallback SVG with URL text
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="220" viewBox="0 0 200 220"><rect width="200" height="220" fill="white"/><text x="100" y="180" text-anchor="middle" font-family="monospace" font-size="9" fill="#1E3A5F">veyaflow.com/dpp/${dppId}</text><rect x="20" y="20" width="160" height="140" fill="none" stroke="#1E3A5F" stroke-width="2"/><text x="100" y="100" text-anchor="middle" font-family="monospace" font-size="8" fill="#999">QR renders on veyaflow.com</text></svg>`;
+    const a = document.createElement('a');
+    a.href = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+    a.download = 'dpp-qr-'+dppId+'.svg'; a.click();
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'dpp-qr-'+dppId+'.png'; a.click();
+}
+
+// ── JSON export ────────────────────────────────────
+
+function buildDPPJson(skuId){
+  const sku = skus.find(s=>s.id===skuId);
+  if(!sku) return null;
+  const d = dppData[skuId]||{fields:{}};
+  const f = d.fields||{};
+  const dppId = d.dppId||getDPPId(skuId);
+  const carbon = f.carbonKg||f.carbonEstimated||null;
+
+  return {
+    "@context": "https://veyaflow.com/dpp/schema/v1",
+    "dppId": dppId,
+    "dppUrl": "https://veyaflow.com/dpp/"+dppId,
+    "generatedBy": "VeyaFlow DPP Generator",
+    "generatedAt": d.generatedAt||new Date().toISOString(),
+    "version": (d.versions&&d.versions[0]?.version)||"v1.0",
+    "brand": brand?.name||'',
+    "product": {
+      "name": sku.name,
+      "ean": sku.ean||null,
+      "articleNo": sku.articleNo||null,
+      "productType": sku.productType||null,
+      "netContent": sku.netContent?(sku.netContent+' '+sku.netUnit):'',
+      "shelfLifeMonths": sku.shelfLifeMonths||null,
+    },
+    "manufacturing": {
+      "countryOfManufacture": sku.countryOfMfr||null,
+      "manufacturer": sku.euResponsible||null,
+    },
+    "materials": {
+      "inci": sku.inci||null,
+      "materialComposition": sku.materialComposition||null,
+      "ingredients": sku.ingredientList||null,
+      "recycledContentProduct": f.recycledProduct?parseFloat(f.recycledProduct):null,
+      "recycledContentPackaging": f.recycledPackaging?parseFloat(f.recycledPackaging):null,
+      "packagingMaterial": f.packagingMaterial||null,
+    },
+    "sustainability": {
+      "carbonFootprintKgCO2e": carbon?parseFloat(carbon):null,
+      "carbonConfidence": f.carbonKg?'BRAND_PROVIDED':(f.carbonEstimated?'ESTIMATED_CATEGORY_AVERAGE':null),
+      "recyclability": f.recyclability||null,
+      "takeBackScheme": f.takeback||null,
+      "takeBackDescription": f.takebackDesc||null,
+      "certifications": sku.certifications||[],
+    },
+    "compliance": {
+      "cpnp": sku.cpnp||null,
+      "ceMarking": sku.ceMarking||null,
+      "euResponsiblePerson": sku.euResponsible||null,
+      "safetyReference": sku.safetyRef||null,
+    },
+    "endOfLife": {
+      "circularRouting": "See Circular GPS data",
+    },
+  };
+}
+
+function downloadDPPJson(skuId){
+  const data = buildDPPJson(skuId);
+  if(!data) return;
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dpp-'+(data.product.name||'product').replace(/\s+/g,'-').toLowerCase()+'.json';
+  a.click();
+}
+
+// ── PDF declaration ────────────────────────────────
+
+async function generateDPPPdf(skuId){
+  const sku = skus.find(s=>s.id===skuId);
+  if(!sku) return;
+  const d = dppData[skuId]||{fields:{}};
+  const f = d.fields||{};
+  const dppId = d.dppId||getDPPId(skuId);
+
+  if(typeof window.jspdf==='undefined'){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload=res; s.onerror=rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  try{
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    let y = 0;
+
+    // Cover
+    doc.setFillColor(30,58,95);
+    doc.rect(0,0,pw,55,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.setTextColor(196,168,130);
+    doc.text('DIGITAL PRODUCT PASSPORT DECLARATION',margin,18);
+    doc.setFontSize(18); doc.setFont('helvetica','normal');
+    doc.setTextColor(255,255,255);
+    doc.text(sku.name||'Product',margin,30);
+    doc.setFontSize(10);
+    doc.setTextColor(200,210,220);
+    doc.text((brand?.name||'Brand')+' · Generated by VeyaFlow',margin,40);
+    doc.setFontSize(8);
+    doc.setTextColor(150,160,170);
+    doc.text('DPP ID: '+dppId,margin,48);
+    doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}),pw-margin,48,{align:'right'});
+
+    y = 68;
+    const line = ()=>{ doc.setDrawColor(230,226,220); doc.line(margin,y,pw-margin,y); y+=5; };
+    const section = (title)=>{
+      doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.setTextColor(196,168,130);
+      doc.text(title.toUpperCase(),margin,y); y+=5; line();
+    };
+    const row = (label,value)=>{
+      if(y>ph-25){doc.addPage();y=20;}
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80);
+      doc.text(label,margin,y);
+      doc.setFont('helvetica','normal'); doc.setTextColor(30,30,30);
+      const lines = doc.splitTextToSize(value||'—',pw-margin-70);
+      doc.text(lines,margin+65,y);
+      y += Math.max(6, lines.length*5);
+    };
+
+    section('Product Identity');
+    row('Product name',sku.name||'—');
+    row('EAN/GTIN',sku.ean||'—');
+    row('Product type',sku.productType||'—');
+    row('Net content',sku.netContent?(sku.netContent+' '+(sku.netUnit||'')):'—');
+    row('Country of manufacture',sku.countryOfMfr||'—');
+    y+=4;
+
+    section('Materials & Composition');
+    row('INCI / ingredients',(sku.inci||sku.materialComposition||sku.ingredientList||'—').slice(0,200));
+    row('Recycled content — product',(f.recycledProduct||'0')+'%');
+    row('Recycled content — packaging',(f.recycledPackaging||'0')+'%');
+    row('Packaging material',f.packagingMaterial||'—');
+    y+=4;
+
+    section('Sustainability');
+    const carbon = f.carbonKg||f.carbonEstimated;
+    row('Carbon footprint',carbon?(carbon+' kg CO₂e per unit'+(f.carbonEstimated&&!f.carbonKg?' (category estimate)':'')):'—');
+    row('Recyclability',f.recyclability||'—');
+    row('Take-back scheme',f.takeback||'—');
+    if(f.takebackDesc) row('Take-back description',f.takebackDesc);
+    y+=4;
+
+    section('Compliance & Certifications');
+    row('Certifications',(sku.certifications||[]).join(', ')||'—');
+    row('CPNP reference',sku.cpnp||'—');
+    row('CE marking',sku.ceMarking?'Yes':'—');
+    row('EU Responsible Person',sku.euResponsible||'—');
+    y+=4;
+
+    section('Digital Product Passport');
+    row('DPP ID',dppId);
+    row('DPP URL','veyaflow.com/dpp/'+dppId);
+    row('Generated',new Date(d.generatedAt||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}));
+    row('Standard','EU ESPR Digital Product Passport (ESPR Reg. 2024/1781)');
+    y+=8;
+
+    // Footer
+    doc.setFontSize(7); doc.setTextColor(180,180,180);
+    doc.text('Generated by VeyaFlow · veyaflow.com · This declaration does not constitute legal advice.',pw/2,ph-8,{align:'center'});
+
+    doc.save('dpp-declaration-'+(sku.name||'product').replace(/\s+/g,'-').toLowerCase()+'.pdf');
+  }catch(err){
+    const cl=classifyApiError(err);
+    const e=document.createElement('div'); e.style.cssText='position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;max-width:320px';
+    e.innerHTML=errCard('PDF could not be generated',cl.sub+' Try Print → Save as PDF as a fallback.','Close','this.closest(\'[style*=fixed]\').remove()');
+    document.body.appendChild(e); setTimeout(()=>e.remove(),8000);
+  }
+}
+
 function init(){
   loadState();
+  loadDPP();
   buildNav();
   updateSidebarBrand();
   renderRegStrip();
