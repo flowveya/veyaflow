@@ -9502,5 +9502,87 @@ function init(){
 
 init();
 </script>
+<script>
+/* VeyaFlow — Supabase Backend Integration
+   Paste this block AFTER </script> and BEFORE </body>
+   Safe: runs after main code, fallbacks to localStorage if DB unreachable */
+
+function getSessionId(){
+  var sid=localStorage.getItem('ns_session_id');
+  if(!sid){sid='sess_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);localStorage.setItem('ns_session_id',sid);}
+  return sid;
+}
+
+async function dbCall(action,data){
+  try{
+    var res=await fetch('/.netlify/functions/supabase-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,session_id:getSessionId(),data})});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }catch(e){
+    console.warn('VeyaFlow DB fallback:',action,e.message);
+    return null;
+  }
+}
+
+// Wrap saveBrandState to also sync to Supabase
+var _origSaveBrand=saveBrandState;
+saveBrandState=function(){
+  _origSaveBrand();
+  if(brand) dbCall('brand.save',brand);
+};
+
+// Wrap saveSourcingCRM to also sync to Supabase
+var _origSaveCRM=saveSourcingCRM;
+saveSourcingCRM=function(){
+  _origSaveCRM();
+  sourcingCRM.forEach(function(e){dbCall('crm.upsert',e);});
+};
+
+// Wrap submitFeedback to email alert at 3 reports
+var _origFeedback=submitFeedback;
+submitFeedback=function(id,accurate,fields){
+  _origFeedback(id,accurate,fields);
+  if(!accurate&&fields.length){
+    var e=sourcingCRM.find(function(c){return c.id===id;});
+    if(e&&getFeedbackReportCount(e.mfrId)>=3){
+      fetch('/.netlify/functions/send-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'inaccuracy_flag',mfrId:e.mfrId,mfrName:e.mfrName,reportCount:getFeedbackReportCount(e.mfrId),inaccurateFields:fields})}).catch(function(){});
+    }
+  }
+};
+
+// Wrap setMfrFieldOverride to sync to Supabase
+var _origSetField=setMfrFieldOverride;
+setMfrFieldOverride=function(mfrId,field,value,updatedBy){
+  _origSetField(mfrId,field,value,updatedBy);
+  dbCall('field.set',{mfrId,fieldName:field,value,updatedBy});
+};
+
+// Wrap submitRequestListed to save to Supabase + send email
+var _origSubmitListed=submitRequestListed;
+submitRequestListed=async function(){
+  var f=requestListedForm;
+  if(!f.companyName||!f.contactEmail||!f.country){
+    var err=document.getElementById('req-listed-err');
+    if(err)err.textContent='Company name, email, and country are required.';
+    return;
+  }
+  await dbCall('listing.submit',{companyName:f.companyName,contactName:f.contactName,contactEmail:f.contactEmail,country:f.country,city:f.city,website:f.website,specialisms:f.specialisms,certifications:f.certifications,moq:f.moq});
+  fetch('/.netlify/functions/send-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'listing_request_alert',companyName:f.companyName,contactEmail:f.contactEmail,country:f.country,specialisms:f.specialisms,certifications:f.certifications,moq:f.moq})}).catch(function(){});
+  _origSubmitListed();
+};
+
+// On load: restore brand from Supabase if localStorage is empty
+(async function(){
+  if(!brand){
+    var result=await dbCall('brand.load',{});
+    if(result&&result.brand){
+      brand=result.brand;
+      try{localStorage.setItem('ns_brand',JSON.stringify(brand));}catch(e){}
+      updateSidebarBrand();
+      renderRegStrip();
+    }
+  }
+})();
+</script>
 </body>
 </html>
