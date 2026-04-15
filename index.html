@@ -9501,6 +9501,184 @@ function init(){
 }
 
 init();
+  /* ═══════════════════════════════════════════════════
+   VeyaFlow — Backend Integration Layer
+   Paste this block into index.html just before the
+   closing </script> tag.
+
+   How it works:
+   - Every save/load goes through these wrapper functions
+   - If the Netlify function returns an error or is
+     unreachable, it falls back to localStorage silently
+   - Session ID is generated once and persisted in
+     localStorage — acts as user identifier until auth
+═══════════════════════════════════════════════════ */
+
+// ── Session ID ────────────────────────────────────
+function getSessionId() {
+  let sid = localStorage.getItem('ns_session_id');
+  if (!sid) {
+    sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('ns_session_id', sid);
+  }
+  return sid;
+}
+
+// ── Supabase proxy call ───────────────────────────
+async function dbCall(action, data) {
+  try {
+    const res = await fetch('/.netlify/functions/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, session_id: getSessionId(), data }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    console.warn('VeyaFlow DB fallback to localStorage:', action, e.message);
+    return null; // caller handles null → falls back to localStorage
+  }
+}
+
+// ── Email function call ───────────────────────────
+async function emailCall(payload) {
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return true;
+  } catch (e) {
+    console.warn('VeyaFlow email error:', e.message);
+    return false;
+  }
+}
+
+// ── Brand: save ───────────────────────────────────
+// Wraps existing saveBrandState() — call after every brand change
+const _originalSaveBrandState = saveBrandState;
+saveBrandState = function() {
+  _originalSaveBrandState(); // localStorage always written first
+  if (brand) dbCall('brand.save', brand); // then sync to Supabase
+};
+
+// ── Brand: load from Supabase on init ─────────────
+async function loadBrandFromDB() {
+  const result = await dbCall('brand.load', {});
+  if (result?.brand && !brand) {
+    // Only restore from DB if localStorage has nothing
+    // (localStorage is faster on repeat visits)
+    brand = result.brand;
+    updateSidebarBrand();
+    renderRegStrip();
+  }
+}
+
+// ── Sourcing CRM: save ────────────────────────────
+// Wraps existing saveSourcingCRM()
+const _originalSaveSourcingCRM = saveSourcingCRM;
+saveSourcingCRM = function() {
+  _originalSaveSourcingCRM(); // localStorage first
+  // Sync all entries — upsert each
+  sourcingCRM.forEach(entry => {
+    dbCall('crm.upsert', entry);
+  });
+};
+
+// ── Sourcing CRM: load (with DB merge) ───────────
+const _originalLoadSourcingCRM = loadSourcingCRM;
+loadSourcingCRM = async function() {
+  _originalLoadSourcingCRM(); // load from localStorage first
+  const result = await dbCall('crm.load', {});
+  if (result?.entries?.length) {
+    // Merge: DB entries win for entries not in localStorage
+    result.entries.forEach(dbEntry => {
+      const local = sourcingCRM.find(c =>
+        c.mfrId === dbEntry.mfrId
+      );
+      if (!local) sourcingCRM.push(dbEntry);
+    });
+    try {
+      localStorage.setItem('ns_sourcing_crm', JSON.stringify(sourcingCRM));
+    } catch(e) {}
+  }
+};
+
+// ── Listing requests: submit with email alert ─────
+// Wraps existing submitRequestListed()
+const _originalSubmitRequestListed = submitRequestListed;
+submitRequestListed = async function() {
+  const f = requestListedForm;
+  if (!f.companyName || !f.contactEmail || !f.country) {
+    const err = document.getElementById('req-listed-err');
+    if (err) err.textContent = 'Company name, email, and country are required.';
+    return;
+  }
+
+  // Save to Supabase
+  await dbCall('listing.submit', {
+    companyName:    f.companyName,
+    contactName:    f.contactName,
+    contactEmail:   f.contactEmail,
+    country:        f.country,
+    city:           f.city,
+    website:        f.website,
+    specialisms:    f.specialisms,
+    certifications: f.certifications,
+    moq:            f.moq,
+  });
+
+  // Send email alert to Charlotte
+  await emailCall({
+    type:           'listing_request_alert',
+    companyName:    f.companyName,
+    contactEmail:   f.contactEmail,
+    country:        f.country,
+    specialisms:    f.specialisms,
+    certifications: f.certifications,
+    moq:            f.moq,
+  });
+
+  // Also run original (localStorage + mailto fallback)
+  _originalSubmitRequestListed();
+};
+
+// ── Inaccuracy report: email alert at 3 reports ───
+// Wraps existing submitFeedback() to fire email when threshold hit
+const _originalSubmitFeedback = submitFeedback;
+submitFeedback = function(entryId, accurate, inaccurateFields) {
+  _originalSubmitFeedback(entryId, accurate, inaccurateFields);
+  if (!accurate && inaccurateFields.length) {
+    const entry = sourcingCRM.find(c => c.id === entryId);
+    if (entry) {
+      const reportCount = getFeedbackReportCount(entry.mfrId);
+      if (reportCount >= 3) {
+        const mfr = MANUFACTURERS.find(m => m.id === entry.mfrId);
+        emailCall({
+          type:            'inaccuracy_flag',
+          mfrId:           entry.mfrId,
+          mfrName:         entry.mfrName,
+          reportCount,
+          inaccurateFields,
+        });
+      }
+    }
+  }
+};
+
+// ── Supplier field override: sync to DB ───────────
+const _originalSetMfrFieldOverride = setMfrFieldOverride;
+setMfrFieldOverride = function(mfrId, field, value, updatedBy) {
+  _originalSetMfrFieldOverride(mfrId, field, value, updatedBy); // localStorage first
+  dbCall('field.set', { mfrId, fieldName: field, value, updatedBy });
+};
+
+// ── Boot: load brand from DB if localStorage empty ─
+(async function bootBackend() {
+  await loadBrandFromDB();
+})();
 </script>
 </body>
 </html>
