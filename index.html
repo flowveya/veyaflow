@@ -6358,6 +6358,13 @@ async function generateReport(){
   const statusEl=document.getElementById('r-status');
   const setStatus=msg=>{ if(statusEl)statusEl.textContent=msg; };
 
+  // Confidence levels per module — based on data quality
+  const confidence = {
+    market:     brand?.targetMarkets?.length>0 ? 'HIGH' : 'MEDIUM',
+    retail:     categoryRetailers.length>50 ? 'HIGH' : 'MEDIUM',
+    compliance: mkt ? 'HIGH' : 'MEDIUM',
+    financial:  (brand?.rspSEK||skus[0]?.rspSEK) ? 'HIGH' : 'MEDIUM',
+  };
 
   // MODULE DEFINITIONS — each is a focused, deep-dive prompt
   const modules = [
