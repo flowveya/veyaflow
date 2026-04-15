@@ -9,17 +9,18 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
 
 // Simple Supabase REST helper — no SDK needed
 async function supabase(method, path, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Prefer': method === 'POST' ? 'return=representation' : 'return=representation',
-    },
+headers: {
+  'Content-Type': 'application/json',
+  'apikey': SUPABASE_ANON,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Prefer': 'return=representation',
+},
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
