@@ -6366,6 +6366,15 @@ async function generateReport(){
     financial:  (brand?.rspSEK||skus[0]?.rspSEK) ? 'HIGH' : 'MEDIUM',
   };
 
+  // Board line — pre-calculated margin intel for retail module
+  const sku0 = skus[0]||{};
+  const rsp = parseFloat(sku0.rspSEK||sku0.rspEUR||0);
+  const netPrice = parseFloat(sku0.netPriceSEK||0);
+  const marginPct = rsp>0&&netPrice>0 ? Math.round((1-(netPrice/rsp))*100) : null;
+  const boardLine = marginPct
+    ? `RSP: ${rsp} SEK | Net price: ${netPrice} SEK | Gross margin: ${marginPct}% | MOQ: ${sku0.moq||'—'} units`
+    : `RSP not set — enter pricing in My Products for margin calculations`;
+
   // MODULE DEFINITIONS — each is a focused, deep-dive prompt
   const modules = [
     {
