@@ -10400,10 +10400,71 @@ function downloadBlob(content, filename, mimeType){
    CLAIM LOCALIZER
    Paste Swedish copy → AI flags issues per target market
 ═══════════════════════════════════════════════════ */
-let claimsState = {input:'', result:null, loading:false, selectedMarkets:[], rewriteResult:null, rewriteLoading:false};
+let claimsState = {input:'', result:null, loading:false, selectedMarkets:[], rewriteResult:null, rewriteLoading:false, activeTab:'analyse'};
+
+// ── CLAIMS LIBRARY ───────────────────────────────
+function loadClaimsLibrary(){
+  try{ return JSON.parse(localStorage.getItem('ns_claims_library')||'[]'); }catch(e){return [];}
+}
+function saveClaimsLibrary(lib){
+  try{ localStorage.setItem('ns_claims_library',JSON.stringify(lib)); }catch(e){}
+}
+function addToClaimsLibrary(claim, market, status){
+  const lib = loadClaimsLibrary();
+  const key = claim+'__'+market;
+  if(lib.find(e=>e.key===key)) return; // no duplicates
+  lib.push({key, claim, market, status, savedAt:new Date().toISOString(), brand:brand?.name||''});
+  saveClaimsLibrary(lib);
+  renderClaims(document.getElementById('page-claims'));
+}
+function removeFromClaimsLibrary(key){
+  const lib = loadClaimsLibrary().filter(e=>e.key!==key);
+  saveClaimsLibrary(lib);
+  renderClaims(document.getElementById('page-claims'));
+}
+function exportClaimsLibraryCSV(){
+  const lib = loadClaimsLibrary();
+  if(!lib.length) return;
+  const rows = [['Claim','Market','Status','Brand','Saved'],...lib.map(e=>[
+    '"'+e.claim.replace(/"/g,'""')+'"', e.market, e.status, e.brand,
+    new Date(e.savedAt).toLocaleDateString('en-GB')
+  ])];
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = 'approved-claims-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ── GREENWASHING FLAGS ───────────────────────────
+const GREENWASHING_FLAGS = {
+  'eco-friendly':    {directive:'Art. 3(a) EU Green Claims Directive', risk:'Vague environmental benefit — no substantiation standard defined', fix:'Replace with specific certified claim: "Made with [X]% recycled materials" or "Carbon footprint independently verified at [X] kg CO₂e"'},
+  'sustainable':     {directive:'Art. 3(a) EU Green Claims Directive', risk:'Generic sustainability claim without measurable basis prohibited from Sept 2027', fix:'Specify: "Packaged in 100% recyclable materials" or reference a certification'},
+  'carbon neutral':  {directive:'Art. 3(b) EU Green Claims Directive', risk:'Offset-based carbon neutral claims banned unless independently verified lifecycle assessment on file', fix:'"Carbon footprint independently certified at [X] kg CO₂e per unit (PAS 2060)" or remove claim'},
+  'carbon negative': {directive:'Art. 3(b) EU Green Claims Directive', risk:'Requires verified LCA and independent third-party certification', fix:'Remove unless ISO 14067 LCA certificate is on file'},
+  'planet-friendly': {directive:'Art. 3(a) EU Green Claims Directive', risk:'Non-specific environmental claim — no measurable basis', fix:'Remove or replace with specific verifiable attribute'},
+  'climate positive':{directive:'Art. 3(b) EU Green Claims Directive', risk:'Offset-based claim — requires ISO 14067 verification', fix:'Remove unless verified LCA on file'},
+  'natural':         {directive:'EU Green Claims Directive (Art. 3(c)) + ISO 16128', risk:'"Natural" without % quantification or ISO 16128 reference is ambiguous under GCD', fix:'"[X]% natural-origin ingredients (ISO 16128)" — always quantify'},
+  'clean':           {directive:'EU Green Claims Directive Art. 3(a)', risk:'"Clean" has no regulatory definition — deemed misleading', fix:'Replace with specific claim: "Free from parabens, sulfates, and synthetic fragrance"'},
+  'green':           {directive:'EU Green Claims Directive Art. 3(a)', risk:'Generic colour-coded environmental claim — no substantiation standard', fix:'Replace with specific verifiable attribute or certification logo'},
+  'biodegradable':   {directive:'Art. 3(d) EU Green Claims Directive', risk:'Must specify timeframe, conditions, and test standard (e.g. EN 13432)', fix:'"Biodegradable under industrial composting conditions — EN 13432" or remove'},
+  'compostable':     {directive:'Art. 3(d) EU Green Claims Directive', risk:'Must specify conditions (home vs industrial) and certification (TÜV OK Compost)', fix:'"Industrially compostable — certified TÜV OK Compost" — specify exactly'},
+  'zero waste':      {directive:'Art. 3(a) EU Green Claims Directive', risk:'Absolute environmental claim — requires substantiation across full lifecycle', fix:'Remove unless verified across full supply chain lifecycle'},
+};
+
+function checkGreenwashing(claimText){
+  const lower = claimText.toLowerCase();
+  const hits = [];
+  for(const [trigger, data] of Object.entries(GREENWASHING_FLAGS)){
+    if(lower.includes(trigger)) hits.push({trigger, ...data});
+  }
+  return hits;
+}
 
 function renderClaims(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+  const lib = loadClaimsLibrary();
+  const activeTab = claimsState.activeTab||'analyse';
 
   el.innerHTML=`
     <div class="page-wrap">
@@ -10411,51 +10472,101 @@ function renderClaims(el){
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
           <div class="page-title">Claim Localizer</div>
-          <div class="page-sub">Paste your Swedish product copy — AI flags claims that need changing per market</div>
+          <div class="page-sub">Multi-market compliance check · Auto-rewrites · Greenwashing detector · Claims library</div>
         </div>
       </div>
 
-      <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1.25rem">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">What this does</div>
-        <div style="font-family:var(--sans);font-size:.8rem;color:rgba(255,255,255,.8);line-height:1.65">
-          You write claims in Swedish. This tool checks whether each claim is legally safe for your target markets — Denmark, Germany, UK — and flags what needs to change before you print packaging or send a pitch deck. No more discovering "Anti-Aging" is restricted in Germany after the printer has run.
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:1rem">
-        <div class="section-tag">Your product copy</div>
-        <div class="field">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-            <label class="lbl" style="margin:0">Paste your claims / product copy (Swedish or English)</label>
-            ${skus.length>0&&skus[0].claims?.length?`<button class="btn-outline" style="font-size:.6rem;padding:.2rem .55rem" onclick="claimsState.input=(skus[0].claims||[]).join('. ');document.getElementById('claims-input').value=claimsState.input">Auto-fill from hero SKU →</button>`:''}
+      <!-- Tab nav -->
+      <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">
+        ${[['analyse','Analyse Claims'],['library','My Approved Claims'+(lib.length?' ('+lib.length+')':'')]].map(([id,label])=>`
+          <div onclick="claimsState.activeTab='${id}';renderClaims(document.getElementById('page-claims'))"
+            style="padding:.45rem 1.1rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+            ${activeTab===id?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
+            ${label}
           </div>
-          <textarea id="claims-input" rows="7"
-            placeholder="e.g. Kliniskt testad. Reducerar rynkor med 32% på 8 veckor. Anti-aging formula. Läkares rekommendation. Reparerar huden på djupet. Organisk. Fri från konservering. Vegansk. SPF 30."
-            oninput="claimsState.input=this.value">${claimsState.input||''}</textarea>
-        </div>
-        <div class="field">
-          <label class="lbl">Target markets to check</label>
-          <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem">
-            ${['Denmark','Germany','United Kingdom','Norway','Netherlands','France','Sweden'].map(m=>`
-              <div class="market-chip${(brand.targetMarkets||[]).includes(m)||m==='Denmark'?' selected':''}"
-                onclick="claimsState.selectedMarkets=claimsState.selectedMarkets.includes('${m}')?claimsState.selectedMarkets.filter(x=>x!=='${m}'):[...claimsState.selectedMarkets,'${m}'];this.classList.toggle('selected')" data-market="${m}">${m}</div>
-            `).join('')}
-          </div>
-        </div>
-        <button class="btn-primary" onclick="runClaimLocalizer()" ${claimsState.loading?'disabled':''} style="width:100%">
-          ${claimsState.loading?'Analysing claims...':'Analyse claims →'}
-        </button>
+        `).join('')}
       </div>
 
-      ${claimsState.loading?`
-        <div class="card" style="text-align:center;padding:2rem">
-          <div class="spinner" style="margin:0 auto 1rem"></div>
-          <div style="font-family:var(--mono);font-size:.68rem;color:var(--navy)">Checking each claim against market regulations...</div>
-        </div>
-      `:''}
-
-      ${claimsState.result&&!claimsState.loading?renderClaimsResult():''}
+      ${activeTab==='library' ? renderClaimsLibrary(lib) : renderClaimsAnalyseTab()}
     </div>
+  `;
+}
+
+function renderClaimsAnalyseTab(){
+  return `
+    <div class="card" style="margin-bottom:1rem">
+      <div class="section-tag">Your product copy</div>
+      <div class="field">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+          <label class="lbl" style="margin:0">Paste your claims / product copy (Swedish or English)</label>
+          ${skus.length>0&&skus[0].claims?.length?`<button class="btn-outline" style="font-size:.6rem;padding:.2rem .55rem" onclick="claimsState.input=(skus[0].claims||[]).join('. ');document.getElementById('claims-input').value=claimsState.input">Auto-fill from SKU →</button>`:''}
+        </div>
+        <textarea id="claims-input" rows="5"
+          placeholder="e.g. Kliniskt testad. Reducerar rynkor med 32%. Anti-aging formula. Eco-friendly packaging. Läkares rekommendation. Vegansk. SPF 30."
+          oninput="claimsState.input=this.value">${claimsState.input||''}</textarea>
+      </div>
+      <div class="field">
+        <label class="lbl">Target markets — results shown as columns simultaneously</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem">
+          ${['Denmark','Germany','United Kingdom','Norway','Netherlands','France','Sweden','Belgium'].map(m=>`
+            <div class="market-chip${(claimsState.selectedMarkets.includes(m)||(claimsState.selectedMarkets.length===0&&(brand.targetMarkets||[]).includes(m)))?' selected':''}"
+              onclick="(function(){var arr=claimsState.selectedMarkets.slice();var i=arr.indexOf('${m}');if(i>=0)arr.splice(i,1);else arr.push('${m}');claimsState.selectedMarkets=arr;renderClaims(document.getElementById('page-claims'));})()" data-market="${m}">${m}</div>
+          `).join('')}
+        </div>
+      </div>
+      <button class="btn-primary" onclick="runClaimLocalizer()" ${claimsState.loading?'disabled':''} style="width:100%">
+        ${claimsState.loading?'Analysing across all markets…':'Analyse claims →'}
+      </button>
+    </div>
+
+    ${claimsState.loading?`
+      <div class="card" style="text-align:center;padding:2rem">
+        <div class="spinner" style="margin:0 auto 1rem"></div>
+        <div style="font-family:var(--mono);font-size:.68rem;color:var(--navy)">Checking each claim across ${(claimsState.selectedMarkets||[]).length} markets...</div>
+      </div>
+    `:''}
+
+    ${claimsState.result&&!claimsState.loading?renderClaimsResult():''}
+  `;
+}
+
+function renderClaimsLibrary(lib){
+  if(!lib.length) return `
+    <div class="card" style="text-align:center;padding:2.5rem">
+      <div style="font-size:1.5rem;margin-bottom:.5rem">◎</div>
+      <div style="font-family:var(--sans);font-size:.85rem;color:var(--navy);margin-bottom:.35rem">No approved claims saved yet</div>
+      <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted)">Analyse your claims, then click "Save to library" on any GREEN result to build your approved claims database.</div>
+    </div>
+  `;
+
+  const byMarket = {};
+  lib.forEach(e=>{ if(!byMarket[e.market]) byMarket[e.market]=[]; byMarket[e.market].push(e); });
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">${lib.length} approved claim${lib.length!==1?'s':''} across ${Object.keys(byMarket).length} market${Object.keys(byMarket).length!==1?'s':''}</div>
+      <button class="btn-primary" style="font-size:.65rem" onclick="exportClaimsLibraryCSV()">↓ Export CSV</button>
+    </div>
+    ${Object.entries(byMarket).map(([market, claims])=>`
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--navy);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.65rem">
+          ${market} <span style="font-weight:400;color:var(--muted)">(${claims.length} claim${claims.length!==1?'s':''})</span>
+        </div>
+        ${claims.map(e=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);gap:.5rem">
+            <div style="display:flex;align-items:center;gap:.5rem;flex:1;min-width:0">
+              <span style="font-family:var(--mono);font-size:.6rem;background:#ECFDF5;color:#065F46;padding:.1rem .3rem;flex-shrink:0">✓ GREEN</span>
+              <div style="font-family:var(--sans);font-size:.78rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">"${e.claim}"</div>
+            </div>
+            <div style="display:flex;gap:.35rem;flex-shrink:0">
+              <button class="btn-outline" style="font-size:.55rem;padding:.15rem .5rem" onclick="copyToClipboard('${e.claim.replace(/'/g,"\\'")}')">Copy</button>
+              <button onclick="removeFromClaimsLibrary('${e.key.replace(/'/g,"\\'")}');renderClaims(document.getElementById('page-claims'))"
+                style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem" title="Remove">✕</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}
   `;
 }
 
@@ -10484,6 +10595,13 @@ async function runClaimLocalizer(){
   claimsState = {input, result:null, loading:true, selectedMarkets};
   renderClaims(document.getElementById('page-claims'));
 
+  // Client-side greenwashing pre-screen
+  const gwHits = [];
+  input.split(/[.!?]/).forEach(sentence=>{
+    const hits = checkGreenwashing(sentence.trim());
+    hits.forEach(h=>gwHits.push({sentence:sentence.trim(), ...h}));
+  });
+
   const prompt = `You are a cosmetics and consumer goods regulatory expert for Nordic brands expanding into European markets. April 2026.
 
 Analyse these product claims/copy for a ${brand.category||'consumer'} brand (${brand.name}) entering: ${selectedMarkets.join(', ')}.
@@ -10491,33 +10609,32 @@ Analyse these product claims/copy for a ${brand.category||'consumer'} brand (${b
 CLAIMS TO ANALYSE:
 ${input}
 
-For each distinct claim or statement, provide a structured assessment. Format your response as a series of claim blocks using this EXACT format:
+For each distinct claim or statement, output a block using this EXACT format:
 
 CLAIM: [exact claim text]
 STATUS: [GREEN / AMBER / RED]
-MARKETS_AFFECTED: [list of markets where this is an issue, or "All clear"]
+MARKETS_AFFECTED: [comma-separated list, or "All clear"]
 ISSUE: [specific regulatory problem, or "No issues identified"]
 RECOMMENDED_CHANGE: [exact suggested replacement wording, or "No change needed"]
+ALTERNATIVES: [for RED or AMBER only: 2-3 safe GREEN alternatives separated by " | "]
 ---
 
-Rules for status:
-- GREEN: Claim is safe across all target markets as written
-- AMBER: Claim needs minor rewording or is market-specific — safe in some, restricted in others
-- RED: Claim is a serious regulatory risk — therapeutic/drug claim, unsubstantiated, or banned in one or more target markets
+Per-market rules (apply each independently for ${selectedMarkets.join(', ')}):
+GERMANY: "Anti-Aging" → must rephrase; cellular repair/regeneration = drug claim (UWG); VerpackG required; "natural" must have ISO 16128 %
+UNITED KINGDOM: "Repairs/heals/regenerates" = MHRA drug claims; separate UK CPNP/SCPN required post-Brexit; UK RP address mandatory
+DENMARK: DVFA oversight; Danish labelling required; Nordic Swan recommended
+NORWAY: EEA mirrors EU; Norwegian RP required; Norwegian labelling
+NETHERLANDS: NVWA strict on efficacy claims; Dutch labelling required
+FRANCE: ANSM very strict on drug-cosmetic boundary; French labelling mandatory; avoid "répare/régénère"
+SWEDEN: Lakemedelsverket; Swedish labelling; MPA for borderline products
 
-Key rules to apply:
-- Germany: "Anti-Aging" must be "reduces the appearance of signs of aging" — the word itself is increasingly restricted
-- Germany: Any claim implying cellular repair or regeneration is a drug claim
-- UK post-Brexit: "Repairs", "heals", "regenerates" are drug claims under MHRA guidance
-- EU/UK: "Clinically proven" requires a clinical study on file — flag if no study reference
-- EU/UK: "Doctor recommended" or "dermatologist approved" implies endorsement — requires substantiation
-- SPF claims require ISO 24444 testing — flag if SPF claimed without test reference
-- "Organic" without certification = misleading under EU Green Claims Directive (September 2027 enforcement start)
-- "Natural" is acceptable but should be qualified
-- "Vegan" is acceptable across all markets
-- Health claims on food/supplements: only EFSA-approved claims permitted (EU)
+EU-WIDE: "Clinically proven" requires study on file; "Doctor recommended" requires substantiation; SPF requires ISO 24444 testing
+GREEN CLAIMS (from Sept 2027): "eco-friendly/sustainable/carbon neutral/natural (no %)/clean/planet-friendly" = GCD Art.3 violation — always flag RED
+FOOD/SUPPLEMENTS: Only EFSA-approved health claims permitted
 
-Be specific and actionable. Every RED must have a clear recommended change.`;
+ALTERNATIVES format: provide 2-3 safe phrasings that would be GREEN for all affected markets. Must be commercially usable, not legal boilerplate.
+
+Be specific and actionable. Every RED must have ALTERNATIVES.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}],1400);
@@ -10535,19 +10652,26 @@ function renderClaimsResult(){
     return errCard(cl.headline, cl.sub, 'Try again', "claimsState.result=null;claimsState.loading=false;runClaimLocalizer()");
   }
 
+  const markets = claimsState.selectedMarkets||[];
   const blocks = claimsState.result.split('---').map(b=>b.trim()).filter(b=>b.length>20);
   let green=0, amber=0, red=0;
+  const lib = loadClaimsLibrary();
 
   const parsed = blocks.map(block=>{
-    const claim = (block.match(/CLAIM:\s*(.+)/)||['',''])[1].trim();
-    const status = (block.match(/STATUS:\s*(GREEN|AMBER|RED)/)||['','AMBER'])[1];
-    const markets = (block.match(/MARKETS_AFFECTED:\s*(.+)/)||['',''])[1].trim();
-    const issue = (block.match(/ISSUE:\s*(.+)/)||['',''])[1].trim();
-    const fix = (block.match(/RECOMMENDED_CHANGE:\s*(.+)/)||['',''])[1].trim();
-    if(status==='GREEN') green++;
-    else if(status==='AMBER') amber++;
-    else if(status==='RED') red++;
-    return {claim, status, markets, issue, fix};
+    const claim       = (block.match(/CLAIM:\s*(.+)/)||['',''])[1].trim();
+    const status      = (block.match(/STATUS:\s*(GREEN|AMBER|RED)/)||['','AMBER'])[1];
+    const mktsLine    = (block.match(/MARKETS_AFFECTED:\s*(.+)/)||['','All clear'])[1].trim();
+    const issue       = (block.match(/ISSUE:\s*(.+)/)||['',''])[1].trim();
+    const fix         = (block.match(/RECOMMENDED_CHANGE:\s*(.+)/)||['',''])[1].trim();
+    const altsLine    = (block.match(/ALTERNATIVES:\s*([\s\S]+?)(?:\n[A-Z_]+:|$)/)||['',''])[1].trim();
+    const alts        = altsLine ? altsLine.split(' | ').map(a=>a.trim()).filter(a=>a.length>3) : [];
+    // Client-side greenwashing check
+    const gwFlags     = checkGreenwashing(claim);
+    const effectiveStatus = gwFlags.length && status==='GREEN' ? 'AMBER' : status;
+    if(effectiveStatus==='GREEN') green++;
+    else if(effectiveStatus==='AMBER') amber++;
+    else red++;
+    return {claim, status:effectiveStatus, originalStatus:status, mktsLine, issue, fix, alts, gwFlags};
   }).filter(p=>p.claim);
 
   const statusStyle = {
@@ -10557,34 +10681,114 @@ function renderClaimsResult(){
   };
 
   return `
-    <!-- Summary bar -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--border);background:#fff;margin-bottom:1rem">
-      ${[['✓ Clear',green,'#ECFDF5','#065F46'],['⚠ Review',amber,'#FFFBEB','#92400E'],['✗ Risk',red,'#FEF2F2','#991B1B']].map(([label,count,bg,color])=>`
-        <div style="padding:.85rem;text-align:center;background:${bg}">
-          <div style="font-family:var(--serif);font-size:1.6rem;color:${color};line-height:1">${count}</div>
-          <div style="font-family:var(--mono);font-size:.55rem;color:${color};text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem">${label}</div>
-        </div>
-      `).join('')}
-    </div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
-      <button class="btn-outline" style="font-size:.62rem;padding:.3rem .7rem" onclick="copyClaimsReport()">Copy full report</button>
+    <!-- Summary + actions -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+      <div style="display:flex;gap:.5rem">
+        ${[['✓ GREEN',green,'#ECFDF5','#065F46'],['⚠ AMBER',amber,'#FFFBEB','#92400E'],['✗ RED',red,'#FEF2F2','#991B1B']].map(([label,count,bg,color])=>`
+          <div style="padding:.35rem .75rem;background:${bg};border:1px solid ${color}20;text-align:center">
+            <span style="font-family:var(--serif);font-size:1.1rem;color:${color}">${count}</span>
+            <span style="font-family:var(--mono);font-size:.52rem;color:${color};margin-left:.3rem">${label}</span>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn-outline" style="font-size:.62rem;padding:.3rem .7rem" onclick="copyClaimsReport()">Copy report</button>
     </div>
 
-    <!-- Claim cards -->
-    ${parsed.map(p=>{
+    <!-- Multi-market grid -->
+    ${markets.length>1?`
+      <div style="overflow-x:auto;margin-bottom:1rem">
+        <table style="width:100%;border-collapse:collapse;font-size:.72rem;min-width:${markets.length*160+200}px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--navy)">
+              <th style="text-align:left;padding:.5rem .75rem;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);width:200px">Claim</th>
+              ${markets.map(m=>`<th style="text-align:center;padding:.5rem .75rem;font-family:var(--mono);font-size:.58rem;color:var(--navy)">${m}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${parsed.map((p,pi)=>{
+              const s = statusStyle[p.status]||statusStyle.AMBER;
+              return `
+                <tr style="border-bottom:1px solid var(--border);background:${pi%2===0?'#FAFAF9':'#fff'}">
+                  <td style="padding:.5rem .75rem;font-family:var(--sans);font-size:.73rem;color:var(--ink);font-weight:${p.status!=='GREEN'?'500':'400'}">"${p.claim}"</td>
+                  ${markets.map(m=>{
+                    const affected = p.mktsLine.includes(m)||p.mktsLine==='All markets'||p.mktsLine==='All';
+                    const isGreen = p.status==='GREEN'||!affected;
+                    const cellColor = isGreen?'#065F46':p.status==='RED'?'#991B1B':'#92400E';
+                    const cellBg = isGreen?'#ECFDF5':p.status==='RED'?'#FEF2F2':'#FFFBEB';
+                    const cellIcon = isGreen?'✓':p.status==='RED'?'✗':'⚠';
+                    return `<td style="text-align:center;padding:.5rem .4rem;background:${cellBg}">
+                      <span style="font-family:var(--mono);font-size:.6rem;color:${cellColor};font-weight:700">${cellIcon}</span>
+                      ${!isGreen&&p.status==='GREEN'?'':(!isGreen?`<div style="font-family:var(--mono);font-size:.48rem;color:${cellColor};margin-top:.1rem">${m.slice(0,3).toUpperCase()}</div>`:'')}
+                    </td>`;
+                  }).join('')}
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `:''}
+
+    <!-- Detailed claim cards -->
+    ${parsed.map((p,pi)=>{
       const s = statusStyle[p.status]||statusStyle.AMBER;
+      const savedKey = p.claim+'__'+(markets[0]||'');
+      const isSaved = lib.some(e=>e.claim===p.claim);
       return `
-        <div style="border:1px solid ${s.border};background:${s.bg};padding:1rem 1.125rem;margin-bottom:.6rem">
-          <div style="display:flex;align-items:flex-start;gap:.6rem;margin-bottom:.5rem">
-            <span style="font-family:var(--mono);font-size:.8rem;font-weight:700;color:${s.color};flex-shrink:0">${s.icon}</span>
-            <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:${s.color}">"${p.claim}"</div>
+        <div style="border:1px solid ${s.border};background:${s.bg};padding:.85rem 1rem;margin-bottom:.55rem">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
+            <div style="display:flex;align-items:flex-start;gap:.5rem;flex:1">
+              <span style="font-family:var(--mono);font-size:.75rem;font-weight:700;color:${s.color};flex-shrink:0">${s.icon}</span>
+              <div style="font-family:var(--sans);font-size:.85rem;font-weight:600;color:${s.color}">"${p.claim}"</div>
+            </div>
+            ${p.status==='GREEN'?`
+              <button onclick="addToClaimsLibrary('${p.claim.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(claimsState.selectedMarkets[0]||'All').replace(/'/g,"\\'")}','GREEN')"
+                style="flex-shrink:0;padding:.2rem .55rem;background:none;border:1px solid #A7F3D0;color:#065F46;font-family:var(--mono);font-size:.52rem;cursor:pointer;white-space:nowrap">
+                ${isSaved?'✓ Saved':'+ Save to library'}
+              </button>
+            `:''}
           </div>
-          ${p.markets&&p.markets!=='All clear'?`<div style="font-family:var(--mono);font-size:.58rem;color:${s.color};margin-bottom:.35rem">Markets: ${p.markets}</div>`:''}
-          ${p.issue&&p.issue!=='No issues identified'?`<div style="font-family:var(--sans);font-size:.78rem;color:${s.color};line-height:1.5;margin-bottom:.35rem">${p.issue}</div>`:''}
+
+          ${p.mktsLine&&p.mktsLine!=='All clear'?`
+            <div style="font-family:var(--mono);font-size:.55rem;color:${s.color};margin-bottom:.3rem">Affected: ${p.mktsLine}</div>
+          `:''}
+
+          ${p.gwFlags.length?`
+            <div style="background:#FEF3C7;border:1px solid #FCD34D;padding:.4rem .65rem;margin-bottom:.4rem;border-radius:2px">
+              <div style="font-family:var(--mono);font-size:.52rem;color:#92400E;font-weight:700;margin-bottom:.2rem">🌱 EU Green Claims Directive — ${p.gwFlags[0].directive}</div>
+              <div style="font-family:var(--sans);font-size:.68rem;color:#92400E">${p.gwFlags[0].risk}</div>
+              <div style="font-family:var(--sans);font-size:.68rem;color:#92400E;margin-top:.2rem"><strong>Fix:</strong> ${p.gwFlags[0].fix}</div>
+            </div>
+          `:''}
+
+          ${p.issue&&p.issue!=='No issues identified'?`
+            <div style="font-family:var(--sans);font-size:.75rem;color:${s.color};line-height:1.5;margin-bottom:.35rem">${p.issue}</div>
+          `:''}
+
           ${p.fix&&p.fix!=='No change needed'?`
-            <div style="background:rgba(255,255,255,.6);border:1px solid ${s.border};padding:.5rem .75rem;margin-top:.35rem">
-              <div style="font-family:var(--mono);font-size:.55rem;color:${s.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Suggested wording</div>
-              <div style="font-family:var(--sans);font-size:.8rem;color:var(--ink);font-style:italic">"${p.fix}"</div>
+            <div style="background:rgba(255,255,255,.7);border:1px solid ${s.border};padding:.45rem .65rem;margin-bottom:.35rem">
+              <div style="font-family:var(--mono);font-size:.5rem;color:${s.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.15rem">Suggested wording</div>
+              <div style="font-family:var(--sans);font-size:.78rem;color:var(--ink);font-style:italic">"${p.fix}"</div>
+            </div>
+          `:''}
+
+          ${p.alts.length?`
+            <div style="margin-top:.35rem">
+              <div style="font-family:var(--mono);font-size:.5rem;color:${s.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">
+                ✦ Safe alternatives (GREEN for all markets)
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.25rem">
+                ${p.alts.map((alt,ai)=>`
+                  <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.8);border:1px solid ${s.border};padding:.3rem .55rem">
+                    <div style="font-family:var(--sans);font-size:.75rem;color:var(--ink)">${ai+1}. "${alt}"</div>
+                    <div style="display:flex;gap:.3rem;flex-shrink:0">
+                      <button onclick="copyToClipboard('${alt.replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:.5rem;cursor:pointer;padding:.1rem .35rem">Copy</button>
+                      <button onclick="addToClaimsLibrary('${alt.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(claimsState.selectedMarkets[0]||'All').replace(/'/g,"\\'")}','GREEN')"
+                        style="background:none;border:1px solid #A7F3D0;color:#065F46;font-family:var(--mono);font-size:.5rem;cursor:pointer;padding:.1rem .35rem">+ Library</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
             </div>
           `:''}
         </div>
@@ -10594,34 +10798,31 @@ function renderClaimsResult(){
     <!-- Rewrite section -->
     ${(red>0||amber>0)?`
     <div style="border-top:2px solid var(--border);margin-top:1.25rem;padding-top:1.25rem">
-      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.25rem">
-        Rewrite copy for ${claimsState.selectedMarkets&&claimsState.selectedMarkets.length?claimsState.selectedMarkets.join(' + '):'target markets'}
-      </div>
-      <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-bottom:.85rem;line-height:1.5">
-        Generate a clean version of your product copy with all flagged claims replaced by their approved alternatives — ready to use on packaging, in pitches, or on your website.
+      <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--navy);margin-bottom:.65rem">
+        Generate compliant copy
       </div>
       ${claimsState.rewriteLoading?`
         <div style="display:flex;align-items:center;gap:.75rem;padding:1rem;background:#F9F8F6;border:1px solid var(--border)">
           <div class="spinner" style="width:20px;height:20px;margin:0"></div>
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Rewriting copy…</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Rewriting…</div>
         </div>
       `:claimsState.rewriteResult?`
         <div style="margin-bottom:.75rem">
-          <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">✓ Rewritten copy</div>
-          <div id="claims-rewrite-box" style="font-family:var(--sans);font-size:.88rem;line-height:1.8;color:var(--ink);background:#F9F8F6;border:1px solid var(--border);padding:1.1rem 1.25rem;white-space:pre-wrap">${claimsState.rewriteResult}</div>
+          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">✓ Rewritten copy</div>
+          <div id="claims-rewrite-box" style="font-family:var(--sans);font-size:.85rem;line-height:1.8;color:var(--ink);background:#F9F8F6;border:1px solid var(--border);padding:1rem 1.25rem;white-space:pre-wrap">${claimsState.rewriteResult}</div>
           <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
-            <button class="btn-primary" style="font-size:.68rem;padding:.45rem .9rem" onclick="copyToClipboard(document.getElementById('claims-rewrite-box').textContent)">Copy text</button>
+            <button class="btn-primary" style="font-size:.68rem" onclick="copyToClipboard(document.getElementById('claims-rewrite-box').textContent)">Copy text</button>
             <button class="btn-outline" style="font-size:.65rem" onclick="claimsState.rewriteResult=null;claimsState.rewriteLoading=false;renderClaims(document.getElementById('page-claims'))">Regenerate</button>
           </div>
         </div>
       `:`
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-          ${(claimsState.selectedMarkets||[brand?.targetMarkets?.[0]||'Denmark']).map(m=>`
+          ${(claimsState.selectedMarkets||[]).map(m=>`
             <button class="btn-outline" style="font-size:.65rem;padding:.35rem .75rem" onclick="rewriteClaimsCopyForMarket('${m}')">Rewrite for ${m}</button>
           `).join('')}
         </div>
         <button class="btn-primary" style="width:100%;padding:.85rem;font-size:.72rem" onclick="rewriteClaimsCopy()">
-          Rewrite copy with approved claims →
+          Rewrite for all markets →
         </button>
       `}
     </div>
@@ -15684,7 +15885,7 @@ function renderDPPQrCode(url){
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     s.onload = ()=>_renderQR(container, url);
-    s.onerror = ()=>{container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:1rem">QR code loads on veyaflow.com</div>';};
+    s.onerror = ()=>{container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:#F59E0B;text-align:center;padding:1rem;border:1px solid #FCD34D;background:#FFFBEB">⚠ QR library unavailable — check internet connection</div>';};
     document.head.appendChild(s);
   } else {
     _renderQR(container, url);
