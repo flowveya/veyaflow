@@ -17385,6 +17385,14 @@ function renderPitchResult(){
   if(pitchActiveVariant>=parsed.length) pitchActiveVariant=0;
   const active = parsed[pitchActiveVariant];
 
+  // Guard: if active is undefined (stale saved pitchResult format), clear and re-render form
+  if(!active || !active.body){
+    pitchResult = null;
+    const el = document.getElementById('page-pitch');
+    if(el) renderPitch(el);
+    return '';
+  }
+
   const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑'};
   const variantDesc  = {
     'Direct & Commercial':'Numbers first. No brand story. Buyer sees ROI in 10 seconds.',
