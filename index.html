@@ -1286,7 +1286,7 @@ async function runAutofill(){
 
   try{
     // Step 1 — fetch website via Anthropic API web_search or direct fetch
-    const fetchRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const fetchRes = await fetch('/.netlify/functions/anthropic-proxy', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -1306,7 +1306,7 @@ async function runAutofill(){
     if(!siteText || siteText.length < 50) throw new Error('Could not read site content');
 
     // Step 2 — extract structured brand data
-    const extractRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const extractRes = await fetch('/.netlify/functions/anthropic-proxy', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -9632,7 +9632,7 @@ Full 3-year total: LOW — HIGH | Payback: X months from first listing`
     compSection = {title:'Competitive Landscape', content:compCached.content, confidence:'research_verified', cached:true, cachedDate:new Date(compCached.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})};
   } else {
     try{
-      const compRes = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      const compRes = await fetch('/.netlify/functions/anthropic-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         model:'claude-haiku-4-5-20251001', max_tokens:900,
         tools:[{type:'web_search_20250305',name:'web_search'}],
         system:`Research which brands are currently stocked in ${targetRetailer}'s ${cat} section in ${reportForm.targetMarket}. Return competitor analysis as structured text.\n\nFor each brand found (aim for 4-6), provide:\nBrand name | Country of origin | Approximate RSP | Positioning (1 sentence)\n\nThen:\nGAP OPPORTUNITY: [positioning missing from current range]\nRECOMMENDED POSITIONING: [how the entering brand should differentiate]\nRECOMMENDED RSP RANGE: [range avoiding direct competition]\n\nBase findings on web search results from 2025-2026.`,
@@ -14679,7 +14679,7 @@ severity definitions:
 - info: best practice recommendation`;
 
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch('/.netlify/functions/anthropic-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -17597,7 +17597,7 @@ Pitch text:
 ${pitchText.slice(0,2500)}`;
 
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch('/.netlify/functions/anthropic-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -17750,7 +17750,7 @@ strengths and concerns: max 3 each. questionsIWouldAsk: exactly 3.`;
   const brandCtx = brand ? `Brand: ${brand.name||'—'}, category: ${brand.category||'—'}, stage: ${brand.stage||'—'}, revenue: ${brand.annualRevenue||'not disclosed'}.` : '';
 
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch('/.netlify/functions/anthropic-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -19216,7 +19216,7 @@ Parse the user's natural language query. Return:
 Rank by fit. Include only retailers with relevanceScore >= 40. Max 15 results.`;
 
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch('/.netlify/functions/anthropic-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -22437,7 +22437,7 @@ async function runRegulatoryCheck(manual){
   for(const queryTemplate of sources){
     const query = queryTemplate.replace('{year}', year);
     try{
-      const res = await fetch('https://api.anthropic.com/v1/messages',{
+      const res = await fetch('/.netlify/functions/anthropic-proxy',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
