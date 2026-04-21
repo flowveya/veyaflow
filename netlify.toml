@@ -1,20 +1,26 @@
 [build]
   functions = "netlify/functions"
-  publish = "."
+  publish   = "."
 
 [functions]
+  # Use Node.js 20 for all functions
   node_bundler = "esbuild"
 
-[functions."anthropic-proxy"]
-  timeout = 26
-
+# Redirect /brand/:shareId to the static viewer HTML
+# The viewer JS then calls the Netlify function with the shareId
 [[redirects]]
-  from = "/api/anthropic"
-  to = "/.netlify/functions/anthropic-proxy"
+  from   = "/brand/*"
+  to     = "/brand/index.html"
   status = 200
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
+# Friendly 404 page
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+[context.production.environment]
+  # These are read by Netlify functions — set actual values in Netlify dashboard
+  # SUPABASE_URL       = "https://your-project.supabase.co"
+  # SUPABASE_SERVICE_KEY = "eyJ..."   (service role — functions/share-brand-pack.js)
+  # SUPABASE_ANON_KEY    = "eyJ..."   (anon — functions/get-brand-pack.js)
