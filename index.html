@@ -17625,7 +17625,9 @@ ${pitchText.slice(0,2500)}`;
 }
 
 function renderPitchScoreCard(result, retailerName, market, pitchText){
-  const total = result.total||0;
+  // Ensure total is always a proper integer — model sometimes returns string or wrong value
+  const dimSum = Object.values(result.scores||{}).reduce((acc,d)=>acc+(parseInt(d.score)||0),0);
+  const total = parseInt(result.total)||dimSum||0;
   const totalColor  = total>=80?'#065F46':total>=60?'#92400E':'#991B1B';
   const totalBg     = total>=80?'#ECFDF5':total>=60?'#FFFBEB':'#FEF2F2';
   const totalBorder = total>=80?'#A7F3D0':total>=60?'#FCD34D':'#FCA5A5';
