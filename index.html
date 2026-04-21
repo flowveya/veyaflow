@@ -17357,6 +17357,14 @@ HARD RULES FOR ALL THREE VARIANTS:
 
 function renderPitchResult(){
   if(!pitchResult) return '';
+  // Guard: stale localStorage format — clear and show form
+  if(!pitchResult.text || typeof pitchResult.text !== 'string'){
+    pitchResult = null;
+    try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
+    const el = document.getElementById('page-pitch');
+    if(el) renderPitch(el);
+    return '';
+  }
   const intel = PITCH_INTEL[pitchResult.retailer]||{};
   const blocks = pitchResult.text.split('---').map(b=>b.trim()).filter(b=>b.includes('VARIANT:'));
 
