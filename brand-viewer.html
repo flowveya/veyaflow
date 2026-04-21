@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brand Pack — VeyaFlow</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    :root {
+      --navy:  #1B2D4F;
+      --gold:  #C4A882;
+      --sans:  'Inter', system-ui, -apple-system, sans-serif;
+      --mono:  'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+      --serif: 'Playfair Display', Georgia, serif;
+      --border:#E8E4DE;
+      --muted: #888;
+      --ink:   #1A1A1A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); background: #FAFAF8; color: var(--ink); }
+
+    /* ── Header ── */
+    .vf-header {
+      background: var(--navy);
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .vf-logo { font-family: var(--serif); font-size: 1rem; color: #fff; letter-spacing: .02em; }
+    .vf-logo span { color: var(--gold); }
+    .vf-header-badge { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.4); letter-spacing: .08em; text-transform: uppercase; }
+
+    /* ── Content ── */
+    .vf-wrap { max-width: 780px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+    /* ── Cover ── */
+    .vf-cover { padding: 2rem 1.75rem; margin-bottom: 1.5rem; }
+    .vf-cover-prepared { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.4); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .35rem; }
+    .vf-cover-brand { font-family: var(--serif); font-size: 1.6rem; color: #fff; margin-bottom: .2rem; }
+    .vf-cover-sub { font-family: var(--mono); font-size: .65rem; color: rgba(255,255,255,.55); }
+    .vf-cover-meta { display: flex; gap: 1.25rem; margin-top: 1rem; flex-wrap: wrap; }
+    .vf-cover-meta-item { font-family: var(--mono); font-size: .6rem; color: rgba(255,255,255,.6); }
+    .vf-cover-meta-item strong { color: var(--gold); display: block; font-size: .72rem; margin-bottom: .1rem; }
+
+    /* ── Sections ── */
+    .vf-section { background: #fff; border: 1px solid var(--border); border-left: 3px solid var(--gold); padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+    .vf-section-title { font-family: var(--mono); font-size: .6rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--navy); margin-bottom: .75rem; }
+    .vf-section-body { font-family: var(--sans); font-size: .82rem; line-height: 1.8; color: #333; white-space: pre-wrap; }
+
+    /* ── SKU cards ── */
+    .vf-sku-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; }
+    .vf-sku-card { border: 1px solid var(--border); padding: .85rem 1rem; }
+    .vf-sku-name { font-family: var(--sans); font-size: .85rem; font-weight: 600; color: var(--navy); margin-bottom: .3rem; }
+    .vf-sku-field { font-family: var(--mono); font-size: .58rem; color: var(--muted); margin-top: .2rem; }
+    .vf-sku-field strong { color: var(--ink); }
+    .vf-cert { display: inline-block; font-family: var(--mono); font-size: .5rem; background: #ECFDF5; color: #065F46; padding: .1rem .35rem; border: 1px solid #A7F3D0; margin: .1rem .1rem 0 0; }
+
+    /* ── Readiness bar ── */
+    .vf-score-bar-wrap { background: #E8E4DE; height: 6px; border-radius: 3px; margin: .35rem 0; }
+    .vf-score-bar { height: 6px; border-radius: 3px; transition: width .6s ease; }
+
+    /* ── Footer ── */
+    .vf-footer { border-top: 1px solid var(--border); padding: 1.25rem 1.5rem; text-align: center; margin-top: 2rem; }
+    .vf-footer-logo { font-family: var(--serif); font-size: .85rem; color: var(--navy); margin-bottom: .2rem; }
+    .vf-footer-sub { font-family: var(--mono); font-size: .52rem; color: var(--muted); }
+    .vf-footer-cta { display: inline-block; margin-top: .65rem; font-family: var(--mono); font-size: .6rem; color: var(--navy); border: 1px solid var(--navy); padding: .35rem .85rem; text-decoration: none; }
+
+    /* ── States ── */
+    .vf-loading { text-align: center; padding: 4rem 1rem; }
+    .vf-loading-spinner { width: 28px; height: 28px; border: 3px solid #E8E4DE; border-top-color: var(--navy); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .vf-error { text-align: center; padding: 4rem 1rem; }
+    .vf-error-icon { font-size: 2rem; margin-bottom: .75rem; }
+    .vf-error-title { font-family: var(--serif); font-size: 1.2rem; color: var(--navy); margin-bottom: .5rem; }
+    .vf-error-sub { font-family: var(--sans); font-size: .8rem; color: var(--muted); line-height: 1.6; max-width: 380px; margin: 0 auto 1.25rem; }
+
+    @media (max-width: 560px) {
+      .vf-cover { padding: 1.25rem 1rem; }
+      .vf-section { padding: 1rem; }
+      .vf-cover-brand { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="vf-header">
+  <div class="vf-logo">Veya<span>Flow</span></div>
+  <div class="vf-header-badge">Brand Pack — Shared view</div>
+</header>
+
+<div class="vf-wrap" id="content">
+  <div class="vf-loading">
+    <div class="vf-loading-spinner"></div>
+    <div style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Loading brand pack…</div>
+  </div>
+</div>
+
+<footer class="vf-footer">
+  <div class="vf-footer-logo">VeyaFlow</div>
+  <div class="vf-footer-sub">Brand Growth Intelligence · Powered by VeyaFlow</div>
+  <a href="https://veyaflow.com" class="vf-footer-cta">Start your free trial →</a>
+</footer>
+
+<script>
+(async function(){
+  const shareId = location.pathname.split('/brand/')[1]?.replace(/\/$/, '');
+  const wrap = document.getElementById('content');
+
+  function showError(title, sub){
+    wrap.innerHTML = `
+      <div class="vf-error">
+        <div class="vf-error-icon">◌</div>
+        <div class="vf-error-title">${title}</div>
+        <div class="vf-error-sub">${sub}</div>
+        <a href="https://veyaflow.com" style="font-family:var(--mono);font-size:.65rem;color:var(--navy);text-decoration:underline">veyaflow.com →</a>
+      </div>
+    `;
+  }
+
+  if(!shareId || !/^[0-9a-f-]{36}$/.test(shareId)){
+    return showError('Invalid link', 'This Brand Pack link is invalid or malformed.');
+  }
+
+  // Fetch from Netlify function
+  let data;
+  try {
+    const res = await fetch(`/.netlify/functions/get-brand-pack?id=${shareId}`);
+    if(res.status === 404){
+      const err = await res.json();
+      return showError('Brand Pack not available', err.message || 'This link is no longer active.');
+    }
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch(e) {
+    return showError('Could not load Brand Pack', 'Please try again or contact the brand directly.');
+  }
+
+  const pack  = data.brandPackData || {};
+  const brand = pack.brand   || {};
+  const skus  = pack.skus    || [];
+  const sections = pack.sections || [];
+  const coverAccent = pack.coverAccent || '#1B2D4F';
+  const created = new Date(data.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+  // Update page title
+  document.title = `${brand.name || 'Brand Pack'} — VeyaFlow`;
+
+  // Build cover
+  const coverHTML = `
+    <div class="vf-cover" style="background:${coverAccent}">
+      <div class="vf-cover-prepared">Prepared for</div>
+      <div class="vf-cover-brand">${esc(brand.name || '—')}</div>
+      <div class="vf-cover-sub">${esc(pack.retailer || '')}${pack.market ? ' · ' + esc(pack.market) : ''}</div>
+      <div class="vf-cover-meta">
+        ${brand.category ? `<div class="vf-cover-meta-item"><strong>${esc(brand.category)}</strong>Category</div>` : ''}
+        ${brand.currentMarket ? `<div class="vf-cover-meta-item"><strong>${esc(brand.currentMarket)}</strong>Home market</div>` : ''}
+        ${skus.length ? `<div class="vf-cover-meta-item"><strong>${skus.length} SKU${skus.length!==1?'s':''}</strong>In this pack</div>` : ''}
+        <div class="vf-cover-meta-item"><strong>${created}</strong>Generated</div>
+      </div>
+    </div>
+  `;
+
+  // Build sections
+  const sectionsHTML = sections.map(s => `
+    <div class="vf-section">
+      <div class="vf-section-title">${esc(s.title || '')}</div>
+      <div class="vf-section-body">${esc(s.body || '')}</div>
+    </div>
+  `).join('');
+
+  // Build SKU cards
+  const skusHTML = skus.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Products (${skus.length})</div>
+      <div class="vf-sku-grid">
+        ${skus.map(sku => `
+          <div class="vf-sku-card">
+            <div class="vf-sku-name">${esc(sku.name || 'Unnamed product')}</div>
+            ${sku.ean  ? `<div class="vf-sku-field">EAN <strong>${esc(sku.ean)}</strong></div>` : ''}
+            ${sku.rspSEK ? `<div class="vf-sku-field">RSP <strong>${esc(String(sku.rspSEK))} SEK</strong></div>` : ''}
+            ${sku.netContent ? `<div class="vf-sku-field">Net <strong>${esc(String(sku.netContent))} ${esc(sku.netUnit||'')}</strong></div>` : ''}
+            ${(sku.certifications||[]).length ? `<div style="margin-top:.35rem">${sku.certifications.map(c=>`<span class="vf-cert">${esc(c)}</span>`).join('')}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  // Readiness score
+  const scoreHTML = pack.readinessScore != null ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Market Readiness Score</div>
+      <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.5rem">
+        <div style="font-family:var(--serif);font-size:1.5rem;font-weight:700;color:${pack.readinessScore>=70?'#065F46':pack.readinessScore>=50?'#92400E':'#991B1B'}">${pack.readinessScore}</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">/100</div>
+      </div>
+      <div class="vf-score-bar-wrap"><div class="vf-score-bar" style="width:${pack.readinessScore}%;background:${pack.readinessScore>=70?'#10B981':pack.readinessScore>=50?'#F59E0B':'#EF4444'}"></div></div>
+    </div>
+  ` : '';
+
+  wrap.innerHTML = coverHTML + sectionsHTML + skusHTML + scoreHTML;
+})();
+
+function esc(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
