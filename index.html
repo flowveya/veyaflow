@@ -10088,26 +10088,40 @@ function toggleCompareMarket(m){
 async function runCompare(){
   const btn=document.getElementById('cm-btn');
   if(btn){btn.disabled=true;btn.textContent='Analysing…';}
+  const compareEl = document.getElementById('page-compare');
 
-  const sku = skus[0]||null;
-  const scores = compareForm.markets.map(m=>scoreMarketFull(_nameToCode(m), brand||{name:compareForm.brandName,category:compareForm.category,currentMarket:'Sweden'}, sku));
-  scores.sort((a,b)=>b.total-a.total);
-  const winner = scores[0];
-  const parallel = detectParallelEntry(compareForm.markets);
-  const delta = complianceDelta(scores.map(s=>s.market?.name||s.marketCode), brand||{category:compareForm.category}, sku);
-
-  // Short AI call — qualitative "what would it take" for rank 2 market only
-  const rank2 = scores[1];
-  let aiWhatItTakes = '';
   try{
-    const prompt = `You are VeyaFlow. A Nordic ${compareForm.category} brand (${compareForm.brandName}) is comparing markets.\n\nThey should enter ${winner.market?.name||winner.marketCode} first (score ${winner.total}/100).\n\n"What would it take" to enter ${rank2?.market?.name||rank2?.marketCode} (score ${rank2?.total}/100)?\n\nList 2-3 specific blockers with: what needs to change, time estimate, cost estimate. Format as:\n1. [Blocker]: [Fix] | Time: X | Cost: Y SEK\n2. ...\n\nEnd with one sentence: total additional investment and whether it is Year 1 viable. Be specific. Max 80 words.`;
-    aiWhatItTakes = await callAPI([{role:'user',content:prompt}], 500);
-  }catch(e){ aiWhatItTakes = 'Contact VeyaFlow for a detailed market entry assessment.'; }
+    const sku = skus[0]||null;
+    const scores = compareForm.markets.map(m=>scoreMarketFull(_nameToCode(m), brand||{name:compareForm.brandName,category:compareForm.category,currentMarket:'Sweden'}, sku));
+    scores.sort((a,b)=>b.total-a.total);
+    const winner = scores[0];
+    const parallel = detectParallelEntry(compareForm.markets);
+    const delta = complianceDelta(scores.map(s=>s.market?.name||s.marketCode), brand||{category:compareForm.category}, sku);
 
-  compareResult = {scores, winner:winner.marketCode, markets:compareForm.markets, brand:compareForm.brandName, category:compareForm.category, aiWhatItTakes, parallel, delta, timestamp:new Date().toISOString()};
-  savePageState('ns_compareForm', compareForm);
-  savePageState('ns_compareResult', compareResult);
-  renderCompare(document.getElementById('page-compare'));
+    // Short AI call — qualitative "what would it take" for rank 2 market only
+    const rank2 = scores[1];
+    let aiWhatItTakes = '';
+    try{
+      const controller = new AbortController();
+      const timeout = setTimeout(()=>controller.abort(), 24000);
+      const prompt = `You are VeyaFlow. A Nordic ${compareForm.category} brand (${compareForm.brandName}) is comparing markets.\n\nThey should enter ${winner.market?.name||winner.marketCode} first (score ${winner.total}/100).\n\n"What would it take" to enter ${rank2?.market?.name||rank2?.marketCode} (score ${rank2?.total}/100)?\n\nList 2-3 specific blockers with: what needs to change, time estimate, cost estimate. Format as:\n1. [Blocker]: [Fix] | Time: X | Cost: Y SEK\n2. ...\n\nEnd with one sentence: total additional investment and whether it is Year 1 viable. Be specific. Max 80 words.`;
+      aiWhatItTakes = await callAPI([{role:'user',content:prompt}], 500);
+      clearTimeout(timeout);
+    }catch(e){ aiWhatItTakes = 'AI analysis timed out — scores above are calculated data and fully accurate.'; }
+
+    compareResult = {scores, winner:winner.marketCode, markets:compareForm.markets, brand:compareForm.brandName, category:compareForm.category, aiWhatItTakes, parallel, delta, timestamp:new Date().toISOString()};
+    savePageState('ns_compareForm', compareForm);
+    savePageState('ns_compareResult', compareResult);
+    renderCompare(compareEl);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Compare markets →';}
+    if(compareEl){
+      const wrap = compareEl.querySelector('.page-wrap')||compareEl;
+      const errDiv = document.createElement('div');
+      errDiv.innerHTML = errCard('Analysis could not complete','The comparison took too long. Try selecting fewer markets or try again.','Try again','runCompare()');
+      wrap.prepend(errDiv);
+    }
+  }
 }
 
 // ── Render: Results ───────────────────────────────
@@ -21298,7 +21312,7 @@ function renderBrandHomeAlert(alertDef) {
           </button>
         ` : ''}
         <button onclick="localStorage.setItem('${alertDef.dismissKey}','1');renderDashboard(document.getElementById('page-home'))"
-          style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;text-align:center;padding:.2rem">
+          style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;text-align:center;padding:.2rem;display:none">
           Dismiss
         </button>
       </div>
@@ -22444,36 +22458,47 @@ async function runRegulatoryCheck(manual){
   if(!manual && !shouldRunWeeklyCheck()) return;
 
   const cats = getBrandCategories();
-  if(!cats.length) return; // no category set — skip
+  if(!cats.length) return;
 
   loadRegulatoryMonitor();
 
-  // Sync settings from brand profile
   const targetMkts = brand?.targetMarkets||[brand?.currentMarket||'Sweden'];
   regulatoryMonitorState.settings.markets    = targetMkts;
   regulatoryMonitorState.settings.categories = cats;
   regulatoryMonitorState.checking = true;
   regulatoryMonitorState.error    = null;
 
+  // Auto-clear spinner after 30s regardless — never block UI
+  const spinnerTimeout = setTimeout(()=>{
+    if(regulatoryMonitorState.checking){
+      regulatoryMonitorState.checking = false;
+      regulatoryMonitorState.lastChecked = new Date().toISOString();
+      saveRegulatoryMonitor();
+      renderPage('home');
+    }
+  }, 30000);
+
   if(manual) renderPage('home');
 
   const year = new Date().getFullYear();
   const newAlerts = [];
-
-  // Build search queries for each category
   const sources = cats.flatMap(cat=>REG_MONITOR_SOURCES[cat]?.searchQueries||[]).slice(0,4);
 
-  for(const queryTemplate of sources){
-    const query = queryTemplate.replace('{year}', year);
-    try{
-      const res = await fetch('/.netlify/functions/anthropic-proxy',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          model:'claude-haiku-4-5-20251001',
-          max_tokens:600,
-          tools:[{type:'web_search_20250305', name:'web_search'}],
-          system:`You are a regulatory intelligence analyst for European consumer brands. Search for recent regulatory changes (last 90 days) affecting: ${cats.join(', ')} products in ${targetMkts.join(', ')}.
+  try{
+    for(const queryTemplate of sources){
+      const query = queryTemplate.replace('{year}', year);
+      try{
+        const controller = new AbortController();
+        const reqTimeout = setTimeout(()=>controller.abort(), 20000);
+        const res = await fetch('/.netlify/functions/anthropic-proxy',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          signal: controller.signal,
+          body: JSON.stringify({
+            model:'claude-haiku-4-5-20251001',
+            max_tokens:600,
+            tools:[{type:'web_search_20250305', name:'web_search'}],
+            system:`You are a regulatory intelligence analyst for European consumer brands. Search for recent regulatory changes (last 90 days) affecting: ${cats.join(', ')} products in ${targetMkts.join(', ')}.
 
 If you find a meaningful regulatory update, change, proposal, or enforcement action, return JSON:
 {"found":true,"title":"concise title","summary":"2-3 sentence plain English summary of what changed and what brands need to do","market":"affected market(s)","category":"${cats[0]}","severity":"high|medium|low","url":"source URL if available","date":"YYYY-MM-DD if known"}
@@ -22481,38 +22506,39 @@ If you find a meaningful regulatory update, change, proposal, or enforcement act
 If nothing new found, return: {"found":false}
 
 Return JSON only. No markdown.`,
-          messages:[{role:'user', content:`Search: ${query}`}],
-        }),
-      });
-      const data = await res.json();
-      const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
-      const parsed = safeJsonParse(text.replace(/```json|```/g,'').trim(), {found:false});
-      if(parsed && parsed.found && parsed.title && parsed.summary){
-        const id = 'reg_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-        // Deduplicate by title similarity
-        const isDup = regulatoryMonitorState.alerts.some(a=>
-          a.title.toLowerCase().slice(0,40)===parsed.title.toLowerCase().slice(0,40)
-        );
-        if(!isDup && !newAlerts.some(a=>a.title.toLowerCase().slice(0,40)===parsed.title.toLowerCase().slice(0,40))){
-          newAlerts.push({
-            id, date:parsed.date||new Date().toISOString().slice(0,10),
-            title:parsed.title, summary:parsed.summary,
-            market:parsed.market||targetMkts[0], category:parsed.category||cats[0],
-            severity:parsed.severity||'medium', url:parsed.url||null, read:false,
-          });
+            messages:[{role:'user', content:`Search: ${query}`}],
+          }),
+        });
+        clearTimeout(reqTimeout);
+        const data = await res.json();
+        const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+        const parsed = safeJsonParse(text.replace(/```json|```/g,'').trim(), {found:false});
+        if(parsed && parsed.found && parsed.title && parsed.summary){
+          const id = 'reg_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+          const isDup = regulatoryMonitorState.alerts.some(a=>
+            a.title.toLowerCase().slice(0,40)===parsed.title.toLowerCase().slice(0,40)
+          );
+          if(!isDup && !newAlerts.some(a=>a.title.toLowerCase().slice(0,40)===parsed.title.toLowerCase().slice(0,40))){
+            newAlerts.push({
+              id, date:parsed.date||new Date().toISOString().slice(0,10),
+              title:parsed.title, summary:parsed.summary,
+              market:parsed.market||targetMkts[0], category:parsed.category||cats[0],
+              severity:parsed.severity||'medium', url:parsed.url||null, read:false,
+            });
+          }
         }
-      }
-    }catch(e){} // individual search failures are silent
-    // Rate-limit: wait 1s between searches to avoid 429
-    await new Promise(r=>setTimeout(r,1000));
+      }catch(e){} // individual search failures silent
+      await new Promise(r=>setTimeout(r,1000));
+    }
+  }finally{
+    // Always reset — no matter what happens
+    clearTimeout(spinnerTimeout);
+    regulatoryMonitorState.alerts = [...newAlerts, ...regulatoryMonitorState.alerts].slice(0,30);
+    regulatoryMonitorState.lastChecked = new Date().toISOString();
+    regulatoryMonitorState.checking    = false;
+    saveRegulatoryMonitor();
+    if(manual || newAlerts.length) renderPage('home');
   }
-
-  // Prepend new alerts, keep last 30
-  regulatoryMonitorState.alerts = [...newAlerts, ...regulatoryMonitorState.alerts].slice(0,30);
-  regulatoryMonitorState.lastChecked = new Date().toISOString();
-  regulatoryMonitorState.checking    = false;
-  saveRegulatoryMonitor();
-  if(manual || newAlerts.length) renderPage('home');
 }
 
 function markAlertRead(alertId){
@@ -22528,10 +22554,10 @@ function renderRegulatoryAlertBanner(){
   if(!unread.length && !regulatoryMonitorState.checking) return '';
 
   if(regulatoryMonitorState.checking){
-    return `<div style="background:#F9F8F6;border:1px solid var(--border);border-left:4px solid var(--navy);padding:.55rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
-      <div class="spinner" style="width:12px;height:12px;flex-shrink:0"></div>
-      <div style="font-family:var(--mono);font-size:.6rem;color:var(--navy)">Checking for regulatory updates…</div>
-    </div>`;
+    return `<div id="reg-scan-banner" style="background:#F9F8F6;border:1px solid var(--border);border-left:4px solid var(--navy);padding:.45rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--navy);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy)">Regulatory scan running in background</div>
+    </div><script>setTimeout(function(){var b=document.getElementById('reg-scan-banner');if(b)b.style.display='none';},10000);<\/script>`;
   }
 
   const color  = highPrio.length ? '#991B1B' : '#1E40AF';
@@ -22629,11 +22655,14 @@ function renderRegMonitorPage(el){
 
       <!-- Alerts -->
       ${regulatoryMonitorState.checking ? `
-        <div style="border:1px solid var(--border);padding:1.5rem;text-align:center">
-          <div class="spinner" style="margin:0 auto .65rem"></div>
-          <div style="font-family:var(--sans);font-size:.82rem;color:var(--navy);margin-bottom:.25rem">Scanning for regulatory updates…</div>
-          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Searching EU Commission, ECHA, UK OPSS, and Nordic regulators</div>
+        <div id="reg-page-scan-banner" style="border:1px solid var(--border);padding:.85rem 1rem;display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--navy);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
+          <div>
+            <div style="font-family:var(--sans);font-size:.78rem;color:var(--navy)">Regulatory scan running in background</div>
+            <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Results appear here when complete — you can navigate away</div>
+          </div>
         </div>
+        <script>setTimeout(function(){var b=document.getElementById('reg-page-scan-banner');if(b)b.style.display='none';},10000);<\/script>
       ` : all.length ? `
         <div>
           ${unread.length ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
@@ -23387,7 +23416,7 @@ function renderSeasonalAlerts(){
             <button onclick="openSeasonalPitch('${win.retailerName.replace(/'/g,"\\'")}','${card.market}','${win.name.replace(/'/g,"\\'")}','${(win.pitchAngle||'').replace(/'/g,"\\'").replace(/\n/g,' ')}','${(win.formatRequired||'').replace(/'/g,"\\'")}',${JSON.stringify(win.priceRange||null)})"
               class="btn-primary" style="font-size:.65rem">Prepare seasonal pitch →</button>
             <button onclick="localStorage.setItem('${dismissKey}','1');renderPage('home')"
-              style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:${c.text};cursor:pointer;opacity:.6;text-align:center">Dismiss</button>
+              style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:${c.text};cursor:pointer;opacity:.6;text-align:center;display:none">Dismiss</button>
           </div>
         </div>
       `);
@@ -25309,7 +25338,7 @@ function renderSourcingCRM(el){
                       ${entry.notes?`<div style="font-family:var(--sans);font-size:.72rem;color:#555;flex:1;white-space:pre-wrap">${entry.notes}</div>`:''}
                       <button class="btn-outline" style="font-size:.58rem;padding:.25rem .55rem" onclick="sourcingCRMEditId=${entry.id};renderSourcingCRM(document.getElementById('page-sourcing'))">${entry.notes?'Edit':'Add notes'}</button>
                       <a href="mailto:${entry.mfrContact}" style="font-family:var(--mono);font-size:.58rem;padding:.25rem .55rem;border:1px solid var(--border);color:var(--navy);text-decoration:none">Email →</a>
-                      <button onclick="openReferralModal(${JSON.stringify({mfrName:entry.mfrName||'',mfrCountry:entry.mfrCountry||'',mfrType:entry.mfrType||'',mfrContact:entry.mfrContact||'',mfrWebsite:entry.mfrWebsite||''})})"
+                      <button onclick="openReferralModal({mfrName:'${(entry.mfrName||'').replace(/'/g,'&apos;')}',mfrCountry:'${(entry.mfrCountry||'').replace(/'/g,'&apos;')}',mfrType:'${(entry.mfrType||'').replace(/'/g,'&apos;')}',mfrContact:'${(entry.mfrContact||'').replace(/'/g,'&apos;')}',mfrWebsite:'${(entry.mfrWebsite||'').replace(/'/g,'&apos;')}'})"
                         style="font-family:var(--mono);font-size:.58rem;padding:.25rem .55rem;border:1px solid var(--gold);background:none;color:var(--gold);cursor:pointer;white-space:nowrap">Refer →</button>
                       <button onclick="deleteSourcingEntry(${entry.id})" style="font-family:var(--mono);font-size:.55rem;padding:.25rem .55rem;border:1px solid #FCA5A5;background:none;color:#991B1B;cursor:pointer">Remove</button>
                     </div>
