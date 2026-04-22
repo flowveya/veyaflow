@@ -713,7 +713,7 @@ function loadManualSuppliers(){
   try{
     const raw = localStorage.getItem('ns_manual_suppliers');
     if(raw){
-      const manual = JSON.parse(raw);
+      const manual = safeJsonParse(raw)||[];
       manual.forEach(s=>{
         if(!SUPPLIERS.find(x=>x.id===s.id)) SUPPLIERS.push(s);
       });
@@ -1143,22 +1143,22 @@ function loadState(){
     const ff=localStorage.getItem('ns_findForm');
     const sf=localStorage.getItem('ns_supplierFilter');
 
-    if(b) brand=JSON.parse(b);
-    if(r) savedReports=JSON.parse(r);
-    if(rf){ const v=JSON.parse(rf); Object.assign(reportForm,v); }
-    if(rs){ const v=JSON.parse(rs); if(v.result) reportState=v; }
+    if(b) brand=safeJsonParse(b);
+    if(r) savedReports=safeJsonParse(r)||[];
+    if(rf){ const v=safeJsonParse(rf); Object.assign(reportForm,v); }
+    if(rs){ const v=safeJsonParse(rs); if(v.result) reportState=v; }
     const mp=localStorage.getItem('ns_market_presets');
-    if(mp) marketPresets=JSON.parse(mp);
-    if(cf){ const v=JSON.parse(cf); Object.assign(compareForm,v); }
-    if(cr) compareResult=JSON.parse(cr);
-    if(pf){ const v=JSON.parse(pf); Object.assign(pitchForm,v); }
-    if(pr) pitchResult=JSON.parse(pr);
-    if(cirf){ const v=JSON.parse(cirf); Object.assign(circularForm,v); }
+    if(mp) marketPresets=safeJsonParse(mp)||{};
+    if(cf){ const v=safeJsonParse(cf); Object.assign(compareForm,v); }
+    if(cr) compareResult=safeJsonParse(cr);
+    if(pf){ const v=safeJsonParse(pf); Object.assign(pitchForm,v); }
+    if(pr) pitchResult=safeJsonParse(pr);
+    if(cirf){ const v=safeJsonParse(cirf); Object.assign(circularForm,v); }
     if(cir){ const _cr=JSON.parse(cir); if(_cr&&Array.isArray(_cr.routes)&&_cr.routes[0]?.routeType) circularResult=_cr; else localStorage.removeItem('ns_circularResult'); }
-    if(ff){ const v=JSON.parse(ff); Object.assign(findForm,v); }
+    if(ff){ const v=safeJsonParse(ff); Object.assign(findForm,v); }
     const sk=localStorage.getItem('ns_skus');
-    if(sk) skus=JSON.parse(sk);
-    if(sf){ const v=JSON.parse(sf); Object.assign(supplierFilter,v); }
+    if(sk) skus=safeJsonParse(sk)||[];
+    if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -1320,7 +1320,7 @@ async function runAutofill(){
     const extractData = await extractRes.json();
     const rawText = (extractData.content||[]).find(b=>b.type==='text')?.text||'';
     const clean = rawText.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
+    const parsed = safeJsonParse(clean);
 
     // Map API category strings → display categories
     const mappedCats = [...new Set(
@@ -1737,6 +1737,32 @@ function savePageState(key,value){
 /* ═══════════════════════════════════════════════════
    API
 ═══════════════════════════════════════════════════ */
+/* ─── Safe JSON parse ─────────────────────────────── */
+function safeJsonParse(text, fallback){
+  if(fallback===undefined) fallback=null;
+  if(!text || (typeof text==='string' && text.trim()==='')) return fallback;
+  try{ return JSON.parse(text); }catch(e){ return fallback; }
+}
+
+/* ─── API request queue — prevents 429 floods ──────── */
+const _apiQueue=[];
+let _apiRunning=false;
+async function _processApiQueue(){
+  if(_apiRunning||_apiQueue.length===0) return;
+  _apiRunning=true;
+  const {fn,resolve,reject}=_apiQueue.shift();
+  try{ resolve(await fn()); }catch(e){ reject(e); }
+  await new Promise(r=>setTimeout(r,600));
+  _apiRunning=false;
+  _processApiQueue();
+}
+function queuedCallAPI(messages,maxTokens){
+  return new Promise((resolve,reject)=>{
+    _apiQueue.push({fn:()=>callAPI(messages,maxTokens),resolve,reject});
+    _processApiQueue();
+  });
+}
+
 async function callAPI(messages,maxTokens=1200){
   let res;
   try{
@@ -2035,7 +2061,7 @@ function getTrialState(){
   try{
     const raw = localStorage.getItem('ns_trial');
     if(!raw) return null;
-    return JSON.parse(raw);
+    return safeJsonParse(raw);
   }catch(e){ return null; }
 }
 function initTrialIfNeeded(){
@@ -13423,7 +13449,7 @@ BULLET_2: [text]
 BULLET_3: [text]${cs.bullets.count>3?'\nBULLET_4: [text]':''}${cs.bullets.count>4?'\nBULLET_5: [text]':''}${cs.bullets.count>5?'\nBULLET_6: [text]':''}`;
 
     try{
-      const text = await callAPI([{role:'user',content:prompt}], 600);
+      const text = await queuedCallAPI([{role:'user',content:prompt}], 600);
       const lines = text.split('\n');
       const get = (key) => (lines.find(l=>l.startsWith(key+':'))||'').replace(key+':','').trim();
       const shortDesc = removeFlaggedTerms(get('SHORT_DESC'), lang, tone);
@@ -14293,6 +14319,7 @@ function renderClaims(el){
 }
 
 function renderClaimsAnalyseTab(){
+  const brandCats = getBrandCategories()||[];
   return `
     <!-- ── Safe harbour reference ── -->
     <div style="margin-bottom:1rem">
@@ -14354,7 +14381,7 @@ function renderClaimsAnalyseTab(){
         <label class="lbl">Target markets</label>
         <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.25rem">
           ${['Denmark','Germany','United Kingdom','Norway','Netherlands','France','Sweden','Belgium'].map(m=>`
-            <div class="market-chip${(claimsState.selectedMarkets.includes(m)||(claimsState.selectedMarkets.length===0&&(brand.targetMarkets||[]).includes(m)))?' selected':''}"
+            <div class="market-chip${(claimsState.selectedMarkets.includes(m)||(claimsState.selectedMarkets.length===0&&(brand?.targetMarkets||[]).includes(m)))?' selected':''}"
               onclick="(function(){var arr=claimsState.selectedMarkets.slice();var i=arr.indexOf('${m}');if(i>=0)arr.splice(i,1);else arr.push('${m}');claimsState.selectedMarkets=arr;renderClaims(document.getElementById('page-claims'));})();" data-market="${m}">${m}</div>
           `).join('')}
         </div>
@@ -14703,7 +14730,7 @@ severity definitions:
     });
     const data = await res.json();
     const raw  = (data.content||[]).find(b=>b.type==='text')?.text||'';
-    const result = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const result = safeJsonParse(raw.replace(/```json|```/g,'').trim());
     claimsState.labelScan.result  = result;
     claimsState.labelScan.loading = false;
   } catch(err){
@@ -17610,7 +17637,7 @@ ${pitchText.slice(0,2500)}`;
     const data = await res.json();
     const raw  = (data.content||[]).find(b=>b.type==='text')?.text||'';
     const clean = raw.replace(/```json|```/g,'').trim();
-    const result = JSON.parse(clean);
+    const result = safeJsonParse(clean);
     savePitchScore(retailerName, result);
     el.innerHTML = renderPitchScoreCard(result, retailerName, market, pitchText);
   } catch(err){
@@ -17764,7 +17791,7 @@ strengths and concerns: max 3 each. questionsIWouldAsk: exactly 3.`;
     });
     const data = await res.json();
     const raw  = (data.content||[]).find(b=>b.type==='text')?.text||'';
-    const result = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const result = safeJsonParse(raw.replace(/```json|```/g,'').trim());
     el.innerHTML = renderMirrorCard(result, retailerName, pitchText);
   } catch(err){
     el.innerHTML = `
@@ -19230,7 +19257,7 @@ Rank by fit. Include only retailers with relevanceScore >= 40. Max 15 results.`;
     });
     const data = await res.json();
     const raw  = (data.content||[]).find(b=>b.type==='text')?.text||'';
-    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const parsed = safeJsonParse(raw.replace(/```json|```/g,'').trim());
     crmNLSearch = {query:q, loading:false, results:parsed.matches||[], interpretation:parsed.interpretation||q, error:null};
   } catch(err){
     crmNLSearch = {query:q, loading:false, results:null, interpretation:'', error:'Search failed — try again or use filters below.'};
@@ -19247,7 +19274,7 @@ function loadCRM(){
   const saved = localStorage.getItem('ns_crm');
   if(saved){
     try{
-      const parsed = JSON.parse(saved);
+      const parsed = safeJsonParse(saved);
       // Merge: keep saved data, add any new RETAILER_REGISTRY entries
       const defaults = initCRMCards();
       const savedIds = new Set(parsed.map(c=>c.id));
@@ -19855,7 +19882,7 @@ Output this exact JSON structure:
     // Extract JSON from response
     const jsonMatch = parseResp.match(/\{[\s\S]*\}/);
     if(!jsonMatch) throw new Error('Could not parse requirements');
-    agentState.parsed = JSON.parse(jsonMatch[0]);
+    agentState.parsed = safeJsonParse(jsonMatch[0]);
   }catch(e){
     // Fallback: use raw query
     agentState.parsed = {
@@ -22459,8 +22486,8 @@ Return JSON only. No markdown.`,
       });
       const data = await res.json();
       const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
-      const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
-      if(parsed.found && parsed.title && parsed.summary){
+      const parsed = safeJsonParse(text.replace(/```json|```/g,'').trim(), {found:false});
+      if(parsed && parsed.found && parsed.title && parsed.summary){
         const id = 'reg_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
         // Deduplicate by title similarity
         const isDup = regulatoryMonitorState.alerts.some(a=>
@@ -22476,6 +22503,8 @@ Return JSON only. No markdown.`,
         }
       }
     }catch(e){} // individual search failures are silent
+    // Rate-limit: wait 1s between searches to avoid 429
+    await new Promise(r=>setTimeout(r,1000));
   }
 
   // Prepend new alerts, keep last 30
