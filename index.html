@@ -58,19 +58,22 @@
   }
   .nav-item:hover { background: rgba(196,168,130,.08); }
   .nav-item.active { background: rgba(196,168,130,.15); border-left-color: var(--gold); }
-  .nav-icon { font-size: .85rem; width: 18px; text-align: center; color: rgba(255,255,255,.4); }
+  .nav-icon { font-size: .85rem; width: 18px; text-align: center; color: rgba(255,255,255,.4); flex-shrink: 0; }
   .nav-item.active .nav-icon { color: var(--gold); }
-  .nav-label { font-size: .72rem; color: rgba(255,255,255,.45); letter-spacing: .04em; }
+  .nav-label { font-size: .72rem; color: rgba(255,255,255,.45); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-item.active .nav-label { color: var(--gold); }
-  .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; }
+  .nav-sub { font-family: var(--sans); font-size: .53rem; color: rgba(255,255,255,.2); margin-top: .08rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-item.active .nav-sub { color: rgba(196,168,130,.45); }
+  .nav-item:hover .nav-sub { color: rgba(255,255,255,.32); }
+  .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; flex-shrink: 0; }
 
   /* Nav section tabs */
-  .nav-section-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+  .nav-section-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; margin-top: .15rem; }
   .nav-section-tab {
     flex: 1; padding: .45rem .25rem; text-align: center;
     font-family: var(--mono); font-size: .52rem; letter-spacing: .06em; text-transform: uppercase;
     color: rgba(255,255,255,.3); cursor: pointer; border-bottom: 2px solid transparent;
-    transition: all .15s;
+    transition: all .15s; white-space: nowrap;
   }
   .nav-section-tab:hover { color: rgba(255,255,255,.55); background: rgba(255,255,255,.03); }
   .nav-section-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(196,168,130,.07); }
@@ -192,11 +195,6 @@
   @keyframes slideUp { from { transform:translateY(10px);opacity:0; } to { transform:translateY(0);opacity:1; } }
   @keyframes slideIn { from { transform:translateX(20px);opacity:0; } to { transform:translateX(0);opacity:1; } }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
-
-  /* Nav subtitles */
-  .nav-sub { font-family:var(--sans);font-size:.53rem;color:rgba(255,255,255,.2);margin-top:.08rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-  .nav-item.active .nav-sub { color:rgba(196,168,130,.45); }
-  .nav-item:hover .nav-sub { color:rgba(255,255,255,.32); }
 
   /* Tooltip system */
   .vf-tip { position:relative;display:inline-flex;align-items:center;cursor:help; }
@@ -589,6 +587,11 @@
     <div class="page" id="page-sourcing"></div>
     <div class="page" id="page-verified"></div>
     <div class="page" id="page-reg_monitor"></div>
+    <div class="page" id="page-retail-tracker"></div>
+    <div class="page" id="page-retail-templates"></div>
+    <div class="page" id="page-retail-checklist"></div>
+    <div class="page" id="page-retail-performance"></div>
+    <div class="page" id="page-retail-comms"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -1881,6 +1884,12 @@ const NAV=[
   {id:"verified",  sec:"source", icon:"★", label:"Verified Directory",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
   {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
+  // ── RETAIL section ─────────────────────────────
+  {id:"retail-tracker",    sec:"retail", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-templates",  sec:"retail", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-checklist",  sec:"retail", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-performance",sec:"retail", icon:"◉", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-comms",      sec:"retail", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
 ];
 
 // Returns nav items visible for current brand stage
@@ -1901,7 +1910,6 @@ function getVisibleNav(){
 const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
 function switchNavSection(sec){
-  if(sec==='retail') return; // locked
   navSection=sec;
   buildNav();
 }
@@ -2005,6 +2013,11 @@ const NAV_SUBTITLES = {
   dpp:'Generate product passport', sourcing:'Find manufacturers with AI',
   reg_monitor:'Weekly regulatory updates', verified:'VeyaFlow-vetted suppliers',
   csrd:'Generate your retailer sustainability pack',
+  'retail-tracker':'Track my retailer submissions',
+  'retail-templates':'Generate retailer masterdata',
+  'retail-checklist':'Everything needed to go live',
+  'retail-performance':'Track sell-through per retailer',
+  'retail-comms':'Log every buyer interaction',
 };
 
 function buildNav(){
@@ -2028,23 +2041,30 @@ function buildNav(){
   html+='<div class="nav-section-tabs">';
   html+='<div class="nav-section-tab'+(navSection==='brand'?' active':'')+'" data-sec="brand" onclick="switchNavSection(this.dataset.sec)">Brand</div>';
   html+='<div class="nav-section-tab'+(navSection==='source'?' active':'')+'" data-sec="source" onclick="switchNavSection(this.dataset.sec)">Source</div>';
-  html+='<div class="nav-section-tab locked" title="Coming soon">Retail</div>';
+  html+='<div class="nav-section-tab'+(navSection==='retail'?' active':'')+'" data-sec="retail" onclick="switchNavSection(this.dataset.sec)">Retail</div>';
   html+='</div>';
 
-  if(navSection==='retail'){
-    html+='<div class="nav-locked-section"><div class="nav-locked-title">🔒 Retail</div><div class="nav-locked-sub">Retailer portal integrations, live buyer data, and automated order management — coming in V2.</div></div>';
-  } else {
-    sectionItems.forEach(function(n){
-      html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
-      html+='<span class="nav-icon">'+n.icon+'</span>';
-      html+='<div style="flex:1;min-width:0"><span class="nav-label">'+n.label+'</span>';
-      if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
-      html+='</div>';
-      if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
-      if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
-      html+='</div>';
-    });
-  }
+  sectionItems.forEach(function(n){
+    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
+    html+='<span class="nav-icon">'+n.icon+'</span>';
+    html+='<div style="flex:1;min-width:0"><span class="nav-label">'+n.label+'</span>';
+    if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
+    html+='</div>';
+    if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
+    if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+    if(n.id==='retail-tracker'){
+      try{
+        var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+        var stale=subs.filter(function(s){
+          if(s.status!=='under_review') return false;
+          var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+          return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+        }).length;
+        if(stale>0) html+='<span class="nav-badge" style="background:#F59E0B">'+stale+'</span>';
+      }catch(e){}
+    }
+    html+='</div>';
+  });
 
   nav.innerHTML=html;
 
@@ -2127,7 +2147,7 @@ function showPage(id){
   currentPage=id;
   // Auto-switch section tab to match the page being shown
   var navItem = NAV.find(function(n){ return n.id===id; });
-  if(navItem&&navItem.sec&&navItem.sec!=='retail') navSection=navItem.sec;
+  if(navItem&&navItem.sec) navSection=navItem.sec;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('active'));
@@ -2483,6 +2503,11 @@ function renderPage(id){
   else if(id==='dpp'){ loadDPP(); renderDPP(el); }
   else if(id==='csrd'){ renderCSRD(el); }
   else if(id==='sourcing'){ loadSourcingCRM(); renderSourcingCRM(el); }
+  else if(id==='retail-tracker'){ loadRetailSubmissions(); renderRetailTracker(el); }
+  else if(id==='retail-templates'){ renderRetailTemplates(el); }
+  else if(id==='retail-checklist'){ loadRetailChecklist(); renderRetailChecklist(el); }
+  else if(id==='retail-performance'){ loadRetailPerformance(); renderRetailPerformance(el); }
+  else if(id==='retail-comms'){ loadRetailComms(); renderRetailComms(el); }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -4681,6 +4706,40 @@ function renderNextActions(){
   if(overdue>0)
     actions.push({icon:'⏰',label:overdue+' CRM follow-up'+(overdue>1?'s':'')+' overdue', desc:'Retailers waiting for your response', page:'crm', time:'5 min', urgent:true});
 
+  // Retail: stale under-review submissions (>21 days no update)
+  try{
+    if(typeof getStaleRetailSubmissions === 'function'){
+      const stale = getStaleRetailSubmissions();
+      stale.forEach(function(s){
+        actions.push({
+          icon:'⚑',
+          label:'Your '+(s.retailerName||'retailer')+' submission has had no update in '+s.days+' days',
+          desc:'Follow up now — still under review',
+          page:'retail-tracker',
+          time:'5 min',
+          urgent:true,
+        });
+      });
+    }
+  }catch(e){}
+
+  // Retail: under_review submissions with incomplete listing checklist
+  try{
+    if(typeof getIncompleteChecklistSubmissions === 'function'){
+      const inc = getIncompleteChecklistSubmissions();
+      inc.forEach(function(s){
+        actions.push({
+          icon:'☑',
+          label:'Your '+(s.retailerName||'retailer')+' submission has '+s.incomplete+' incomplete listing requirement'+(s.incomplete>1?'s':''),
+          desc:'Close the gaps before go-live',
+          page:'retail-checklist',
+          time:'10 min',
+          urgent:true,
+        });
+      });
+    }
+  }catch(e){}
+
   const daysToMay8 = Math.ceil((new Date('2026-05-08')-new Date())/86400000);
   if(daysToMay8>0&&daysToMay8<=30&&(getBrandCategories()||[]).some(c=>c.includes('Beauty')||c.includes('Skincare')||c.includes('Wellness')))
     actions.push({icon:'🏪',label:'Apotek Hjärtat deadline in '+daysToMay8+'d',desc:'Prepare pitch before May 8 range review',page:'pitch',time:'15 min',urgent:true});
@@ -4717,6 +4776,154 @@ function renderNextActions(){
     </div>
   `;
 }
+
+/* ═══════════════════════════════════════════════════
+   COMPLIANCE RADAR
+   Single-screen traffic light view of every
+   applicable regulation for the brand's categories
+   and markets. The feature that gives a founder
+   a complete compliance picture in 30 seconds.
+═══════════════════════════════════════════════════ */
+const COMPLIANCE_RADAR_ITEMS = [
+  // Cosmetics — EU
+  {id:'cpnp',          label:'CPNP notification',              categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.cpnpRef||s?.cpnp||s?.cpnpNumber?'green':'red',     actionPage:'skus',        actionLabel:'Add in My Products'},
+  {id:'eu_rp',         label:'EU Responsible Person',          categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>b?.euResponsiblePerson?.name||b?.euRP||b?.euRpName?'green':'red',   actionPage:'home',  actionLabel:'Add in Brand Profile'},
+  {id:'pif',           label:'Product Information File (PIF)', categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.safetyAssessment||s?.safetyAssessor?'green':'amber', actionPage:'claims',     actionLabel:'Check in PIF Gap Checker'},
+  {id:'reach_svhc',    label:'REACH SVHC check',               categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>{if(!s?.inci)return 'amber';return checkInciForSVHC(s.inci||'').length?'red':'green';}, actionPage:'skus', actionLabel:'Check INCI in My Products'},
+  // Cosmetics — UK
+  {id:'uk_rp',         label:'UK Responsible Person',          categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>b?.ukRP?.name||b?.ukRpName||b?.ukResponsiblePerson?'green':'red', actionPage:'home',  actionLabel:'Add UK RP in Brand Profile'},
+  {id:'uk_scpn',       label:'UK SCPN cosmetics notification', categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>s?.ukScpnRef||s?.ukScpn?'green':'red',                actionPage:'skus',        actionLabel:'Register at SCPN portal'},
+  // Cosmetics — CH
+  {id:'ch_chemrrv',    label:'Swiss ChemRRV notification',     categories:['cosmetic_skincare'],        markets:['Switzerland'],                 check:(b,s)=>b?.chNotified||s?.chNotification?'green':'red',        actionPage:'home',       actionLabel:'Register ChemRRV (CH only)'},
+  // Devices
+  {id:'ce_marking',    label:'CE marking',                     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.ceMarking?'green':'red',                           actionPage:'skus',        actionLabel:'Add CE number in My Products'},
+  {id:'weee',          label:'WEEE producer registration',     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.weeeRegistered?'green':'red',  urgency:'critical',  actionPage:'skus',        actionLabel:'Register per market before first sale', fineRisk:'Up to €100,000'},
+  // Packaging registers
+  {id:'lucid_de',      label:'Lucid packaging register',       categories:['all'],                      markets:['Germany'],                     check:(b,s)=>b?.lucidRegistered?'green':'red', urgency:'critical',  actionPage:'home',        actionLabel:'Register at verpackungsregister.org', fineRisk:'Up to €200,000'},
+  {id:'fti_se',        label:'FTI producer responsibility',    categories:['all'],                      markets:['Sweden'],                      check:(b,s)=>b?.ftiRegistered?'green':'amber',                      actionPage:'home',        actionLabel:'Register at ftiab.se'},
+  {id:'citeo_fr',      label:'Citeo packaging register',       categories:['all'],                      markets:['France'],                      check:(b,s)=>b?.citeoRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at citeo.com'},
+  {id:'groent_punkt',  label:'Grønt Punkt Norge',              categories:['all'],                      markets:['Norway'],                      check:(b,s)=>b?.groentPunktRegistered?'green':'amber',              actionPage:'home',        actionLabel:'Register at grontpunkt.no'},
+  // Norway
+  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
+  {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],                      check:(b,s)=>b?.noVatRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at skatteetaten.no if >NOK 50k/yr'},
+  // Cross-category
+  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>s?.eudrCompliant||b?.eudrCompliant?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
+  {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
+  {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
+];
+
+function renderComplianceRadar(){
+  if(!brand) return '';
+  const sku0 = skus[0]||null;
+  const brandCats = getBrandCategories()||[brand.category||''];
+  const brandMkts = [...(brand.targetMarkets||[]), brand.currentMarket||'Sweden'];
+
+  // Map category names to radar category ids
+  const CAT_MAP = {
+    'Skincare & Beauty':'cosmetic_skincare','Wellness & Supplements':'wellness_supplement',
+    'Food & Beverage':'food_beverage','Fashion & Apparel':'fashion_apparel',
+  };
+  const brandCatIds = brandCats.map(c=>CAT_MAP[c]||c);
+  const hasDevice = skus.some(s=>isWEEEDevice(s));
+  if(hasDevice && !brandCatIds.includes('beauty_device')) brandCatIds.push('beauty_device');
+
+  // Filter radar items to relevant ones
+  const EU_MKTS = ['Sweden','Denmark','Germany','Netherlands','France','Belgium','Austria','Finland','Italy','Spain','Portugal'];
+  const relevant = COMPLIANCE_RADAR_ITEMS.filter(item=>{
+    // Category match
+    const catMatch = item.categories.includes('all') ||
+      item.categories.some(c=>brandCatIds.includes(c));
+    if(!catMatch) return false;
+    // Market match
+    const mktMatch = item.markets.some(m=>{
+      if(m==='all_eu') return brandMkts.some(bm=>EU_MKTS.includes(bm));
+      return brandMkts.includes(m);
+    });
+    return mktMatch;
+  });
+
+  if(!relevant.length) return '';
+
+  // Evaluate each item
+  const evaluated = relevant.map(item=>{
+    const status = item.check(brand, sku0);
+    return {...item, status};
+  });
+
+  const reds    = evaluated.filter(i=>i.status==='red').sort((a,b)=>(b.urgency==='critical'?1:0)-(a.urgency==='critical'?1:0));
+  const ambers  = evaluated.filter(i=>i.status==='amber');
+  const greens  = evaluated.filter(i=>i.status==='green');
+  const criticalCount = reds.filter(i=>i.urgency==='critical').length;
+
+  const summaryColor = reds.length>0?'#991B1B':ambers.length>0?'#92400E':'#065F46';
+  const summaryBg    = reds.length>0?'#FEF2F2':ambers.length>0?'#FFFBEB':'#ECFDF5';
+
+  function radarCard(item){
+    const cfg = {
+      red:   {icon:'🔴',bg:'#FEF2F2',border:'#FCA5A5',accent:'#EF4444',text:'#991B1B'},
+      amber: {icon:'⚠',  bg:'#FFFBEB',border:'#FCD34D',accent:'#F59E0B',text:'#92400E'},
+      green: {icon:'✅', bg:'#F0FDF4',border:'#A7F3D0',accent:'#10B981',text:'#065F46'},
+    }[item.status]||{icon:'○',bg:'#F9F8F6',border:'#E5E7EB',accent:'#9CA3AF',text:'#555'};
+
+    const mktLabel = item.markets.includes('all_eu')?'EU':
+                     item.markets.includes('United Kingdom')&&item.markets.includes('all_eu')?'EU + UK':
+                     item.markets.join(', ');
+
+    return `<div style="background:${cfg.bg};border:1px solid ${cfg.border};padding:.55rem .75rem;display:flex;align-items:flex-start;gap:.5rem">
+      <span style="font-size:.9rem;flex-shrink:0;margin-top:.05rem">${cfg.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.1rem">
+          <span style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:${cfg.text}">${item.label}</span>
+          <span style="font-family:var(--mono);font-size:.48rem;background:${cfg.accent};color:#fff;padding:.05rem .3rem">${mktLabel}</span>
+          ${item.fineRisk?`<span style="font-family:var(--mono);font-size:.48rem;background:#7F1D1D;color:#fff;padding:.05rem .3rem">Fine: ${item.fineRisk}</span>`:''}
+        </div>
+        ${item.status!=='green'?`<div style="font-family:var(--sans);font-size:.62rem;color:${cfg.text};opacity:.85">
+          ${item.actionLabel}
+          ${item.actionPage?`<span onclick="showPage('${item.actionPage}')" style="color:${cfg.accent};cursor:pointer;text-decoration:underline;margin-left:.25rem">→ Fix now</span>`:''}
+        </div>`:''}
+      </div>
+    </div>`;
+  }
+
+  const greenToggleId = 'radar-greens-'+Date.now();
+
+  return `
+    <div style="margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.35rem">
+        <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Compliance Radar</div>
+        <button onclick="showPage('report')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--gold);cursor:pointer;padding:0">Run full market report →</button>
+      </div>
+
+      <!-- Summary strip -->
+      <div style="background:${summaryBg};border:1px solid ${reds.length?'#FCA5A5':ambers.length?'#FCD34D':'#A7F3D0'};padding:.55rem .85rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
+        <div style="font-family:var(--sans);font-size:.75rem;color:${summaryColor};font-weight:500">
+          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
+        </div>
+        <span style="font-family:var(--mono);font-size:.52rem;color:${summaryColor}">${relevant.length} applicable to your profile</span>
+      </div>
+
+      <!-- Red items first -->
+      ${reds.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${reds.map(radarCard).join('')}</div>`:''}
+
+      <!-- Amber items -->
+      ${ambers.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${ambers.map(radarCard).join('')}</div>`:''}
+
+      <!-- Green items — collapsed -->
+      ${greens.length?`
+        <div>
+          <div onclick="var d=document.getElementById('${greenToggleId}');d.style.display=d.style.display==='none'?'flex':'none'"
+            style="font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.3rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:.3rem">
+            <span style="color:var(--green)">✅</span> Show covered regulations (${greens.length}) <span style="opacity:.5;margin-left:.2rem">▾</span>
+          </div>
+          <div id="${greenToggleId}" style="display:none;flex-direction:column;gap:.3rem;margin-top:.35rem">
+            ${greens.map(radarCard).join('')}
+          </div>
+        </div>
+      `:''}
+    </div>
+  `;
+}
+
 
 function renderDashboard(el){
   // Mark readiness score as viewed for setup tracker
@@ -23509,152 +23716,6 @@ function buildComplianceEvents(){
   return events;
 }
 
-/* ═══════════════════════════════════════════════════
-   COMPLIANCE RADAR
-   Single-screen traffic light view of every
-   applicable regulation for the brand's categories
-   and markets. The feature that gives a founder
-   a complete compliance picture in 30 seconds.
-═══════════════════════════════════════════════════ */
-const COMPLIANCE_RADAR_ITEMS = [
-  // Cosmetics — EU
-  {id:'cpnp',          label:'CPNP notification',              categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.cpnpRef||s?.cpnp||s?.cpnpNumber?'green':'red',     actionPage:'skus',        actionLabel:'Add in My Products'},
-  {id:'eu_rp',         label:'EU Responsible Person',          categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>b?.euResponsiblePerson?.name||b?.euRP||b?.euRpName?'green':'red',   actionPage:'home',  actionLabel:'Add in Brand Profile'},
-  {id:'pif',           label:'Product Information File (PIF)', categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.safetyAssessment||s?.safetyAssessor?'green':'amber', actionPage:'claims',     actionLabel:'Check in PIF Gap Checker'},
-  {id:'reach_svhc',    label:'REACH SVHC check',               categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>{if(!s?.inci)return 'amber';return checkInciForSVHC(s.inci||'').length?'red':'green';}, actionPage:'skus', actionLabel:'Check INCI in My Products'},
-  // Cosmetics — UK
-  {id:'uk_rp',         label:'UK Responsible Person',          categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>b?.ukRP?.name||b?.ukRpName||b?.ukResponsiblePerson?'green':'red', actionPage:'home',  actionLabel:'Add UK RP in Brand Profile'},
-  {id:'uk_scpn',       label:'UK SCPN cosmetics notification', categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>s?.ukScpnRef||s?.ukScpn?'green':'red',                actionPage:'skus',        actionLabel:'Register at SCPN portal'},
-  // Cosmetics — CH
-  {id:'ch_chemrrv',    label:'Swiss ChemRRV notification',     categories:['cosmetic_skincare'],        markets:['Switzerland'],                 check:(b,s)=>b?.chNotified||s?.chNotification?'green':'red',        actionPage:'home',       actionLabel:'Register ChemRRV (CH only)'},
-  // Devices
-  {id:'ce_marking',    label:'CE marking',                     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.ceMarking?'green':'red',                           actionPage:'skus',        actionLabel:'Add CE number in My Products'},
-  {id:'weee',          label:'WEEE producer registration',     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.weeeRegistered?'green':'red',  urgency:'critical',  actionPage:'skus',        actionLabel:'Register per market before first sale', fineRisk:'Up to €100,000'},
-  // Packaging registers
-  {id:'lucid_de',      label:'Lucid packaging register',       categories:['all'],                      markets:['Germany'],                     check:(b,s)=>b?.lucidRegistered?'green':'red', urgency:'critical',  actionPage:'home',        actionLabel:'Register at verpackungsregister.org', fineRisk:'Up to €200,000'},
-  {id:'fti_se',        label:'FTI producer responsibility',    categories:['all'],                      markets:['Sweden'],                      check:(b,s)=>b?.ftiRegistered?'green':'amber',                      actionPage:'home',        actionLabel:'Register at ftiab.se'},
-  {id:'citeo_fr',      label:'Citeo packaging register',       categories:['all'],                      markets:['France'],                      check:(b,s)=>b?.citeoRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at citeo.com'},
-  {id:'groent_punkt',  label:'Grønt Punkt Norge',              categories:['all'],                      markets:['Norway'],                      check:(b,s)=>b?.groentPunktRegistered?'green':'amber',              actionPage:'home',        actionLabel:'Register at grontpunkt.no'},
-  // Norway
-  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
-  {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],                      check:(b,s)=>b?.noVatRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at skatteetaten.no if >NOK 50k/yr'},
-  // Cross-category
-  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>s?.eudrCompliant||b?.eudrCompliant?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
-  {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
-  {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
-];
-
-function renderComplianceRadar(){
-  if(!brand) return '';
-  const sku0 = skus[0]||null;
-  const brandCats = getBrandCategories()||[brand.category||''];
-  const brandMkts = [...(brand.targetMarkets||[]), brand.currentMarket||'Sweden'];
-
-  // Map category names to radar category ids
-  const CAT_MAP = {
-    'Skincare & Beauty':'cosmetic_skincare','Wellness & Supplements':'wellness_supplement',
-    'Food & Beverage':'food_beverage','Fashion & Apparel':'fashion_apparel',
-  };
-  const brandCatIds = brandCats.map(c=>CAT_MAP[c]||c);
-  const hasDevice = skus.some(s=>isWEEEDevice(s));
-  if(hasDevice && !brandCatIds.includes('beauty_device')) brandCatIds.push('beauty_device');
-
-  // Filter radar items to relevant ones
-  const EU_MKTS = ['Sweden','Denmark','Germany','Netherlands','France','Belgium','Austria','Finland','Italy','Spain','Portugal'];
-  const relevant = COMPLIANCE_RADAR_ITEMS.filter(item=>{
-    // Category match
-    const catMatch = item.categories.includes('all') ||
-      item.categories.some(c=>brandCatIds.includes(c));
-    if(!catMatch) return false;
-    // Market match
-    const mktMatch = item.markets.some(m=>{
-      if(m==='all_eu') return brandMkts.some(bm=>EU_MKTS.includes(bm));
-      return brandMkts.includes(m);
-    });
-    return mktMatch;
-  });
-
-  if(!relevant.length) return '';
-
-  // Evaluate each item
-  const evaluated = relevant.map(item=>{
-    const status = item.check(brand, sku0);
-    return {...item, status};
-  });
-
-  const reds    = evaluated.filter(i=>i.status==='red').sort((a,b)=>(b.urgency==='critical'?1:0)-(a.urgency==='critical'?1:0));
-  const ambers  = evaluated.filter(i=>i.status==='amber');
-  const greens  = evaluated.filter(i=>i.status==='green');
-  const criticalCount = reds.filter(i=>i.urgency==='critical').length;
-
-  const summaryColor = reds.length>0?'#991B1B':ambers.length>0?'#92400E':'#065F46';
-  const summaryBg    = reds.length>0?'#FEF2F2':ambers.length>0?'#FFFBEB':'#ECFDF5';
-
-  function radarCard(item){
-    const cfg = {
-      red:   {icon:'🔴',bg:'#FEF2F2',border:'#FCA5A5',accent:'#EF4444',text:'#991B1B'},
-      amber: {icon:'⚠',  bg:'#FFFBEB',border:'#FCD34D',accent:'#F59E0B',text:'#92400E'},
-      green: {icon:'✅', bg:'#F0FDF4',border:'#A7F3D0',accent:'#10B981',text:'#065F46'},
-    }[item.status]||{icon:'○',bg:'#F9F8F6',border:'#E5E7EB',accent:'#9CA3AF',text:'#555'};
-
-    const mktLabel = item.markets.includes('all_eu')?'EU':
-                     item.markets.includes('United Kingdom')&&item.markets.includes('all_eu')?'EU + UK':
-                     item.markets.join(', ');
-
-    return `<div style="background:${cfg.bg};border:1px solid ${cfg.border};padding:.55rem .75rem;display:flex;align-items:flex-start;gap:.5rem">
-      <span style="font-size:.9rem;flex-shrink:0;margin-top:.05rem">${cfg.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.1rem">
-          <span style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:${cfg.text}">${item.label}</span>
-          <span style="font-family:var(--mono);font-size:.48rem;background:${cfg.accent};color:#fff;padding:.05rem .3rem">${mktLabel}</span>
-          ${item.fineRisk?`<span style="font-family:var(--mono);font-size:.48rem;background:#7F1D1D;color:#fff;padding:.05rem .3rem">Fine: ${item.fineRisk}</span>`:''}
-        </div>
-        ${item.status!=='green'?`<div style="font-family:var(--sans);font-size:.62rem;color:${cfg.text};opacity:.85">
-          ${item.actionLabel}
-          ${item.actionPage?`<span onclick="showPage('${item.actionPage}')" style="color:${cfg.accent};cursor:pointer;text-decoration:underline;margin-left:.25rem">→ Fix now</span>`:''}
-        </div>`:''}
-      </div>
-    </div>`;
-  }
-
-  const greenToggleId = 'radar-greens-'+Date.now();
-
-  return `
-    <div style="margin-bottom:1.25rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.35rem">
-        <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Compliance Radar</div>
-        <button onclick="showPage('report')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--gold);cursor:pointer;padding:0">Run full market report →</button>
-      </div>
-
-      <!-- Summary strip -->
-      <div style="background:${summaryBg};border:1px solid ${reds.length?'#FCA5A5':ambers.length?'#FCD34D':'#A7F3D0'};padding:.55rem .85rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
-        <div style="font-family:var(--sans);font-size:.75rem;color:${summaryColor};font-weight:500">
-          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
-        </div>
-        <span style="font-family:var(--mono);font-size:.52rem;color:${summaryColor}">${relevant.length} applicable to your profile</span>
-      </div>
-
-      <!-- Red items first -->
-      ${reds.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${reds.map(radarCard).join('')}</div>`:''}
-
-      <!-- Amber items -->
-      ${ambers.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${ambers.map(radarCard).join('')}</div>`:''}
-
-      <!-- Green items — collapsed -->
-      ${greens.length?`
-        <div>
-          <div onclick="var d=document.getElementById('${greenToggleId}');d.style.display=d.style.display==='none'?'flex':'none'"
-            style="font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.3rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:.3rem">
-            <span style="color:var(--green)">✅</span> Show covered regulations (${greens.length}) <span style="opacity:.5;margin-left:.2rem">▾</span>
-          </div>
-          <div id="${greenToggleId}" style="display:none;flex-direction:column;gap:.3rem;margin-top:.35rem">
-            ${greens.map(radarCard).join('')}
-          </div>
-        </div>
-      `:''}
-    </div>
-  `;
-}
 
 function renderComplianceCalendar(){
   if(!brand) return '';
@@ -26532,6 +26593,1443 @@ function init(){
   setTimeout(()=>{ if(brand) runRegulatoryCheck(false); }, 2000);
 }
 
+
+/* ═══════════════════════════════════════════════════
+   RETAIL SECTION — Post-pitch workflow
+   Modules: Tracker · Templates · Checklist · Performance · Comms
+═══════════════════════════════════════════════════ */
+
+/* ─── CONSTANTS ────────────────────────────────── */
+
+const RETAIL_SUB_STATUSES = [
+  {id:'draft',         label:'Draft',          color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB'},
+  {id:'submitted',     label:'Submitted',      color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE'},
+  {id:'under_review',  label:'Under review',   color:'#92400E', bg:'#FFFBEB', border:'#FDE68A'},
+  {id:'meeting_booked',label:'Meeting booked', color:'#6D28D9', bg:'#F5F3FF', border:'#DDD6FE'},
+  {id:'terms',         label:'Terms',          color:'#0369A1', bg:'#F0F9FF', border:'#BAE6FD'},
+  {id:'listed',        label:'Listed',         color:'#065F46', bg:'#ECFDF5', border:'#A7F3D0'},
+  {id:'live',          label:'Live',           color:'#047857', bg:'#D1FAE5', border:'#6EE7B7'},
+  {id:'rejected',      label:'Rejected',       color:'#991B1B', bg:'#FEF2F2', border:'#FECACA'},
+];
+const RETAIL_PIPELINE_STAGES = ['draft','submitted','under_review','meeting_booked','terms','listed','live'];
+
+const ARTICLE_TEMPLATES = {
+  apotek_hjartat_se: {
+    name: 'Apotek Hjärtat Article Template',
+    format: 'xlsx',
+    portalUrl: 'https://leverantor.apotekshjartat.se',
+    fields: [
+      { label:'Article number (EAN)',             source:'sku.ean' },
+      { label:'Product name (Swedish)',           source:'sku.nameSV||sku.name' },
+      { label:'Brand name',                       source:'brand.name' },
+      { label:'Product description (max 500)',    source:'sku.descSV||sku.descEN' },
+      { label:'Category (Apotek category code)',  source:'manual' },
+      { label:'RSP inc. VAT (SEK)',               source:'sku.rspSEK' },
+      { label:'Net price (SEK)',                  source:'private' },
+      { label:'VAT rate (%)',                     source:'const:25' },
+      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
+      { label:'EU Responsible Person',            source:'brand.euResponsiblePerson' },
+      { label:'Country of manufacture',           source:'sku.countryOfMfr' },
+      { label:'Shelf life (months)',              source:'sku.shelfLifeMonths' },
+      { label:'Net weight/volume',                source:'sku.netContent' },
+      { label:'Recycled packaging %',             source:'manual' },
+    ],
+    confidence: 'veyaflow_verified',
+  },
+  matas_dk: {
+    name: 'Matas Masterdata Template',
+    format: 'xlsx',
+    portalUrl: 'https://supplier.matas.dk',
+    fields: [
+      { label:'EAN',                              source:'sku.ean' },
+      { label:'Product name (Danish)',            source:'sku.descDA||sku.name' },
+      { label:'Brand',                            source:'brand.name' },
+      { label:'Description (max 300, Danish)',    source:'sku.descDA||sku.descEN' },
+      { label:'RSP (DKK)',                        source:'sku.rspDKK' },
+      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
+      { label:'Ingredients (INCI)',               source:'sku.inci' },
+    ],
+    confidence: 'research_verified',
+  },
+};
+
+const LISTING_REQUIREMENTS = {
+  apotek_hjartat_se: {
+    confidence: 'veyaflow_verified',
+    requirements: [
+      { id:'ean',                label:'EAN-13 barcode confirmed',                 autoCheck:'sku.ean',              fixPage:'skus' },
+      { id:'cpnp',               label:'CPNP reference on file',                   autoCheck:'sku.cpnp',             fixPage:'skus' },
+      { id:'eu_rp',              label:'EU Responsible Person confirmed',          autoCheck:'brand.euRP',           fixPage:'home' },
+      { id:'se_label',           label:'Swedish-language label approved',          autoCheck:null,                   fixPage:'skus' },
+      { id:'images',             label:'Product images (1000×1000px white BG)',    autoCheck:null,                   fixPage:'brandpack' },
+      { id:'article_template',   label:'Article template submitted via portal',    autoCheck:null,                   fixPage:'retail-templates' },
+      { id:'rsp_confirmed',      label:'RSP confirmed with buyer',                 autoCheck:null,                   fixPage:'retail-comms' },
+      { id:'safety_assessment',  label:'Safety Assessment on file',                autoCheck:'sku.safetyRef',        fixPage:'skus' },
+      { id:'masterdata',         label:'Masterdata live in Apotek system',        autoCheck:null,                   fixPage:'retail-tracker' },
+      { id:'first_delivery',     label:'First delivery date agreed',               autoCheck:null,                   fixPage:'retail-comms' },
+    ],
+  },
+  matas_dk: {
+    confidence: 'veyaflow_verified',
+    requirements: [
+      { id:'ean',               label:'EAN-13 confirmed',                          autoCheck:'sku.ean',              fixPage:'skus' },
+      { id:'cpnp',              label:'CPNP reference confirmed',                  autoCheck:'sku.cpnp',             fixPage:'skus' },
+      { id:'dk_label',          label:'Danish-language label approved',            autoCheck:null,                   fixPage:'skus' },
+      { id:'dk_images',         label:'Product images (1200×1200px)',              autoCheck:null,                   fixPage:'brandpack' },
+      { id:'dk_copy',           label:'Danish product description approved',       autoCheck:'sku.descDA',           fixPage:'skus' },
+      { id:'article_template',  label:'Masterdata submitted via Matas portal',    autoCheck:null,                   fixPage:'retail-templates' },
+      { id:'rsp_dkk',           label:'DKK RSP confirmed with buyer',              autoCheck:'sku.rspDKK',           fixPage:'skus' },
+      { id:'beauty_days',       label:'Beauty Days participation confirmed (if applicable)', autoCheck:null,         fixPage:'retail-comms' },
+    ],
+  },
+};
+
+const COMMS_TYPES = [
+  {id:'email_sent',        label:'Email sent',         icon:'→✉'},
+  {id:'email_received',    label:'Email received',     icon:'✉←'},
+  {id:'meeting',           label:'Meeting',            icon:'◆'},
+  {id:'call',              label:'Call',               icon:'☎'},
+  {id:'portal_submission', label:'Portal submission',  icon:'⇧'},
+  {id:'rejection',         label:'Rejection',          icon:'✗'},
+  {id:'listing_confirmed', label:'Listing confirmed',  icon:'★'},
+  {id:'reorder',           label:'Reorder',            icon:'↻'},
+];
+const COMMS_TYPE_MAP = COMMS_TYPES.reduce(function(m,t){ m[t.id]=t; return m; },{});
+
+/* ─── STATE ────────────────────────────────────── */
+
+let retailSubmissions = [];
+let retailChecklistState = {};     // key: retailerId+'::'+skuId -> { [reqId]: bool }
+let retailPerformance = [];
+let retailComms = [];
+
+let retailTrackerExpandedId = null;
+let retailTrackerAddOpen = false;
+let retailTrackerAddForm = {retailerId:'', skuIds:[], contactName:'', contactEmail:'', notes:''};
+
+let retailTemplatesSelRetailer = 'apotek_hjartat_se';
+let retailTemplatesSelSku = '';
+let retailTemplatesManualFields = {};
+
+let retailChecklistSelRetailer = 'apotek_hjartat_se';
+let retailChecklistSelSku = '';
+
+let retailPerfSelRetailer = '';
+let retailPerfSelSku = '';
+let retailPerfForm = {month:'', unitsSold:'', unitsDelivered:'', revenue:'', currency:'SEK', promotionActive:false, promotionType:'', notes:''};
+
+let retailCommsSelRetailer = '';
+let retailCommsFilterType = '';
+let retailCommsAddOpen = false;
+let retailCommsAddForm = {retailerId:'', date:'', type:'email_sent', contactName:'', summary:'', nextAction:'', nextActionDate:'', attachmentNote:''};
+
+/* ─── LOAD / SAVE ──────────────────────────────── */
+
+function loadRetailSubmissions(){
+  try{ retailSubmissions = safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]', [])||[]; }
+  catch(e){ retailSubmissions = []; }
+}
+function saveRetailSubmissions(){
+  try{ localStorage.setItem('ns_retail_submissions', JSON.stringify(retailSubmissions)); }catch(e){}
+}
+
+function loadRetailChecklist(){
+  try{ retailChecklistState = safeJsonParse(localStorage.getItem('ns_retail_checklist')||'{}', {})||{}; }
+  catch(e){ retailChecklistState = {}; }
+}
+function saveRetailChecklist(){
+  try{ localStorage.setItem('ns_retail_checklist', JSON.stringify(retailChecklistState)); }catch(e){}
+}
+
+function loadRetailPerformance(){
+  try{ retailPerformance = safeJsonParse(localStorage.getItem('ns_retail_performance')||'[]', [])||[]; }
+  catch(e){ retailPerformance = []; }
+}
+function saveRetailPerformance(){
+  try{ localStorage.setItem('ns_retail_performance', JSON.stringify(retailPerformance)); }catch(e){}
+}
+
+function loadRetailComms(){
+  try{ retailComms = safeJsonParse(localStorage.getItem('ns_retail_comms')||'[]', [])||[]; }
+  catch(e){ retailComms = []; }
+}
+function saveRetailComms(){
+  try{ localStorage.setItem('ns_retail_comms', JSON.stringify(retailComms)); }catch(e){}
+}
+
+/* ─── SHARED HELPERS ───────────────────────────── */
+
+function retailUuid(){
+  return Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+}
+
+function retailEsc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function retailerNameFromId(id){
+  if(!id) return '';
+  if(typeof crmCards !== 'undefined' && crmCards && crmCards.length){
+    var c = crmCards.find(function(x){ return x.id===id; });
+    if(c) return c.name;
+  }
+  if(typeof RETAILER_REGISTRY !== 'undefined'){
+    var r = RETAILER_REGISTRY.find(function(x){ return x.id===id; });
+    if(r) return r.name;
+  }
+  return id;
+}
+
+function retailerMarketFromId(id){
+  if(typeof crmCards !== 'undefined' && crmCards && crmCards.length){
+    var c = crmCards.find(function(x){ return x.id===id; });
+    if(c) return c.market||'';
+  }
+  if(typeof RETAILER_REGISTRY !== 'undefined'){
+    var r = RETAILER_REGISTRY.find(function(x){ return x.id===id; });
+    if(r) return r.marketName||r.market||'';
+  }
+  return '';
+}
+
+function daysSinceIso(iso){
+  if(!iso) return null;
+  var t = new Date(iso).getTime();
+  if(isNaN(t)) return null;
+  return Math.floor((Date.now()-t)/86400000);
+}
+
+function retailDownloadCsv(filename, rows){
+  var csv = '\uFEFF' + rows.map(function(r){
+    return r.map(function(v){
+      var s = (v===null||v===undefined) ? '' : String(v);
+      return '"' + s.replace(/"/g,'""') + '"';
+    }).join(',');
+  }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Get list of retailer ids that are at 'pitched' stage or higher in CRM
+function retailGetPitchedOrHigherCrmCards(){
+  if(typeof crmCards === 'undefined' || !crmCards || !crmCards.length){
+    try{ loadCRM(); }catch(e){}
+  }
+  if(!crmCards || !crmCards.length) return [];
+  var allowed = {pitched:1, meeting:1, listed:1};
+  return crmCards.filter(function(c){ return allowed[c.stage]; });
+}
+
+/* ─── BRAND HOME ALERT HELPERS ─────────────────── */
+
+// Returns array of {retailerName, days} for submissions stale >21 days in under_review
+function getStaleRetailSubmissions(){
+  try{
+    var subs = safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]', [])||[];
+    return subs.filter(function(s){
+      if(s.status !== 'under_review') return false;
+      var ref = s.statusChangedAt || s.submittedDate;
+      if(!ref) return false;
+      var d = daysSinceIso(ref);
+      return d !== null && d > 21;
+    }).map(function(s){
+      return { id:s.id, retailerName:s.retailerName, days: daysSinceIso(s.statusChangedAt || s.submittedDate) };
+    });
+  }catch(e){ return []; }
+}
+
+// Returns count of under_review submissions with checklist <100%
+function getIncompleteChecklistSubmissions(){
+  try{
+    var subs = safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]', [])||[];
+    var cstate = safeJsonParse(localStorage.getItem('ns_retail_checklist')||'{}', {})||{};
+    var results = [];
+    subs.forEach(function(s){
+      if(s.status !== 'under_review') return;
+      var reqsObj = LISTING_REQUIREMENTS[s.retailerId];
+      if(!reqsObj) return;
+      var reqs = reqsObj.requirements || [];
+      var firstSku = (s.skuIds||[])[0];
+      if(!firstSku) return;
+      var key = s.retailerId+'::'+firstSku;
+      var state = cstate[key] || {};
+      var sku = (typeof skus !== 'undefined' ? skus : []).find(function(x){ return String(x.id)===String(firstSku); });
+      var incomplete = 0;
+      reqs.forEach(function(r){
+        var done = false;
+        if(r.autoCheck) done = !!retailChecklistAutoCheckValue(r.autoCheck, sku);
+        if(state[r.id]) done = true;
+        if(!done) incomplete++;
+      });
+      if(incomplete>0) results.push({ id:s.id, retailerName:s.retailerName, incomplete:incomplete, total:reqs.length });
+    });
+    return results;
+  }catch(e){ return []; }
+}
+
+function retailChecklistAutoCheckValue(expr, sku){
+  if(!expr) return false;
+  if(expr === 'brand.euRP'){
+    if(!brand) return false;
+    return !!(brand.euResponsiblePerson || brand.euRP || brand.euRpName || (brand.euResponsiblePerson && brand.euResponsiblePerson.name));
+  }
+  if(expr.indexOf('sku.') === 0){
+    if(!sku) return false;
+    var field = expr.slice(4);
+    // handle simple dotted: no dots in our fields
+    return !!sku[field];
+  }
+  return false;
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE 1 — SUBMISSION TRACKER
+═══════════════════════════════════════════════════ */
+
+function renderRetailTracker(el){
+  if(!el) return;
+  loadRetailSubmissions();
+  var subs = retailSubmissions.slice().sort(function(a,b){
+    return new Date(b.submittedDate||0) - new Date(a.submittedDate||0);
+  });
+  var html = '';
+  html += '<div class="page-wrap"><div class="topbar">';
+  html += '<div><div class="page-title">Submission Tracker</div>';
+  html += '<div class="page-sub">Formal retailer submissions · '+subs.length+' total</div></div>';
+  html += '<button class="btn-primary" style="font-size:.65rem" onclick="openAddRetailSubmission()">+ New submission</button>';
+  html += '</div><div class="content">';
+
+  // Pipeline summary
+  html += renderRetailPipelineSummary(subs);
+
+  // Add submission form (when open)
+  if(retailTrackerAddOpen){
+    html += renderRetailAddSubmissionForm();
+  }
+
+  // Empty state
+  if(subs.length === 0 && !retailTrackerAddOpen){
+    html += '<div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">';
+    html += '<div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">⟳</div>';
+    html += '<div class="empty-title" style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.5rem">Track every formal retailer submission</div>';
+    html += '<div class="empty-sub" style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.25rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.55">Different from your CRM (which tracks relationships). This tracks the formal commercial process — from submitted to under review to listed to live.</div>';
+    html += '<button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="openAddRetailSubmission()">+ Add your first submission</button>';
+    html += '</div>';
+  } else {
+    // Horizontal pipeline rows — group by stage
+    html += '<div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:1.25rem 0 .6rem">Active submissions</div>';
+    subs.forEach(function(s){ html += renderRetailSubmissionCard(s); });
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function renderRetailPipelineSummary(subs){
+  var counts = {};
+  RETAIL_PIPELINE_STAGES.forEach(function(st){ counts[st]=0; });
+  var rejected = 0;
+  subs.forEach(function(s){
+    if(s.status === 'rejected') rejected++;
+    else if(counts[s.status] !== undefined) counts[s.status]++;
+  });
+  var html = '<div style="background:#fff;border:1px solid var(--border);padding:1rem 1.1rem;margin-bottom:1rem;overflow-x:auto">';
+  html += '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.75rem">Pipeline</div>';
+  html += '<div style="display:flex;align-items:stretch;gap:.25rem;min-width:min-content">';
+  RETAIL_PIPELINE_STAGES.forEach(function(stageId, idx){
+    var st = RETAIL_SUB_STATUSES.find(function(x){ return x.id===stageId; });
+    var n = counts[stageId]||0;
+    html += '<div style="flex:1;min-width:78px;padding:.55rem .5rem;background:'+st.bg+';border:1px solid '+st.border+';text-align:center">';
+    html += '<div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.06em;color:'+st.color+';margin-bottom:.2rem">'+retailEsc(st.label)+'</div>';
+    html += '<div style="font-family:var(--serif);font-size:1.1rem;color:'+st.color+';font-weight:500">'+n+'</div>';
+    html += '</div>';
+    if(idx < RETAIL_PIPELINE_STAGES.length-1){
+      html += '<div style="display:flex;align-items:center;color:var(--muted);font-family:var(--mono);font-size:.7rem;flex-shrink:0;padding:0 .1rem">→</div>';
+    }
+  });
+  html += '</div>';
+  if(rejected>0){
+    html += '<div style="margin-top:.6rem;font-family:var(--mono);font-size:.58rem;color:#991B1B">✗ '+rejected+' rejected</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderRetailSubmissionCard(s){
+  var st = RETAIL_SUB_STATUSES.find(function(x){ return x.id===s.status; }) || RETAIL_SUB_STATUSES[0];
+  var expanded = retailTrackerExpandedId === s.id;
+  var skuNames = (s.skuIds||[]).map(function(sid){
+    var sk = (typeof skus !== 'undefined' ? skus : []).find(function(x){ return String(x.id)===String(sid); });
+    return sk ? (sk.name||sk.ean||'SKU') : 'SKU';
+  }).filter(Boolean);
+  var staleBadge = '';
+  if(s.status === 'under_review'){
+    var ref = s.statusChangedAt || s.submittedDate;
+    var d = daysSinceIso(ref);
+    if(d !== null && d > 21){
+      staleBadge = '<span style="font-family:var(--mono);font-size:.52rem;padding:.2rem .45rem;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;margin-left:.4rem">⚑ '+d+'d no update</span>';
+    }
+  }
+  var submittedDisplay = s.submittedDate ? new Date(s.submittedDate).toLocaleDateString('en-GB') : 'Not set';
+  var html = '<div style="border:1px solid var(--border);border-left:3px solid '+st.color+';background:#fff;padding:.9rem 1rem;margin-bottom:.6rem;cursor:pointer" onclick="toggleRetailSubmissionExpand(\''+s.id+'\')">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap">';
+  html += '<div style="flex:1;min-width:200px">';
+  html += '<div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy);margin-bottom:.15rem">'+retailEsc(s.retailerName)+(s.market?' · '+retailEsc(s.market):'')+staleBadge+'</div>';
+  html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Submitted '+submittedDisplay+(skuNames.length?' · '+retailEsc(skuNames.join(', ')):'')+'</div>';
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">';
+  html += '<span style="font-family:var(--mono);font-size:.6rem;padding:.25rem .55rem;background:'+st.bg+';color:'+st.color+';border:1px solid '+st.border+'">'+retailEsc(st.label)+'</span>';
+  html += '<span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">'+(expanded?'▾':'▸')+'</span>';
+  html += '</div></div>';
+
+  if(expanded){
+    html += '<div onclick="event.stopPropagation()" style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border);cursor:default">';
+    // Status dropdown
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
+    html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Status</div>';
+    html += '<select data-subid="'+s.id+'" onchange="updateRetailSubmissionStatus(this.dataset.subid,this.value)" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
+    RETAIL_SUB_STATUSES.forEach(function(st2){
+      html += '<option value="'+st2.id+'"'+(s.status===st2.id?' selected':'')+'>'+retailEsc(st2.label)+'</option>';
+    });
+    html += '</select></div>';
+    html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Submitted date</div>';
+    html += '<input type="date" id="rsub-sdate-'+s.id+'" value="'+(s.submittedDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '</div>';
+    // Contact
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
+    html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact name</div>';
+    html += '<input type="text" id="rsub-cname-'+s.id+'" value="'+retailEsc(s.contactName||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact email</div>';
+    html += '<input type="email" id="rsub-cemail-'+s.id+'" value="'+retailEsc(s.contactEmail||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '</div>';
+    // Next action
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
+    html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Next action</div>';
+    html += '<input type="text" id="rsub-na-'+s.id+'" value="'+retailEsc(s.nextAction||'')+'" placeholder="e.g. Follow up on sample request" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Date</div>';
+    html += '<input type="date" id="rsub-nad-'+s.id+'" value="'+(s.nextActionDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '</div>';
+    // Stage-specific fields
+    if(s.status === 'meeting_booked'){
+      html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Meeting date</div>';
+      html += '<input type="date" id="rsub-mdate-'+s.id+'" value="'+(s.meetingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    }
+    if(s.status === 'listed' || s.status === 'live'){
+      html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Listing date</div>';
+      html += '<input type="date" id="rsub-ldate-'+s.id+'" value="'+(s.listingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    }
+    if(s.status === 'rejected'){
+      html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Rejection reason</div>';
+      html += '<textarea id="rsub-rej-'+s.id+'" style="width:100%;min-height:60px;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);resize:vertical">'+retailEsc(s.rejectionReason||'')+'</textarea></div>';
+    }
+    // Notes
+    html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Notes</div>';
+    html += '<textarea id="rsub-notes-'+s.id+'" style="width:100%;min-height:72px;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);resize:vertical">'+retailEsc(s.notes||'')+'</textarea></div>';
+    // Action buttons
+    html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap">';
+    html += '<button class="btn-primary" style="font-size:.7rem" onclick="saveRetailSubmissionEdit(\''+s.id+'\')">Save</button>';
+    if(LISTING_REQUIREMENTS[s.retailerId]){
+      html += '<button class="btn-outline" style="font-size:.7rem" onclick="openChecklistFor(\''+s.retailerId+'\',\''+((s.skuIds||[])[0]||'')+'\')">Listing checklist →</button>';
+    }
+    html += '<button class="btn-outline" style="font-size:.7rem" onclick="openCommsFor(\''+s.retailerId+'\')">Buyer comms →</button>';
+    html += '<button class="btn-outline" style="font-size:.7rem;color:#991B1B;border-color:#FCA5A5" onclick="deleteRetailSubmission(\''+s.id+'\')">Delete</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderRetailAddSubmissionForm(){
+  var candidates = retailGetPitchedOrHigherCrmCards();
+  var html = '<div style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">';
+  html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">New submission</div>';
+  html += '<button onclick="closeAddRetailSubmission()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>';
+  html += '</div>';
+
+  html += '<div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Retailer (pre-filled from CRM — Pitched or higher)</div>';
+  if(candidates.length === 0){
+    html += '<div style="padding:.6rem .75rem;background:#FFFBEB;border:1px solid #FDE68A;font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.8rem">No CRM retailers at Pitched stage yet. <span onclick="showPage(\'crm\')" style="text-decoration:underline;cursor:pointer">Go to Retailer CRM →</span> or add manually below.</div>';
+  } else {
+    html += '<select id="rsub-new-retailer" onchange="retailTrackerAddForm.retailerId=this.value" style="width:100%;padding:.5rem .65rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);margin-bottom:.8rem">';
+    html += '<option value="">— Select a retailer —</option>';
+    candidates.forEach(function(c){
+      var sel = retailTrackerAddForm.retailerId===c.id ? ' selected' : '';
+      html += '<option value="'+retailEsc(c.id)+'"'+sel+'>'+retailEsc(c.name)+' · '+retailEsc(c.market||'')+' · '+retailEsc(c.stage)+'</option>';
+    });
+    html += '</select>';
+  }
+
+  // SKU selection
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  if(skusList.length){
+    html += '<div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Products submitted</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem">';
+    skusList.forEach(function(sk){
+      var checked = retailTrackerAddForm.skuIds.indexOf(String(sk.id)) !== -1;
+      html += '<label style="display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .6rem;font-family:var(--sans);font-size:.72rem;background:'+(checked?'#EFF6FF':'#F9FAFB')+';border:1px solid '+(checked?'#BFDBFE':'var(--border)')+';cursor:pointer">';
+      html += '<input type="checkbox" data-skuid="'+retailEsc(sk.id)+'" onchange="retailToggleAddSku(this)"'+(checked?' checked':'')+' style="margin:0;width:auto;min-height:auto"> '+retailEsc(sk.name||'SKU');
+      html += '</label>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-bottom:.8rem">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+  }
+
+  html += '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.8rem">';
+  html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact name</div>';
+  html += '<input type="text" id="rsub-new-cname" value="'+retailEsc(retailTrackerAddForm.contactName)+'" oninput="retailTrackerAddForm.contactName=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact email</div>';
+  html += '<input type="email" id="rsub-new-cemail" value="'+retailEsc(retailTrackerAddForm.contactEmail)+'" oninput="retailTrackerAddForm.contactEmail=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:.9rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Notes</div>';
+  html += '<textarea id="rsub-new-notes" oninput="retailTrackerAddForm.notes=this.value" placeholder="Submission context, attachments, route…" style="width:100%;min-height:60px;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);resize:vertical">'+retailEsc(retailTrackerAddForm.notes)+'</textarea></div>';
+
+  html += '<div style="display:flex;gap:.5rem">';
+  html += '<button class="btn-primary" style="font-size:.72rem" onclick="createRetailSubmission()">Create submission</button>';
+  html += '<button class="btn-outline" style="font-size:.72rem" onclick="closeAddRetailSubmission()">Cancel</button>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function openAddRetailSubmission(){
+  retailTrackerAddOpen = true;
+  retailTrackerAddForm = {retailerId:'', skuIds:[], contactName:'', contactEmail:'', notes:''};
+  renderPage('retail-tracker');
+}
+
+function closeAddRetailSubmission(){
+  retailTrackerAddOpen = false;
+  renderPage('retail-tracker');
+}
+
+function retailToggleAddSku(cb){
+  var id = String(cb.dataset.skuid||'');
+  var i = retailTrackerAddForm.skuIds.indexOf(id);
+  if(i === -1) retailTrackerAddForm.skuIds.push(id);
+  else retailTrackerAddForm.skuIds.splice(i,1);
+}
+
+function createRetailSubmission(){
+  var f = retailTrackerAddForm;
+  if(!f.retailerId){ alert('Pick a retailer first.'); return; }
+  var now = new Date().toISOString();
+  var todayDate = now.slice(0,10);
+  var sub = {
+    id: retailUuid(),
+    retailerId: f.retailerId,
+    retailerName: retailerNameFromId(f.retailerId),
+    market: retailerMarketFromId(f.retailerId),
+    submittedDate: todayDate,
+    status: 'submitted',
+    statusChangedAt: now,
+    skuIds: f.skuIds.slice(),
+    contactName: f.contactName||'',
+    contactEmail: f.contactEmail||'',
+    nextAction: '',
+    nextActionDate: '',
+    notes: f.notes||'',
+    meetingDate: '',
+    listingDate: '',
+    rejectionReason: '',
+    createdAt: now,
+  };
+  loadRetailSubmissions();
+  retailSubmissions.push(sub);
+  saveRetailSubmissions();
+  retailTrackerAddOpen = false;
+  retailTrackerExpandedId = sub.id;
+  if(typeof showSuccess === 'function') showSuccess('Submission added for '+sub.retailerName);
+  renderPage('retail-tracker');
+}
+
+function toggleRetailSubmissionExpand(id){
+  retailTrackerExpandedId = (retailTrackerExpandedId === id) ? null : id;
+  renderPage('retail-tracker');
+}
+
+function updateRetailSubmissionStatus(id, status){
+  loadRetailSubmissions();
+  var s = retailSubmissions.find(function(x){ return x.id===id; });
+  if(!s) return;
+  if(s.status !== status){
+    s.status = status;
+    s.statusChangedAt = new Date().toISOString();
+  }
+  saveRetailSubmissions();
+  renderPage('retail-tracker');
+}
+
+function saveRetailSubmissionEdit(id){
+  loadRetailSubmissions();
+  var s = retailSubmissions.find(function(x){ return x.id===id; });
+  if(!s) return;
+  var sDate = document.getElementById('rsub-sdate-'+id);
+  var cName = document.getElementById('rsub-cname-'+id);
+  var cEmail = document.getElementById('rsub-cemail-'+id);
+  var nAct = document.getElementById('rsub-na-'+id);
+  var nActD = document.getElementById('rsub-nad-'+id);
+  var notes = document.getElementById('rsub-notes-'+id);
+  var mDate = document.getElementById('rsub-mdate-'+id);
+  var lDate = document.getElementById('rsub-ldate-'+id);
+  var rej   = document.getElementById('rsub-rej-'+id);
+  if(sDate) s.submittedDate = sDate.value;
+  if(cName) s.contactName = cName.value;
+  if(cEmail) s.contactEmail = cEmail.value;
+  if(nAct) s.nextAction = nAct.value;
+  if(nActD) s.nextActionDate = nActD.value;
+  if(notes) s.notes = notes.value;
+  if(mDate) s.meetingDate = mDate.value;
+  if(lDate) s.listingDate = lDate.value;
+  if(rej)   s.rejectionReason = rej.value;
+  saveRetailSubmissions();
+  if(typeof showSuccess === 'function') showSuccess('Submission saved');
+}
+
+function deleteRetailSubmission(id){
+  if(!confirm('Delete this submission? This cannot be undone.')) return;
+  loadRetailSubmissions();
+  retailSubmissions = retailSubmissions.filter(function(x){ return x.id!==id; });
+  saveRetailSubmissions();
+  if(retailTrackerExpandedId===id) retailTrackerExpandedId=null;
+  renderPage('retail-tracker');
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE 2 — ARTICLE TEMPLATES
+═══════════════════════════════════════════════════ */
+
+function retailTemplateResolveSource(source, sku, brandObj){
+  if(!source) return {type:'empty', value:''};
+  if(source === 'private') return {type:'private', value:''};
+  if(source === 'manual')  return {type:'manual',  value:''};
+  if(source.indexOf('const:') === 0) return {type:'auto', value: source.slice(6)};
+  if(source === 'brand.name'){
+    return {type: brandObj && brandObj.name ? 'auto' : 'missing', value: (brandObj && brandObj.name) || ''};
+  }
+  if(source === 'brand.euResponsiblePerson'){
+    var rp = brandObj && (
+      (brandObj.euResponsiblePerson && brandObj.euResponsiblePerson.name) ||
+      brandObj.euResponsiblePerson ||
+      brandObj.euRP ||
+      brandObj.euRpName
+    );
+    return {type: rp ? 'auto' : 'missing', value: (typeof rp==='string' ? rp : '')};
+  }
+  // compound: 'sku.x||sku.y' or 'sku.x'
+  if(source.indexOf('sku.') === 0){
+    if(!sku) return {type:'missing', value:''};
+    var parts = source.split('||').map(function(p){ return p.trim(); });
+    for(var i=0; i<parts.length; i++){
+      var p = parts[i];
+      if(p.indexOf('sku.') === 0){
+        var f = p.slice(4);
+        if(sku[f]) return {type:'auto', value: String(sku[f])};
+      } else if(p.indexOf('brand.') === 0){
+        var bf = p.slice(6);
+        if(brandObj && brandObj[bf]) return {type:'auto', value: String(brandObj[bf])};
+      }
+    }
+    return {type:'missing', value:''};
+  }
+  return {type:'empty', value:''};
+}
+
+function renderRetailTemplates(el){
+  if(!el) return;
+  var retailerKeys = Object.keys(ARTICLE_TEMPLATES);
+  if(!retailTemplatesSelRetailer || !ARTICLE_TEMPLATES[retailTemplatesSelRetailer]){
+    retailTemplatesSelRetailer = retailerKeys[0];
+  }
+  var tpl = ARTICLE_TEMPLATES[retailTemplatesSelRetailer];
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  if(!retailTemplatesSelSku && skusList.length) retailTemplatesSelSku = String(skusList[0].id);
+  var sku = skusList.find(function(x){ return String(x.id)===String(retailTemplatesSelSku); });
+
+  var html = '';
+  html += '<div class="page-wrap"><div class="topbar">';
+  html += '<div><div class="page-title">Article Templates</div>';
+  html += '<div class="page-sub">Generate retailer-specific masterdata · pre-filled from SKU data</div></div>';
+  html += '<button class="btn-primary" style="font-size:.65rem" onclick="downloadRetailTemplate()">Download CSV ↓</button>';
+  html += '</div><div class="content">';
+
+  // Retailer + SKU selectors
+  html += '<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem">';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Retailer</div>';
+  html += '<select onchange="retailTemplatesSelRetailer=this.value;retailTemplatesManualFields={};renderPage(\'retail-templates\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+  retailerKeys.forEach(function(k){
+    html += '<option value="'+retailEsc(k)+'"'+(retailTemplatesSelRetailer===k?' selected':'')+'>'+retailEsc(ARTICLE_TEMPLATES[k].name)+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Product</div>';
+  if(skusList.length){
+    html += '<select onchange="retailTemplatesSelSku=this.value;renderPage(\'retail-templates\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+    skusList.forEach(function(sk){
+      html += '<option value="'+retailEsc(sk.id)+'"'+(String(retailTemplatesSelSku)===String(sk.id)?' selected':'')+'>'+retailEsc(sk.name||'SKU '+sk.id)+'</option>';
+    });
+    html += '</select>';
+  } else {
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Portal URL + confidence badge
+  var confBadge = tpl.confidence==='veyaflow_verified' ? '<span style="font-family:var(--mono);font-size:.55rem;color:#1B2D4F">★★★ VeyaFlow-verified</span>' : '<span style="font-family:var(--mono);font-size:.55rem;color:#4A6FA5">★★ Research-verified</span>';
+  html += '<div style="background:#F7F5F0;border:1px solid var(--border);padding:.65rem .85rem;margin-bottom:1rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;align-items:center">';
+  html += '<div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Portal: <a href="'+retailEsc(tpl.portalUrl)+'" target="_blank" rel="noopener" style="color:var(--navy)">'+retailEsc(tpl.portalUrl.replace(/^https?:\/\//,''))+' ↗</a></div>';
+  html += '<div>'+confBadge+'</div>';
+  html += '</div>';
+
+  // Disclaimer
+  html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.65rem .85rem;margin-bottom:1rem;font-family:var(--sans);font-size:.72rem;color:#78350F;line-height:1.5">';
+  html += '<strong>VeyaFlow pre-fills what it knows.</strong> Review every field before submitting — you are responsible for accuracy. Private fields (like net price) are never stored or sent to VeyaFlow.';
+  html += '</div>';
+
+  // Fields table
+  if(!sku){
+    html += '<div class="card" style="padding:1.5rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">Select a product above to see the pre-filled template.</div>';
+  } else {
+    var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0;
+    var rowsHtml = '';
+    tpl.fields.forEach(function(f, idx){
+      var resolved = retailTemplateResolveSource(f.source, sku, brand);
+      var userVal = retailTemplatesManualFields[f.label] || '';
+      var effectiveType = resolved.type;
+      if(effectiveType==='manual' && userVal) effectiveType='auto_manual';
+      if(effectiveType==='private' && userVal) effectiveType='private_filled';
+
+      var bg = '#fff', col = 'var(--navy)', badge = '', valCell = '';
+      if(effectiveType === 'auto'){
+        bg = '#ECFDF5'; col = '#065F46';
+        badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#065F46;padding:.15rem .4rem;background:#fff;border:1px solid #A7F3D0">Auto</span>';
+        valCell = '<div style="font-family:var(--sans);font-size:.78rem;color:'+col+';word-break:break-word">'+retailEsc(resolved.value)+'</div>';
+        autoCount++;
+      } else if(effectiveType === 'missing'){
+        bg = '#FFFBEB'; col = '#92400E';
+        badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#92400E;padding:.15rem .4rem;background:#fff;border:1px solid #FDE68A">Missing — fix in SKU</span>';
+        valCell = '<div style="font-family:var(--sans);font-size:.75rem;color:#92400E;font-style:italic">Not set — <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">add in My Products →</span></div>';
+        missingCount++;
+      } else if(effectiveType === 'manual' || effectiveType === 'auto_manual'){
+        bg = effectiveType==='auto_manual' ? '#EFF6FF' : '#FFFBEB';
+        col = effectiveType==='auto_manual' ? '#1E40AF' : '#92400E';
+        badge = '<span style="font-family:var(--mono);font-size:.5rem;color:'+col+';padding:.15rem .4rem;background:#fff;border:1px solid '+(effectiveType==='auto_manual'?'#BFDBFE':'#FDE68A')+'">Manual</span>';
+        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value" placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        manualCount++;
+      } else if(effectiveType === 'private' || effectiveType === 'private_filled'){
+        bg = '#F3F4F6'; col = '#6B7280';
+        badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#6B7280;padding:.15rem .4rem;background:#fff;border:1px solid #E5E7EB">Private · local only</span>';
+        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value" placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        privateCount++;
+      } else {
+        bg = '#F9FAFB';
+        valCell = '<div style="font-family:var(--sans);font-size:.75rem;color:var(--muted)">—</div>';
+      }
+      rowsHtml += '<tr style="background:'+bg+';border-bottom:1px solid var(--border)">';
+      rowsHtml += '<td style="padding:.55rem .7rem;font-family:var(--sans);font-size:.75rem;color:var(--navy);font-weight:500;width:38%;vertical-align:top">'+retailEsc(f.label)+'</td>';
+      rowsHtml += '<td style="padding:.55rem .7rem;vertical-align:top">'+valCell+'</td>';
+      rowsHtml += '<td style="padding:.55rem .7rem;vertical-align:top;white-space:nowrap">'+badge+'</td>';
+      rowsHtml += '</tr>';
+    });
+    // Summary strip
+    html += '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem;font-family:var(--mono);font-size:.6rem;color:var(--muted)">';
+    html += '<span style="color:#065F46">✓ '+autoCount+' auto-filled</span>';
+    if(manualCount>0) html += '<span style="color:#92400E">⚑ '+manualCount+' need manual input</span>';
+    if(missingCount>0) html += '<span style="color:#991B1B">✗ '+missingCount+' missing from SKU data</span>';
+    if(privateCount>0) html += '<span style="color:#6B7280">🔒 '+privateCount+' private (local only)</span>';
+    html += '</div>';
+
+    html += '<div style="background:#fff;border:1px solid var(--border);overflow-x:auto">';
+    html += '<table style="width:100%;border-collapse:collapse">';
+    html += '<thead><tr style="background:var(--navy);color:#fff"><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Field</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Value</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Source</th></tr></thead>';
+    html += '<tbody>'+rowsHtml+'</tbody>';
+    html += '</table></div>';
+
+    html += '<div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap">';
+    html += '<button class="btn-primary" style="font-size:.72rem" onclick="downloadRetailTemplate()">Download CSV ↓</button>';
+    html += '<a href="'+retailEsc(tpl.portalUrl)+'" target="_blank" rel="noopener" class="btn-outline" style="font-size:.72rem;text-decoration:none;display:inline-flex;align-items:center">Open '+retailEsc(tpl.portalUrl.replace(/^https?:\/\//,''))+' ↗</a>';
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function downloadRetailTemplate(){
+  var tpl = ARTICLE_TEMPLATES[retailTemplatesSelRetailer];
+  if(!tpl){ alert('Pick a retailer first.'); return; }
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  var sku = skusList.find(function(x){ return String(x.id)===String(retailTemplatesSelSku); });
+  if(!sku){ alert('Pick a product first.'); return; }
+  var rows = [['Field','Value','Source']];
+  tpl.fields.forEach(function(f){
+    var resolved = retailTemplateResolveSource(f.source, sku, brand);
+    var userVal = retailTemplatesManualFields[f.label] || '';
+    var value = '';
+    var sourceLabel = '';
+    if(resolved.type === 'auto'){ value = resolved.value; sourceLabel='auto'; }
+    else if(resolved.type === 'manual' || resolved.type === 'private'){ value = userVal; sourceLabel = resolved.type==='private' ? 'private' : 'manual'; }
+    else if(resolved.type === 'missing'){ value = ''; sourceLabel='missing'; }
+    else { value = ''; sourceLabel=''; }
+    rows.push([f.label, value, sourceLabel]);
+  });
+  var filename = tpl.name.replace(/[^a-z0-9]+/gi,'_')+'_'+(sku.name||'sku').replace(/[^a-z0-9]+/gi,'_')+'.csv';
+  retailDownloadCsv(filename, rows);
+  if(typeof showSuccess === 'function') showSuccess('Template downloaded — review before submitting');
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE 3 — LISTING CHECKLIST
+═══════════════════════════════════════════════════ */
+
+function renderRetailChecklist(el){
+  if(!el) return;
+  loadRetailChecklist();
+  var retailerKeys = Object.keys(LISTING_REQUIREMENTS);
+  if(!retailChecklistSelRetailer || !LISTING_REQUIREMENTS[retailChecklistSelRetailer]){
+    retailChecklistSelRetailer = retailerKeys[0];
+  }
+  var reqsObj = LISTING_REQUIREMENTS[retailChecklistSelRetailer];
+  var reqs = reqsObj.requirements;
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  if(!retailChecklistSelSku && skusList.length) retailChecklistSelSku = String(skusList[0].id);
+  var sku = skusList.find(function(x){ return String(x.id)===String(retailChecklistSelSku); });
+  var stateKey = retailChecklistSelRetailer+'::'+retailChecklistSelSku;
+  var state = retailChecklistState[stateKey] || {};
+
+  var html = '';
+  html += '<div class="page-wrap"><div class="topbar">';
+  html += '<div><div class="page-title">Listing Checklist</div>';
+  html += '<div class="page-sub">Everything needed to go live · per retailer per product</div></div>';
+  html += '<button class="btn-outline" style="font-size:.65rem" onclick="printRetailChecklist()">Print / Save PDF</button>';
+  html += '</div><div class="content">';
+
+  // Selectors
+  html += '<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem">';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Retailer</div>';
+  html += '<select onchange="retailChecklistSelRetailer=this.value;renderPage(\'retail-checklist\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+  retailerKeys.forEach(function(k){
+    var lab = k === 'apotek_hjartat_se' ? 'Apotek Hjärtat (Sweden)' : k === 'matas_dk' ? 'Matas (Denmark)' : k;
+    html += '<option value="'+retailEsc(k)+'"'+(retailChecklistSelRetailer===k?' selected':'')+'>'+retailEsc(lab)+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Product</div>';
+  if(skusList.length){
+    html += '<select onchange="retailChecklistSelSku=this.value;renderPage(\'retail-checklist\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+    skusList.forEach(function(sk){
+      html += '<option value="'+retailEsc(sk.id)+'"'+(String(retailChecklistSelSku)===String(sk.id)?' selected':'')+'>'+retailEsc(sk.name||'SKU '+sk.id)+'</option>';
+    });
+    html += '</select>';
+  } else {
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  if(!sku){
+    html += '<div class="card" style="padding:1.5rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">Select a product above to see the checklist.</div>';
+    html += '</div></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Progress
+  var doneCount = 0;
+  reqs.forEach(function(r){
+    var autoDone = r.autoCheck ? retailChecklistAutoCheckValue(r.autoCheck, sku) : false;
+    if(autoDone || state[r.id]) doneCount++;
+  });
+  var pct = Math.round((doneCount/reqs.length)*100);
+  var barColor = pct>=100 ? 'var(--green)' : pct>=70 ? 'var(--amber)' : 'var(--red)';
+  html += '<div style="background:#fff;border:1px solid var(--border);padding:1rem 1.1rem;margin-bottom:1rem">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:.5rem">';
+  html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">'+doneCount+' of '+reqs.length+' requirements complete</div>';
+  html += '<div style="font-family:var(--mono);font-size:1.3rem;color:'+barColor+';font-weight:500">'+pct+'%</div>';
+  html += '</div>';
+  html += '<div style="background:var(--border);height:6px;border-radius:3px"><div style="background:'+barColor+';height:6px;border-radius:3px;width:'+pct+'%;transition:width .4s ease"></div></div>';
+  html += '</div>';
+
+  // Requirements list
+  html += '<div style="background:#fff;border:1px solid var(--border)">';
+  reqs.forEach(function(r, idx){
+    var autoDone = r.autoCheck ? retailChecklistAutoCheckValue(r.autoCheck, sku) : false;
+    var manualDone = !!state[r.id];
+    var done = autoDone || manualDone;
+    var border = idx < reqs.length-1 ? 'border-bottom:1px solid var(--border);' : '';
+    html += '<div style="display:flex;align-items:center;gap:.8rem;padding:.75rem 1rem;'+border+'background:'+(done?'#F7FDF9':'#fff')+'">';
+    if(autoDone){
+      html += '<span style="font-family:var(--mono);font-size:.9rem;color:var(--green);flex-shrink:0">✓</span>';
+    } else {
+      html += '<input type="checkbox" data-reqid="'+retailEsc(r.id)+'" onchange="toggleRetailChecklistItem(this.dataset.reqid)"'+(manualDone?' checked':'')+' style="flex-shrink:0;width:18px;height:18px;min-height:auto;cursor:pointer">';
+    }
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-family:var(--sans);font-size:.8rem;color:'+(done?'#065F46':'var(--navy)')+';font-weight:500">'+retailEsc(r.label)+'</div>';
+    if(autoDone){
+      html += '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.1rem">Auto-verified from your data</div>';
+    } else if(r.autoCheck && !autoDone){
+      html += '<div style="font-family:var(--mono);font-size:.52rem;color:#991B1B;margin-top:.1rem">Missing in your data — <span onclick="showPage(\''+retailEsc(r.fixPage||'skus')+'\')" style="text-decoration:underline;cursor:pointer">fix →</span></div>';
+    }
+    html += '</div>';
+    if(!autoDone && !manualDone && r.fixPage){
+      html += '<button class="btn-outline" style="flex-shrink:0;font-size:.6rem;padding:.3rem .55rem" onclick="showPage(\''+retailEsc(r.fixPage)+'\')">Fix →</button>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Footer note
+  html += '<div style="margin-top:1rem;font-family:var(--mono);font-size:.55rem;color:var(--muted)">Progress saved automatically. Your checks are stored locally per retailer per product.</div>';
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function toggleRetailChecklistItem(reqId){
+  loadRetailChecklist();
+  var stateKey = retailChecklistSelRetailer+'::'+retailChecklistSelSku;
+  var s = retailChecklistState[stateKey] || {};
+  s[reqId] = !s[reqId];
+  retailChecklistState[stateKey] = s;
+  saveRetailChecklist();
+  renderPage('retail-checklist');
+}
+
+function openChecklistFor(retailerId, skuId){
+  if(retailerId) retailChecklistSelRetailer = retailerId;
+  if(skuId) retailChecklistSelSku = skuId;
+  showPage('retail-checklist');
+}
+
+function printRetailChecklist(){
+  var retailerKeys = Object.keys(LISTING_REQUIREMENTS);
+  var reqsObj = LISTING_REQUIREMENTS[retailChecklistSelRetailer];
+  if(!reqsObj){ alert('Select a retailer first.'); return; }
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  var sku = skusList.find(function(x){ return String(x.id)===String(retailChecklistSelSku); });
+  if(!sku){ alert('Select a product first.'); return; }
+  loadRetailChecklist();
+  var stateKey = retailChecklistSelRetailer+'::'+retailChecklistSelSku;
+  var state = retailChecklistState[stateKey] || {};
+  var retailerLabel = retailChecklistSelRetailer === 'apotek_hjartat_se' ? 'Apotek Hjärtat' : retailChecklistSelRetailer === 'matas_dk' ? 'Matas' : retailChecklistSelRetailer;
+  var today = new Date().toLocaleDateString('en-GB');
+  var rowsHtml = reqsObj.requirements.map(function(r){
+    var autoDone = r.autoCheck ? retailChecklistAutoCheckValue(r.autoCheck, sku) : false;
+    var done = autoDone || !!state[r.id];
+    return '<tr><td style="padding:.5rem .75rem;border-bottom:1px solid #ddd;text-align:center;width:36px">'+(done?'☑':'☐')+'</td><td style="padding:.5rem .75rem;border-bottom:1px solid #ddd">'+retailEsc(r.label)+'</td></tr>';
+  }).join('');
+  var brandName = (brand && brand.name) || 'Brand';
+  var html = '<!DOCTYPE html><html><head><title>Listing Checklist — '+retailerLabel+'</title><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 30px;color:#111}h1{font-weight:400;font-size:22px;margin:0 0 .2rem}.meta{font-family:monospace;font-size:11px;color:#666;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-top:12px}th{text-align:left;font-family:monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#666;padding:.4rem .75rem;border-bottom:2px solid #333}footer{margin-top:32px;font-family:monospace;font-size:10px;color:#888;border-top:1px solid #ddd;padding-top:12px}</style></head><body>';
+  html += '<h1>Listing Checklist — '+retailerLabel+'</h1>';
+  html += '<div class="meta">'+retailEsc(brandName)+' · '+retailEsc(sku.name||'Product')+(sku.ean?' · EAN '+retailEsc(sku.ean):'')+' · Generated '+today+'</div>';
+  html += '<table><thead><tr><th>✓</th><th>Requirement</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>';
+  html += '<footer>Generated by VeyaFlow · veyaflow.com</footer>';
+  html += '<script>window.onload=function(){window.print();};<\/script></body></html>';
+  var w = window.open('', '_blank');
+  if(!w){ alert('Popup blocked — please allow popups to print the checklist.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE 4 — PERFORMANCE
+═══════════════════════════════════════════════════ */
+
+function retailPerfKey(retailerId, skuId){ return retailerId+'::'+skuId; }
+
+function renderRetailPerformance(el){
+  if(!el) return;
+  loadRetailPerformance();
+  // Build retailer list — only retailers we have submissions/listings for
+  loadRetailSubmissions();
+  var retailerIds = {};
+  retailSubmissions.forEach(function(s){
+    if(s.status==='listed'||s.status==='live') retailerIds[s.retailerId] = s.retailerName;
+  });
+  // Also allow adding performance for any CRM retailer at listed stage
+  if(typeof crmCards !== 'undefined' && crmCards && crmCards.length){
+    crmCards.forEach(function(c){
+      if(c.stage === 'listed') retailerIds[c.id] = c.name;
+    });
+  }
+  var retailerList = Object.keys(retailerIds).map(function(k){ return {id:k, name:retailerIds[k]}; });
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+
+  if(!retailPerfSelRetailer && retailerList.length) retailPerfSelRetailer = retailerList[0].id;
+  if(!retailPerfSelSku && skusList.length) retailPerfSelSku = String(skusList[0].id);
+
+  var html = '';
+  html += '<div class="page-wrap"><div class="topbar">';
+  html += '<div><div class="page-title">Performance</div>';
+  html += '<div class="page-sub">Track sell-through per retailer per product · '+retailPerformance.length+' monthly record'+(retailPerformance.length!==1?'s':'')+'</div></div>';
+  html += '<button class="btn-outline" style="font-size:.65rem" onclick="downloadRetailPerformanceCsv()">Export CSV ↓</button>';
+  html += '</div><div class="content">';
+
+  if(retailerList.length === 0){
+    html += '<div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">';
+    html += '<div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">◉</div>';
+    html += '<div class="empty-title" style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.5rem">Nothing listed yet</div>';
+    html += '<div class="empty-sub" style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.25rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.55">Once a submission reaches "Listed" status in the Submission Tracker, you can track monthly sell-through data here to catch ranging risk early and build proof points for future pitches.</div>';
+    html += '<button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage(\'retail-tracker\')">Open Submission Tracker →</button>';
+    html += '</div>';
+    html += '</div></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Selectors
+  html += '<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem">';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Retailer</div>';
+  html += '<select onchange="retailPerfSelRetailer=this.value;renderPage(\'retail-performance\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+  retailerList.forEach(function(r){
+    html += '<option value="'+retailEsc(r.id)+'"'+(retailPerfSelRetailer===r.id?' selected':'')+'>'+retailEsc(r.name)+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Product</div>';
+  if(skusList.length){
+    html += '<select onchange="retailPerfSelSku=this.value;renderPage(\'retail-performance\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
+    skusList.forEach(function(sk){
+      html += '<option value="'+retailEsc(sk.id)+'"'+(String(retailPerfSelSku)===String(sk.id)?' selected':'')+'>'+retailEsc(sk.name||'SKU '+sk.id)+'</option>';
+    });
+    html += '</select>';
+  }
+  html += '</div></div>';
+
+  // Filter data for current selection
+  var current = retailPerformance.filter(function(p){
+    return p.retailerId===retailPerfSelRetailer && String(p.skuId)===String(retailPerfSelSku);
+  }).sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); });
+
+  // Add month form
+  html += renderRetailPerfAddForm();
+
+  if(current.length === 0){
+    html += '<div class="card" style="padding:1.25rem;text-align:center;font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:1rem">No monthly data yet for this retailer/product pair. Use the form above to add a month.</div>';
+  } else {
+    // Bar chart
+    html += renderRetailPerfChart(current);
+    // Table
+    html += renderRetailPerfTable(current);
+    // Proof point button — if any month has sellThrough >= 70%
+    var strong = current.filter(function(r){ return (r.sellThroughPct||0) >= 70; });
+    if(strong.length){
+      var best = strong.reduce(function(a,b){ return (a.sellThroughPct||0) > (b.sellThroughPct||0) ? a : b; });
+      html += '<div style="margin-top:1rem;background:#ECFDF5;border:1px solid #A7F3D0;padding:.9rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem">';
+      html += '<div><div style="font-family:var(--mono);font-size:.58rem;color:#065F46;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Strong sell-through detected</div>';
+      html += '<div style="font-family:var(--sans);font-size:.8rem;color:#065F46">Best month: '+retailEsc(best.month)+' · '+(best.sellThroughPct||0)+'% sell-through</div></div>';
+      html += '<button class="btn-primary" style="font-size:.7rem;background:#10B981" onclick="addRetailPerformanceProofPoint()">+ Add to brand proof points</button>';
+      html += '</div>';
+    }
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function renderRetailPerfAddForm(){
+  var f = retailPerfForm;
+  var currencyOpts = ['SEK','DKK','NOK','EUR','GBP'];
+  var html = '<div style="background:#fff;border:1px solid var(--border);padding:.9rem 1rem">';
+  html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Add monthly data</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;align-items:end">';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Month</div><input type="month" id="rperf-month" value="'+retailEsc(f.month)+'" oninput="retailPerfForm.month=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Units sold</div><input type="number" min="0" id="rperf-sold" value="'+retailEsc(f.unitsSold)+'" oninput="retailPerfForm.unitsSold=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Units delivered</div><input type="number" min="0" id="rperf-deliv" value="'+retailEsc(f.unitsDelivered)+'" oninput="retailPerfForm.unitsDelivered=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Revenue</div><input type="number" min="0" step="0.01" id="rperf-rev" value="'+retailEsc(f.revenue)+'" oninput="retailPerfForm.revenue=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Currency</div><select id="rperf-ccy" onchange="retailPerfForm.currency=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+  currencyOpts.forEach(function(c){ html += '<option value="'+c+'"'+(f.currency===c?' selected':'')+'>'+c+'</option>'; });
+  html += '</select></div>';
+  html += '<div><button class="btn-primary" style="font-size:.7rem;width:100%;padding:.45rem .6rem" onclick="saveRetailPerformanceMonth()">Save month</button></div>';
+  html += '</div>';
+  html += '<div style="margin-top:.55rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">';
+  html += '<label style="font-family:var(--sans);font-size:.7rem;color:#555;display:inline-flex;align-items:center;gap:.35rem"><input type="checkbox" id="rperf-promo" '+(f.promotionActive?'checked':'')+' onchange="retailPerfForm.promotionActive=this.checked" style="margin:0;width:auto;min-height:auto"> Promotion active</label>';
+  html += '<input type="text" placeholder="Promotion type (e.g. Beauty Days)" id="rperf-promo-type" value="'+retailEsc(f.promotionType)+'" oninput="retailPerfForm.promotionType=this.value" style="flex:1;min-width:160px;padding:.4rem .55rem;font-family:var(--sans);font-size:.72rem;border:1px solid var(--border)">';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function saveRetailPerformanceMonth(){
+  var f = retailPerfForm;
+  if(!retailPerfSelRetailer || !retailPerfSelSku){ alert('Pick a retailer and product first.'); return; }
+  if(!f.month){ alert('Pick a month.'); return; }
+  var sold = parseFloat(f.unitsSold)||0;
+  var delivered = parseFloat(f.unitsDelivered)||0;
+  var sellThrough = delivered>0 ? Math.round((sold/delivered)*100) : 0;
+  var reorderTriggered = sellThrough >= 70;
+  loadRetailPerformance();
+  // remove existing record for same retailer/sku/month
+  retailPerformance = retailPerformance.filter(function(r){
+    return !(r.retailerId===retailPerfSelRetailer && String(r.skuId)===String(retailPerfSelSku) && r.month===f.month);
+  });
+  retailPerformance.push({
+    id: retailUuid(),
+    retailerId: retailPerfSelRetailer,
+    skuId: retailPerfSelSku,
+    month: f.month,
+    unitsSold: sold,
+    unitsDelivered: delivered,
+    revenue: parseFloat(f.revenue)||0,
+    currency: f.currency||'SEK',
+    sellThroughPct: sellThrough,
+    promotionActive: !!f.promotionActive,
+    promotionType: f.promotionType||'',
+    notes: f.notes||'',
+    reorderTriggered: reorderTriggered,
+    createdAt: new Date().toISOString(),
+  });
+  saveRetailPerformance();
+  retailPerfForm = {month:'', unitsSold:'', unitsDelivered:'', revenue:'', currency:f.currency, promotionActive:false, promotionType:'', notes:''};
+  if(typeof showSuccess === 'function') showSuccess('Monthly data saved · '+sellThrough+'% sell-through');
+  renderPage('retail-performance');
+}
+
+function renderRetailPerfChart(current){
+  var maxSt = Math.max.apply(null, current.map(function(r){ return r.sellThroughPct||0; }).concat([100]));
+  var html = '<div style="margin-top:1rem;background:#fff;border:1px solid var(--border);padding:1rem 1.1rem">';
+  html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">Sell-through % by month</div>';
+  html += '<div style="display:flex;align-items:flex-end;gap:.35rem;height:140px;border-bottom:1px solid var(--border);padding-bottom:.3rem">';
+  current.forEach(function(r){
+    var st = r.sellThroughPct||0;
+    var h = Math.max(3, Math.round((st / (maxSt||100)) * 120));
+    var col = st>=70 ? 'var(--green)' : st<40 ? 'var(--red)' : 'var(--amber)';
+    html += '<div title="'+retailEsc(r.month)+' · '+st+'% · '+r.unitsSold+'/'+r.unitsDelivered+' units" style="flex:1;min-width:28px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:default">';
+    html += '<div style="font-family:var(--mono);font-size:.55rem;color:'+col+';margin-bottom:.2rem">'+st+'%</div>';
+    html += '<div style="background:'+col+';width:100%;height:'+h+'px;border-radius:2px 2px 0 0"></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:.35rem;margin-top:.3rem">';
+  current.forEach(function(r){
+    html += '<div style="flex:1;min-width:28px;font-family:var(--mono);font-size:.5rem;color:var(--muted);text-align:center">'+retailEsc((r.month||'').slice(5))+'</div>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:.75rem;display:flex;gap:.9rem;font-family:var(--mono);font-size:.55rem;color:var(--muted);flex-wrap:wrap">';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:var(--red);vertical-align:middle;margin-right:.3rem"></span>Below 40% — risk of ranging out</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);vertical-align:middle;margin-right:.3rem"></span>40–69%</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:var(--green);vertical-align:middle;margin-right:.3rem"></span>70%+ — reorder trigger</span>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderRetailPerfTable(current){
+  var html = '<div style="margin-top:1rem;background:#fff;border:1px solid var(--border);overflow-x:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;font-family:var(--sans);font-size:.74rem">';
+  html += '<thead><tr style="background:var(--navy);color:#fff"><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Month</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sold</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Delivered</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sell-through</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Revenue</th><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Promo</th><th style="padding:.5rem .65rem"></th></tr></thead><tbody>';
+  current.slice().reverse().forEach(function(r){
+    var stCol = (r.sellThroughPct||0)>=70 ? 'var(--green)' : (r.sellThroughPct||0)<40 ? 'var(--red)' : 'var(--amber)';
+    html += '<tr style="border-bottom:1px solid var(--border)">';
+    html += '<td style="padding:.45rem .65rem;color:var(--navy);font-weight:500">'+retailEsc(r.month)+'</td>';
+    html += '<td style="padding:.45rem .65rem;text-align:right">'+(r.unitsSold||0)+'</td>';
+    html += '<td style="padding:.45rem .65rem;text-align:right">'+(r.unitsDelivered||0)+'</td>';
+    html += '<td style="padding:.45rem .65rem;text-align:right;color:'+stCol+';font-weight:500;font-family:var(--mono)">'+(r.sellThroughPct||0)+'%</td>';
+    html += '<td style="padding:.45rem .65rem;text-align:right">'+(r.revenue||0)+' '+retailEsc(r.currency||'')+'</td>';
+    html += '<td style="padding:.45rem .65rem;font-size:.7rem;color:var(--muted)">'+(r.promotionActive?'● '+retailEsc(r.promotionType||'Active'):'—')+'</td>';
+    html += '<td style="padding:.45rem .65rem;text-align:right"><button onclick="deleteRetailPerformance(\''+r.id+'\')" style="background:none;border:none;color:#991B1B;cursor:pointer;font-size:.7rem" title="Delete">✕</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function deleteRetailPerformance(id){
+  if(!confirm('Delete this monthly record?')) return;
+  loadRetailPerformance();
+  retailPerformance = retailPerformance.filter(function(r){ return r.id!==id; });
+  saveRetailPerformance();
+  renderPage('retail-performance');
+}
+
+function downloadRetailPerformanceCsv(){
+  loadRetailPerformance();
+  if(!retailPerformance.length){ alert('No performance data to export.'); return; }
+  var rows = [['Retailer','SKU','Month','Units sold','Units delivered','Sell-through %','Revenue','Currency','Promotion','Promotion type','Reorder trigger']];
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  retailPerformance.forEach(function(r){
+    var sk = skusList.find(function(x){ return String(x.id)===String(r.skuId); });
+    rows.push([
+      retailerNameFromId(r.retailerId), (sk?sk.name:r.skuId), r.month,
+      r.unitsSold, r.unitsDelivered, r.sellThroughPct,
+      r.revenue, r.currency, r.promotionActive?'Yes':'No', r.promotionType||'', r.reorderTriggered?'Yes':'No',
+    ]);
+  });
+  retailDownloadCsv('VeyaFlow_Performance_'+new Date().toISOString().slice(0,10)+'.csv', rows);
+}
+
+function addRetailPerformanceProofPoint(){
+  loadRetailPerformance();
+  var current = retailPerformance.filter(function(p){
+    return p.retailerId===retailPerfSelRetailer && String(p.skuId)===String(retailPerfSelSku);
+  });
+  var strong = current.filter(function(r){ return (r.sellThroughPct||0) >= 70; });
+  if(!strong.length){ alert('No months with 70%+ sell-through yet.'); return; }
+  var best = strong.reduce(function(a,b){ return (a.sellThroughPct||0) > (b.sellThroughPct||0) ? a : b; });
+  var retailerName = retailerNameFromId(retailPerfSelRetailer);
+  var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
+  var sk = skusList.find(function(x){ return String(x.id)===String(retailPerfSelSku); });
+  var pp = best.sellThroughPct+'% sell-through at '+retailerName+' in '+best.month+(sk?' for '+sk.name:'');
+  if(!brand){ alert('Brand profile not set up yet.'); return; }
+  brand.proofPoints = brand.proofPoints || [];
+  if(brand.proofPoints.indexOf(pp) === -1){
+    brand.proofPoints.push(pp);
+    try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); }catch(e){}
+    if(typeof saveBrandState === 'function'){ try{ saveBrandState(); }catch(e){} }
+    if(typeof showSuccess === 'function') showSuccess('Added to brand proof points: '+pp);
+  } else {
+    if(typeof showSuccess === 'function') showSuccess('Already in proof points');
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   MODULE 5 — BUYER COMMS
+═══════════════════════════════════════════════════ */
+
+function renderRetailComms(el){
+  if(!el) return;
+  loadRetailComms();
+  // Build retailer list from CRM + submissions
+  var retailerIds = {};
+  if(typeof crmCards !== 'undefined' && crmCards && crmCards.length){
+    crmCards.forEach(function(c){
+      if(c.stage && c.stage!=='not_contacted') retailerIds[c.id] = c.name;
+    });
+  }
+  loadRetailSubmissions();
+  retailSubmissions.forEach(function(s){ retailerIds[s.retailerId] = s.retailerName; });
+  // Also include any retailer referenced by an existing comms entry
+  retailComms.forEach(function(c){
+    if(!retailerIds[c.retailerId]) retailerIds[c.retailerId] = c.retailerName || retailerNameFromId(c.retailerId);
+  });
+  var retailerList = Object.keys(retailerIds).map(function(k){ return {id:k, name:retailerIds[k]}; }).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+  if(!retailCommsSelRetailer && retailerList.length) retailCommsSelRetailer = retailerList[0].id;
+
+  var filtered = retailComms.filter(function(c){
+    if(retailCommsSelRetailer && c.retailerId !== retailCommsSelRetailer) return false;
+    if(retailCommsFilterType && c.type !== retailCommsFilterType) return false;
+    return true;
+  }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var html = '';
+  html += '<div class="page-wrap"><div class="topbar">';
+  html += '<div><div class="page-title">Buyer Comms</div>';
+  html += '<div class="page-sub">Log every buyer interaction · '+retailComms.length+' entr'+(retailComms.length===1?'y':'ies')+'</div></div>';
+  html += '<div style="display:flex;gap:.4rem">';
+  html += '<button class="btn-outline" style="font-size:.65rem" onclick="downloadRetailCommsCsv()">Export CSV ↓</button>';
+  html += '<button class="btn-primary" style="font-size:.65rem" onclick="openAddRetailComms()">+ Log entry</button>';
+  html += '</div>';
+  html += '</div><div class="content">';
+
+  // Filters
+  html += '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">';
+  if(retailerList.length){
+    html += '<div style="flex:1;min-width:200px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Retailer</div>';
+    html += '<select onchange="retailCommsSelRetailer=this.value;renderPage(\'retail-comms\')" style="width:100%;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
+    html += '<option value="">All retailers</option>';
+    retailerList.forEach(function(r){
+      html += '<option value="'+retailEsc(r.id)+'"'+(retailCommsSelRetailer===r.id?' selected':'')+'>'+retailEsc(r.name)+'</option>';
+    });
+    html += '</select></div>';
+  }
+  html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Type</div>';
+  html += '<select onchange="retailCommsFilterType=this.value;renderPage(\'retail-comms\')" style="width:100%;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
+  html += '<option value="">All types</option>';
+  COMMS_TYPES.forEach(function(t){
+    html += '<option value="'+t.id+'"'+(retailCommsFilterType===t.id?' selected':'')+'>'+retailEsc(t.label)+'</option>';
+  });
+  html += '</select></div>';
+  html += '</div>';
+
+  // Add form
+  if(retailCommsAddOpen){
+    html += renderRetailCommsAddForm(retailerList);
+  }
+
+  // Empty state or timeline
+  if(retailComms.length === 0 && !retailCommsAddOpen){
+    html += '<div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">';
+    html += '<div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">✉</div>';
+    html += '<div class="empty-title" style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.5rem">Date-stamp every buyer interaction</div>';
+    html += '<div class="empty-sub" style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.25rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.55">Simpler than the CRM — focused on the active commercial relationship. Know exactly when you last spoke and what was said.</div>';
+    html += '<button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="openAddRetailComms()">+ Log your first entry</button>';
+    html += '</div>';
+  } else if(filtered.length === 0){
+    html += '<div class="card" style="padding:1.25rem;text-align:center;font-family:var(--sans);font-size:.78rem;color:var(--muted)">No entries match the current filters.</div>';
+  } else {
+    // Timeline
+    html += '<div style="position:relative;padding-left:1.25rem">';
+    html += '<div style="position:absolute;left:.35rem;top:.3rem;bottom:.3rem;width:2px;background:var(--border)"></div>';
+    filtered.forEach(function(c){
+      var t = COMMS_TYPE_MAP[c.type] || {label:c.type, icon:'•'};
+      html += '<div style="position:relative;margin-bottom:.8rem">';
+      html += '<div style="position:absolute;left:-1.25rem;top:.35rem;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.5rem;color:var(--gold)">●</div>';
+      html += '<div style="background:#fff;border:1px solid var(--border);padding:.75rem .9rem;margin-left:.6rem">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">';
+      html += '<div><span style="font-family:var(--mono);font-size:.55rem;color:var(--navy);padding:.15rem .45rem;background:#F7F5F0;border:1px solid var(--border);margin-right:.4rem">'+retailEsc(t.icon)+' '+retailEsc(t.label)+'</span>';
+      html += '<span style="font-family:var(--sans);font-size:.78rem;color:var(--navy);font-weight:500">'+retailEsc(retailerNameFromId(c.retailerId))+'</span>';
+      if(c.contactName) html += '<span style="font-family:var(--sans);font-size:.7rem;color:var(--muted)"> · '+retailEsc(c.contactName)+'</span>';
+      html += '</div>';
+      html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">'+retailEsc(c.date||'')+'</div>';
+      html += '</div>';
+      if(c.summary) html += '<div style="font-family:var(--sans);font-size:.77rem;color:#444;line-height:1.5;margin-bottom:.35rem">'+retailEsc(c.summary)+'</div>';
+      if(c.nextAction){
+        html += '<div style="font-family:var(--mono);font-size:.58rem;color:#92400E;padding:.3rem .5rem;background:#FFFBEB;border:1px solid #FDE68A;display:inline-block">→ '+retailEsc(c.nextAction)+(c.nextActionDate?' · by '+retailEsc(c.nextActionDate):'')+'</div>';
+      }
+      if(c.attachmentNote){
+        html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">📎 '+retailEsc(c.attachmentNote)+'</div>';
+      }
+      html += '<div style="margin-top:.4rem;text-align:right"><button onclick="deleteRetailComms(\''+c.id+'\')" style="background:none;border:none;color:#991B1B;cursor:pointer;font-family:var(--mono);font-size:.6rem;text-decoration:underline">Delete</button></div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function renderRetailCommsAddForm(retailerList){
+  var f = retailCommsAddForm;
+  if(!f.date) f.date = new Date().toISOString().slice(0,10);
+  var html = '<div style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">';
+  html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">Log new entry</div>';
+  html += '<button onclick="closeAddRetailComms()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>';
+  html += '</div>';
+
+  html += '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.75rem">';
+  html += '<div style="flex:1;min-width:200px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Retailer</div>';
+  html += '<select id="rcomms-ret" onchange="retailCommsAddForm.retailerId=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
+  html += '<option value="">— Select —</option>';
+  retailerList.forEach(function(r){
+    html += '<option value="'+retailEsc(r.id)+'"'+(f.retailerId===r.id?' selected':'')+'>'+retailEsc(r.name)+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Date</div>';
+  html += '<input type="date" id="rcomms-date" value="'+retailEsc(f.date)+'" oninput="retailCommsAddForm.date=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Type</div>';
+  html += '<select id="rcomms-type" onchange="retailCommsAddForm.type=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
+  COMMS_TYPES.forEach(function(t){
+    html += '<option value="'+t.id+'"'+(f.type===t.id?' selected':'')+'>'+retailEsc(t.icon)+' '+retailEsc(t.label)+'</option>';
+  });
+  html += '</select></div>';
+  html += '</div>';
+
+  html += '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.75rem">';
+  html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact name</div>';
+  html += '<input type="text" id="rcomms-contact" value="'+retailEsc(f.contactName)+'" oninput="retailCommsAddForm.contactName=this.value" placeholder="Buyer name" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:.75rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Summary (max 280 chars)</div>';
+  html += '<textarea id="rcomms-summary" maxlength="280" oninput="retailCommsAddForm.summary=this.value;var cc=document.getElementById(\'rcomms-char\');if(cc)cc.textContent=(280-this.value.length)+\' chars left\'" placeholder="What was discussed, agreed, or requested?" style="width:100%;min-height:64px;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);resize:vertical">'+retailEsc(f.summary)+'</textarea>';
+  html += '<div id="rcomms-char" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-align:right;margin-top:.2rem">'+(280-(f.summary||'').length)+' chars left</div></div>';
+
+  html += '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.75rem">';
+  html += '<div style="flex:1;min-width:200px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Next action</div>';
+  html += '<input type="text" id="rcomms-na" value="'+retailEsc(f.nextAction)+'" oninput="retailCommsAddForm.nextAction=this.value" placeholder="e.g. Send CPNP doc" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">By</div>';
+  html += '<input type="date" id="rcomms-nad" value="'+retailEsc(f.nextActionDate)+'" oninput="retailCommsAddForm.nextActionDate=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:.9rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Attachment note (optional)</div>';
+  html += '<input type="text" id="rcomms-att" value="'+retailEsc(f.attachmentNote)+'" oninput="retailCommsAddForm.attachmentNote=this.value" placeholder="e.g. Sent CPNP.pdf · sample dispatched" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+
+  html += '<div style="display:flex;gap:.5rem">';
+  html += '<button class="btn-primary" style="font-size:.72rem" onclick="saveRetailCommsEntry()">Save entry</button>';
+  html += '<button class="btn-outline" style="font-size:.72rem" onclick="closeAddRetailComms()">Cancel</button>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function openAddRetailComms(){
+  retailCommsAddOpen = true;
+  retailCommsAddForm = {retailerId: retailCommsSelRetailer||'', date:new Date().toISOString().slice(0,10), type:'email_sent', contactName:'', summary:'', nextAction:'', nextActionDate:'', attachmentNote:''};
+  renderPage('retail-comms');
+}
+
+function closeAddRetailComms(){
+  retailCommsAddOpen = false;
+  renderPage('retail-comms');
+}
+
+function openCommsFor(retailerId){
+  if(retailerId) retailCommsSelRetailer = retailerId;
+  showPage('retail-comms');
+}
+
+function saveRetailCommsEntry(){
+  var f = retailCommsAddForm;
+  if(!f.retailerId){ alert('Pick a retailer.'); return; }
+  if(!f.date){ alert('Pick a date.'); return; }
+  if(!f.summary && !f.nextAction){ alert('Add a summary or next action.'); return; }
+  loadRetailComms();
+  retailComms.push({
+    id: retailUuid(),
+    retailerId: f.retailerId,
+    retailerName: retailerNameFromId(f.retailerId),
+    date: f.date,
+    type: f.type||'email_sent',
+    contactName: f.contactName||'',
+    summary: (f.summary||'').slice(0,280),
+    nextAction: f.nextAction||'',
+    nextActionDate: f.nextActionDate||'',
+    attachmentNote: f.attachmentNote||'',
+    createdAt: new Date().toISOString(),
+  });
+  saveRetailComms();
+  retailCommsAddOpen = false;
+  if(typeof showSuccess === 'function') showSuccess('Entry logged');
+  renderPage('retail-comms');
+}
+
+function deleteRetailComms(id){
+  if(!confirm('Delete this entry?')) return;
+  loadRetailComms();
+  retailComms = retailComms.filter(function(c){ return c.id!==id; });
+  saveRetailComms();
+  renderPage('retail-comms');
+}
+
+function downloadRetailCommsCsv(){
+  loadRetailComms();
+  if(!retailComms.length){ alert('No entries to export.'); return; }
+  var rows = [['Date','Retailer','Type','Contact','Summary','Next action','Next action date','Attachment note']];
+  retailComms.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(c){
+    var t = COMMS_TYPE_MAP[c.type]; var typeLabel = t ? t.label : c.type;
+    rows.push([c.date, retailerNameFromId(c.retailerId), typeLabel, c.contactName||'', c.summary||'', c.nextAction||'', c.nextActionDate||'', c.attachmentNote||'']);
+  });
+  retailDownloadCsv('VeyaFlow_BuyerComms_'+new Date().toISOString().slice(0,10)+'.csv', rows);
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE NAV — enable retail section drawer
+═══════════════════════════════════════════════════ */
+
+// Patch mobile drawer title after initial render to include retail
+(function(){
+  if(typeof toggleMobDrawer === 'function'){
+    var _orig = toggleMobDrawer;
+    toggleMobDrawer = function(section){
+      _orig(section);
+      if(section === 'retail'){
+        var drawer = document.getElementById('mob-drawer');
+        if(drawer){
+          var title = drawer.querySelector('div');
+          if(title) title.textContent = 'Retail';
+        }
+      }
+    };
+  }
+})();
 init();
 </script>
 <script>
@@ -26610,6 +28108,7 @@ if(typeof submitRequestListed==='function'){
     console.warn('VeyaFlow brand restore failed:',e.message);
   }
 })();
+
 </script>
 </body>
 </html>
