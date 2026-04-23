@@ -20857,7 +20857,7 @@ function renderMfrAiPanel(mfr){
   if(!findAiCache[mfr.id])return'';
   const text=findAiCache[mfr.id];
   const sections=["SUSTAINABILITY FIT","MARKET READINESS","WHAT TO ASK FIRST","RED FLAGS","VERDICT"];
-  const colors={"SUSTAINABILITY FIT":"#10B981","MARKET READINESS":var_navy,"WHAT TO ASK FIRST":"#C4A882","RED FLAGS":"#EF4444","VERDICT":"#1E3A5F"};
+  const colors={"SUSTAINABILITY FIT":"#10B981","MARKET READINESS":"#1E3A5F","WHAT TO ASK FIRST":"#C4A882","RED FLAGS":"#EF4444","VERDICT":"#1E3A5F"};
   let html=`<div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem">★ AI assessment — ${mfr.name}</div>`;
   sections.forEach(s=>{
     const parts=text.split(new RegExp(s+"[^\\n]*\\n","i"));
@@ -23619,6 +23619,7 @@ const REGULATORY_DEADLINES = [
 function buildComplianceEvents(){
   const now  = new Date();
   const end  = new Date(now); end.setMonth(end.getMonth()+12);
+  const year = now.getFullYear();
   const cats = getBrandCategories();
   const events = [];
 
@@ -23673,7 +23674,6 @@ function buildComplianceEvents(){
     if(!pr || !pr.annualDeclarationMonth) return;
     const mmdd = PR_MONTH_MAP[pr.annualDeclarationMonth];
     if(!mmdd) return;
-    const year = new Date().getFullYear();
     // Try this year, then next year
     [year, year+1].forEach(y=>{
       addEvent(
@@ -24728,7 +24728,7 @@ function csrdAutoFill(){
   }
 
   // Auto-fill from Supplier Nudge
-  const auditedSupplier = SUPPLIER_DATABASE&&SUPPLIER_DATABASE.find(s=>s.certifications&&s.certifications.length>0&&s.tier===1);
+  const auditedSupplier = (typeof SUPPLIER_DATABASE !== 'undefined') && SUPPLIER_DATABASE.find(s=>s.certifications&&s.certifications.length>0&&s.tier===1);
   if(auditedSupplier && !answers.social_audit){
     answers.social_audit = 'Yes — '+auditedSupplier.certifications.join(', ');
   }
@@ -24967,7 +24967,7 @@ function renderDPP(el){
             <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Your products — DPP status</div>
             ${skus.map(sku=>{
               const r = dppReadiness(sku);
-              const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+              const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
               const barC = r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444';
               const dppGenerated = !!(dppData[sku.id]?.generatedAt);
               return `
