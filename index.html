@@ -210,8 +210,8 @@
   .section-tag { font-family: var(--mono); font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
 
   /* ONBOARDING */
-  .onboard-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; overflow-y: auto; }
-  .onboard-inner { width: 100%; max-width: 520px; }
+  .onboard-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 2rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .onboard-inner { width: 100%; max-width: 520px; padding-bottom: 2rem; }
   .onboard-title { font-family: var(--serif); font-size: 1.4rem; color: var(--navy); margin-bottom: .35rem; }
   .onboard-sub { font-family: var(--sans); font-size: .8rem; color: var(--muted); margin-bottom: 1.25rem; }
   .stage-option {
@@ -362,7 +362,7 @@
     /* Layout */
     #sidebar { display: none; }
     #app { flex-direction: column; }
-    #main { flex: 1; min-height: 0; overflow: hidden; }
+    #main { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
     .content { padding: .85rem; padding-bottom: 5.5rem; overflow-x: hidden; }
     .topbar { padding: .75rem .85rem; flex-wrap: wrap; gap: .4rem; }
     .page-title { font-size: 1.05rem; }
@@ -405,7 +405,8 @@
     .report-section { padding: 1rem .85rem; }
 
     /* Onboarding */
-    .onboard-wrap { padding: .85rem; align-items: flex-start; }
+    .onboard-wrap { padding: .85rem .75rem; align-items: flex-start; }
+    .onboard-inner { padding-bottom: env(safe-area-inset-bottom, 1.5rem); }
     .onboard-title { font-size: 1.2rem; }
     .onboard-sub { font-size: .85rem; }
     .cat-option { padding: .65rem .75rem; font-size: .78rem; min-height: 44px; }
@@ -415,6 +416,24 @@
 
     /* Dashboard */
     #readiness-sequencer-row { grid-template-columns: 1fr !important; gap: .85rem !important; }
+
+    /* Inline-padded buttons in key flow areas — ensure 44px touch on mobile */
+    .topbar .btn-primary[style], .topbar .btn-outline[style] {
+      min-height: 44px !important; padding: .6rem .85rem !important; font-size: .65rem !important;
+    }
+    /* Primary action CTAs in cards (View blockers, Generate, Compare now etc.) */
+    .card .btn-primary[style] { min-height: 44px !important; }
+    /* Readiness hero CTAs */
+    #readiness-panel .btn-primary { min-height: 44px !important; }
+    /* Onboard inner buttons regardless of inline style */
+    .onboard-inner .btn-primary { min-height: 52px !important; font-size: .88rem !important; width: 100% !important; }
+    .onboard-inner .btn-outline { min-height: 48px !important; }
+    /* Setup modal steps */
+    #setup-modal .btn-primary, #setup-modal .btn-outline { min-height: 48px !important; }
+    /* Module generate/run buttons (Analyse, Run, Submit etc.) */
+    .page .btn-primary[style*="padding:.3"], .page .btn-primary[style*="padding:.4"] {
+      min-height: 44px !important;
+    }
 
     /* CRM kanban — stack vertically */
     .crm-kanban { grid-template-columns: 1fr !important; }
@@ -552,6 +571,7 @@
 
     <!-- PAGES -->
     <div class="page active" id="page-home"></div>
+    <div class="page" id="page-csrd"></div>
     <div class="page" id="page-find"></div>
     <div class="page" id="page-agent"></div>
     <div class="page" id="page-report"></div>
@@ -1373,6 +1393,48 @@ function applyAutofillToProfile(){
   }
 }
 
+function completeSetupStep(){
+  const step = _setupModalStep;
+  const totalSteps = 3;
+  const canNow = step===1 ? (_setupDraft.categories&&_setupDraft.categories.length>0)
+               : step===2 ? !!_setupDraft.stage
+               : !!(_setupDraft.primaryMarket||'Sweden');
+
+  if(!canNow){
+    const btn = document.querySelector('#vf-setup-modal button[onclick="completeSetupStep()"]');
+    if(btn){ btn.style.opacity='.4'; setTimeout(function(){btn.style.opacity='';},500); }
+    return;
+  }
+
+  if(step < totalSteps){ _setupModalStep++; renderSetupModal(); return; }
+
+  // Final save — defensive fallbacks for every field
+  const cats   = (_setupDraft.categories&&_setupDraft.categories.length)
+                   ? _setupDraft.categories
+                   : (getBrandCategories().length ? getBrandCategories() : ['Skincare & Beauty']);
+  const stage  = _setupDraft.stage||brand&&brand.stage||'trading';
+  const market = _setupDraft.primaryMarket||brand&&brand.currentMarket||'Sweden';
+
+  if(!brand){
+    brand = {name:'',category:cats[0]||'',currentMarket:market,stage:stage,targetMarkets:[],skus:''};
+  }
+  brand.categories    = cats;
+  brand.category      = cats[0]||brand.category||'';
+  brand.stage         = stage;
+  brand.currentMarket = market;
+  brand.setupComplete = true;
+
+  saveBrandState();
+  buildNav();
+
+  const modal = document.getElementById('vf-setup-modal');
+  const returnPage = modal&&modal.getAttribute('data-return')||'home';
+  if(modal) modal.remove();
+
+  showSuccess('Brand profile personalised for '+cats[0]);
+  renderPage(returnPage||currentPage||'home');
+}
+
 function renderSetupModal(){
   const modal = document.getElementById('vf-setup-modal');
   if(!modal) return;
@@ -1569,8 +1631,8 @@ function renderSetupModal(){
                     :                                         step3;
 
   modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;position:relative">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch">
+      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch">
         <!-- Header -->
         <div style="padding:1.25rem 1.25rem .75rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2">
           <div style="display:flex;align-items:center;justify-content:space-between">
@@ -1590,20 +1652,8 @@ function renderSetupModal(){
         ${showFooterNav?`
         <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
-          <button onclick="(function(){
-            if(!${canProceed}){ return; }
-            if(_setupModalStep<${totalSteps}){ _setupModalStep++; renderSetupModal(); return; }
-            if(!brand){ brand={name:'',category:_setupDraft.categories[0]||'',currentMarket:_setupDraft.primaryMarket,stage:_setupDraft.stage,targetMarkets:[],skus:''}; }
-            brand.categories    = _setupDraft.categories;
-            brand.category      = _setupDraft.categories[0]||brand.category||'';
-            brand.stage         = _setupDraft.stage||brand.stage||'trading';
-            brand.currentMarket = _setupDraft.primaryMarket||brand.currentMarket||'Sweden';
-            brand.setupComplete = true;
-            saveBrandState();
-            document.getElementById('vf-setup-modal').remove();
-            renderPage('${returnPage}');
-          })()"
-            style="background:${canProceed?'var(--navy)':'#D1D5DB'};color:${canProceed?'#fff':'#9CA3AF'};border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.4rem 1.1rem;cursor:${canProceed?'pointer':'default'};letter-spacing:.05em">
+          <button onclick="completeSetupStep()"
+            style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
             ${_setupModalStep<totalSteps?'Next →':'Save & personalise →'}
           </button>
         </div>`:''}
@@ -1698,8 +1748,8 @@ function renderSetupModal(){
                    : !!_setupDraft.primaryMarket;
 
   modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;position:relative">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch">
+      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch">
         <!-- Header -->
         <div style="padding:1.25rem 1.25rem .75rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2">
           <div style="display:flex;align-items:center;justify-content:space-between">
@@ -1718,21 +1768,8 @@ function renderSetupModal(){
         <!-- Footer -->
         <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
-          <button onclick="(function(){
-            if(!${canProceed}){ return; }
-            if(_setupModalStep<${totalSteps}){ _setupModalStep++; renderSetupModal(); return; }
-            // Save — merge into brand or create stub
-            if(!brand){ brand={name:'',category:_setupDraft.categories[0]||'',currentMarket:_setupDraft.primaryMarket,stage:_setupDraft.stage,targetMarkets:[],skus:''}; }
-            brand.categories = _setupDraft.categories;
-            brand.category   = _setupDraft.categories[0]||brand.category||'';
-            brand.stage      = _setupDraft.stage||brand.stage||'trading';
-            brand.currentMarket = _setupDraft.primaryMarket||brand.currentMarket||'Sweden';
-            brand.setupComplete = true;
-            saveBrandState();
-            document.getElementById('vf-setup-modal').remove();
-            renderPage('${returnPage}');
-          })()"
-            style="background:${canProceed?'var(--navy)':'#D1D5DB'};color:${canProceed?'#fff':'#9CA3AF'};border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.4rem 1.1rem;cursor:${canProceed?'pointer':'default'};letter-spacing:.05em">
+          <button onclick="completeSetupStep()"
+            style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
             ${_setupModalStep<totalSteps?'Next →':'Save & personalise →'}
           </button>
         </div>
@@ -1842,6 +1879,7 @@ const NAV=[
   {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"sourcing",  sec:"source", icon:"◌", label:"Sourcing CRM",         stages:["idea","product","trading","expanding","scaling"],  cats:null},
   {id:"verified",  sec:"source", icon:"★", label:"Verified Directory",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
+  {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
 ];
 
@@ -1934,6 +1972,7 @@ const MODULE_EXPLAINERS = {
   cfo:       {title:'CFO View',            what:'Private financial modelling. Your cost data never leaves your browser.',get:['Margin stress-tester per retailer','Retail Math Backwards: what ex-works cost do I need?','Contract Terms Analyser with benchmarks','Multi-currency support'],time:'Ongoing'},
   sourcing:  {title:'Sourcing Agent',      what:'AI agent that finds and briefs manufacturers matching your product spec.',get:['Natural language sourcing query','Fit-scored manufacturer results','AI-generated sourcing brief','Sourcing CRM to track enquiries'],time:'2 minutes per search'},
   brandpack: {title:'Brand Pack',          what:'Generate a verified brand profile to share with buyers instead of a PDF deck.',get:['AI-written brand story and commercial proof points','Retailer-specific variant matching their priorities','Shareable magic link for every pitch email','Confidence tier badge'],time:'5 minutes to generate'},
+  csrd:      {title:'CSRD Pack',           what:'Auto-generate your sustainability disclosure for retail partners legally required to collect ESG data.',get:['12 standard CSRD questions auto-filled from VeyaFlow data','Green/amber status per question showing what needs attention','Simple form to fill any gaps','Exportable PDF-ready document dated and signed'],time:'5 minutes to complete'},
 };
 
 function showModuleExplainer(moduleId){
@@ -1965,6 +2004,7 @@ const NAV_SUBTITLES = {
   claims:'Check my claims are legal', sequencer:'Which market to enter first',
   dpp:'Generate product passport', sourcing:'Find manufacturers with AI',
   reg_monitor:'Weekly regulatory updates', verified:'VeyaFlow-vetted suppliers',
+  csrd:'Generate your retailer sustainability pack',
 };
 
 function buildNav(){
@@ -2441,6 +2481,7 @@ function renderPage(id){
   else if(id==='reg_monitor'){loadRegulatoryMonitor();renderRegMonitorPage(el);}
   else if(id==='crm'){ loadCRM(); renderCRM(el); }
   else if(id==='dpp'){ loadDPP(); renderDPP(el); }
+  else if(id==='csrd'){ renderCSRD(el); }
   else if(id==='sourcing'){ loadSourcingCRM(); renderSourcingCRM(el); }
 }
 
@@ -2482,7 +2523,7 @@ function renderOnboardStep(){
         <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="onboardForm.category='${c}';renderOnboardStep()">${c}</div>`).join('')}</div>
       </div>
       <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
-      <button id="ob-continue-1" class="btn-primary" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
+      <button id="ob-continue-1" class="btn-primary" style="width:100%;margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
     `;
   } else if(onboardStep===2){
     inner.innerHTML=`
@@ -2502,7 +2543,7 @@ function renderOnboardStep(){
       </div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=1;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1" onclick="onboardStep=3;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=3;renderPage('home')">Continue →</button>
       </div>
     `;
   } else if(onboardStep===3){
@@ -2520,7 +2561,7 @@ function renderOnboardStep(){
       <div class="field"><label class="lbl">Your name</label><input type="text" id="ob-username" value="${onboardForm.userName||''}" placeholder="e.g. Charlotte" oninput="onboardForm.userName=this.value"></div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=2;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1" onclick="onboardStep=4;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=4;renderPage('home')">Continue →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">Your workspace is saved in this browser — persists between sessions</div>
     `;
@@ -2571,7 +2612,7 @@ function renderOnboardStep(){
 
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=3;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1" onclick="onboardStep=5;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=5;renderPage('home')">Continue →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">All proof point fields are optional — add what you have now, update anytime</div>
     `;
@@ -2826,12 +2867,45 @@ const CONFIDENCE_LEVELS = {
   ai_estimated:      { stars:'★',   color:'#999999', label:' (estimated)' },
 };
 
+/* ─── Regulatory term tooltips ──────────────────── */
+const REG_TERM_TIPS = {
+  'CPNP':  'EU Cosmetic Product Notification Portal — required before selling any cosmetic in the EU. Free at cpnp.ec.europa.eu',
+  'EU RP': 'EU Responsible Person — a company based in the EU taking legal responsibility for your product. Required for all EU cosmetics.',
+  'EUDR':  'EU Deforestation Regulation — proof required that products do not contribute to deforestation. Affects palm oil, cocoa, soy, rubber, wood.',
+  'GCD':   'EU Green Claims Directive — unsubstantiated environmental claims are illegal. Affects: natural, eco-friendly, sustainable, carbon neutral.',
+  'PIF':   'Product Information File — technical dossier required for all EU cosmetics. Must be held by your EU Responsible Person.',
+  'WEEE':  'Waste Electrical & Electronic Equipment Directive — producer registration required per EU market for electrical devices.',
+  'SVHC':  'Substance of Very High Concern — ECHA candidate list. Products must not exceed 0.1% concentration. SCIP database notification required if above threshold.',
+  'REACH': 'EU REACH Regulation — Registration, Evaluation, Authorisation of Chemicals. Governs SVHC substances in products.',
+  'CMR':   'Carcinogenic, Mutagenic, or Reprotoxic — highest hazard category under EU cosmetics regulation. Restricted or prohibited in cosmetics.',
+  'MDR':   'EU Medical Device Regulation 2017/745 — applies to devices with a medical purpose. Stricter than LVD for beauty devices.',
+  'LVD':   'Low Voltage Directive 2014/35/EU — applies to consumer electrical devices. Required for CE marking on non-medical beauty devices.',
+  'VerpackG': 'German Packaging Act — requires packaging registration in the LUCID system before selling packaged goods in Germany.',
+};
+
+function tipifyRegTerms(html){
+  if(!html) return html||'';
+  let result = html;
+  Object.entries(REG_TERM_TIPS).forEach(([term, desc])=>{
+    // Only replace standalone whole-word matches, first occurrence only
+    const re = new RegExp('\\b(' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')\\b', 'g');
+    result = result.replace(re, '<span class="vf-tip" data-tip="'+desc.replace(/"/g,'&quot;')+'">$1 <span style="font-size:.65em;opacity:.4">?</span></span>');
+  });
+  return result;
+}
+
 function renderConfidence(level, opts){
   const cfg = CONFIDENCE_LEVELS[level] || CONFIDENCE_LEVELS.ai_estimated;
   const size = (opts&&opts.size)||'normal';
   const fs   = size==='small'?'.5rem':size==='large'?'.75rem':'.58rem';
-  const title= {veyaflow_verified:'VeyaFlow-verified intelligence',research_verified:'Research-verified (public sources)',ai_estimated:'AI-estimated — may be >12 months old'}[level]||'';
-  return `<span title="${title}" style="font-family:var(--mono);font-size:${fs};color:${cfg.color};white-space:nowrap;letter-spacing:.02em">${cfg.stars}${cfg.label}</span>`;
+  const desc = {
+    veyaflow_verified:'Validated through direct primary research and market contacts. Highest trust level.',
+    research_verified:'Based on public documents, annual reports, and retailer communications. Verified within 6 months.',
+    ai_estimated:'AI synthesis from multiple sources. May be up to 12 months old. Treat as a starting point.',
+  }[level]||'';
+  const label = {veyaflow_verified:'VeyaFlow-verified',research_verified:'Research-verified',ai_estimated:'AI-estimated'}[level]||'';
+  const tipText = label+(desc?': '+desc:'');
+  return `<span class="vf-tip" data-tip="${tipText}" style="font-family:var(--mono);font-size:${fs};color:${cfg.color};white-space:nowrap;letter-spacing:.02em;cursor:help">${cfg.stars}${cfg.label}</span>`;
 }
 
 // Determine confidence level for a retailer field based on verifiedBy + date
@@ -3693,6 +3767,12 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       else{ blockers.push({id:'mdrMissing',level:'amber',label:'MDR/LVD classification not confirmed',impact:'Must confirm MDR (medical) or LVD (consumer electronics) classification.'}); }
       if(sku.safetyRef||sku.technicalFile){ comp+=10; greens.push('Technical file on file'); }
       else{ blockers.push({id:'techFileMissing',level:'amber',label:'Technical file not confirmed',impact:'Required for CE marking — held by EU Authorised Representative.'}); }
+      // WEEE producer registration check
+      const weeeMarkets = getWEEEMarkets().filter(m=>m!=='Norway'&&WEEE_MARKET_MAP[m]); // Norway = EEA but non-EU
+      if(weeeMarkets.length>0){
+        if(sku.weeeRegistered){ comp+=8; greens.push('WEEE producer registration confirmed'); }
+        else{ blockers.push({id:'weeeMissing',level:'amber',label:'WEEE producer registration required',impact:'Required in: '+weeeMarkets.join(', ')+'. Register before first sale. Fine up to €100,000 in Germany.'}); }
+      }
       if(marketCode==='UK'){
         if(sku.ukCaMarking||sku.ukDeviceRegistration){ greens.push('UKCA marking on file'); }
         else{ blockers.push({id:'noRpUK',level:'amber',label:'UKCA marking required for UK device listings',impact:'Post-Brexit: CE marking not sufficient. UKCA required.',partner:true}); }
@@ -3907,7 +3987,7 @@ function renderReadinessScore(){
             <span style="color:#EF4444;font-size:.8rem;flex-shrink:0">●</span>
             <div style="flex:1">
               <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:#7F1D1D">${b.label}</div>
-              <div style="font-family:var(--sans);font-size:.65rem;color:#991B1B;margin-top:.1rem">${b.impact}</div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#991B1B;margin-top:.1rem">${tipifyRegTerms(b.impact)}</div>
               ${res.fix?`<div style="font-family:var(--mono);font-size:.58rem;color:#7F1D1D;margin-top:.2rem">Fix: ${res.fix}${res.days?` · ~${res.days} days`:''}</div>`:''}
               ${res.partner?`<div style="margin-top:.4rem"><span style="font-family:var(--mono);font-size:.58rem;background:#1E3A5F;color:var(--gold);padding:.15rem .5rem;cursor:pointer">◈ VeyaFlow Verified Partner — ${res.partner} →</span></div>`:''}
             </div>
@@ -3919,7 +3999,7 @@ function renderReadinessScore(){
             <span style="color:#F59E0B;font-size:.8rem;flex-shrink:0">◐</span>
             <div style="flex:1">
               <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:#78350F">${b.label}</div>
-              <div style="font-family:var(--sans);font-size:.65rem;color:#92400E;margin-top:.1rem">${b.impact}</div>
+              <div style="font-family:var(--sans);font-size:.65rem;color:#92400E;margin-top:.1rem">${tipifyRegTerms(b.impact)}</div>
               ${res.fix?`<div style="font-family:var(--mono);font-size:.58rem;color:#78350F;margin-top:.2rem">Fix: ${res.fix}${res.days?` · ~${res.days} days`:''}</div>`:''}
             </div>
           </div>`;
@@ -4671,6 +4751,10 @@ function renderDashboard(el){
       ${renderSeasonalAlerts()}
       ${renderReferralNudge()}
       ${renderOverdueMilestoneAlert()}
+
+      <!-- ══ COMPLIANCE RADAR ══════════════════════ -->
+      ${renderComplianceRadar()}
+
       ${renderComplianceCalendar()}
 
       <!-- ══ ZONE 3: REPORTS + PROFILE ══════════════ -->
@@ -9679,6 +9763,15 @@ ${(()=>{
 
 REACH note for all markets: Confirm no SVHC substances above 0.1% in finished product. SCIP database notification required for articles containing SVHC above threshold. ${ECHA_SVHC_UPDATE_NOTE}
 
+${(()=>{
+  const hasDevice = skus.some(s=>isWEEEDevice(s));
+  if(!hasDevice) return '';
+  const weeeMkts = getWEEEMarkets().filter(m=>m!=='Norway');
+  if(!weeeMkts.length) return '';
+  const sys = WEEE_REQUIREMENTS.EU.collectiveSystems;
+  return `## WEEE PRODUCER REGISTRATION — ELECTRICAL DEVICES\nRequired because: electrical/electronic devices detected in product range.\n\nAffected markets and registration bodies:\n${weeeMkts.map(m=>{const c=WEEE_MARKET_MAP[m];const s=sys[c];return s?`- ${m}: ${s.name} (${s.url})${s.fineIfMissed?' — fine if missed: '+s.fineIfMissed:''}`:null;}).filter(Boolean).join('\n')}\n\nAnnual fee estimate: ${WEEE_REQUIREMENTS.EU.annualFeeEstimate}\nRequired marking: ${WEEE_REQUIREMENTS.EU.symbology}\nAnnual reporting required in each registered market.\nRegister BEFORE first sale — this is enforced.`;
+})()}
+
 ## COMPLIANCE CHECKLIST — Prioritised
 | Requirement | Action | Portal/Authority | Timeline | Cost | Priority | Unblocks |
 CRITICAL (blocks all sales) first. Then IMPORTANT (blocks premium retail). Then NICE TO HAVE.
@@ -13136,6 +13229,19 @@ function renderSkuTab2(){
         </div>
         <div class="field"><label class="lbl">CE / UKCA marking <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(if electrical)</span></label>
           <input type="text" value="${skuForm.ceMarking||''}" placeholder="e.g. CE + UKCA" oninput="skuForm.ceMarking=this.value"></div>
+        ${isWEEEDevice(skuForm)?`
+        <div class="field">
+          <label class="lbl">WEEE producer registration <span style="font-family:var(--sans);font-size:.62rem;color:#92400E;font-weight:400;text-transform:none;letter-spacing:0">⚠ Required per EU market for electrical devices</span></label>
+          <select oninput="skuForm.weeeRegistered=this.value==='yes';skuForm.weeeRegistrationStatus=this.value">
+            <option value="">Select status…</option>
+            <option value="yes" ${skuForm.weeeRegistrationStatus==='yes'?'selected':''}>✓ Registered in all target markets</option>
+            <option value="in_progress" ${skuForm.weeeRegistrationStatus==='in_progress'?'selected':''}>In progress</option>
+            <option value="no" ${!skuForm.weeeRegistrationStatus||skuForm.weeeRegistrationStatus==='no'?'selected':''}>Not yet registered</option>
+          </select>
+          <div style="font-family:var(--sans);font-size:.65rem;color:#92400E;margin-top:.3rem;line-height:1.5">
+            Register per market: DE=stiftung ear · SE=El-Kretsen · DK=DPA-System · NO=Elretur · FR=Eco-systèmes · NL=Wecycle
+          </div>
+        </div>`:''}
       </div>
       <div class="field">
         <label class="lbl">Claims</label>
@@ -13211,7 +13317,7 @@ function submitSkuTypeFeedback(){
     const ti=document.getElementById('sku-type-input'); if(ti){ti.style.borderColor='#EF4444'; ti.placeholder='Please enter a product type'; setTimeout(()=>{ti.style.borderColor='';},2000);}
     return;
   }
-  const existing = JSON.parse(localStorage.getItem('ns_sku_type_suggestions')||'[]');
+  const existing = safeJsonParse(localStorage.getItem('ns_sku_type_suggestions'), []);
   existing.push({value:v, ts:new Date().toISOString()});
   localStorage.setItem('ns_sku_type_suggestions', JSON.stringify(existing));
   localStorage.setItem('ns_sku_type_submitted','1');
@@ -13885,7 +13991,7 @@ function renderImageResizer(){
 
   modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto">
-      <div style="background:#fff;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;position:relative">
+      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch">
         <!-- Header -->
         <div style="padding:.85rem 1.25rem .7rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2;display:flex;align-items:flex-start;justify-content:space-between">
           <div>
@@ -19514,6 +19620,11 @@ function moveCRMCard(id, stage){
     const fc = FIRST_CONTACT[id];
     if(fc){ crmFirstContactId = id; crmEditId = id; }
   }
+  // Prompt CSRD pack when moved to Listed
+  if(stage === 'listed'){
+    const retailerName = card.name||'this retailer';
+    showCSRDListingPrompt(retailerName);
+  }
   renderPage('crm');
 }
 
@@ -19910,7 +20021,7 @@ function submitRequestListed(){
     return;
   }
   // Store submission in localStorage for Charlotte review
-  const submissions = JSON.parse(localStorage.getItem('ns_listing_requests')||'[]');
+  const submissions = safeJsonParse(localStorage.getItem('ns_listing_requests'), []);
   submissions.push({...f, submittedAt: new Date().toISOString(), status:'pending_review'});
   localStorage.setItem('ns_listing_requests', JSON.stringify(submissions));
 
@@ -21646,6 +21757,36 @@ function renderAllBrandHomeAlerts() {
     `);
   }
 
+  // WEEE alert — amber, device brands targeting EU
+  if(brand && skus.some(s=>isWEEEDevice(s))){
+    const weeeMkts = getWEEEMarkets().filter(m=>m!=='Norway');
+    const sku0 = skus.find(s=>isWEEEDevice(s));
+    if(weeeMkts.length>0 && sku0 && !sku0.weeeRegistered){
+      action.push(`
+        <div style="background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #F59E0B;padding:.85rem 1.25rem;margin-bottom:.85rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-size:.55rem;background:#F59E0B;color:#fff;padding:.1rem .4rem;font-weight:700">⚠ ACTION REQUIRED</span>
+              <span style="font-family:var(--mono);font-size:.58rem;color:#92400E;font-weight:700">WEEE PRODUCER REGISTRATION — ELECTRICAL DEVICES</span>
+            </div>
+            <div style="font-family:var(--sans);font-size:.75rem;color:#78350F;line-height:1.55;margin-bottom:.25rem">
+              Your electrical devices may require WEEE producer registration before sale in <strong>${weeeMkts.join(', ')}</strong>. Register per market — annual reporting required.
+            </div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:#92400E;opacity:.75">
+              DE: stiftung ear · SE: El-Kretsen · DK: DPA-System · NO: Elretur · FR: Eco-systèmes · NL: Wecycle
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.4rem;flex-shrink:0">
+            <button onclick="showPage('skus')"
+              style="font-family:var(--mono);font-size:.62rem;padding:.35rem .75rem;background:#F59E0B;color:#fff;border:none;cursor:pointer">Check requirements →</button>
+            <button onclick="(function(){var s=skus.find(function(x){return x.id=='${sku0.id}';});if(s){s.weeeRegistered=true;s.weeeRegistrationStatus='yes';saveSkus();}renderPage('home');})()"
+              style="background:none;border:1px solid #FCD34D;font-family:var(--mono);font-size:.58rem;color:#92400E;cursor:pointer;padding:.25rem .55rem">✓ Mark as registered</button>
+          </div>
+        </div>
+      `);
+    }
+  }
+
   // Deadline-based alerts — sort by priority
   BRAND_HOME_ALERTS.forEach(def=>{
     if(!alertMatchesBrand(def)) return;
@@ -22486,7 +22627,7 @@ function renderESGModal(retailerId){
 
   if(!esg){
     modal.innerHTML = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch">
         <div style="background:#fff;width:100%;max-width:440px;padding:1.5rem;text-align:center">
           <div style="font-family:var(--sans);font-size:.85rem;color:var(--navy);margin-bottom:.5rem">ESG data not yet available for ${name}</div>
           <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-bottom:.75rem">Request current ESG requirements directly from the buyer.</div>
@@ -22554,7 +22695,7 @@ function renderESGModal(retailerId){
                 <span style="font-size:.8rem;flex-shrink:0">${req.met?'✓':req.required?'⛔':'◌'}</span>
                 <div style="flex:1">
                   <div style="font-family:var(--sans);font-size:.72rem;color:${req.met?'#065F46':req.required?'#991B1B':'#374151'};font-weight:500">${req.label} ${req.required?'<span style="font-family:var(--mono);font-size:.48rem;color:#991B1B">REQUIRED</span>':'<span style="font-family:var(--mono);font-size:.48rem;color:var(--muted)">PREFERRED</span>'}</div>
-                  <div style="font-family:var(--sans);font-size:.62rem;color:${req.met?'#065F46':req.required?'#991B1B':'#555'};line-height:1.45">${req.note}</div>
+                  <div style="font-family:var(--sans);font-size:.62rem;color:${req.met?'#065F46':req.required?'#991B1B':'#555'};line-height:1.45">${tipifyRegTerms(req.note)}</div>
                 </div>
               </div>
             `).join('')}
@@ -23176,6 +23317,59 @@ function needsLucidRegistration(){
   return !brand.lucidRegistered; // brand.lucidRegistered = true when user marks done
 }
 
+/* ═══════════════════════════════════════════════════
+   WEEE — WASTE ELECTRICAL & ELECTRONIC EQUIPMENT
+   Applies to any product with battery, plug, or
+   electronic component. LED masks, microcurrent,
+   sonic cleansers, light therapy, electronic tools.
+   Register as producer per EU market before first sale.
+═══════════════════════════════════════════════════ */
+const WEEE_REQUIREMENTS = {
+  EU: {
+    directive:'EU WEEE Directive 2012/19/EU',
+    requirement:'Register as producer in each EU market where devices are sold. Annual reporting of units placed on market.',
+    collectiveSystems:{
+      DE:{name:'stiftung ear',      url:'https://www.stiftung-ear.de',   mandatory:true,  fineIfMissed:'Up to €100,000', annualReportMonth:'March'},
+      SE:{name:'El-Kretsen',        url:'https://www.el-kretsen.se',     mandatory:true,  annualReportMonth:'January'},
+      DK:{name:'DPA-System',        url:'https://www.dpa-system.dk',     mandatory:true,  annualReportMonth:'April'},
+      NO:{name:'Renas / Elretur',   url:'https://www.elretur.no',        mandatory:true,  annualReportMonth:'March'},
+      FI:{name:'Serty',             url:'https://www.serty.fi',          mandatory:true,  annualReportMonth:'February'},
+      FR:{name:'Eco-systèmes',      url:'https://www.eco-systemes.fr',   mandatory:true,  annualReportMonth:'March'},
+      NL:{name:'Wecycle',           url:'https://www.wecycle.nl',        mandatory:true,  annualReportMonth:'February'},
+      UK:{name:'Environment Agency',url:'https://www.gov.uk/weee-producer',mandatory:true,note:'Separate from EU — UK-specific WEEE Producer Registration',annualReportMonth:'April'},
+    },
+    symbology:'Crossed-out wheelie bin symbol mandatory on product and packaging',
+    annualFeeEstimate:'€100–500/yr per market depending on volume',
+    confidence:'research_verified',
+  },
+};
+
+// Market name → WEEE system code
+const WEEE_MARKET_MAP = {
+  Sweden:'SE', Denmark:'DK', Norway:'NO', Germany:'DE',
+  'United Kingdom':'UK', Netherlands:'NL', France:'FR', Finland:'FI',
+};
+
+// Check if SKU type is a WEEE-applicable device
+function isWEEEDevice(sku){
+  if(!sku) return false;
+  const t = sku.productType||'';
+  if(t==='device'||t==='beauty_device'||t==='garment_accessories') return true;
+  // Also flag by CE marking presence or device keywords in name
+  if(sku.ceMarking) return true;
+  const name = (sku.name||'').toLowerCase();
+  return ['led ','sonic ','microcurrent','device','tool','cleansing brush','massager',
+          'light therapy','laser','electric','ultrasonic'].some(kw=>name.includes(kw));
+}
+
+// Get WEEE-relevant markets from brand target markets
+function getWEEEMarkets(){
+  if(!brand) return [];
+  return [...(brand.targetMarkets||[]), brand.currentMarket||'Sweden']
+    .filter(m=>WEEE_MARKET_MAP[m])
+    .filter((m,i,a)=>a.indexOf(m)===i);
+}
+
 const REGULATORY_DEADLINES = [
   // Cosmetics / skincare
   {
@@ -23286,9 +23480,180 @@ function buildComplianceEvents(){
     });
   });
 
+  // 6. WEEE annual reporting (device SKUs only)
+  const hasDevice = skus.some(s=>isWEEEDevice(s));
+  if(hasDevice){
+    const weeeMkts = getWEEEMarkets();
+    weeeMkts.forEach(mkt=>{
+      const code = WEEE_MARKET_MAP[mkt];
+      if(!code) return;
+      const sys = WEEE_REQUIREMENTS.EU.collectiveSystems[code];
+      if(!sys||!sys.annualReportMonth) return;
+      const mmdd2 = PR_MONTH_MAP[sys.annualReportMonth];
+      if(!mmdd2) return;
+      [year, year+1].forEach(y=>{
+        addEvent(
+          `${y}-${mmdd2}`,
+          `${sys.name} — WEEE annual report (${mkt})`,
+          'File report',
+          'skus',
+          'weee_report',
+          `weee_${mkt}_${y}`
+        );
+      });
+    });
+  }
+
   // Sort chronologically
   events.sort((a,b)=>a.date-b.date);
   return events;
+}
+
+/* ═══════════════════════════════════════════════════
+   COMPLIANCE RADAR
+   Single-screen traffic light view of every
+   applicable regulation for the brand's categories
+   and markets. The feature that gives a founder
+   a complete compliance picture in 30 seconds.
+═══════════════════════════════════════════════════ */
+const COMPLIANCE_RADAR_ITEMS = [
+  // Cosmetics — EU
+  {id:'cpnp',          label:'CPNP notification',              categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.cpnpRef||s?.cpnp||s?.cpnpNumber?'green':'red',     actionPage:'skus',        actionLabel:'Add in My Products'},
+  {id:'eu_rp',         label:'EU Responsible Person',          categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>b?.euResponsiblePerson?.name||b?.euRP||b?.euRpName?'green':'red',   actionPage:'home',  actionLabel:'Add in Brand Profile'},
+  {id:'pif',           label:'Product Information File (PIF)', categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.safetyAssessment||s?.safetyAssessor?'green':'amber', actionPage:'claims',     actionLabel:'Check in PIF Gap Checker'},
+  {id:'reach_svhc',    label:'REACH SVHC check',               categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>{if(!s?.inci)return 'amber';return checkInciForSVHC(s.inci||'').length?'red':'green';}, actionPage:'skus', actionLabel:'Check INCI in My Products'},
+  // Cosmetics — UK
+  {id:'uk_rp',         label:'UK Responsible Person',          categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>b?.ukRP?.name||b?.ukRpName||b?.ukResponsiblePerson?'green':'red', actionPage:'home',  actionLabel:'Add UK RP in Brand Profile'},
+  {id:'uk_scpn',       label:'UK SCPN cosmetics notification', categories:['cosmetic_skincare'],        markets:['United Kingdom'],              check:(b,s)=>s?.ukScpnRef||s?.ukScpn?'green':'red',                actionPage:'skus',        actionLabel:'Register at SCPN portal'},
+  // Cosmetics — CH
+  {id:'ch_chemrrv',    label:'Swiss ChemRRV notification',     categories:['cosmetic_skincare'],        markets:['Switzerland'],                 check:(b,s)=>b?.chNotified||s?.chNotification?'green':'red',        actionPage:'home',       actionLabel:'Register ChemRRV (CH only)'},
+  // Devices
+  {id:'ce_marking',    label:'CE marking',                     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.ceMarking?'green':'red',                           actionPage:'skus',        actionLabel:'Add CE number in My Products'},
+  {id:'weee',          label:'WEEE producer registration',     categories:['beauty_device'],            markets:['all_eu','United Kingdom'],     check:(b,s)=>s?.weeeRegistered?'green':'red',  urgency:'critical',  actionPage:'skus',        actionLabel:'Register per market before first sale', fineRisk:'Up to €100,000'},
+  // Packaging registers
+  {id:'lucid_de',      label:'Lucid packaging register',       categories:['all'],                      markets:['Germany'],                     check:(b,s)=>b?.lucidRegistered?'green':'red', urgency:'critical',  actionPage:'home',        actionLabel:'Register at verpackungsregister.org', fineRisk:'Up to €200,000'},
+  {id:'fti_se',        label:'FTI producer responsibility',    categories:['all'],                      markets:['Sweden'],                      check:(b,s)=>b?.ftiRegistered?'green':'amber',                      actionPage:'home',        actionLabel:'Register at ftiab.se'},
+  {id:'citeo_fr',      label:'Citeo packaging register',       categories:['all'],                      markets:['France'],                      check:(b,s)=>b?.citeoRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at citeo.com'},
+  {id:'groent_punkt',  label:'Grønt Punkt Norge',              categories:['all'],                      markets:['Norway'],                      check:(b,s)=>b?.groentPunktRegistered?'green':'amber',              actionPage:'home',        actionLabel:'Register at grontpunkt.no'},
+  // Norway
+  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
+  {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],                      check:(b,s)=>b?.noVatRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at skatteetaten.no if >NOK 50k/yr'},
+  // Cross-category
+  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>s?.eudrCompliant||b?.eudrCompliant?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
+  {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
+  {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
+];
+
+function renderComplianceRadar(){
+  if(!brand) return '';
+  const sku0 = skus[0]||null;
+  const brandCats = getBrandCategories()||[brand.category||''];
+  const brandMkts = [...(brand.targetMarkets||[]), brand.currentMarket||'Sweden'];
+
+  // Map category names to radar category ids
+  const CAT_MAP = {
+    'Skincare & Beauty':'cosmetic_skincare','Wellness & Supplements':'wellness_supplement',
+    'Food & Beverage':'food_beverage','Fashion & Apparel':'fashion_apparel',
+  };
+  const brandCatIds = brandCats.map(c=>CAT_MAP[c]||c);
+  const hasDevice = skus.some(s=>isWEEEDevice(s));
+  if(hasDevice && !brandCatIds.includes('beauty_device')) brandCatIds.push('beauty_device');
+
+  // Filter radar items to relevant ones
+  const EU_MKTS = ['Sweden','Denmark','Germany','Netherlands','France','Belgium','Austria','Finland','Italy','Spain','Portugal'];
+  const relevant = COMPLIANCE_RADAR_ITEMS.filter(item=>{
+    // Category match
+    const catMatch = item.categories.includes('all') ||
+      item.categories.some(c=>brandCatIds.includes(c));
+    if(!catMatch) return false;
+    // Market match
+    const mktMatch = item.markets.some(m=>{
+      if(m==='all_eu') return brandMkts.some(bm=>EU_MKTS.includes(bm));
+      return brandMkts.includes(m);
+    });
+    return mktMatch;
+  });
+
+  if(!relevant.length) return '';
+
+  // Evaluate each item
+  const evaluated = relevant.map(item=>{
+    const status = item.check(brand, sku0);
+    return {...item, status};
+  });
+
+  const reds    = evaluated.filter(i=>i.status==='red').sort((a,b)=>(b.urgency==='critical'?1:0)-(a.urgency==='critical'?1:0));
+  const ambers  = evaluated.filter(i=>i.status==='amber');
+  const greens  = evaluated.filter(i=>i.status==='green');
+  const criticalCount = reds.filter(i=>i.urgency==='critical').length;
+
+  const summaryColor = reds.length>0?'#991B1B':ambers.length>0?'#92400E':'#065F46';
+  const summaryBg    = reds.length>0?'#FEF2F2':ambers.length>0?'#FFFBEB':'#ECFDF5';
+
+  function radarCard(item){
+    const cfg = {
+      red:   {icon:'🔴',bg:'#FEF2F2',border:'#FCA5A5',accent:'#EF4444',text:'#991B1B'},
+      amber: {icon:'⚠',  bg:'#FFFBEB',border:'#FCD34D',accent:'#F59E0B',text:'#92400E'},
+      green: {icon:'✅', bg:'#F0FDF4',border:'#A7F3D0',accent:'#10B981',text:'#065F46'},
+    }[item.status]||{icon:'○',bg:'#F9F8F6',border:'#E5E7EB',accent:'#9CA3AF',text:'#555'};
+
+    const mktLabel = item.markets.includes('all_eu')?'EU':
+                     item.markets.includes('United Kingdom')&&item.markets.includes('all_eu')?'EU + UK':
+                     item.markets.join(', ');
+
+    return `<div style="background:${cfg.bg};border:1px solid ${cfg.border};padding:.55rem .75rem;display:flex;align-items:flex-start;gap:.5rem">
+      <span style="font-size:.9rem;flex-shrink:0;margin-top:.05rem">${cfg.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.1rem">
+          <span style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:${cfg.text}">${item.label}</span>
+          <span style="font-family:var(--mono);font-size:.48rem;background:${cfg.accent};color:#fff;padding:.05rem .3rem">${mktLabel}</span>
+          ${item.fineRisk?`<span style="font-family:var(--mono);font-size:.48rem;background:#7F1D1D;color:#fff;padding:.05rem .3rem">Fine: ${item.fineRisk}</span>`:''}
+        </div>
+        ${item.status!=='green'?`<div style="font-family:var(--sans);font-size:.62rem;color:${cfg.text};opacity:.85">
+          ${item.actionLabel}
+          ${item.actionPage?`<span onclick="showPage('${item.actionPage}')" style="color:${cfg.accent};cursor:pointer;text-decoration:underline;margin-left:.25rem">→ Fix now</span>`:''}
+        </div>`:''}
+      </div>
+    </div>`;
+  }
+
+  const greenToggleId = 'radar-greens-'+Date.now();
+
+  return `
+    <div style="margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.35rem">
+        <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Compliance Radar</div>
+        <button onclick="showPage('report')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--gold);cursor:pointer;padding:0">Run full market report →</button>
+      </div>
+
+      <!-- Summary strip -->
+      <div style="background:${summaryBg};border:1px solid ${reds.length?'#FCA5A5':ambers.length?'#FCD34D':'#A7F3D0'};padding:.55rem .85rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
+        <div style="font-family:var(--sans);font-size:.75rem;color:${summaryColor};font-weight:500">
+          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
+        </div>
+        <span style="font-family:var(--mono);font-size:.52rem;color:${summaryColor}">${relevant.length} applicable to your profile</span>
+      </div>
+
+      <!-- Red items first -->
+      ${reds.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${reds.map(radarCard).join('')}</div>`:''}
+
+      <!-- Amber items -->
+      ${ambers.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${ambers.map(radarCard).join('')}</div>`:''}
+
+      <!-- Green items — collapsed -->
+      ${greens.length?`
+        <div>
+          <div onclick="var d=document.getElementById('${greenToggleId}');d.style.display=d.style.display==='none'?'flex':'none'"
+            style="font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.3rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:.3rem">
+            <span style="color:var(--green)">✅</span> Show covered regulations (${greens.length}) <span style="opacity:.5;margin-left:.2rem">▾</span>
+          </div>
+          <div id="${greenToggleId}" style="display:none;flex-direction:column;gap:.3rem;margin-top:.35rem">
+            ${greens.map(radarCard).join('')}
+          </div>
+        </div>
+      `:''}
+    </div>
+  `;
 }
 
 function renderComplianceCalendar(){
@@ -24249,6 +24614,250 @@ function getDPPId(skuId){
 
 // ── Render: DPP page (list of all SKUs) ──────────
 
+/* ═══════════════════════════════════════════════════
+   CSRD SUPPLY CHAIN QUESTIONNAIRE GENERATOR
+   Large retail customers (Apotek, ICA, dm, Douglas,
+   Boots) are CSRD-obligated and ask tier-1 suppliers
+   for sustainability data. VeyaFlow auto-fills from
+   data already entered. Brand fills remaining gaps.
+   Output: formatted PDF-ready disclosure document.
+═══════════════════════════════════════════════════ */
+const CSRD_QUESTIONS = [
+  {id:'scope1',          category:'Climate',    question:'Scope 1 direct emissions (tCO2e)',                        unit:'tCO2e/year',   source:'dpp',       hint:'DPP carbon estimate or manual entry'},
+  {id:'scope2',          category:'Climate',    question:'Scope 2 indirect emissions from purchased energy',        unit:'tCO2e/year',   source:'manual',    hint:'From energy bills — electricity and heat'},
+  {id:'scope3',          category:'Climate',    question:'Scope 3 upstream supply chain emissions',                 unit:'tCO2e/year',   source:'manual',    hint:'Ingredient + logistics emissions'},
+  {id:'renewable_energy',category:'Climate',    question:'% of energy from renewable sources',                     unit:'%',            source:'manual',    hint:'e.g. green electricity tariff'},
+  {id:'recycled_pkg',    category:'Circular',   question:'% recycled content in packaging',                        unit:'%',            source:'skus',      hint:'From packaging specs in My Products'},
+  {id:'recyclable_pkg',  category:'Circular',   question:'Is primary packaging recyclable?',                       unit:'yes/no/partial',source:'skus',     hint:'Packaging type from My Products'},
+  {id:'social_audit',    category:'Social',     question:'Has manufacturing facility been audited in last 2 years? (SMETA/BSCI/SA8000)', unit:'yes/no + cert',source:'suppliers', hint:'From Supplier Nudge certificate data'},
+  {id:'living_wage',     category:'Social',     question:'Does your primary manufacturer pay living wage?',        unit:'yes/no/unknown',source:'manual',   hint:'Ask your manufacturer directly'},
+  {id:'women_leadership',category:'Social',     question:'% women in management at your company',                 unit:'%',            source:'manual',    hint:'Internal HR data'},
+  {id:'supplier_code',   category:'Governance', question:'Do you have a Supplier Code of Conduct?',               unit:'yes/no',       source:'manual',    hint:'A document setting standards for your suppliers'},
+  {id:'eudr_compliance', category:'Governance', question:'EUDR due diligence statement for forest-risk commodities', unit:'statement', source:'skus',      hint:'EUDR status from My Products'},
+  {id:'certifications',  category:'Governance', question:'List all active sustainability certifications',          unit:'list',         source:'skus',      hint:'COSMOS, FSC, Vegan, B Corp, GOTS, etc.'},
+];
+
+const CSRD_CATEGORY_COLORS = {
+  Climate:'#1E40AF', Circular:'#065F46', Social:'#92400E', Governance:'#1E3A5F'
+};
+const CSRD_CATEGORY_BG = {
+  Climate:'#EFF6FF', Circular:'#ECFDF5', Social:'#FFFBEB', Governance:'#F9F8F6'
+};
+
+// Auto-fill CSRD answers from existing VeyaFlow data
+function csrdAutoFill(){
+  const answers = safeJsonParse(localStorage.getItem('ns_csrd_answers'), {});
+  const sku0 = skus[0]||null;
+  const allCerts = [...new Set([
+    ...(sku0?.certifications||[]),
+    ...skus.flatMap(s=>s.certifications||[]),
+    ...(brand?.certifications||[]).map(c=>c.name||c.label||c),
+  ])].filter(Boolean);
+
+  // Auto-fill from SKU data
+  if(sku0){
+    if(!answers.recycled_pkg && sku0.recycledContent)
+      answers.recycled_pkg = sku0.recycledContent;
+    if(!answers.recyclable_pkg && sku0.packagingType)
+      answers.recyclable_pkg = sku0.packagingType.toLowerCase().includes('glass')||sku0.packagingType.toLowerCase().includes('metal')?'yes':sku0.packagingType.toLowerCase().includes('plastic')?'partial':'unknown';
+    if(!answers.eudr_compliance)
+      answers.eudr_compliance = (sku0.eudrCompliant||brand?.eudrCompliant) ? 'EUDR due diligence completed — no deforestation risk identified in supply chain.' : '';
+    if(!answers.certifications && allCerts.length)
+      answers.certifications = allCerts.join(', ');
+  }
+
+  // Auto-fill from Supplier Nudge
+  const auditedSupplier = SUPPLIER_DATABASE&&SUPPLIER_DATABASE.find(s=>s.certifications&&s.certifications.length>0&&s.tier===1);
+  if(auditedSupplier && !answers.social_audit){
+    answers.social_audit = 'Yes — '+auditedSupplier.certifications.join(', ');
+  }
+
+  // Auto-fill from DPP if carbon data exists
+  try{
+    const dppData = safeJsonParse(localStorage.getItem('ns_dpp_data'), {});
+    const dppSku = sku0 && dppData[sku0.id];
+    if(dppSku?.carbonFootprint && !answers.scope1){
+      answers.scope1 = dppSku.carbonFootprint;
+    }
+  }catch(e){}
+
+  localStorage.setItem('ns_csrd_answers', JSON.stringify(answers));
+  return answers;
+}
+
+function csrdGetAnswers(){ return safeJsonParse(localStorage.getItem('ns_csrd_answers'), {}); }
+function csrdSaveAnswer(id, val){
+  const a = csrdGetAnswers(); a[id]=val;
+  localStorage.setItem('ns_csrd_answers', JSON.stringify(a));
+}
+
+function showCSRDListingPrompt(retailerName){
+  const CSRD_RETAILERS = ['Apotek Hjärtat','ICA','Douglas','dm','Boots','Sephora','Matas','Kicks','Lyko','Asos','Zalando'];
+  const isCsrdObligation = CSRD_RETAILERS.some(r=>retailerName.toLowerCase().includes(r.toLowerCase()));
+  if(!isCsrdObligation) return;
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:5rem;right:1.5rem;z-index:9999;background:#fff;border:1px solid #FCD34D;border-left:4px solid #F59E0B;padding:.85rem 1.1rem;max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.12);animation:slideUp .2s ease';
+  toast.innerHTML = '<div style="font-family:var(--mono);font-size:.55rem;color:#92400E;font-weight:700;margin-bottom:.25rem">SUSTAINABILITY DATA REQUEST LIKELY</div>'+
+    '<div style="font-family:var(--sans);font-size:.72rem;color:#78350F;line-height:1.5;margin-bottom:.55rem">'+retailerName+' is CSRD-obligated and may request your ESG data. Generate your pack now.</div>'+
+    '<div style="display:flex;gap:.4rem">'+
+      '<button onclick="showPage(\'csrd\');this.closest(\'div[style]\').remove()" style="font-family:var(--mono);font-size:.6rem;padding:.3rem .65rem;background:#F59E0B;color:#fff;border:none;cursor:pointer">Generate CSRD Pack →</button>'+
+      '<button onclick="this.closest(\'div[style]\').remove()" style="font-family:var(--mono);font-size:.58rem;padding:.3rem .55rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer">Later</button>'+
+    '</div>';
+  document.body.appendChild(toast);
+  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 12000);
+}
+
+function renderCSRD(el){
+  if(!brand){ el.innerHTML='<div class="page-wrap"><div class="card empty-state"><div class="empty-title">Set up your brand workspace first</div><button class="btn-primary" onclick="openSetupModal()">Set up workspace →</button></div></div>'; return; }
+  csrdAutoFill();
+  const answers = csrdGetAnswers();
+  const year = new Date().getFullYear();
+  const categories = [...new Set(CSRD_QUESTIONS.map(q=>q.category))];
+  const autoFilled = CSRD_QUESTIONS.filter(q=>answers[q.id]&&answers[q.id]!=='').length;
+  const total = CSRD_QUESTIONS.length;
+  const pct = Math.round((autoFilled/total)*100);
+
+  el.innerHTML = `
+    <div class="topbar">
+      <div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">Source</div>
+        <div class="page-title">CSRD Pack</div>
+        <div class="page-sub">Your retailer sustainability disclosure — auto-filled from VeyaFlow data</div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+        <button onclick="showModuleExplainer('csrd')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:pointer;font-size:.62rem;padding:.25rem .55rem;font-family:var(--mono)">? How it works</button>
+        <button onclick="exportCSRDPDF()" class="btn-outline" style="font-size:.65rem;padding:.35rem .8rem">↓ Export PDF</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- Explainer banner -->
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid #3B82F6;padding:.75rem 1rem;margin-bottom:1.25rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.6">
+        <strong>Your large retail partners are legally required to collect this data from their suppliers.</strong>
+        VeyaFlow generates your response automatically from data you have already entered. Fill in any gaps below, then export as a PDF to send to any retailer requesting ESG/sustainability data.
+      </div>
+
+      <!-- Progress -->
+      <div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem">
+          <div>
+            <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.1rem">Disclosure completeness</div>
+            <div style="font-family:var(--sans);font-size:.85rem;color:var(--navy);font-weight:500">${brand.name} — CSRD Supply Chain Disclosure ${year}</div>
+          </div>
+          <div style="font-family:var(--mono);font-size:1.2rem;color:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'};font-weight:700">${pct}%</div>
+        </div>
+        <div style="background:var(--border);height:6px;border-radius:3px">
+          <div style="background:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'};height:6px;border-radius:3px;width:${pct}%;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ ${autoFilled} auto-filled</span>
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--amber)">◐ ${total-autoFilled} need input</span>
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Date: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</span>
+        </div>
+      </div>
+
+      <!-- Questions by category -->
+      ${categories.map(cat=>{
+        const catQs = CSRD_QUESTIONS.filter(q=>q.category===cat);
+        const catColor = CSRD_CATEGORY_COLORS[cat]||'var(--navy)';
+        const catBg    = CSRD_CATEGORY_BG[cat]||'#F9F8F6';
+        return `
+          <div style="margin-bottom:1.25rem">
+            <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:${catColor};font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem">
+              <span style="background:${catBg};border:1px solid ${catColor};padding:.15rem .5rem">${cat}</span>
+            </div>
+            ${catQs.map(q=>{
+              const val = answers[q.id]||'';
+              const filled = val.trim()!=='';
+              return `
+                <div style="background:#fff;border:1px solid ${filled?'#A7F3D0':'#FCD34D'};border-left:3px solid ${filled?'var(--green)':'var(--amber)'};padding:.65rem .85rem;margin-bottom:.4rem">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem">
+                    <div style="font-family:var(--sans);font-size:.75rem;color:var(--navy);font-weight:500;flex:1">${q.question}</div>
+                    <span style="font-family:var(--mono);font-size:.5rem;padding:.1rem .35rem;background:${filled?'#ECFDF5':'#FFFBEB'};color:${filled?'#065F46':'#92400E'};white-space:nowrap;flex-shrink:0">${filled?'✓ filled':'needs input'}</span>
+                  </div>
+                  <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.3rem">Unit: ${q.unit} · Source: ${q.hint}</div>
+                  <input type="text" value="${(val||'').replace(/"/g,'&quot;')}"
+                    placeholder="${q.unit==='yes/no'?'yes / no':q.unit==='yes/no/partial'?'yes / no / partial':q.unit==='yes/no + cert'?'yes — [certificate name]':q.unit==='yes/no/unknown'?'yes / no / unknown':'Enter value…'}"
+                    oninput="csrdSaveAnswer('${q.id}',this.value);this.closest('div[style]').style.borderColor=this.value.trim()?'#A7F3D0':'#FCD34D';this.closest('div[style]').style.borderLeftColor=this.value.trim()?'var(--green)':'var(--amber)'"
+                    style="width:100%;font-family:var(--sans);font-size:.75rem;padding:.35rem .55rem;border:1px solid var(--border);background:#FAFAFA;box-sizing:border-box">
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }).join('')}
+
+      <!-- Footer actions -->
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <button onclick="exportCSRDPDF()" class="btn-primary" style="padding:.5rem 1.1rem;font-size:.72rem">↓ Export PDF — ${brand.name} CSRD Pack ${year}</button>
+        <button onclick="csrdAutoFill();renderPage('csrd')" class="btn-outline" style="font-size:.65rem;padding:.4rem .85rem">↻ Re-sync from VeyaFlow data</button>
+        <button onclick="if(confirm('Clear all saved answers?')){localStorage.removeItem('ns_csrd_answers');renderPage('csrd')}" class="btn-outline" style="font-size:.65rem;padding:.4rem .85rem;color:var(--red);border-color:var(--red)">✕ Clear all</button>
+      </div>
+
+    </div>
+  `;
+}
+
+async function exportCSRDPDF(){
+  const answers = csrdGetAnswers();
+  const year = new Date().getFullYear();
+  const brandName = brand?.name||'Brand';
+  const categories = [...new Set(CSRD_QUESTIONS.map(q=>q.category))];
+  const dateStr = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+  // Build printable HTML document
+  const catColors = CSRD_CATEGORY_COLORS;
+  let sectionsHTML = categories.map(cat=>{
+    const qs = CSRD_QUESTIONS.filter(q=>q.category===cat);
+    return `<div style="margin-bottom:1.5rem">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${catColors[cat]||'#1E3A5F'};border-bottom:2px solid ${catColors[cat]||'#1E3A5F'};padding-bottom:.2rem;margin-bottom:.6rem">${cat}</div>
+      ${qs.map(q=>{
+        const val = answers[q.id]||'';
+        return `<div style="margin-bottom:.5rem;padding:.4rem .6rem;background:${val?'#F0FDF4':'#FFFBEB'};border-left:3px solid ${val?'#10B981':'#F59E0B'}">
+          <div style="font-size:.72rem;color:#333;margin-bottom:.15rem">${q.question} <span style="font-size:.6rem;color:#888">(${q.unit})</span></div>
+          <div style="font-size:.8rem;font-weight:600;color:${val?'#065F46':'#92400E'}">${val||'[Not provided]'}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  const printHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>${brandName} CSRD Pack ${year}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;color:#222;margin:2cm;line-height:1.5}
+      h1{font-size:16px;color:#1E3A5F;margin-bottom:.2rem}
+      .meta{font-size:.65rem;color:#888;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid #ddd}
+      .disclaimer{font-size:.6rem;color:#888;margin-top:2rem;padding-top:.5rem;border-top:1px solid #ddd}
+      @media print{body{margin:1.5cm}}
+    </style>
+  </head><body>
+    <h1>${brandName} — CSRD Supply Chain Disclosure ${year}</h1>
+    <div class="meta">Generated by VeyaFlow · ${dateStr} · This document is provided in response to CSRD Directive (EU) 2022/2464 data requests from retail partners.</div>
+    ${sectionsHTML}
+    <div class="disclaimer">Signatory: ${brand?.userName||'[Name]'} · ${brandName} · ${dateStr}<br>
+    Data is self-reported and accurate to the best of the company's knowledge. Annual update recommended.</div>
+  </body></html>`;
+
+  // Open print dialog
+  const w = window.open('','_blank','width=800,height=900');
+  if(w){
+    w.document.write(printHTML);
+    w.document.close();
+    w.focus();
+    setTimeout(()=>{ w.print(); }, 400);
+    showSuccess('CSRD pack opened — use Save as PDF in the print dialog');
+  } else {
+    // Fallback: download as text if popup blocked
+    const blob = new Blob([printHTML], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=`${brandName.replace(/\s+/g,'_')}_CSRD_Pack_${year}.html`; a.click();
+    URL.revokeObjectURL(url);
+    showSuccess('CSRD pack downloaded — open in browser and print to PDF');
+  }
+}
+
+// Add csrd to MODULE_EXPLAINERS
 function renderDPP(el){
   loadDPP();
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
@@ -25243,7 +25852,7 @@ function renderEscrowModal(mfrName, view){
   `;
 
   modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch">
       <div style="background:#fff;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;position:relative">
         <button onclick="document.getElementById('vf-escrow-modal').remove()"
           style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);z-index:2">✕</button>
@@ -25486,7 +26095,7 @@ function renderReferralModal(){
 
   modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto">
-      <div style="background:#fff;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;position:relative">
+      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch">
         <button onclick="document.getElementById('vf-referral-modal').remove()"
           style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);z-index:2">✕</button>
         ${referralState.submitted ? confirmedView : formView}
@@ -25867,7 +26476,7 @@ function submitRequestListed(){
     if(err)err.textContent='Company name, email, and country are required.';
     return;
   }
-  const submissions=JSON.parse(localStorage.getItem('ns_listing_requests')||'[]');
+  const submissions=safeJsonParse(localStorage.getItem('ns_listing_requests'), []);
   submissions.push({...f,submittedAt:new Date().toISOString(),status:'pending_review'});
   localStorage.setItem('ns_listing_requests',JSON.stringify(submissions));
   const subject=encodeURIComponent('VeyaFlow Manufacturer Listing Request: '+f.companyName);
