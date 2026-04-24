@@ -30,6 +30,89 @@ headers: {
   return data;
 }
 
+// ─── Auth helpers (for Retailer Portal) ──────────────
+// The auth endpoints use a different base path (/auth/v1/) and the anon key
+// in the apikey header. The user's access_token goes in the Authorization
+// header for user-scoped endpoints like /user.
+
+async function supabaseAuthPost(pathWithQuery, body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/${pathWithQuery}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+  if (!res.ok) {
+    const err = new Error(`Supabase Auth ${res.status}: ${JSON.stringify(data)}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+async function supabaseAuthGetUser(accessToken) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_ANON,
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+  if (!res.ok) {
+    const err = new Error(`Supabase Auth ${res.status}: ${JSON.stringify(data)}`);
+    err.status = res.status;
+    err.code = res.status === 401 ? 'TOKEN_EXPIRED' : 'AUTH_FAILED';
+    throw err;
+  }
+  return data;
+}
+
+// Given an access_token, resolve the caller's retailer_account row.
+// Every portal action calls this first — retailer_id is never trusted
+// from the client, it's derived from the authenticated email.
+async function verifyTokenAndGetRetailer(accessToken) {
+  if (!accessToken) {
+    const err = new Error('Missing access_token');
+    err.code = 'NO_TOKEN';
+    throw err;
+  }
+  const user = await supabaseAuthGetUser(accessToken);
+  const email = user && user.email;
+  if (!email) {
+    const err = new Error('Authenticated user has no email');
+    err.code = 'NO_EMAIL';
+    throw err;
+  }
+  const rows = await supabase(
+    'GET',
+    `retailer_accounts?contact_email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`
+  );
+  if (!rows.length) {
+    const err = new Error('No active retailer account for this email');
+    err.code = 'NO_RETAILER_ACCOUNT';
+    throw err;
+  }
+  const a = rows[0];
+  return {
+    account_id:    a.id,
+    retailer_id:   a.retailer_id,
+    retailer_name: a.retailer_name,
+    contact_name:  a.contact_name,
+    contact_email: a.contact_email,
+    role:          a.role,
+    user_id:       user.id,
+  };
+}
+
 exports.handler = async (event) => {
   // CORS headers
   const headers = {
@@ -53,7 +136,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  const { action, session_id, data } = payload;
+  const { action, session_id, data, access_token } = payload;
 
   try {
 
@@ -172,6 +255,186 @@ exports.handler = async (event) => {
         updated_by: data.updatedBy || 'brand_feedback',
         confidence: 'HIGH',
         last_updated: new Date().toISOString(),
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    // ── Retailer Portal — Auth ────────────────────
+    // Login flow:
+    //   portal → action=portal.auth.login with {email, password}
+    //   ← returns {access_token, refresh_token, expires_at, retailer}
+    // Portal stores tokens in localStorage; every later call sends access_token.
+    // On 401 w/ TOKEN_EXPIRED, portal calls portal.auth.refresh with refresh_token.
+
+    if (action === 'portal.auth.login') {
+      const email    = data && data.email;
+      const password = data && data.password;
+      if (!email || !password) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Email and password required' }) };
+      }
+      try {
+        const tok = await supabaseAuthPost('token?grant_type=password', { email, password });
+        const retailer = await verifyTokenAndGetRetailer(tok.access_token);
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({
+            ok: true,
+            access_token:  tok.access_token,
+            refresh_token: tok.refresh_token,
+            expires_at:    tok.expires_at,
+            retailer,
+          }),
+        };
+      } catch (err) {
+        if (err.code === 'NO_RETAILER_ACCOUNT') {
+          return { statusCode: 403, headers, body: JSON.stringify({ error: 'This account has no active retailer access. Contact VeyaFlow admin.', code: 'NO_RETAILER_ACCOUNT' }) };
+        }
+        // Bad credentials come back as 400 from Supabase Auth
+        if (err.status === 400) {
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' }) };
+        }
+        throw err;
+      }
+    }
+
+    if (action === 'portal.auth.verify') {
+      try {
+        const retailer = await verifyTokenAndGetRetailer(access_token);
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, retailer }) };
+      } catch (err) {
+        if (err.code === 'TOKEN_EXPIRED') {
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Session expired', code: 'TOKEN_EXPIRED' }) };
+        }
+        if (err.code === 'NO_RETAILER_ACCOUNT') {
+          return { statusCode: 403, headers, body: JSON.stringify({ error: 'Retailer access revoked', code: 'NO_RETAILER_ACCOUNT' }) };
+        }
+        return { statusCode: 401, headers, body: JSON.stringify({ error: err.message || 'Invalid session' }) };
+      }
+    }
+
+    if (action === 'portal.auth.refresh') {
+      const refresh_token = data && data.refresh_token;
+      if (!refresh_token) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'refresh_token required' }) };
+      }
+      try {
+        const tok = await supabaseAuthPost('token?grant_type=refresh_token', { refresh_token });
+        const retailer = await verifyTokenAndGetRetailer(tok.access_token);
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({
+            ok: true,
+            access_token:  tok.access_token,
+            refresh_token: tok.refresh_token,
+            expires_at:    tok.expires_at,
+            retailer,
+          }),
+        };
+      } catch (err) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Refresh failed', code: 'REFRESH_FAILED' }) };
+      }
+    }
+
+    // ── Retailer Portal — Submissions ─────────────
+    // Every action re-verifies the token and derives retailer_id server-side.
+    // The client never sends retailer_id — prevents cross-tenant leakage.
+
+    if (action === 'portal.submission.list') {
+      const retailer = await verifyTokenAndGetRetailer(access_token);
+      const rows = await supabase(
+        'GET',
+        `portal_submissions?retailer_id=eq.${encodeURIComponent(retailer.retailer_id)}&order=submitted_at.desc`
+      );
+      return { statusCode: 200, headers, body: JSON.stringify({ submissions: rows, retailer }) };
+    }
+
+    if (action === 'portal.submission.get') {
+      const retailer = await verifyTokenAndGetRetailer(access_token);
+      const id = data && data.id;
+      if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) };
+      const rows = await supabase(
+        'GET',
+        `portal_submissions?id=eq.${encodeURIComponent(id)}&retailer_id=eq.${encodeURIComponent(retailer.retailer_id)}&limit=1`
+      );
+      if (!rows.length) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Submission not found' }) };
+      }
+      // Also load rejection reason if status is rejected (for detail view)
+      let rejection = null;
+      if (rows[0].status === 'rejected') {
+        const rj = await supabase(
+          'GET',
+          `rejection_reasons?submission_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=1`
+        );
+        rejection = rj[0] || null;
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ submission: rows[0], rejection }) };
+    }
+
+    if (action === 'portal.status.update') {
+      const retailer = await verifyTokenAndGetRetailer(access_token);
+      const id         = data && data.id;
+      const new_status = data && data.new_status;
+      const note       = (data && data.note) || '';
+      if (!id || !new_status) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and new_status required' }) };
+      }
+      // Verify ownership + fetch current status for log
+      const cur = await supabase(
+        'GET',
+        `portal_submissions?id=eq.${encodeURIComponent(id)}&retailer_id=eq.${encodeURIComponent(retailer.retailer_id)}&limit=1`
+      );
+      if (!cur.length) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Submission not found' }) };
+      }
+      const oldStatus = cur[0].status;
+      if (oldStatus === new_status) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, unchanged: true }) };
+      }
+      await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(id)}`, { status: new_status });
+      await supabase('POST', 'submission_status_log', {
+        submission_id: id,
+        old_status:    oldStatus,
+        new_status,
+        changed_by:    retailer.contact_email,
+        note,
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    if (action === 'portal.rejection.create') {
+      const retailer = await verifyTokenAndGetRetailer(access_token);
+      const submission_id   = data && data.submission_id;
+      const reason_category = (data && data.reason_category) || 'other';
+      const reason_detail   = (data && data.reason_detail)   || '';
+      const internal_note   = (data && data.internal_note)   || '';
+      if (!submission_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'submission_id required' }) };
+      }
+      // Verify ownership
+      const cur = await supabase(
+        'GET',
+        `portal_submissions?id=eq.${encodeURIComponent(submission_id)}&retailer_id=eq.${encodeURIComponent(retailer.retailer_id)}&limit=1`
+      );
+      if (!cur.length) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Submission not found' }) };
+      }
+      const oldStatus = cur[0].status;
+      // Write rejection reason, then flip status, then log
+      await supabase('POST', 'rejection_reasons', {
+        submission_id,
+        retailer_id:     retailer.retailer_id,
+        reason_category,
+        reason_detail,
+        internal_note,
+      });
+      await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(submission_id)}`, { status: 'rejected' });
+      await supabase('POST', 'submission_status_log', {
+        submission_id,
+        old_status: oldStatus,
+        new_status: 'rejected',
+        changed_by: retailer.contact_email,
+        note:       reason_detail,
       });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
