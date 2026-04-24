@@ -466,6 +466,78 @@ exports.handler = async (event) => {
       })};
     }
 
+    // ═══════════════════════════════════════════════
+    // ── Feedback Loop Engine (Phase 1) ──────────
+    // ═══════════════════════════════════════════════
+    //
+    // All three actions use session_id auth (matches brand-side pattern).
+    // No access_token required — these are brand-side only.
+
+    // Idempotent upsert by dedupe_key. If an event with this key already
+    // exists, return it untouched (isNew=false). Otherwise insert (isNew=true).
+    if (action === 'loop.upsert') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const ev = payload.event || {};
+      if (!ev.dedupe_key || !ev.trigger_type || !ev.severity) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'event.dedupe_key, trigger_type, severity required' }) };
+      }
+      const existing = await supabase('GET', `loop_events?dedupe_key=eq.${encodeURIComponent(ev.dedupe_key)}&limit=1`);
+      if (existing.length) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, isNew: false, event: existing[0] }) };
+      }
+      const inserted = await supabase('POST', 'loop_events', {
+        session_id,
+        trigger_type:  ev.trigger_type,
+        severity:      ev.severity,
+        retailer_id:   ev.retailer_id   || null,
+        retailer_name: ev.retailer_name || null,
+        sku_id:        ev.sku_id        || null,
+        sku_name:      ev.sku_name      || null,
+        market:        ev.market        || null,
+        context:       ev.context       || {},
+        dedupe_key:    ev.dedupe_key,
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, isNew: true, event: inserted[0] || null }) };
+    }
+
+    // Fetch active and recent events for this session.
+    // Returns events ordered by created_at DESC, default limit 100.
+    if (action === 'loop.list') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const limit = Math.min(parseInt(payload.limit || 100, 10) || 100, 500);
+      const rows = await supabase('GET', `loop_events?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.desc&limit=${limit}`);
+      return { statusCode: 200, headers, body: JSON.stringify({ events: rows }) };
+    }
+
+    // Update a single event's mutable fields (accept/dismiss/resolve/drafted_content).
+    // Only whitelisted fields can be updated; everything else is ignored.
+    if (action === 'loop.update') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const id = payload.id;
+      const updates = payload.updates || {};
+      if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) };
+
+      // Verify ownership before update — session_id guard prevents cross-session writes
+      const existing = await supabase('GET', `loop_events?id=eq.${encodeURIComponent(id)}&session_id=eq.${encodeURIComponent(session_id)}&limit=1`);
+      if (!existing.length) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Event not found' }) };
+
+      const allowed = {};
+      const now = new Date().toISOString();
+      if (updates.accepted === true)        { allowed.accepted = true;  allowed.accepted_at = now; }
+      if (updates.dismissed === true)       { allowed.dismissed = true; allowed.dismissed_at = now; }
+      if (updates.resolved === true)        { allowed.resolved = true;  allowed.resolved_at = now; }
+      if (typeof updates.drafted_content === 'string') {
+        allowed.drafted_content = updates.drafted_content;
+        allowed.drafted_at      = now;
+      }
+      if (Object.keys(allowed).length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid fields to update' }) };
+      }
+
+      const updated = await supabase('PATCH', `loop_events?id=eq.${encodeURIComponent(id)}&session_id=eq.${encodeURIComponent(session_id)}`, allowed);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, event: updated[0] || null }) };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
