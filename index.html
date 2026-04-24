@@ -1397,17 +1397,37 @@ function applyAutofillToProfile(){
 }
 
 function completeSetupStep(){
+  // Defensive: if _setupDraft got lost (hot-reload, tab switch, etc.), rehydrate to safe defaults
+  if(!_setupDraft || typeof _setupDraft !== 'object'){
+    console.warn('[setup] _setupDraft was null/invalid — rehydrating');
+    _setupDraft = {categories:[], stage:'', primaryMarket:''};
+  }
+  if(!Array.isArray(_setupDraft.categories))        _setupDraft.categories = [];
+  if(typeof _setupDraft.stage !== 'string')         _setupDraft.stage = '';
+  if(typeof _setupDraft.primaryMarket !== 'string') _setupDraft.primaryMarket = '';
+
   const step = _setupModalStep;
   const totalSteps = 3;
-  const canNow = step===1 ? (_setupDraft.categories&&_setupDraft.categories.length>0)
-               : step===2 ? !!_setupDraft.stage
-               : !!(_setupDraft.primaryMarket||'Sweden');
 
-  if(!canNow){
+  // Per-step validation — list the specific field(s) missing so the user can act
+  var missing = [];
+  if(step===1 && _setupDraft.categories.length===0) missing.push('category');
+  if(step===2 && !_setupDraft.stage)                missing.push('stage');
+  if(step===3 && !_setupDraft.primaryMarket)        missing.push('primary market');
+
+  var errEl = document.getElementById('vf-setup-error');
+  if(missing.length){
+    console.warn('[setup] cannot advance, missing:', missing);
+    if(errEl){
+      errEl.textContent = 'Select a ' + missing.join(' and ') + ' to continue.';
+      errEl.style.display = 'block';
+    }
     const btn = document.querySelector('#vf-setup-modal button[onclick="completeSetupStep()"]');
     if(btn){ btn.style.opacity='.4'; setTimeout(function(){btn.style.opacity='';},500); }
     return;
   }
+  // Clear any previous error once validation passes
+  if(errEl){ errEl.textContent = ''; errEl.style.display = 'none'; }
 
   if(step < totalSteps){ _setupModalStep++; renderSetupModal(); return; }
 
@@ -1751,10 +1771,10 @@ function renderSetupModal(){
                    : !!_setupDraft.primaryMarket;
 
   modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top));overflow-y:auto;-webkit-overflow-scrolling:touch">
-      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top))">
+      <div style="background:#fff;width:100%;max-width:480px;max-height:calc(100vh - 2rem);max-height:calc(100dvh - 2rem);display:flex;flex-direction:column;position:relative">
         <!-- Header -->
-        <div style="padding:1.25rem 1.25rem .75rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2">
+        <div style="padding:1.25rem 1.25rem .75rem;border-bottom:1px solid var(--border);background:#fff;flex-shrink:0">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--navy);letter-spacing:.08em">BRAND PROFILE SETUP</div>
             <button onclick="document.getElementById('vf-setup-modal').remove();renderPage('${returnPage}')" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:.15rem .3rem">✕</button>
@@ -1764,12 +1784,14 @@ function renderSetupModal(){
             <div style="background:var(--navy);height:3px;border-radius:2px;width:${Math.round((_setupModalStep/totalSteps)*100)}%;transition:width .3s ease"></div>
           </div>
         </div>
-        <!-- Body -->
-        <div style="padding:1.25rem">
+        <!-- Body (scrolls) -->
+        <div style="padding:1.25rem;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch">
           ${_setupModalStep===1?step1:_setupModalStep===2?step2:step3}
         </div>
-        <!-- Footer -->
-        <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+        <!-- Inline error slot — populated by completeSetupStep when validation fails -->
+        <div id="vf-setup-error" style="display:none;margin:0 1.25rem;padding:.55rem .8rem;background:#FEF2F2;border:1px solid #FECACA;font-family:var(--sans);font-size:.72rem;color:#991B1B;flex-shrink:0"></div>
+        <!-- Footer (always visible) -->
+        <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-shrink:0">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
           <button onclick="completeSetupStep()"
             style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
@@ -2073,23 +2095,35 @@ function buildNav(){
   if(mobnav){
     var brandPages=['home','skus','report','compare','claims','pitch','brandpack','bizcase','crm','cfo'];
     var sourcePages=['find','suppliers','circular','dpp'];
+    var retailPages=['retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
     var inBrand=brandPages.includes(currentPage);
     var inSource=sourcePages.includes(currentPage);
+    var inRetail=retailPages.includes(currentPage);
     var mobTabs=[
       {id:'home',   icon:'\u2302', label:'Home',   direct:true},
       {id:'brand',  icon:'\u25ce', label:'Brand',  direct:false, section:'brand'},
       {id:'source', icon:'\u25cc', label:'Source', direct:false, section:'source'},
+      {id:'retail', icon:'\u25a4', label:'Retail', direct:false, section:'retail'},
       {id:'crm',    icon:'\u229e', label:'CRM',    direct:true},
     ];
+    // Count stale retail submissions for tab badge (same rule as desktop sidebar)
+    var staleRetail=0;
+    try{
+      var _subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+      staleRetail=_subs.filter(function(s){
+        if(s.status!=='under_review') return false;
+        var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+        return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+      }).length;
+    }catch(e){}
     var mobHtml='';
     mobTabs.forEach(function(n){
-      var active=(n.id==='home'&&currentPage==='home')||(n.id==='crm'&&currentPage==='crm')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource);
+      var active=(n.id==='home'&&currentPage==='home')||(n.id==='crm'&&currentPage==='crm')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource)||(n.id==='retail'&&inRetail);
       mobHtml+='<div class="mob-nav-item'+(active?' active':'')+'" onclick="'+( n.direct ? 'closeMobDrawer();showPage(\''+n.id+'\')' : 'toggleMobDrawer(\''+n.section+'\')' )+'">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
       var pendingSource=sourcingCRM.filter(function(x){return x.status==='enquiry_sent'||x.status==='awaiting';}).length;
       if(n.id==='find'&&pendingSource>0) mobHtml+='<span class="mob-badge">'+pendingSource+'</span>';
-      var pendingSource=sourcingCRM.filter(function(x){return x.status==='enquiry_sent'||x.status==='awaiting';}).length;
-      if(n.id==='find'&&pendingSource>0) mobHtml+='<span class="mob-badge">'+pendingSource+'</span>';
+      if(n.id==='retail'&&staleRetail>0) mobHtml+='<span class="mob-badge" style="background:#F59E0B">'+staleRetail+'</span>';
       mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
       mobHtml+='<span class="mob-nav-label">'+n.label+'</span>';
       mobHtml+='</div>';
@@ -2098,7 +2132,7 @@ function buildNav(){
   }
 }
 
-var mobDrawerOpen = null; // 'brand' | 'source' | null
+var mobDrawerOpen = null; // 'brand' | 'source' | 'retail' | null
 
 function toggleMobDrawer(section){
   if(mobDrawerOpen===section){ closeMobDrawer(); return; }
@@ -26009,6 +26043,43 @@ function openReferralModal(prefilledMfr){
   renderReferralModal();
 }
 
+// ── Live-lookup helpers — avoid baking JSON/strings into onclick attrs ──
+// onclick="..." strings are evaluated as code at click time, so any quote
+// or ampersand in a manufacturer name baked via JSON.stringify() or
+// string-concat would break the attribute and silently swallow the click.
+// These helpers are the safe onclick targets — they read live data at the
+// moment of the click.
+
+function openReferralFromNudge(){
+  // Pre-fill from the most recent sourcing CRM entry, if any
+  var pre = null;
+  if(Array.isArray(sourcingCRM) && sourcingCRM.length){
+    var c = sourcingCRM[0];
+    pre = {
+      mfrName:    c.mfrName    || '',
+      mfrCountry: c.mfrCountry || '',
+      mfrType:    c.mfrType    || '',
+      mfrContact: c.mfrContact || '',
+      mfrWebsite: c.mfrWebsite || '',
+    };
+  }
+  openReferralModal(pre);
+}
+
+function openReferralFromCrm(id){
+  if(!Array.isArray(sourcingCRM)){ openReferralModal(null); return; }
+  // Coerce id — onclick sends a number literal; entries may have number or string ids
+  var entry = sourcingCRM.find(function(c){ return c.id === id || String(c.id) === String(id); });
+  if(!entry){ openReferralModal(null); return; }
+  openReferralModal({
+    mfrName:    entry.mfrName    || '',
+    mfrCountry: entry.mfrCountry || '',
+    mfrType:    entry.mfrType    || '',
+    mfrContact: entry.mfrContact || '',
+    mfrWebsite: entry.mfrWebsite || '',
+  });
+}
+
 function submitReferral(){
   const f = referralState.form;
   if(!f.mfrName || !f.country){
@@ -26168,7 +26239,6 @@ function renderReferralModal(){
 // Brand Home nudge card — shown contextually in Sourcing CRM and Brand Home
 function renderReferralNudge(){
   if(!brand || !shouldShowReferralNudge()) return '';
-  const crmEntry = sourcingCRM[0]; // most recent CRM entry as pre-fill candidate
 
   return `
     <div style="background:#F9F8F6;border:1px solid var(--border);border-left:4px solid var(--gold);padding:.75rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
@@ -26178,7 +26248,7 @@ function renderReferralNudge(){
         <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);line-height:1.5">Brands who refer 3+ manufacturers get early access to manufacturers referred by others in the VeyaFlow network — and Referral Partner credit.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.35rem;flex-shrink:0">
-        <button onclick="openReferralModal(${crmEntry?JSON.stringify({mfrName:crmEntry.mfrName,mfrCountry:crmEntry.mfrCountry,mfrType:crmEntry.mfrType,mfrContact:crmEntry.mfrContact,mfrWebsite:crmEntry.mfrWebsite}):null})"
+        <button onclick="openReferralFromNudge()"
           class="btn-primary" style="font-size:.62rem;white-space:nowrap">Refer a manufacturer →</button>
         <button onclick="dismissReferralNudge();renderPage('home')"
           style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;text-align:center">Dismiss for 30 days</button>
@@ -26497,7 +26567,7 @@ function renderSourcingCRM(el){
                       ${entry.notes?`<div style="font-family:var(--sans);font-size:.72rem;color:#555;flex:1;white-space:pre-wrap">${entry.notes}</div>`:''}
                       <button class="btn-outline" style="font-size:.58rem;padding:.25rem .55rem" onclick="sourcingCRMEditId=${entry.id};renderSourcingCRM(document.getElementById('page-sourcing'))">${entry.notes?'Edit':'Add notes'}</button>
                       <a href="mailto:${entry.mfrContact}" style="font-family:var(--mono);font-size:.58rem;padding:.25rem .55rem;border:1px solid var(--border);color:var(--navy);text-decoration:none">Email →</a>
-                      <button onclick="openReferralModal({mfrName:'${(entry.mfrName||'').replace(/'/g,'&apos;')}',mfrCountry:'${(entry.mfrCountry||'').replace(/'/g,'&apos;')}',mfrType:'${(entry.mfrType||'').replace(/'/g,'&apos;')}',mfrContact:'${(entry.mfrContact||'').replace(/'/g,'&apos;')}',mfrWebsite:'${(entry.mfrWebsite||'').replace(/'/g,'&apos;')}'})"
+                      <button onclick="openReferralFromCrm(${entry.id})"
                         style="font-family:var(--mono);font-size:.58rem;padding:.25rem .55rem;border:1px solid var(--gold);background:none;color:var(--gold);cursor:pointer;white-space:nowrap">Refer →</button>
                       <button onclick="deleteSourcingEntry(${entry.id})" style="font-family:var(--mono);font-size:.55rem;padding:.25rem .55rem;border:1px solid #FCA5A5;background:none;color:#991B1B;cursor:pointer">Remove</button>
                     </div>
@@ -27047,22 +27117,69 @@ function renderRetailSubmissionCard(s){
 }
 
 function renderRetailAddSubmissionForm(){
+  // Build retailer pools:
+  // 1. Pipeline — CRM cards at Pitched/Meeting/Listed (pinned at top of dropdown)
+  // 2. Other — remaining CRM cards + any RETAILER_REGISTRY entries not already in CRM,
+  //            deduplicated by id and grouped by market.
   var candidates = retailGetPitchedOrHigherCrmCards();
+  var pipelineIds = {};
+  candidates.forEach(function(c){ pipelineIds[c.id] = 1; });
+
+  var crmCardsList = (typeof crmCards !== 'undefined' && crmCards) ? crmCards : [];
+  var crmIdSet = {};
+  crmCardsList.forEach(function(c){ crmIdSet[c.id] = 1; });
+
+  var otherRetailers = [];
+  crmCardsList.forEach(function(c){
+    if(!pipelineIds[c.id]) otherRetailers.push({id:c.id, name:c.name, market:c.market||''});
+  });
+  var regList = (typeof RETAILER_REGISTRY !== 'undefined' && RETAILER_REGISTRY) ? RETAILER_REGISTRY : [];
+  regList.forEach(function(r){
+    if(!crmIdSet[r.id] && !pipelineIds[r.id]){
+      otherRetailers.push({id:r.id, name:r.name, market:r.marketName||r.market||''});
+    }
+  });
+
+  var byMarket = {};
+  otherRetailers.forEach(function(r){
+    var m = r.market||'Other';
+    if(!byMarket[m]) byMarket[m] = [];
+    byMarket[m].push(r);
+  });
+  var marketNames = Object.keys(byMarket).sort();
+  marketNames.forEach(function(m){
+    byMarket[m].sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  });
+  var totalCount = candidates.length + otherRetailers.length;
+
   var html = '<div style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">';
   html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">New submission</div>';
   html += '<button onclick="closeAddRetailSubmission()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>';
   html += '</div>';
 
-  html += '<div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Retailer (pre-filled from CRM — Pitched or higher)</div>';
-  if(candidates.length === 0){
-    html += '<div style="padding:.6rem .75rem;background:#FFFBEB;border:1px solid #FDE68A;font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.8rem">No CRM retailers at Pitched stage yet. <span onclick="showPage(\'crm\')" style="text-decoration:underline;cursor:pointer">Go to Retailer CRM →</span> or add manually below.</div>';
+  html += '<div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Retailer <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· '+totalCount+' available'+(candidates.length?' · pipeline shown first':'')+'</span></div>';
+
+  if(totalCount === 0){
+    html += '<div style="padding:.6rem .75rem;background:#FFFBEB;border:1px solid #FDE68A;font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.8rem">No retailers available yet. <span onclick="showPage(\'crm\')" style="text-decoration:underline;cursor:pointer">Open Retailer CRM →</span> to add one.</div>';
   } else {
     html += '<select id="rsub-new-retailer" onchange="retailTrackerAddForm.retailerId=this.value" style="width:100%;padding:.5rem .65rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);margin-bottom:.8rem">';
     html += '<option value="">— Select a retailer —</option>';
-    candidates.forEach(function(c){
-      var sel = retailTrackerAddForm.retailerId===c.id ? ' selected' : '';
-      html += '<option value="'+retailEsc(c.id)+'"'+sel+'>'+retailEsc(c.name)+' · '+retailEsc(c.market||'')+' · '+retailEsc(c.stage)+'</option>';
+    if(candidates.length){
+      html += '<optgroup label="From your CRM pipeline (Pitched or higher)">';
+      candidates.forEach(function(c){
+        var sel = retailTrackerAddForm.retailerId===c.id ? ' selected' : '';
+        html += '<option value="'+retailEsc(c.id)+'"'+sel+'>'+retailEsc(c.name)+' · '+retailEsc(c.market||'')+' · '+retailEsc(c.stage)+'</option>';
+      });
+      html += '</optgroup>';
+    }
+    marketNames.forEach(function(m){
+      html += '<optgroup label="'+retailEsc(m)+'">';
+      byMarket[m].forEach(function(r){
+        var sel = retailTrackerAddForm.retailerId===r.id ? ' selected' : '';
+        html += '<option value="'+retailEsc(r.id)+'"'+sel+'>'+retailEsc(r.name)+'</option>';
+      });
+      html += '</optgroup>';
     });
     html += '</select>';
   }
@@ -28107,6 +28224,279 @@ if(typeof submitRequestListed==='function'){
   }catch(e){
     console.warn('VeyaFlow brand restore failed:',e.message);
   }
+})();
+
+/* ═══════════════════════════════════════════════════
+   Session 3 — Brand ⇌ Portal bridge
+   Sync new submissions to retailer portal + poll for status updates.
+═══════════════════════════════════════════════════ */
+
+// Portal status IDs mostly match brand-side RETAIL_SUB_STATUSES; these two differ.
+function portalStatusToBrand(s){
+  if(s==='received')          return 'submitted';
+  if(s==='terms_negotiation') return 'terms';
+  return s;
+}
+
+// Proxy call that sends fields at root level (not wrapped in `data`).
+// Used for portal.* actions where the proxy reads payload.foo directly.
+async function portalCall(action, extraFields){
+  try{
+    var body = Object.assign({action:action, session_id:getSessionId()}, extraFields||{});
+    var res = await fetch('/.netlify/functions/supabase-proxy',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if(!res.ok){
+      if(res.status!==404 && res.status!==400) console.warn('VeyaFlow portal:',action,'HTTP',res.status);
+      return null;
+    }
+    return await res.json();
+  }catch(e){ return null; }
+}
+
+// Build a Brand Pack snapshot to send to the retailer portal.
+function buildPortalBrandPack(sub){
+  var pack = {
+    category:    (typeof brand!=='undefined'&&brand&&brand.category) || '',
+    homeMarket:  (typeof brand!=='undefined'&&brand&&brand.currentMarket) || '',
+    targetMarket:(sub && sub.market) || '',
+    readinessDimensions: {},
+    claims: [],
+    notes: (sub && sub.notes) || '',
+    verified: (typeof brand!=='undefined'&&brand&&brand.verifiedTier) ? true : false,
+    verifiedTier: (typeof brand!=='undefined'&&brand&&brand.verifiedTier) || '',
+    articleTemplate: {},
+  };
+  // Readiness dimensions: from latest saved report if available
+  if(typeof savedReports!=='undefined' && savedReports.length){
+    var r = savedReports[0] || {};
+    var d = r.dimensions || r.dims || {};
+    pack.readinessDimensions = {
+      compliance:  d.compliance  || 0,
+      commercial:  d.commercial  || 0,
+      operational: d.operational || 0,
+      brand:       d.brand       || 0,
+    };
+  }
+  // Claims aggregated across submitted SKUs
+  if(typeof skus!=='undefined' && Array.isArray(skus) && skus.length){
+    var claimsSet = {};
+    (sub&&sub.skuIds||[]).forEach(function(sid){
+      var sk = skus.find(function(x){ return String(x.id)===String(sid); });
+      if(!sk) return;
+      (sk.certifications||[]).forEach(function(c){ claimsSet[c]=1; });
+      (sk.claimsApproved||[]).forEach(function(c){ claimsSet[c]=1; });
+    });
+    pack.claims = Object.keys(claimsSet).slice(0,8);
+  }
+  return pack;
+}
+
+// Snapshot SKUs in the shape portal.html expects
+function buildPortalSkuSnapshot(skuIds){
+  var localSkus = (typeof skus!=='undefined' && Array.isArray(skus)) ? skus : [];
+  return (skuIds||[]).map(function(id){
+    var sk = localSkus.find(function(s){ return String(s.id)===String(id); });
+    if(!sk) return null;
+    return {
+      name: sk.name || '',
+      ean:  sk.ean  || '',
+      cpnp: !!(sk.cpnp || sk.cpnpRef),
+      claimsAudited: Array.isArray(sk.claimsApproved) && sk.claimsApproved.length > 0,
+      euRp: !!(sk.euRp || sk.euRpConfirmed),
+      rsp:  sk.rspSEK ? (sk.rspSEK+' SEK') : (sk.rsp || ''),
+    };
+  }).filter(Boolean);
+}
+
+function readLatestReadinessScore(){
+  if(typeof savedReports!=='undefined' && savedReports.length){
+    var r = savedReports[0] || {};
+    return r.readiness || r.score || null;
+  }
+  return null;
+}
+
+// Wrap createRetailSubmission to also send to retailer portal (if retailer has an account).
+// Local row is always saved — portal sync is best-effort. Failures are silent (many
+// retailers don't have portal accounts yet).
+if(typeof createRetailSubmission==='function'){
+  var _origCreateRetailSubmission = createRetailSubmission;
+  createRetailSubmission = function(){
+    _origCreateRetailSubmission(); // synchronous: local save + re-render
+    try{
+      if(typeof retailSubmissions==='undefined' || !retailSubmissions.length) return;
+      var sub = retailSubmissions[retailSubmissions.length - 1];
+      if(!sub || !sub.retailerId) return;
+      // Fire-and-forget — no await, so local save UX is instant
+      portalCall('portal.submission.create', {
+        retailerId:     sub.retailerId,
+        brandName:      (typeof brand!=='undefined'&&brand&&brand.name) || 'Brand',
+        readinessScore: readLatestReadinessScore(),
+        brandPack:      buildPortalBrandPack(sub),
+        skus:           buildPortalSkuSnapshot(sub.skuIds),
+      }).then(function(res){
+        if(res && res.ok && res.submission && res.submission.id){
+          sub.portalSubmissionId = res.submission.id;
+          sub.portalSynced = true;
+          try{ saveRetailSubmissions(); }catch(e){}
+          if(typeof currentPage!=='undefined' && currentPage==='retail-tracker' && typeof renderPage==='function'){
+            renderPage('retail-tracker');
+          }
+          if(typeof showSuccess==='function') showSuccess('Sent to '+sub.retailerName+' via VeyaFlow portal');
+        } else {
+          // Retailer not on portal yet, or transient failure — flag on local row
+          sub.portalSynced = false;
+          try{ saveRetailSubmissions(); }catch(e){}
+        }
+      });
+    }catch(e){ /* non-fatal */ }
+  };
+}
+
+// ── Status-sync polling ──────────────────────────
+// Polls portal.status.sync every 60s while user is on a relevant page and tab is visible.
+var _portalPollTimer = null;
+var _portalPollLast  = null; // ISO timestamp of last successful sync
+
+function loadPortalAlerts(){
+  try{ return JSON.parse(localStorage.getItem('ns_portal_alerts')||'[]'); }catch(e){ return []; }
+}
+function persistPortalAlerts(list){
+  try{ localStorage.setItem('ns_portal_alerts', JSON.stringify(list.slice(0,20))); }catch(e){}
+}
+
+async function runPortalSync(){
+  if(document.hidden) return;
+  var since = _portalPollLast || localStorage.getItem('ns_portal_last_checked') || null;
+  var res = await portalCall('portal.status.sync', { since: since });
+  if(!res || !res.submissions) return;
+
+  // Apply status changes to local retail submissions
+  var localSubs = [];
+  try{ localSubs = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[]; }catch(e){ localSubs = []; }
+  var changed = false;
+  var newAlerts = [];
+
+  (res.changes||[]).forEach(function(change){
+    if(!change || !change.submissionId) return;
+    if(!change.oldStatus) return; // skip initial 'received' entry — it's the brand's own submit
+    var localSub = localSubs.find(function(s){ return s.portalSubmissionId === change.submissionId; });
+    if(!localSub) return;
+    var newBrandStatus = portalStatusToBrand(change.newStatus);
+    if(localSub.status !== newBrandStatus){
+      localSub.status = newBrandStatus;
+      localSub.statusChangedAt = change.changedAt;
+      changed = true;
+    }
+    newAlerts.push({
+      id:           change.id,
+      submissionId: change.submissionId,
+      retailerName: change.retailerName || localSub.retailerName || 'retailer',
+      oldStatus:    portalStatusToBrand(change.oldStatus),
+      newStatus:    newBrandStatus,
+      changedAt:    change.changedAt,
+      seen:         false,
+    });
+  });
+
+  if(changed){
+    try{ localStorage.setItem('ns_retail_submissions', JSON.stringify(localSubs)); }catch(e){}
+    if(typeof retailSubmissions!=='undefined') retailSubmissions = localSubs;
+  }
+
+  if(newAlerts.length){
+    var existing = loadPortalAlerts();
+    var existingIds = {};
+    existing.forEach(function(a){ existingIds[a.id] = 1; });
+    newAlerts.forEach(function(a){ if(!existingIds[a.id]) existing.unshift(a); });
+    persistPortalAlerts(existing);
+  }
+
+  _portalPollLast = res.lastChecked;
+  try{ localStorage.setItem('ns_portal_last_checked', _portalPollLast); }catch(e){}
+
+  if((changed || newAlerts.length) && typeof currentPage!=='undefined' && typeof renderPage==='function'){
+    if(currentPage==='home' || currentPage==='retail-tracker') renderPage(currentPage);
+  }
+}
+
+function startPortalPoll(){
+  if(_portalPollTimer) return;
+  runPortalSync();
+  _portalPollTimer = setInterval(runPortalSync, 60000);
+}
+function stopPortalPoll(){
+  if(_portalPollTimer){ clearInterval(_portalPollTimer); _portalPollTimer = null; }
+}
+
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && _portalPollTimer) runPortalSync();
+});
+
+// Start polling when user is on home or retail-tracker; stop otherwise.
+if(typeof showPage==='function'){
+  var _origShowPage = showPage;
+  showPage = function(name){
+    _origShowPage(name);
+    if(name==='home' || name==='retail-tracker') startPortalPoll();
+    else stopPortalPoll();
+  };
+}
+
+// Brand Home alerts — wrap renderAllBrandHomeAlerts to prepend portal alerts.
+if(typeof renderAllBrandHomeAlerts==='function'){
+  var _origRenderAllBrandHomeAlerts = renderAllBrandHomeAlerts;
+  renderAllBrandHomeAlerts = function(){
+    return renderPortalStatusAlerts() + _origRenderAllBrandHomeAlerts();
+  };
+}
+
+function renderPortalStatusAlerts(){
+  var alerts = loadPortalAlerts().filter(function(a){ return !a.seen; }).slice(0,5);
+  if(!alerts.length) return '';
+  var statusLabel = function(id){
+    var def = (typeof RETAIL_SUB_STATUSES!=='undefined')
+      ? RETAIL_SUB_STATUSES.find(function(s){ return s.id===id; }) : null;
+    return def ? def.label : id;
+  };
+  var html = '';
+  alerts.forEach(function(a){
+    var when = a.changedAt ? new Date(a.changedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    html += '<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-left:4px solid #10B981;padding:.65rem 1rem;margin-bottom:.75rem;display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap">';
+    html +=   '<div style="flex:1;min-width:220px">';
+    html +=     '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#065F46;margin-bottom:.15rem">◎ Portal update</div>';
+    html +=     '<div style="font-family:var(--sans);font-size:.78rem;color:#065F46;font-weight:500">Your submission to '+retailEsc(a.retailerName||'retailer')+' moved to '+retailEsc(statusLabel(a.newStatus))+'</div>';
+    if(when) html += '<div style="font-family:var(--mono);font-size:.5rem;color:#065F46;opacity:.75;margin-top:.15rem">'+retailEsc(when)+'</div>';
+    html +=   '</div>';
+    html +=   '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">';
+    html +=     '<button onclick="showPage(\'retail-tracker\')" style="font-family:var(--mono);font-size:.6rem;padding:.3rem .7rem;background:#065F46;color:#fff;border:none;cursor:pointer">View →</button>';
+    html +=     '<button onclick="dismissPortalAlert(\''+retailEsc(a.id)+'\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#065F46;cursor:pointer;opacity:.75">Dismiss</button>';
+    html +=   '</div>';
+    html += '</div>';
+  });
+  return html;
+}
+
+function dismissPortalAlert(id){
+  var alerts = loadPortalAlerts();
+  var a = alerts.find(function(x){ return x.id===id; });
+  if(a) a.seen = true;
+  persistPortalAlerts(alerts);
+  if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function') renderPage('home');
+}
+
+// If the app boots on home or retail-tracker, kick off polling immediately.
+(function(){
+  function _maybeStartPoll(){
+    if(typeof currentPage!=='undefined' && (currentPage==='home' || currentPage==='retail-tracker')){
+      startPortalPoll();
+    }
+  }
+  if(document.readyState==='complete') setTimeout(_maybeStartPoll, 500);
+  else window.addEventListener('load', function(){ setTimeout(_maybeStartPoll, 500); });
 })();
 
 </script>
