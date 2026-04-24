@@ -381,6 +381,91 @@ exports.handler = async (event) => {
       })};
     }
 
+    // ─── Brand → Portal bridge ───────────────────
+    // These actions are called by the BRAND side, not the retailer portal.
+    // Auth is via session_id (the brand's localStorage identifier) — matches
+    // existing brand.save / crm.upsert pattern. No access_token required.
+
+    // Brand submits its Brand Pack to a retailer's portal inbox
+    if (action === 'portal.submission.create') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const { retailerId, brandName, readinessScore, brandPack, skus } = payload;
+      if (!retailerId || !brandName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'retailerId and brandName required' }) };
+
+      // Verify the retailer exists in retailer_accounts — otherwise submission would be orphan
+      const accounts = await supabase('GET', `retailer_accounts?retailer_id=eq.${encodeURIComponent(retailerId)}&active=eq.true&limit=1`);
+      if (!accounts.length) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Retailer not on VeyaFlow portal yet' }) };
+      }
+
+      const inserted = await supabase('POST', 'portal_submissions', {
+        brand_session_id: session_id,
+        brand_name: brandName,
+        retailer_id: retailerId,
+        readiness_score: readinessScore || null,
+        brand_pack_data: brandPack || {},
+        sku_data: skus || [],
+        status: 'received',
+      });
+      // Initial status log entry — so the brand can see "Received by Matas" in their own polling
+      if (inserted.length) {
+        await supabase('POST', 'submission_status_log', {
+          submission_id: inserted[0].id,
+          old_status: null,
+          new_status: 'received',
+          changed_by: session_id,
+          note: 'Brand submission created via VeyaFlow',
+        });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({
+        ok: true,
+        submission: inserted.length ? mapSubmissionRow(inserted[0]) : null,
+      })};
+    }
+
+    // Brand polls for status changes on its submissions since a given timestamp.
+    // Returns: current submissions + any status_log entries since `since`.
+    if (action === 'portal.status.sync') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      // Default to 24h ago if no `since` — caps payload size on first sync
+      const since = payload.since || new Date(Date.now() - 86400000).toISOString();
+      const subs = await supabase('GET', `portal_submissions?brand_session_id=eq.${encodeURIComponent(session_id)}&order=submitted_at.desc`);
+      if (!subs.length) {
+        return { statusCode: 200, headers, body: JSON.stringify({
+          submissions: [],
+          changes: [],
+          lastChecked: new Date().toISOString(),
+        })};
+      }
+      // Fetch log entries for these submission ids since the cutoff
+      const subIds = subs.map(s => s.id).map(id => encodeURIComponent(id));
+      const subIdList = subIds.join(',');
+      const logs = await supabase('GET', `submission_status_log?submission_id=in.(${subIdList})&changed_at=gt.${encodeURIComponent(since)}&order=changed_at.desc&limit=50`);
+      // Lookup retailer names once so client doesn't have to guess
+      const retailerIds = Array.from(new Set(subs.map(s => s.retailer_id)));
+      let retailerMap = {};
+      if (retailerIds.length) {
+        const retailerIdList = retailerIds.map(r => `"${r}"`).join(',');
+        const retailers = await supabase('GET', `retailer_accounts?retailer_id=in.(${retailerIdList})&select=retailer_id,retailer_name`);
+        retailers.forEach(r => { retailerMap[r.retailer_id] = r.retailer_name; });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({
+        submissions: subs.map(mapSubmissionRow),
+        changes: logs.map(l => ({
+          id: l.id,
+          submissionId: l.submission_id,
+          oldStatus: l.old_status,
+          newStatus: l.new_status,
+          changedBy: l.changed_by,
+          note: l.note,
+          changedAt: l.changed_at,
+          retailerName: retailerMap[subs.find(s => s.id === l.submission_id)?.retailer_id] || null,
+        })),
+        retailerNames: retailerMap,
+        lastChecked: new Date().toISOString(),
+      })};
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
