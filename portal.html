@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeyaFlow Retailer Portal</title>
+<!--
+  VeyaFlow Retailer Portal — portal.html (Session 2)
+  Real Supabase Auth via /.netlify/functions/supabase-proxy.
+  Email + password login. No self-serve signup — accounts created manually
+  by VeyaFlow admin (Supabase dashboard → Authentication → Users; matching
+  row in retailer_accounts).
+
+  Revenue model (not implemented — note for future):
+    V1: Free for retailers.
+    V2: Analytics dashboard as paid add-on.
+    V3: Transaction fee when orders placed through the portal.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0E0E0E;
+    --navy: #1E3A5F;
+    --gold: #C4A882;
+    --cream: #F7F5F0;
+    --border: #EDE9E1;
+    --muted: #9A9489;
+    --green: #10B981;
+    --amber: #F59E0B;
+    --red: #EF4444;
+    --blue: #1E40AF;
+    --serif: 'Playfair Display', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
+
+  .screen { display: none; height: 100vh; overflow: hidden; }
+  .screen.active { display: flex; }
+
+  /* Login screen */
+  #screen-login {
+    background: var(--navy);
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    padding: 1.5rem;
+  }
+  .auth-card {
+    background: #fff; width: 100%; max-width: 420px;
+    padding: 2.25rem 2rem;
+    border: 1px solid rgba(196,168,130,.25);
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .auth-logo { margin-bottom: 1.5rem; text-align: center; }
+  .auth-logo-title { font-family: var(--serif); font-size: 1.6rem; color: var(--navy); font-weight: 400; }
+  .auth-logo-sub { font-family: var(--mono); font-size: .55rem; color: var(--muted); letter-spacing: .18em; text-transform: uppercase; margin-top: .3rem; }
+  .auth-lead { font-family: var(--sans); font-size: .8rem; color: #444; line-height: 1.55; margin-bottom: 1.25rem; text-align: center; }
+  .auth-lbl { display: block; font-family: var(--mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; color: #333; margin-bottom: .35rem; margin-top: .75rem; }
+  .auth-input {
+    width: 100%; padding: .7rem .85rem; border: 1px solid #DDD;
+    background: var(--cream); font-family: var(--sans); font-size: .88rem;
+    color: var(--ink); outline: none; min-height: 44px;
+  }
+  .auth-input:focus { border-color: var(--navy); }
+  .auth-submit {
+    width: 100%; margin-top: 1.5rem; padding: .85rem 1.5rem;
+    background: var(--navy); border: none; color: #fff;
+    font-family: var(--mono); font-size: .72rem; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+    transition: opacity .15s; min-height: 44px;
+  }
+  .auth-submit:hover:not(:disabled) { opacity: .88; }
+  .auth-submit:disabled { opacity: .5; cursor: wait; }
+  .auth-footer {
+    font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.35);
+    letter-spacing: .15em; text-transform: uppercase; margin-top: 2rem;
+  }
+  .auth-error {
+    margin-top: .75rem; padding: .55rem .75rem; background: #FEF2F2;
+    border: 1px solid #FECACA; font-family: var(--sans); font-size: .72rem;
+    color: #991B1B; line-height: 1.45;
+  }
+  .auth-hint {
+    margin-top: 1.25rem; padding: .7rem .85rem; background: #F9F8F6;
+    border: 1px solid var(--border); font-family: var(--sans); font-size: .7rem;
+    color: #666; line-height: 1.5;
+  }
+
+  /* App shell */
+  #screen-app { display: none; height: 100vh; overflow: hidden; }
+  #screen-app.active { display: flex; }
+
+  #sidebar {
+    width: 240px; min-width: 240px; background: var(--navy);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .s-header { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .s-product-title { font-family: var(--serif); font-size: 1.1rem; color: #fff; font-weight: 400; }
+  .s-product-sub { font-family: var(--mono); font-size: .5rem; color: rgba(255,255,255,.3); letter-spacing: .15em; text-transform: uppercase; margin-top: .25rem; }
+  .s-retailer-pill {
+    margin: .85rem; padding: .7rem .85rem;
+    background: rgba(196,168,130,.1); border: 1px solid rgba(196,168,130,.25);
+  }
+  .s-retailer-logo {
+    width: 36px; height: 36px; background: rgba(196,168,130,.25);
+    border: 1px solid rgba(196,168,130,.4); display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1rem; color: var(--gold); float: left; margin-right: .6rem;
+  }
+  .s-retailer-name { font-family: var(--sans); font-size: .78rem; color: var(--gold); font-weight: 500; padding-top: .1rem; }
+  .s-retailer-role { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.35); letter-spacing: .08em; text-transform: uppercase; margin-top: .15rem; }
+
+  .s-nav { flex: 1; overflow-y: auto; padding: .5rem 0; }
+  .s-nav-item {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .7rem 1.25rem; cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  .s-nav-item:hover:not(.locked) { background: rgba(196,168,130,.08); }
+  .s-nav-item.active { background: rgba(196,168,130,.15); border-left-color: var(--gold); }
+  .s-nav-item.locked { cursor: default; opacity: .4; }
+  .s-nav-icon { font-size: .9rem; width: 20px; text-align: center; color: rgba(255,255,255,.4); flex-shrink: 0; }
+  .s-nav-item.active .s-nav-icon { color: var(--gold); }
+  .s-nav-label { font-size: .76rem; color: rgba(255,255,255,.55); letter-spacing: .02em; flex: 1; }
+  .s-nav-item.active .s-nav-label { color: var(--gold); }
+  .s-nav-sub { font-family: var(--mono); font-size: .5rem; color: rgba(255,255,255,.25); letter-spacing: .06em; text-transform: uppercase; }
+  .s-nav-badge { font-family: var(--mono); font-size: .55rem; background: var(--red); color: #fff; padding: 1px 6px; }
+
+  .s-footer { padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
+  .s-footer-text { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.25); letter-spacing: .1em; text-transform: uppercase; }
+  .s-signout {
+    display: block; margin-top: .75rem; background: none; border: 1px solid rgba(255,255,255,.15);
+    color: rgba(255,255,255,.5); padding: .45rem .8rem; font-family: var(--mono); font-size: .58rem;
+    letter-spacing: .08em; text-transform: uppercase; cursor: pointer; width: 100%;
+    transition: all .15s;
+  }
+  .s-signout:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Main content */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 1.1rem 2rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; flex-shrink: 0;
+  }
+  .page-title { font-family: var(--serif); font-size: 1.35rem; color: var(--navy); font-weight: 400; }
+  .page-sub { font-family: var(--mono); font-size: .58rem; color: var(--muted); margin-top: .2rem; letter-spacing: .04em; }
+
+  .content { flex: 1; overflow-y: auto; padding: 1.75rem 2rem; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Filters */
+  .filter-bar {
+    background: #fff; border: 1px solid var(--border); padding: 1rem 1.15rem;
+    margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end;
+  }
+  .filter-field { display: flex; flex-direction: column; min-width: 160px; flex: 1; }
+  .filter-lbl { font-family: var(--mono); font-size: .52rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: .35rem; }
+  .filter-select, .filter-input {
+    padding: .45rem .6rem; font-family: var(--sans); font-size: .78rem;
+    border: 1px solid var(--border); background: #fff; color: var(--ink);
+    outline: none; min-height: 38px; appearance: none;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--navy); }
+  .filter-clear {
+    padding: .45rem .85rem; background: none; border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: .58rem; letter-spacing: .08em;
+    text-transform: uppercase; cursor: pointer; min-height: 38px;
+  }
+  .filter-clear:hover { border-color: var(--navy); color: var(--navy); }
+
+  /* Submission cards */
+  .sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: .85rem; }
+  .sub-card {
+    background: #fff; border: 1px solid var(--border); padding: 1.1rem 1.25rem;
+    cursor: pointer; transition: all .15s;
+    display: flex; flex-direction: column;
+  }
+  .sub-card:hover { border-color: var(--navy); box-shadow: 0 4px 16px rgba(30,58,95,.08); }
+  .sub-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; margin-bottom: .55rem; }
+  .sub-brand-name { font-family: var(--serif); font-size: 1.1rem; color: var(--navy); font-weight: 400; line-height: 1.25; }
+  .sub-status {
+    font-family: var(--mono); font-size: .52rem; padding: .2rem .5rem;
+    letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+  }
+  .status-received          { background: #EFF6FF; color: var(--blue); }
+  .status-under_review      { background: rgba(245,158,11,.12); color: #92400E; }
+  .status-meeting_booked    { background: #F5F3FF; color: #5B21B6; }
+  .status-terms_negotiation { background: rgba(196,168,130,.18); color: #6B5632; }
+  .status-listed            { background: #ECFDF5; color: #065F46; }
+  .status-rejected          { background: rgba(239,68,68,.08); color: #991B1B; }
+
+  .sub-meta { font-family: var(--sans); font-size: .72rem; color: var(--muted); margin-bottom: .65rem; }
+  .sub-readiness-row { display: flex; align-items: center; gap: .65rem; margin-bottom: .65rem; }
+  .sub-score-box {
+    font-family: var(--serif); font-size: 1.4rem; line-height: 1;
+    padding: .35rem .65rem; border: 1px solid currentColor;
+  }
+  .sub-score-label { font-family: var(--mono); font-size: .55rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .sub-date { font-family: var(--mono); font-size: .58rem; color: var(--muted); letter-spacing: .04em; margin-top: auto; padding-top: .35rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .sub-verified-tag {
+    font-family: var(--mono); font-size: .5rem; color: var(--gold);
+    background: rgba(196,168,130,.1); border: 1px solid rgba(196,168,130,.35);
+    padding: .15rem .4rem; letter-spacing: .08em; text-transform: uppercase;
+  }
+
+  .empty {
+    background: #fff; border: 1px solid var(--border); padding: 3rem 2rem;
+    text-align: center;
+  }
+  .empty-icon { font-size: 2rem; opacity: .25; margin-bottom: .75rem; }
+  .empty-title { font-family: var(--serif); font-size: 1.15rem; color: var(--navy); margin-bottom: .45rem; }
+  .empty-sub { font-family: var(--sans); font-size: .82rem; color: var(--muted); max-width: 460px; margin: 0 auto; line-height: 1.55; }
+
+  /* Loading + error states */
+  .loading-card {
+    background: #fff; border: 1px solid var(--border); padding: 2rem;
+    text-align: center; font-family: var(--mono); font-size: .62rem;
+    color: var(--muted); letter-spacing: .08em;
+  }
+  .err-card {
+    background: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid var(--red);
+    padding: 1.1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .err-card-title { font-family: var(--serif); font-size: 1rem; color: #991B1B; margin-bottom: .35rem; }
+  .err-card-body { font-family: var(--sans); font-size: .78rem; color: #7F1D1D; line-height: 1.5; margin-bottom: .75rem; }
+
+  /* Detail view */
+  .back-link {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-family: var(--mono); font-size: .6rem; color: var(--muted);
+    letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    padding: .3rem 0; margin-bottom: 1rem;
+  }
+  .back-link:hover { color: var(--navy); }
+
+  .detail-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .detail-card {
+    background: #fff; border: 1px solid var(--border); padding: 1.25rem 1.5rem;
+  }
+  .detail-card-title { font-family: var(--mono); font-size: .62rem; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .75rem; }
+  .detail-brand-name { font-family: var(--serif); font-size: 2rem; color: var(--navy); font-weight: 400; line-height: 1.15; margin-bottom: .25rem; }
+  .detail-brand-meta { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin-bottom: 1rem; }
+  .detail-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; }
+  .detail-badge {
+    font-family: var(--mono); font-size: .55rem; padding: .25rem .5rem;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .detail-badge-gold { background: rgba(196,168,130,.15); color: #6B5632; border: 1px solid rgba(196,168,130,.4); }
+  .detail-badge-green { background: #ECFDF5; color: #065F46; }
+
+  .pipeline { display: flex; margin: 1rem 0 1.25rem; border: 1px solid var(--border); }
+  .pipeline-step {
+    flex: 1; padding: .55rem .4rem; text-align: center;
+    font-family: var(--mono); font-size: .55rem; color: var(--muted);
+    letter-spacing: .05em; text-transform: uppercase;
+    border-right: 1px solid var(--border); position: relative;
+  }
+  .pipeline-step:last-child { border-right: none; }
+  .pipeline-step.active { background: var(--navy); color: #fff; }
+  .pipeline-step.passed { background: rgba(16,185,129,.1); color: #065F46; }
+  .pipeline-step.rejected { background: rgba(239,68,68,.1); color: #991B1B; }
+
+  .dim-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+  .dim-label { flex: 0 0 120px; font-family: var(--mono); font-size: .62rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .dim-bar { flex: 1; height: 6px; background: var(--border); position: relative; }
+  .dim-bar-fill { position: absolute; top: 0; left: 0; height: 100%; }
+  .dim-val { flex: 0 0 36px; font-family: var(--mono); font-size: .7rem; color: var(--ink); text-align: right; }
+
+  .sku-tbl { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+  .sku-tbl th {
+    font-family: var(--mono); font-size: .55rem; color: var(--muted);
+    letter-spacing: .08em; text-transform: uppercase; text-align: left;
+    padding: .5rem .5rem .55rem; border-bottom: 1px solid var(--border);
+  }
+  .sku-tbl td {
+    font-family: var(--sans); font-size: .78rem; color: var(--ink);
+    padding: .7rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  .sku-tbl tr:last-child td { border-bottom: none; }
+  .sku-check { color: var(--green); font-family: var(--mono); font-size: .85rem; }
+  .sku-cross { color: var(--red); font-family: var(--mono); font-size: .85rem; }
+
+  .art-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem .85rem; }
+  .art-item { padding: .55rem 0; border-bottom: 1px dotted var(--border); }
+  .art-lbl { font-family: var(--mono); font-size: .52rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: .15rem; }
+  .art-val { font-family: var(--sans); font-size: .82rem; color: var(--ink); }
+
+  .status-panel {
+    background: #fff; border: 1px solid var(--gold); padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: .85rem; flex-wrap: wrap; margin-bottom: 1rem;
+  }
+  .status-panel-lbl { font-family: var(--mono); font-size: .6rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .status-panel-select {
+    padding: .55rem .8rem; font-family: var(--sans); font-size: .82rem;
+    border: 1px solid var(--border); background: #fff; min-height: 40px; min-width: 200px; flex: 1;
+  }
+  .status-panel-select:disabled { opacity: .5; cursor: wait; }
+
+  .veya-footer-note {
+    background: rgba(196,168,130,.08); border: 1px solid rgba(196,168,130,.25);
+    padding: .85rem 1.15rem; font-family: var(--sans); font-size: .72rem;
+    color: #6B5632; line-height: 1.55; margin-top: 1rem;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(14,14,14,.65);
+    z-index: 100; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #fff; width: 100%; max-width: 520px;
+    padding: 1.75rem 1.85rem; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--gold); box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  }
+  .modal-title { font-family: var(--serif); font-size: 1.35rem; color: var(--navy); margin-bottom: .25rem; }
+  .modal-sub { font-family: var(--sans); font-size: .78rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
+  .modal-actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.25rem; }
+
+  /* Toasts */
+  .toast-host {
+    position: fixed; top: 1.25rem; right: 1.25rem; z-index: 200;
+    display: flex; flex-direction: column; gap: .5rem;
+  }
+  .toast {
+    background: var(--navy); color: #fff; padding: .85rem 1.1rem;
+    font-family: var(--sans); font-size: .8rem;
+    border-left: 3px solid var(--gold); box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    max-width: 360px; line-height: 1.45;
+    animation: toast-in .25s ease;
+  }
+  .toast.success { border-left-color: var(--green); }
+  .toast.error { border-left-color: var(--red); }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* Shared buttons */
+  .btn-primary {
+    padding: .7rem 1.35rem; background: var(--navy); border: none; color: #fff;
+    font-family: var(--mono); font-size: .68rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    min-height: 40px; transition: opacity .15s;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: .88; }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-outline {
+    padding: .6rem 1rem; background: none; border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--mono); font-size: .62rem;
+    letter-spacing: .06em; text-transform: uppercase; cursor: pointer; min-height: 40px;
+  }
+  .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+
+  /* Mobile */
+  @media (max-width: 760px) {
+    #sidebar { display: none; }
+    .topbar { padding: .85rem 1rem; }
+    .page-title { font-size: 1.05rem; }
+    .content { padding: 1.1rem 1rem; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .art-grid { grid-template-columns: 1fr; }
+    .sub-grid { grid-template-columns: 1fr; }
+    .pipeline { flex-wrap: wrap; }
+    .pipeline-step { flex: 0 0 50%; border-bottom: 1px solid var(--border); }
+    .sku-tbl { font-size: .7rem; }
+    .filter-field { min-width: 140px; }
+    .modal { padding: 1.25rem 1.1rem; }
+  }
+
+  #mobile-retailer-strip {
+    display: none; background: var(--navy); padding: .7rem 1rem;
+    color: #fff; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .mob-r-name { font-family: var(--serif); font-size: 1rem; color: #fff; }
+  .mob-r-sub { font-family: var(--mono); font-size: .5rem; color: rgba(255,255,255,.4); letter-spacing: .1em; text-transform: uppercase; margin-top: .1rem; }
+  .mob-signout { background: none; border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.65); font-family: var(--mono); font-size: .58rem; padding: .35rem .6rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+  @media (max-width: 760px) { #mobile-retailer-strip { display: flex; } }
+
+  /* Full-screen boot state while restoring session */
+  #screen-boot {
+    background: var(--navy); color: #fff;
+    align-items: center; justify-content: center; flex-direction: column;
+  }
+  #screen-boot.active { display: flex; }
+  .boot-title { font-family: var(--serif); font-size: 1.4rem; color: #fff; }
+  .boot-sub { font-family: var(--mono); font-size: .6rem; color: rgba(255,255,255,.5); letter-spacing: .1em; text-transform: uppercase; margin-top: .5rem; }
+</style>
+</head>
+<body>
+
+<!-- Boot / session-restore screen -->
+<div class="screen active" id="screen-boot">
+  <div class="boot-title">VeyaFlow</div>
+  <div class="boot-sub">Retailer Portal · loading</div>
+</div>
+
+<!-- Login -->
+<div class="screen" id="screen-login">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-title">VeyaFlow</div>
+      <div class="auth-logo-sub">Retailer Portal</div>
+    </div>
+    <div class="auth-lead">Sign in to review brand submissions from VeyaFlow Verified brands.</div>
+
+    <label class="auth-lbl" for="login-email">Email</label>
+    <input class="auth-input" id="login-email" type="email" autocomplete="email" placeholder="buyer@retailer.com">
+
+    <label class="auth-lbl" for="login-password">Password</label>
+    <input class="auth-input" id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+
+    <div id="login-error" class="auth-error" style="display:none"></div>
+
+    <button class="auth-submit" id="login-submit" onclick="handleLogin()">Sign in</button>
+
+    <div class="auth-hint">
+      Accounts are created by VeyaFlow admin — there is no self-serve signup. If you need access, contact your VeyaFlow representative.
+    </div>
+  </div>
+  <div class="auth-footer">Powered by VeyaFlow</div>
+</div>
+
+<!-- App -->
+<div class="screen" id="screen-app">
+  <aside id="sidebar">
+    <div class="s-header">
+      <div class="s-product-title">VeyaFlow</div>
+      <div class="s-product-sub">Retailer Portal</div>
+    </div>
+    <div class="s-retailer-pill" id="retailer-pill">
+      <div class="s-retailer-logo" id="retailer-logo-letter">·</div>
+      <div class="s-retailer-name" id="retailer-pill-name">Retailer</div>
+      <div class="s-retailer-role" id="retailer-pill-role">Buyer</div>
+      <div style="clear:both"></div>
+    </div>
+    <nav class="s-nav">
+      <div class="s-nav-item active" id="nav-inbox" onclick="showPage('inbox')">
+        <span class="s-nav-icon">⎈</span>
+        <span class="s-nav-label">Submission Inbox</span>
+        <span class="s-nav-badge" id="nav-inbox-count" style="display:none">0</span>
+      </div>
+      <div class="s-nav-item locked">
+        <span class="s-nav-icon">◉</span>
+        <span class="s-nav-label">Analytics</span>
+        <span class="s-nav-sub">V2</span>
+      </div>
+      <div class="s-nav-item locked">
+        <span class="s-nav-icon">⚙</span>
+        <span class="s-nav-label">Settings</span>
+        <span class="s-nav-sub">V2</span>
+      </div>
+    </nav>
+    <div class="s-footer">
+      <div class="s-footer-text">Powered by VeyaFlow</div>
+      <button class="s-signout" onclick="signOut()">Sign out</button>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="mobile-retailer-strip">
+      <div>
+        <div class="mob-r-name" id="mobile-retailer-name">Retailer</div>
+        <div class="mob-r-sub">VeyaFlow Retailer Portal</div>
+      </div>
+      <button class="mob-signout" onclick="signOut()">Sign out</button>
+    </div>
+
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="topbar-title">Submission Inbox</div>
+        <div class="page-sub" id="topbar-sub">Submissions from VeyaFlow Verified brands</div>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
+
+    <div class="content">
+      <div class="page active" id="page-inbox"></div>
+      <div class="page" id="page-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rejection modal -->
+<div class="modal-overlay" id="modal-rejection">
+  <div class="modal">
+    <div class="modal-title">Reject this submission</div>
+    <div class="modal-sub">The brand will see the reason category. Your free-text note is also shown, but anonymised (no buyer name). Internal notes are private to your team.</div>
+
+    <label class="auth-lbl">Reason</label>
+    <select class="auth-input" id="rej-category"></select>
+
+    <label class="auth-lbl">Note for the brand <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">— optional, anonymised</span></label>
+    <textarea class="auth-input" id="rej-note" rows="3" style="resize:vertical"></textarea>
+
+    <label class="auth-lbl">Internal notes <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">— not shown to brand</span></label>
+    <textarea class="auth-input" id="rej-internal" rows="2" style="resize:vertical"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeRejectionModal()">Cancel</button>
+      <button class="btn-primary" id="rej-confirm-btn" onclick="confirmRejection()">Reject submission</button>
+    </div>
+  </div>
+</div>
+
+<!-- Listed congrats modal -->
+<div class="modal-overlay" id="modal-listed">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:2.5rem;color:var(--gold);margin-bottom:.5rem">★</div>
+    <div class="modal-title">Listed!</div>
+    <div class="modal-sub" id="modal-listed-sub" style="margin-bottom:1.5rem">This submission has been confirmed as Listed. The brand will be notified.</div>
+    <button class="btn-primary" style="width:100%" onclick="closeListedModal()">Continue</button>
+  </div>
+</div>
+
+<!-- Toast host -->
+<div class="toast-host" id="toast-host"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   VeyaFlow Retailer Portal — Session 2
+   Real Supabase Auth via /.netlify/functions/supabase-proxy.
+═══════════════════════════════════════════════════ */
+
+/* ─── CONFIG ─── */
+var PROXY_URL = '/.netlify/functions/supabase-proxy';
+var STORAGE_KEY_SESSION = 'veya_portal_session';
+
+var STATUS_ORDER = ['received','under_review','meeting_booked','terms_negotiation','listed'];
+
+var STATUS_LABELS = {
+  received:          'Received',
+  under_review:      'Under Review',
+  meeting_booked:    'Meeting Booked',
+  terms_negotiation: 'Terms Negotiation',
+  listed:            'Listed',
+  rejected:          'Rejected',
+};
+
+var REJECTION_REASONS = [
+  {id:'missing_documentation', label:'Missing documentation'},
+  {id:'claims_fail',           label:'Claims not compliant'},
+  {id:'rsp_too_high',          label:'RSP above category ceiling'},
+  {id:'category_saturated',    label:'Category already saturated'},
+  {id:'not_right_customer',    label:'Not right for our customer'},
+  {id:'timing_closed',         label:'Timing — range review closed'},
+  {id:'other',                 label:'Other'},
+];
+
+/* ─── STATE ─── */
+var accessToken = null;
+var refreshToken = null;
+var currentUser = null;        // { email, retailerId, retailerName, role, accountId }
+var submissionsCache = [];
+var isLoading = false;
+var loadError = null;
+var currentSubmissionId = null;
+var inboxFilter = { status:'', category:'', readinessMin:0, dateRange:'' };
+
+/* ─── UTILITIES ─── */
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function formatDate(iso){
+  if(!iso) return '';
+  try {
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return iso;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  } catch(e){ return iso; }
+}
+function daysAgo(iso){
+  if(!iso) return null;
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function scoreColor(score){
+  if(score >= 80) return 'var(--green)';
+  if(score >= 60) return 'var(--amber)';
+  return 'var(--red)';
+}
+function scoreBg(score){
+  if(score >= 80) return '#ECFDF5';
+  if(score >= 60) return 'rgba(245,158,11,.12)';
+  return 'rgba(239,68,68,.08)';
+}
+function toast(message, variant){
+  var host = document.getElementById('toast-host');
+  if(!host) return;
+  var el = document.createElement('div');
+  el.className = 'toast' + (variant ? ' ' + variant : '');
+  el.textContent = message;
+  host.appendChild(el);
+  setTimeout(function(){
+    el.style.transition = 'opacity .25s';
+    el.style.opacity = '0';
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 280);
+  }, 3400);
+}
+function showScreen(name){
+  var ids = ['screen-boot','screen-login','screen-app'];
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.classList.toggle('active', id === 'screen-' + name);
+  });
+}
+function showPage(name){
+  var pages = ['inbox','detail'];
+  pages.forEach(function(p){
+    var el = document.getElementById('page-' + p);
+    if(el) el.classList.toggle('active', p === name);
+  });
+  var inboxNav = document.getElementById('nav-inbox');
+  if(inboxNav) inboxNav.classList.toggle('active', name === 'inbox');
+  var content = document.querySelector('.content');
+  if(content) content.scrollTop = 0;
+  if(name === 'inbox'){ renderInbox(); updateTopbar('Submission Inbox','Submissions from VeyaFlow Verified brands',''); }
+  if(name === 'detail'){ renderDetail(); }
+}
+function updateTopbar(title, sub, actionsHtml){
+  var t = document.getElementById('topbar-title');
+  var s = document.getElementById('topbar-sub');
+  var a = document.getElementById('topbar-actions');
+  if(t) t.textContent = title;
+  if(s) s.textContent = sub;
+  if(a) a.innerHTML = actionsHtml || '';
+}
+
+/* ─── PROXY ─── */
+async function proxyCall(action, payload){
+  var body = Object.assign({ action: action }, payload || {});
+  if(accessToken) body.accessToken = accessToken;
+  var res;
+  try {
+    res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch(networkErr) {
+    var nErr = new Error('Network error — check your connection.');
+    nErr.status = 0;
+    throw nErr;
+  }
+  var data = {};
+  try { data = await res.json(); } catch(e){ data = {}; }
+  if(!res.ok){
+    var err = new Error(data.error || 'Request failed (' + res.status + ')');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+/* Handle 401 anywhere in the app — session died, kick to login */
+function handleAuthExpired(){
+  accessToken = null;
+  refreshToken = null;
+  currentUser = null;
+  try { localStorage.removeItem(STORAGE_KEY_SESSION); } catch(e){}
+  showScreen('login');
+  showLoginError('Your session expired. Please sign in again.');
+}
+
+/* ─── AUTH ─── */
+function showLoginError(msg){
+  var el = document.getElementById('login-error');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearLoginError(){
+  var el = document.getElementById('login-error');
+  if(!el) return;
+  el.textContent = '';
+  el.style.display = 'none';
+}
+
+async function handleLogin(){
+  clearLoginError();
+  var email = (document.getElementById('login-email').value || '').trim();
+  var password = document.getElementById('login-password').value || '';
+  if(!email || !password){
+    showLoginError('Enter email and password to sign in.');
+    return;
+  }
+  var btn = document.getElementById('login-submit');
+  if(btn){ btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    var result = await proxyCall('portal.auth.login', { email: email, password: password });
+    accessToken = result.access_token;
+    refreshToken = result.refresh_token;
+    currentUser = result.retailer;
+    persistSession();
+    await loadSubmissionsFromServer();
+    enterApp();
+  } catch(e) {
+    var msg = 'Sign in failed. Try again.';
+    if(e.status === 401) msg = 'Invalid email or password.';
+    else if(e.status === 403) msg = e.message || 'No active retailer account for this email. Contact VeyaFlow admin.';
+    else if(e.status === 0)   msg = e.message;
+    showLoginError(msg);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = 'Sign in'; }
+  }
+}
+
+async function restoreSession(){
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY_SESSION);
+    if(!raw) return false;
+    var s = JSON.parse(raw);
+    if(!s || !s.access_token) return false;
+    accessToken = s.access_token;
+    refreshToken = s.refresh_token || null;
+    // Verify token is still good, and re-fetch retailer context
+    var result = await proxyCall('portal.auth.verify', {});
+    currentUser = result.retailer;
+    persistSession();
+    await loadSubmissionsFromServer();
+    return true;
+  } catch(e) {
+    console.warn('Session restore failed:', e.message);
+    accessToken = null;
+    refreshToken = null;
+    currentUser = null;
+    try { localStorage.removeItem(STORAGE_KEY_SESSION); } catch(ee){}
+    return false;
+  }
+}
+
+function persistSession(){
+  try {
+    localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      retailer: currentUser,
+    }));
+  } catch(e){}
+}
+
+function signOut(){
+  accessToken = null;
+  refreshToken = null;
+  currentUser = null;
+  currentSubmissionId = null;
+  submissionsCache = [];
+  try { localStorage.removeItem(STORAGE_KEY_SESSION); } catch(e){}
+  var em = document.getElementById('login-email'); if(em) em.value = '';
+  var pw = document.getElementById('login-password'); if(pw) pw.value = '';
+  clearLoginError();
+  showScreen('login');
+}
+
+function enterApp(){
+  var pillName = document.getElementById('retailer-pill-name');
+  var pillRole = document.getElementById('retailer-pill-role');
+  var pillLogo = document.getElementById('retailer-logo-letter');
+  var mobName  = document.getElementById('mobile-retailer-name');
+  if(pillName) pillName.textContent = currentUser.retailerName || 'Retailer';
+  if(pillRole) pillRole.textContent = (currentUser.role || 'Buyer');
+  if(pillLogo) pillLogo.textContent = (currentUser.retailerName || 'R').charAt(0).toUpperCase();
+  if(mobName)  mobName.textContent  = currentUser.retailerName || 'Retailer';
+  showScreen('app');
+  showPage('inbox');
+}
+
+/* ─── DATA ─── */
+async function loadSubmissionsFromServer(){
+  isLoading = true;
+  loadError = null;
+  try {
+    var result = await proxyCall('portal.submission.list', {});
+    submissionsCache = result.submissions || [];
+  } catch(e) {
+    if(e.status === 401){ handleAuthExpired(); throw e; }
+    loadError = e.message || 'Failed to load submissions.';
+    submissionsCache = [];
+  } finally {
+    isLoading = false;
+  }
+}
+
+async function refreshInbox(){
+  try {
+    await loadSubmissionsFromServer();
+    renderInbox();
+  } catch(e){ /* auth handled above */ }
+}
+
+async function refreshDetail(){
+  if(!currentSubmissionId) return;
+  try {
+    var result = await proxyCall('portal.submission.get', { id: currentSubmissionId });
+    // Update the cached row
+    var idx = submissionsCache.findIndex(function(x){ return x.id === currentSubmissionId; });
+    if(idx >= 0) submissionsCache[idx] = result.submission;
+    else submissionsCache.unshift(result.submission);
+    renderDetail();
+  } catch(e){
+    if(e.status === 401) handleAuthExpired();
+    else toast('Failed to refresh: ' + e.message, 'error');
+  }
+}
+
+/* ─── INBOX RENDER ─── */
+function getFilteredSubmissions(){
+  return submissionsCache.filter(function(s){
+    if(inboxFilter.status && s.status !== inboxFilter.status) return false;
+    if(inboxFilter.category && s.category !== inboxFilter.category) return false;
+    if(inboxFilter.readinessMin && (s.readinessScore||0) < inboxFilter.readinessMin) return false;
+    if(inboxFilter.dateRange){
+      var d = daysAgo(s.submittedAt);
+      if(d === null) return false;
+      if(inboxFilter.dateRange === '7d'  && d > 7)  return false;
+      if(inboxFilter.dateRange === '30d' && d > 30) return false;
+      if(inboxFilter.dateRange === '90d' && d > 90) return false;
+    }
+    return true;
+  });
+  // Server already returns submissions sorted by submitted_at desc
+}
+
+function renderInbox(){
+  var host = document.getElementById('page-inbox');
+  if(!host) return;
+
+  if(isLoading){
+    host.innerHTML = '<div class="loading-card">Loading submissions…</div>';
+    return;
+  }
+  if(loadError){
+    host.innerHTML = '<div class="err-card">'
+      + '<div class="err-card-title">Couldn\'t load submissions</div>'
+      + '<div class="err-card-body">' + esc(loadError) + '</div>'
+      + '<button class="btn-primary" onclick="refreshInbox()">Retry</button>'
+      + '</div>';
+    return;
+  }
+
+  var all = submissionsCache;
+  var filtered = getFilteredSubmissions();
+
+  // Build category list from actual data
+  var categories = {};
+  all.forEach(function(s){ if(s.category) categories[s.category] = 1; });
+  var categoryOpts = Object.keys(categories).sort();
+
+  var countEl = document.getElementById('nav-inbox-count');
+  if(countEl){
+    countEl.textContent = all.length;
+    countEl.style.display = all.length > 0 ? 'inline-block' : 'none';
+  }
+
+  var html = '';
+  html += '<div class="filter-bar">';
+  html +=   '<div class="filter-field"><div class="filter-lbl">Status</div>';
+  html +=     '<select class="filter-select" onchange="setFilter(\'status\', this.value)">';
+  html +=       '<option value="">All statuses</option>';
+  STATUS_ORDER.forEach(function(st){
+    html +=      '<option value="' + esc(st) + '"' + (inboxFilter.status===st?' selected':'') + '>' + esc(STATUS_LABELS[st]) + '</option>';
+  });
+  html +=       '<option value="rejected"' + (inboxFilter.status==='rejected'?' selected':'') + '>Rejected</option>';
+  html +=     '</select>';
+  html +=   '</div>';
+  html +=   '<div class="filter-field"><div class="filter-lbl">Category</div>';
+  html +=     '<select class="filter-select" onchange="setFilter(\'category\', this.value)">';
+  html +=       '<option value="">All categories</option>';
+  categoryOpts.forEach(function(c){
+    html +=      '<option value="' + esc(c) + '"' + (inboxFilter.category===c?' selected':'') + '>' + esc(c) + '</option>';
+  });
+  html +=     '</select>';
+  html +=   '</div>';
+  html +=   '<div class="filter-field"><div class="filter-lbl">Readiness ≥</div>';
+  html +=     '<select class="filter-select" onchange="setFilter(\'readinessMin\', parseInt(this.value,10)||0)">';
+  [0,60,70,80,90].forEach(function(v){
+    html +=      '<option value="' + v + '"' + (inboxFilter.readinessMin===v?' selected':'') + '>' + (v===0?'Any':v+'+') + '</option>';
+  });
+  html +=     '</select>';
+  html +=   '</div>';
+  html +=   '<div class="filter-field"><div class="filter-lbl">Submitted</div>';
+  html +=     '<select class="filter-select" onchange="setFilter(\'dateRange\', this.value)">';
+  html +=       '<option value=""' + (inboxFilter.dateRange===''?' selected':'') + '>Any time</option>';
+  html +=       '<option value="7d"' + (inboxFilter.dateRange==='7d'?' selected':'') + '>Last 7 days</option>';
+  html +=       '<option value="30d"' + (inboxFilter.dateRange==='30d'?' selected':'') + '>Last 30 days</option>';
+  html +=       '<option value="90d"' + (inboxFilter.dateRange==='90d'?' selected':'') + '>Last 90 days</option>';
+  html +=     '</select>';
+  html +=   '</div>';
+  html +=   '<button class="filter-clear" onclick="clearFilters()">Clear</button>';
+  html +=   '<button class="filter-clear" onclick="refreshInbox()" title="Refresh from server">↻ Refresh</button>';
+  html += '</div>';
+
+  html += '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.85rem">' + filtered.length + ' of ' + all.length + ' submission' + (all.length!==1?'s':'') + '</div>';
+
+  if(all.length === 0){
+    html += '<div class="empty">';
+    html +=   '<div class="empty-icon">⎈</div>';
+    html +=   '<div class="empty-title">No submissions yet</div>';
+    html +=   '<div class="empty-sub">VeyaFlow Verified brands will appear here when they submit to ' + esc(currentUser.retailerName) + '.</div>';
+    html += '</div>';
+  } else if(filtered.length === 0){
+    html += '<div class="empty">';
+    html +=   '<div class="empty-icon">⊘</div>';
+    html +=   '<div class="empty-title">No matches</div>';
+    html +=   '<div class="empty-sub">Try clearing one or more filters to see more submissions.</div>';
+    html += '</div>';
+  } else {
+    html += '<div class="sub-grid">';
+    filtered.forEach(function(s){ html += renderSubmissionCard(s); });
+    html += '</div>';
+  }
+
+  host.innerHTML = html;
+}
+
+function setFilter(key, value){
+  inboxFilter[key] = value;
+  renderInbox();
+}
+function clearFilters(){
+  inboxFilter = { status:'', category:'', readinessMin:0, dateRange:'' };
+  renderInbox();
+}
+
+function renderSubmissionCard(s){
+  var daysSince = daysAgo(s.submittedAt);
+  var dateLine = (daysSince === 0) ? 'Today' : (daysSince + ' day' + (daysSince!==1?'s':'') + ' ago');
+  var html = '<div class="sub-card" data-id="' + esc(s.id) + '" onclick="openSubmission(this.dataset.id)">';
+  html +=   '<div class="sub-head">';
+  html +=     '<div class="sub-brand-name">' + esc(s.brandName) + '</div>';
+  html +=     '<span class="sub-status status-' + esc(s.status) + '">' + esc(STATUS_LABELS[s.status] || s.status) + '</span>';
+  html +=   '</div>';
+  html +=   '<div class="sub-meta">' + esc(s.category) + ' · ' + esc(s.homeMarket) + ' → ' + esc(s.targetMarket) + '</div>';
+  html +=   '<div class="sub-readiness-row">';
+  html +=     '<div class="sub-score-box" style="color:' + scoreColor(s.readinessScore) + ';background:' + scoreBg(s.readinessScore) + '">' + (s.readinessScore||0) + '</div>';
+  html +=     '<div>';
+  html +=       '<div style="font-family:var(--serif);font-size:.9rem;color:var(--navy);line-height:1.2">Readiness</div>';
+  html +=       '<div class="sub-score-label">out of 100 · ' + esc(s.verifiedTier||'Verified') + ' tier</div>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html +=   '<div class="sub-date">';
+  html +=     '<span>Submitted ' + dateLine + '</span>';
+  if(s.verified){
+    html +=   '<span class="sub-verified-tag">★ VeyaFlow Verified</span>';
+  }
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+function openSubmission(id){
+  currentSubmissionId = id;
+  showPage('detail');
+}
+
+/* ─── DETAIL RENDER ─── */
+function getCurrentSubmission(){
+  if(!currentSubmissionId) return null;
+  return submissionsCache.find(function(s){ return s.id === currentSubmissionId; }) || null;
+}
+
+function renderDetail(){
+  var s = getCurrentSubmission();
+  var host = document.getElementById('page-detail');
+  if(!host) return;
+  if(!s){
+    host.innerHTML = '<div class="empty"><div class="empty-title">Submission not found</div><div class="empty-sub">It may have been removed. Try returning to the inbox.</div></div>';
+    updateTopbar('Submission','','');
+    return;
+  }
+
+  updateTopbar(
+    s.brandName,
+    esc(s.category) + ' · submitted ' + formatDate(s.submittedAt),
+    '<button class="btn-outline" onclick="goBackToInbox()">← Back to inbox</button>'
+  );
+
+  var html = '';
+  html += '<div class="back-link" onclick="goBackToInbox()">← Back to inbox</div>';
+  html += renderPipeline(s);
+  html += renderStatusPanel(s);
+
+  html += '<div class="detail-grid">';
+  html +=   '<div class="detail-card">';
+  html +=     '<div class="detail-card-title">Brand overview</div>';
+  html +=     '<div class="detail-brand-name">' + esc(s.brandName) + '</div>';
+  html +=     '<div class="detail-brand-meta">' + esc(s.category) + ' · Home market: ' + esc(s.homeMarket) + ' · Target: ' + esc(s.targetMarket) + '</div>';
+  html +=     '<div class="detail-badges">';
+  if(s.verified){
+    html +=     '<span class="detail-badge detail-badge-gold">★ VeyaFlow Verified · ' + esc(s.verifiedTier||'') + '</span>';
+  }
+  (s.claims||[]).forEach(function(c){
+    html +=     '<span class="detail-badge detail-badge-green">' + esc(c) + '</span>';
+  });
+  html +=     '</div>';
+  if(s.notes){
+    html +=   '<div style="font-family:var(--sans);font-size:.85rem;color:#444;line-height:1.6;padding:.85rem 1rem;background:var(--cream);border-left:3px solid var(--gold)">' + esc(s.notes) + '</div>';
+  }
+  html +=   '</div>';
+
+  html +=   '<div class="detail-card">';
+  html +=     '<div class="detail-card-title">Readiness breakdown</div>';
+  html +=     '<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.85rem">';
+  html +=       '<div style="font-family:var(--serif);font-size:3rem;line-height:1;color:' + scoreColor(s.readinessScore) + '">' + (s.readinessScore||0) + '</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">/ 100</div>';
+  html +=     '</div>';
+  var dims = s.readinessDimensions || {};
+  ['compliance','commercial','operational','brand'].forEach(function(d){
+    var v = dims[d] || 0;
+    html +=     '<div class="dim-row">';
+    html +=       '<div class="dim-label">' + d + '</div>';
+    html +=       '<div class="dim-bar"><div class="dim-bar-fill" style="width:' + Math.min(100,v) + '%;background:' + scoreColor(v) + '"></div></div>';
+    html +=       '<div class="dim-val">' + v + '</div>';
+    html +=     '</div>';
+  });
+  html +=   '</div>';
+  html += '</div>';
+
+  if(s.status === 'rejected' && s.rejectionReason){
+    html += renderRejectionBlock(s.rejectionReason);
+  }
+
+  html += '<div class="detail-card" style="margin-bottom:1rem">';
+  html +=   '<div class="detail-card-title">Products submitted (' + (s.skus||[]).length + ')</div>';
+  html +=   '<table class="sku-tbl">';
+  html +=     '<thead><tr><th>Product</th><th>EAN</th><th>CPNP</th><th>Claims</th><th>EU RP</th><th>RSP</th></tr></thead>';
+  html +=     '<tbody>';
+  (s.skus||[]).forEach(function(sk){
+    html +=   '<tr>';
+    html +=     '<td style="font-weight:500">' + esc(sk.name) + '</td>';
+    html +=     '<td style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">' + esc(sk.ean) + '</td>';
+    html +=     '<td>' + (sk.cpnp ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
+    html +=     '<td>' + (sk.claimsAudited ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
+    html +=     '<td>' + (sk.euRp ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
+    html +=     '<td style="font-family:var(--mono);font-size:.75rem">' + esc(sk.rsp) + '</td>';
+    html +=   '</tr>';
+  });
+  html +=     '</tbody>';
+  html +=   '</table>';
+  html += '</div>';
+
+  if(s.articleTemplate && Object.keys(s.articleTemplate).length){
+    html += '<div class="detail-card" style="margin-bottom:1rem">';
+    html +=   '<div class="detail-card-title">Article template · ' + esc(currentUser.retailerName) + ' format</div>';
+    html +=   '<div class="art-grid">';
+    Object.keys(s.articleTemplate).forEach(function(k){
+      html += '<div class="art-item">';
+      html +=   '<div class="art-lbl">' + esc(k) + '</div>';
+      html +=   '<div class="art-val">' + esc(s.articleTemplate[k]) + '</div>';
+      html += '</div>';
+    });
+    html +=   '</div>';
+    html += '</div>';
+  }
+
+  html += '<div class="veya-footer-note">This submission was pre-qualified by VeyaFlow. All compliance checks (CPNP, claims audit, EU Responsible Person, EUDR where applicable) were completed by the brand before submission.</div>';
+
+  host.innerHTML = html;
+}
+
+function renderPipeline(s){
+  var idx = STATUS_ORDER.indexOf(s.status);
+  var isRejected = (s.status === 'rejected');
+  var html = '<div class="pipeline">';
+  STATUS_ORDER.forEach(function(st, i){
+    var cls = '';
+    if(!isRejected){
+      if(i === idx) cls = 'active';
+      else if(i < idx) cls = 'passed';
+    }
+    html += '<div class="pipeline-step ' + cls + '">' + esc(STATUS_LABELS[st]) + '</div>';
+  });
+  if(isRejected){
+    html += '<div class="pipeline-step rejected" style="flex:0 0 auto;padding:.55rem 1rem">' + esc(STATUS_LABELS.rejected) + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderStatusPanel(s){
+  if(s.status === 'rejected' || s.status === 'listed'){
+    var msg = s.status === 'listed'
+      ? 'This submission is listed. Any changes should be recorded in your internal systems.'
+      : 'This submission has been rejected. The brand has been notified with the reason category.';
+    var bg  = s.status === 'listed' ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.06)';
+    var bc  = s.status === 'listed' ? 'rgba(16,185,129,.35)' : 'rgba(239,68,68,.3)';
+    return '<div style="background:' + bg + ';border:1px solid ' + bc + ';padding:.85rem 1.15rem;margin-bottom:1rem;font-family:var(--sans);font-size:.8rem;color:#333">' + esc(msg) + '</div>';
+  }
+  var html = '<div class="status-panel">';
+  html +=   '<div class="status-panel-lbl">Update status</div>';
+  html +=   '<select class="status-panel-select" id="status-select" onchange="handleStatusChange(this.value)">';
+  STATUS_ORDER.forEach(function(st){
+    html += '<option value="' + esc(st) + '"' + (s.status===st?' selected':'') + '>' + esc(STATUS_LABELS[st]) + '</option>';
+  });
+  html +=   '<option value="rejected">Reject submission</option>';
+  html +=   '</select>';
+  html +=   '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.06em">Changes sync to the brand</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderRejectionBlock(rr){
+  var label = 'Other';
+  REJECTION_REASONS.forEach(function(r){ if(r.id === rr.category) label = r.label; });
+  var html = '<div class="detail-card" style="margin-bottom:1rem;border-color:rgba(239,68,68,.3)">';
+  html +=   '<div class="detail-card-title" style="color:#991B1B">Rejection reason</div>';
+  html +=   '<div style="font-family:var(--sans);font-size:.95rem;color:var(--navy);margin-bottom:.5rem"><strong>' + esc(label) + '</strong></div>';
+  if(rr.detail){
+    html += '<div style="font-family:var(--sans);font-size:.82rem;color:#444;line-height:1.55;margin-bottom:.5rem">' + esc(rr.detail) + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function goBackToInbox(){ showPage('inbox'); }
+
+/* ─── STATUS UPDATES ─── */
+async function handleStatusChange(newStatus){
+  var s = getCurrentSubmission();
+  if(!s) return;
+  if(newStatus === s.status) return;
+  var sel = document.getElementById('status-select');
+  if(newStatus === 'rejected'){
+    openRejectionModal();
+    if(sel) sel.value = s.status; // revert — confirmation happens in modal
+    return;
+  }
+  if(sel) sel.disabled = true;
+  try {
+    var result = await proxyCall('portal.status.update', { id: s.id, newStatus: newStatus });
+    var idx = submissionsCache.findIndex(function(x){ return x.id === s.id; });
+    if(idx >= 0) submissionsCache[idx] = result.submission;
+    if(newStatus === 'listed'){
+      var sub = document.getElementById('modal-listed-sub');
+      if(sub) sub.textContent = s.brandName + ' has been listed. The brand will be notified.';
+      var ov = document.getElementById('modal-listed');
+      if(ov) ov.classList.add('active');
+    } else {
+      toast('Status updated to ' + STATUS_LABELS[newStatus], 'success');
+    }
+    renderDetail();
+  } catch(e){
+    if(e.status === 401) handleAuthExpired();
+    else toast('Failed to update status: ' + e.message, 'error');
+    if(sel){ sel.disabled = false; sel.value = s.status; }
+  }
+}
+
+function closeListedModal(){
+  var ov = document.getElementById('modal-listed');
+  if(ov) ov.classList.remove('active');
+}
+
+/* ─── REJECTION MODAL ─── */
+function openRejectionModal(){
+  var sel = document.getElementById('rej-category');
+  if(sel){
+    var html = '';
+    REJECTION_REASONS.forEach(function(r){
+      html += '<option value="' + esc(r.id) + '">' + esc(r.label) + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = REJECTION_REASONS[0].id;
+  }
+  var noteEl = document.getElementById('rej-note');
+  var intEl  = document.getElementById('rej-internal');
+  if(noteEl) noteEl.value = '';
+  if(intEl)  intEl.value = '';
+  var btn = document.getElementById('rej-confirm-btn');
+  if(btn){ btn.disabled = false; btn.textContent = 'Reject submission'; }
+  var ov = document.getElementById('modal-rejection');
+  if(ov) ov.classList.add('active');
+}
+
+function closeRejectionModal(){
+  var ov = document.getElementById('modal-rejection');
+  if(ov) ov.classList.remove('active');
+}
+
+async function confirmRejection(){
+  var s = getCurrentSubmission();
+  if(!s) return;
+  var cat = (document.getElementById('rej-category')||{}).value || 'other';
+  var note = (document.getElementById('rej-note')||{}).value || '';
+  var internal = (document.getElementById('rej-internal')||{}).value || '';
+  var btn = document.getElementById('rej-confirm-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Rejecting…'; }
+  try {
+    var result = await proxyCall('portal.rejection.create', {
+      id: s.id,
+      reasonCategory: cat,
+      reasonDetail: note,
+      internalNote: internal,
+    });
+    var idx = submissionsCache.findIndex(function(x){ return x.id === s.id; });
+    if(idx >= 0) submissionsCache[idx] = result.submission;
+    closeRejectionModal();
+    toast('Submission rejected. Brand will be notified.', 'success');
+    renderDetail();
+  } catch(e){
+    if(e.status === 401){ handleAuthExpired(); return; }
+    toast('Failed to reject: ' + e.message, 'error');
+    if(btn){ btn.disabled = false; btn.textContent = 'Reject submission'; }
+  }
+}
+
+/* ─── INIT ─── */
+async function init(){
+  // Try session restore; fall back to login if it fails
+  var restored = await restoreSession();
+  if(restored){
+    enterApp();
+  } else {
+    showScreen('login');
+  }
+  // Allow Enter key to submit login
+  var pw = document.getElementById('login-password');
+  if(pw){
+    pw.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter'){ ev.preventDefault(); handleLogin(); }
+    });
+  }
+  var em = document.getElementById('login-email');
+  if(em){
+    em.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter'){ ev.preventDefault(); handleLogin(); }
+    });
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
