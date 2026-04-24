@@ -28499,6 +28499,419 @@ function dismissPortalAlert(id){
   else window.addEventListener('load', function(){ setTimeout(_maybeStartPoll, 500); });
 })();
 
+/* ═══════════════════════════════════════════════════
+   Feature A — Feedback Loop Engine (Phase 1)
+   Trigger 1: sell-through >70% for 2 consecutive months → proof-point event
+   
+   Engine is pure read-and-produce: it scans RETAIL data (retailPerformance,
+   retailSubmissions, retailComms) and creates loop_events via the proxy.
+   Events surface on Brand Home. Accept appends to brand.proofPoints.
+═══════════════════════════════════════════════════ */
+
+/* ─── PROMPTS ─── */
+var FEEDBACK_LOOP_PROMPTS = {
+  sell_through_high: {
+    build: function(ctx){
+      // ctx: { brandName, skuName, retailerName, market, category, months, percentages }
+      var avg = Math.round(ctx.percentages.reduce(function(a,b){ return a+b; }, 0) / ctx.percentages.length);
+      return [
+        { role:'user', content:
+          'Write ONE concise, sales-ready proof-point sentence (max 30 words) that a brand can add to a retailer pitch. ' +
+          'Base it on these real performance numbers. No hype, no generic adjectives. Plain commercial language.\n\n' +
+          'Brand: ' + (ctx.brandName||'This brand') + '\n' +
+          'Product: ' + (ctx.skuName||'A product') + '\n' +
+          'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
+          'Category: ' + (ctx.category||'') + '\n' +
+          'Months of data: ' + ctx.months.join(', ') + '\n' +
+          'Sell-through per month: ' + ctx.percentages.map(function(p){ return p+'%'; }).join(', ') + '\n' +
+          'Average sell-through: ' + avg + '%\n\n' +
+          'Return ONLY the sentence, no preamble.'
+        }
+      ];
+    }
+  }
+};
+
+/* ─── STATE ─── */
+var loopEvents = [];
+var _loopEventsLoaded = false;
+var _loopEngineRunning = false;
+
+/* ─── PROXY HELPERS ─── */
+async function loopCall(action, extra){
+  try{
+    var body = Object.assign({ action: action, session_id: getSessionId() }, extra || {});
+    var res = await fetch('/.netlify/functions/supabase-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if(!res.ok){
+      if(res.status !== 404) console.warn('VeyaFlow loop:', action, 'HTTP', res.status);
+      return null;
+    }
+    return await res.json();
+  }catch(e){ return null; }
+}
+
+async function loadLoopEvents(){
+  var result = await loopCall('loop.list', { limit: 200 });
+  if(result && result.events){
+    loopEvents = result.events;
+    _loopEventsLoaded = true;
+    return loopEvents;
+  }
+  return [];
+}
+
+async function upsertLoopEvent(eventPayload){
+  var result = await loopCall('loop.upsert', { event: eventPayload });
+  if(!result || !result.ok) return null;
+  // Update local cache
+  if(result.isNew && result.event){
+    loopEvents.unshift(result.event);
+  } else if(result.event){
+    var idx = loopEvents.findIndex(function(e){ return e.id === result.event.id; });
+    if(idx < 0) loopEvents.unshift(result.event);
+  }
+  return result.event;
+}
+
+async function updateLoopEventRemote(id, updates){
+  var result = await loopCall('loop.update', { id: id, updates: updates });
+  if(!result || !result.ok) return null;
+  if(result.event){
+    var idx = loopEvents.findIndex(function(e){ return e.id === id; });
+    if(idx >= 0) loopEvents[idx] = result.event;
+  }
+  return result.event;
+}
+
+/* ─── TRIGGER 1: Sell-through >70% for 2 consecutive months ─── */
+
+// Given an array of { year, month (1-12), pct }, return the MOST RECENT pair
+// of consecutive calendar months where both > 70. Returns [] or one pair.
+// Per brief: "sell-through rate >70% for the most recent 2 calendar months".
+function _findConsecutiveHighMonths(entries){
+  if(!entries || entries.length < 2) return [];
+  // Sort ascending by year+month
+  var sorted = entries.slice().sort(function(a,b){
+    if(a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+  // Check only the last two elements — "most recent" semantics
+  var cur  = sorted[sorted.length - 2];
+  var next = sorted[sorted.length - 1];
+  if(cur.pct < 70 || next.pct < 70) return [];
+  var curIdx  = cur.year*12 + cur.month;
+  var nextIdx = next.year*12 + next.month;
+  if(nextIdx - curIdx !== 1) return [];
+  return [{ a: cur, b: next }];
+}
+
+function _parseMonthString(monthStr){
+  // Accept 'YYYY-MM' or 'YYYY-MM-DD'
+  if(!monthStr) return null;
+  var parts = String(monthStr).split('-');
+  if(parts.length < 2) return null;
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10);
+  if(!y || !m) return null;
+  return { year: y, month: m };
+}
+
+function _formatMonthPair(a, b){
+  var pad = function(n){ return n<10 ? '0'+n : String(n); };
+  return a.year+'-'+pad(a.month)+'..'+b.year+'-'+pad(b.month);
+}
+
+function _monthLabel(ym){
+  var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[ym.month-1] + ' ' + ym.year;
+}
+
+async function checkTrigger1SellThroughHigh(){
+  try{
+    if(typeof retailPerformance === 'undefined' || !retailPerformance.length) return;
+    // Group by retailerId + skuId
+    var groups = {};
+    retailPerformance.forEach(function(p){
+      if(!p.retailerId || !p.skuId) return;
+      var pct = p.sellThroughPct;
+      if(pct === undefined || pct === null) return;
+      var ym = _parseMonthString(p.month);
+      if(!ym) return;
+      var key = p.retailerId + '::' + p.skuId;
+      if(!groups[key]) groups[key] = [];
+      groups[key].push({ year: ym.year, month: ym.month, pct: pct, retailerId: p.retailerId, skuId: p.skuId });
+    });
+
+    var sessionId = getSessionId();
+    var localSkus = (typeof skus !== 'undefined' && Array.isArray(skus)) ? skus : [];
+    var keys = Object.keys(groups);
+
+    for(var k=0; k<keys.length; k++){
+      var entries = groups[keys[k]];
+      var pairs = _findConsecutiveHighMonths(entries);
+      // For each consecutive pair >70%, upsert a loop event
+      for(var p=0; p<pairs.length; p++){
+        var pair = pairs[p];
+        var retailerId = entries[0].retailerId;
+        var skuId      = entries[0].skuId;
+        var retailerName = (typeof retailerNameFromId === 'function') ? retailerNameFromId(retailerId) : retailerId;
+        var market       = (typeof retailerMarketFromId === 'function') ? retailerMarketFromId(retailerId) : '';
+        var skuObj       = localSkus.find(function(s){ return String(s.id) === String(skuId); });
+        var skuName      = skuObj ? (skuObj.name || '') : '';
+        var dedupeKey    = sessionId + '::sell_through_high::' + retailerId + '::' + skuId + '::' + _formatMonthPair(pair.a, pair.b);
+
+        await upsertLoopEvent({
+          trigger_type:  'sell_through_high',
+          severity:      'action',
+          retailer_id:   retailerId,
+          retailer_name: retailerName,
+          sku_id:        String(skuId),
+          sku_name:      skuName,
+          market:        market,
+          context: {
+            months:       [_monthLabel(pair.a), _monthLabel(pair.b)],
+            percentages:  [pair.a.pct, pair.b.pct],
+            averagePct:   Math.round((pair.a.pct + pair.b.pct) / 2),
+            category:     (typeof brand !== 'undefined' && brand && brand.category) || '',
+            brandName:    (typeof brand !== 'undefined' && brand && brand.name) || '',
+          },
+          dedupe_key:    dedupeKey,
+        });
+      }
+    }
+  }catch(e){ console.warn('Trigger 1 check failed:', e.message); }
+}
+
+/* ─── ENGINE DISPATCHER ─── */
+async function runFeedbackLoopEngine(){
+  if(_loopEngineRunning) return;
+  _loopEngineRunning = true;
+  try{
+    if(!_loopEventsLoaded) await loadLoopEvents();
+    // Phase 1: only Trigger 1 active
+    await checkTrigger1SellThroughHigh();
+    // Phase 2 will add: checkTrigger3SellThroughLow, checkTrigger4Reorder, checkTrigger5Rejection
+    // Phase 2.5 will add: checkTrigger2ListingBoost
+    // After any events were added, re-render if we're on a page that surfaces them
+    if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
+      renderPage('home');
+    }
+  } finally {
+    _loopEngineRunning = false;
+  }
+}
+
+/* ─── LAZY AI DRAFTING ─── */
+// Drafts are generated on first view of the event card, cached in drafted_content.
+// Only regenerated if user clicks "Regenerate".
+async function ensureEventDraft(eventId){
+  var ev = loopEvents.find(function(e){ return e.id === eventId; });
+  if(!ev) return null;
+  if(ev.drafted_content) return ev.drafted_content;
+  if(ev._drafting) return null; // already in flight
+  ev._drafting = true;
+  try{
+    var messages = null;
+    if(ev.trigger_type === 'sell_through_high' && FEEDBACK_LOOP_PROMPTS.sell_through_high){
+      messages = FEEDBACK_LOOP_PROMPTS.sell_through_high.build({
+        brandName:    ev.context?.brandName    || (brand && brand.name) || '',
+        skuName:      ev.sku_name              || '',
+        retailerName: ev.retailer_name         || '',
+        market:       ev.market                || '',
+        category:     ev.context?.category     || '',
+        months:       ev.context?.months       || [],
+        percentages:  ev.context?.percentages  || [],
+      });
+    }
+    if(!messages) return null;
+    if(typeof queuedCallAPI !== 'function'){
+      console.warn('queuedCallAPI not available — skipping draft');
+      return null;
+    }
+    var response = await queuedCallAPI(messages, 200);
+    // queuedCallAPI → callAPI returns a plain text string (already extracted from content[0].text)
+    var text = (typeof response === 'string') ? response.trim() : '';
+    if(!text) return null;
+    await updateLoopEventRemote(ev.id, { drafted_content: text });
+    ev.drafted_content = text; // sync local immediately for render
+    if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
+      renderPage('home');
+    }
+    return text;
+  } catch(e){
+    console.warn('Draft generation failed:', e.message);
+    return null;
+  } finally {
+    ev._drafting = false;
+  }
+}
+
+/* ─── LIFECYCLE ACTIONS ─── */
+async function loopEventAccept(eventId){
+  var ev = loopEvents.find(function(e){ return e.id === eventId; });
+  if(!ev) return;
+  // Ensure we have drafted content to append
+  var content = ev.drafted_content || await ensureEventDraft(eventId);
+  if(!content){
+    if(typeof showError === 'function') showError('Could not draft proof point — try again.');
+    else console.warn('Could not draft proof point');
+    return;
+  }
+  // Append to brand.proofPoints (avoid duplicates)
+  if(typeof brand !== 'undefined' && brand){
+    brand.proofPoints = brand.proofPoints || [];
+    if(brand.proofPoints.indexOf(content) === -1){
+      brand.proofPoints.push(content);
+    }
+    if(typeof saveBrandState === 'function') saveBrandState();
+  }
+  // Mark accepted remotely
+  await updateLoopEventRemote(eventId, { accepted: true });
+  if(typeof showSuccess === 'function') showSuccess('Proof point added to your Brand Pack');
+  if(typeof currentPage!=='undefined' && typeof renderPage==='function') renderPage(currentPage);
+}
+
+async function loopEventDismiss(eventId){
+  var ev = loopEvents.find(function(e){ return e.id === eventId; });
+  if(!ev) return;
+  await updateLoopEventRemote(eventId, { dismissed: true });
+  if(typeof currentPage!=='undefined' && typeof renderPage==='function') renderPage(currentPage);
+}
+
+async function loopEventEdit(eventId){
+  var ev = loopEvents.find(function(e){ return e.id === eventId; });
+  if(!ev) return;
+  var current = ev.drafted_content || await ensureEventDraft(eventId) || '';
+  var edited = window.prompt('Edit the proof-point sentence:', current);
+  if(edited === null) return; // user cancelled
+  edited = edited.trim();
+  if(!edited) return;
+  await updateLoopEventRemote(eventId, { drafted_content: edited });
+  ev.drafted_content = edited;
+  // Accept with the edited content
+  loopEventAccept(eventId);
+}
+
+/* ─── RENDER (Brand Home alerts row) ─── */
+function _retailEscSafe(s){
+  if(typeof retailEsc === 'function') return retailEsc(s);
+  if(s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function renderLoopEventAlerts(){
+  if(!loopEvents || !loopEvents.length) return '';
+  var active = loopEvents.filter(function(e){ return !e.dismissed && !e.accepted && !e.resolved; });
+  if(!active.length) return '';
+  var html = '';
+  active.slice(0, 5).forEach(function(ev){
+    html += renderLoopEventCard(ev);
+  });
+  return html;
+}
+
+function renderLoopEventCard(ev){
+  if(ev.trigger_type === 'sell_through_high') return _renderSellThroughHighCard(ev);
+  return '';
+}
+
+function _renderSellThroughHighCard(ev){
+  var months = (ev.context && ev.context.months) || [];
+  var pcts   = (ev.context && ev.context.percentages) || [];
+  var avg    = (ev.context && ev.context.averagePct) || 0;
+  var draft  = ev.drafted_content || '';
+  var hasDraft = !!draft;
+  // Kick off lazy draft on first render if we don't have one yet
+  if(!hasDraft && !ev._drafting){
+    setTimeout(function(){ ensureEventDraft(ev.id); }, 100);
+  }
+  var html = '';
+  html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:4px solid #F59E0B;padding:.9rem 1.15rem;margin-bottom:.75rem">';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">';
+  html +=     '<div style="flex:1;min-width:240px">';
+  html +=       '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#92400E;margin-bottom:.25rem">◆ Proof point available</div>';
+  html +=       '<div style="font-family:var(--serif);font-size:1.02rem;color:#78350F;line-height:1.3;margin-bottom:.35rem">' + _retailEscSafe(ev.sku_name || 'Your product') + ' · ' + avg + '% avg sell-through at ' + _retailEscSafe(ev.retailer_name || 'retailer') + '</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.56rem;color:#92400E;opacity:.8;margin-bottom:.55rem">' + _retailEscSafe(months.join(' · ')) + ' · ' + pcts.map(function(p){ return p+'%'; }).join(' / ') + '</div>';
+  if(hasDraft){
+    html +=     '<div style="background:#fff;border:1px dashed #FCD34D;padding:.55rem .75rem;font-family:var(--sans);font-size:.78rem;color:#78350F;line-height:1.55;font-style:italic">"' + _retailEscSafe(draft) + '"</div>';
+  } else {
+    html +=     '<div style="background:#fff;border:1px dashed #FCD34D;padding:.55rem .75rem;font-family:var(--mono);font-size:.62rem;color:#92400E;opacity:.6;letter-spacing:.04em">Drafting proof point…</div>';
+  }
+  html +=     '</div>';
+  html +=     '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;min-width:110px">';
+  html +=       '<button onclick="loopEventAccept(\'' + _retailEscSafe(ev.id) + '\')" ' + (hasDraft?'':'disabled') + ' style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:' + (hasDraft?'#78350F':'#E5E7EB') + ';color:' + (hasDraft?'#fff':'#9CA3AF') + ';border:none;cursor:' + (hasDraft?'pointer':'wait') + ';letter-spacing:.06em;text-transform:uppercase">Accept</button>';
+  html +=       '<button onclick="loopEventEdit(\'' + _retailEscSafe(ev.id) + '\')" style="font-family:var(--mono);font-size:.58rem;padding:.35rem .7rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Edit</button>';
+  html +=       '<button onclick="loopEventDismiss(\'' + _retailEscSafe(ev.id) + '\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#92400E;cursor:pointer;opacity:.7;letter-spacing:.06em;text-transform:uppercase">Dismiss</button>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+// Wrap renderAllBrandHomeAlerts (already wrapped by Session 3 for portal alerts).
+// Loop events render BETWEEN portal alerts and the existing red/amber alerts.
+if(typeof renderAllBrandHomeAlerts === 'function'){
+  var _loopPrevRenderAlerts = renderAllBrandHomeAlerts;
+  renderAllBrandHomeAlerts = function(){
+    // _loopPrevRenderAlerts already includes portal alerts + existing home alerts
+    // We prepend loop events; portal alerts are still first because Session 3 prepended them.
+    // Result order: portal alerts → loop events → existing alerts.
+    // To achieve that split, we inject loop events just after portal alerts.
+    // Simplest approach: prepend loop events to the combined output.
+    // Portal alerts are time-critical (status change notifications); loop events are
+    // opportunities. Both are valid to show at the top. Ordering them portal-first
+    // matches the existing user expectation from Session 3.
+    var prior = _loopPrevRenderAlerts();
+    var loopHtml = renderLoopEventAlerts();
+    if(!loopHtml) return prior;
+    // Insert loop events after any portal alert block (identifiable by our green border-left)
+    // — simplest heuristic: if prior contains 'Portal update' we append loop events after; else prepend.
+    if(prior.indexOf('Portal update') !== -1){
+      // Append loop events after portal alerts but before existing alerts.
+      // We can't precisely split the HTML string safely, so we take the simpler approach:
+      // prior (with portal alerts) + loop events + remaining existing alerts are already
+      // embedded in prior. Just append.
+      return prior + loopHtml;
+    }
+    return loopHtml + prior;
+  };
+}
+
+/* ─── HOOKS into data-save flows ─── */
+
+// Trigger 1 fires on saveRetailPerformanceMonth (sell-through data updated).
+if(typeof saveRetailPerformanceMonth === 'function'){
+  var _loopPrevSaveRP = saveRetailPerformanceMonth;
+  saveRetailPerformanceMonth = function(){
+    _loopPrevSaveRP();
+    // Non-blocking: let the save render first, then run engine
+    setTimeout(runFeedbackLoopEngine, 150);
+  };
+}
+
+// Run engine on app load (once brand + retailPerformance are loaded).
+(function(){
+  function _bootEngine(){
+    // Only run if we have something to scan
+    if(typeof retailPerformance !== 'undefined' && retailPerformance.length){
+      runFeedbackLoopEngine();
+    } else {
+      // Still load events so Brand Home can render whatever exists remotely
+      loadLoopEvents().then(function(){
+        if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
+          renderPage('home');
+        }
+      });
+    }
+  }
+  if(document.readyState === 'complete') setTimeout(_bootEngine, 1200);
+  else window.addEventListener('load', function(){ setTimeout(_bootEngine, 1200); });
+})();
+
 </script>
 </body>
 </html>
