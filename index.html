@@ -12449,7 +12449,10 @@ function renderSkus(el){
           <button onclick="showModuleExplainer('skus')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:pointer;font-size:.62rem;padding:.25rem .55rem;font-family:var(--mono);margin-top:.25rem">? How it works</button>
           <div class="page-sub">Product data room — fill once, export to any retailer</div>
         </div>
-        <button class="btn-primary" onclick="startNewSku()">+ Add product</button>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn-outline" onclick="startBulkImport()" style="font-size:.7rem">↥ Bulk import</button>
+          <button class="btn-primary" onclick="startNewSku()">+ Add product</button>
+        </div>
       </div>
 
       ${skus.length===0?`
@@ -12457,7 +12460,10 @@ function renderSkus(el){
           <div style="font-size:2rem;margin-bottom:.75rem">▦</div>
           <div class="empty-title">No products added yet</div>
           <div class="empty-sub" style="margin-bottom:1.25rem">Add your first SKU — VeyaFlow stores all product data in one place and exports it in any retailer's format.</div>
-          <button class="btn-primary" onclick="startNewSku()">Add your first product →</button>
+          <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
+            <button class="btn-primary" onclick="startNewSku()">Add your first product →</button>
+            <button class="btn-outline" onclick="startBulkImport()">↥ Or bulk import</button>
+          </div>
         </div>
       `:`
         <div class="card" style="margin-bottom:1rem">
@@ -12769,6 +12775,223 @@ function startNewSku(){
   renderPage('skus');
 }
 
+// Skip the choice screen and go straight to upload — for users who already know they want bulk import.
+function startBulkImport(){
+  skuUploadMode = 'choice';
+  skuEditId = null;
+  renderPage('skus');
+  // After render, click the file input directly so the file picker opens
+  setTimeout(function(){
+    var inp = document.getElementById('sku-file-input');
+    if(inp) inp.click();
+  }, 50);
+}
+
+// EAN-13 validator — checks digit count + checksum (modulo-10 weighted sum).
+// Returns { valid: true } if OK, { valid: false, reason: 'short'|'nondigit'|'checksum' } otherwise.
+function _validateEan13(raw){
+  if(!raw) return { valid: false, reason: 'empty' };
+  var s = String(raw).replace(/[\s-]/g, '');
+  if(!/^\d+$/.test(s)) return { valid: false, reason: 'nondigit' };
+  if(s.length !== 13) return { valid: false, reason: 'short' };
+  // Mod-10 checksum: weights 1,3,1,3,... on digits 1-12, sum, ((10 - (sum % 10)) % 10) === digit13
+  var sum = 0;
+  for(var i = 0; i < 12; i++){
+    var d = parseInt(s.charAt(i), 10);
+    sum += (i % 2 === 0) ? d : d * 3;
+  }
+  var check = (10 - (sum % 10)) % 10;
+  if(check !== parseInt(s.charAt(12), 10)) return { valid: false, reason: 'checksum' };
+  return { valid: true };
+}
+
+// Generate and download an .xlsx template for bulk SKU import.
+// Two sheets: Products (headers + 1 example row), Instructions (per-field guide).
+function downloadSkuTemplate(){
+  if(typeof XLSX === 'undefined'){
+    if(typeof showError === 'function') showError('Spreadsheet library not loaded — refresh and try again');
+    else alert('Spreadsheet library not loaded — refresh and try again');
+    return;
+  }
+  // Sheet 1: Products. Headers from SKU_FIELDS labels + 1 example row.
+  var headers = SKU_FIELDS.map(function(f){ return f.label; });
+  var exampleRow = {
+    'Product name':       'Cloud Glow Vitamin C Serum 30ml',
+    'EAN-13':             '7350000000017',
+    'Article number':     'CG-VC-30',
+    'Net content (amount)': '30',
+    'Net content unit':   'ml',
+    'Country of manufacture':'Sweden',
+    'Shelf life (months)':'24',
+    'INCI list':          'Aqua, Ascorbic Acid, Glycerin, …',
+    'CPNP number':        '1234567',
+    'EU Responsible Person':'Cloud & Glow AB, Stockholm',
+    'RSP Sweden (SEK)':   '349',
+    'RSP Denmark (DKK)':  '249',
+    'RSP UK (GBP)':       '32',
+    'RSP EU (EUR)':       '36',
+    'Net price (SEK)':    '149',
+    'MOQ':                '500',
+    'Lead time (days)':   '21',
+    'Description (English)':'A high-potency vitamin C serum…',
+    'Description (Swedish)':'Ett vitamin C-serum med…',
+  };
+  var aoa = [headers];
+  aoa.push(headers.map(function(h){ return exampleRow[h] || ''; }));
+  var wsProducts = XLSX.utils.aoa_to_sheet(aoa);
+  // Set generous column widths
+  wsProducts['!cols'] = headers.map(function(h){ return { wch: Math.max(14, h.length + 2) }; });
+
+  // Sheet 2: Instructions
+  var instrAoa = [
+    ['Field', 'Required?', 'Format / accepted values', 'Notes'],
+    ['Product name',          'Yes', 'Free text', 'Customer-facing product name in English or your home market language'],
+    ['EAN-13',                'Yes', '13 digits, valid checksum', 'Without dashes or spaces. Used to dedupe against existing products'],
+    ['Article number',        'No',  'Free text', 'Internal SKU / article ID'],
+    ['Net content (amount)',  'No',  'Number', 'Just the number (e.g. 30, 50, 250)'],
+    ['Net content unit',      'No',  'g, ml, l, kg, oz', 'Unit of measure'],
+    ['Country of manufacture','No',  'Country name', 'e.g. Sweden, Italy, Germany'],
+    ['Shelf life (months)',   'No',  'Number', 'Total months from manufacture'],
+    ['INCI list',             'No',  'Comma-separated', 'Required for cosmetic SKUs before EU listing'],
+    ['CPNP number',           'No',  '7-digit number', 'EU Cosmetics Regulation notification — required for EU cosmetic listings'],
+    ['EU Responsible Person', 'No',  'Free text', 'Company name + address for EU cosmetics RP'],
+    ['RSP Sweden (SEK)',      'No',  'Number', 'Recommended Selling Price in SEK incl. VAT'],
+    ['RSP Denmark (DKK)',     'No',  'Number', 'RSP in DKK incl. VAT'],
+    ['RSP UK (GBP)',          'No',  'Number', 'RSP in GBP incl. VAT'],
+    ['RSP EU (EUR)',          'No',  'Number', 'RSP in EUR incl. VAT'],
+    ['Net price (SEK)',       'No',  'Number', 'Wholesale / trade price in SEK ex VAT'],
+    ['MOQ',                   'No',  'Number', 'Minimum order quantity'],
+    ['Lead time (days)',      'No',  'Number', 'Days from order to ready-to-ship'],
+    ['Description (English)', 'No',  'Free text', 'Up to 500 chars — used in retailer article templates'],
+    ['Description (Swedish)', 'No',  'Free text', 'Used by Swedish retailers (Apotek Hjärtat, Lyko)'],
+    [''],
+    ['Tips:'],
+    ['- Required fields: only Product name and EAN-13 are required for import.'],
+    ['- Other fields can be filled later in My Products. The more you fill in now, the higher your "readiness" score.'],
+    ['- Date format does not matter — fields are stored as text.'],
+    ['- Add as many rows as you need. Up to 500 SKUs per file.'],
+    ['- Save as .xlsx, .xls, or .csv before uploading.'],
+  ];
+  var wsInstr = XLSX.utils.aoa_to_sheet(instrAoa);
+  wsInstr['!cols'] = [{wch:26},{wch:10},{wch:30},{wch:60}];
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsProducts, 'Products');
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instructions');
+  XLSX.writeFile(wb, 'VeyaFlow_SKU_Import_Template.xlsx');
+}
+
+// Validate a single parsed SKU row. Returns { errors: [string], warnings: [string] }.
+// Required: name, ean (with valid checksum), no duplicate against existing skus[]
+// Soft warnings: rsp not numeric, very short name, etc.
+function _validateSkuImportRow(sku, existingEans, seenInBatchEans){
+  var errors = [];
+  var warnings = [];
+  // Required: product name
+  if(!sku.name || !String(sku.name).trim()) errors.push('Product name missing');
+  // Required: EAN with valid checksum
+  if(!sku.ean){
+    errors.push('EAN missing');
+  } else {
+    var v = _validateEan13(sku.ean);
+    if(!v.valid){
+      if(v.reason === 'short')      errors.push('EAN must be exactly 13 digits');
+      else if(v.reason === 'nondigit') errors.push('EAN contains non-digit characters');
+      else if(v.reason === 'checksum') errors.push('EAN-13 checksum invalid (last digit does not match)');
+      else                          errors.push('EAN format invalid');
+    }
+  }
+  // Duplicate check — both vs existing skus AND vs other rows in this same batch
+  if(sku.ean && errors.length === 0){
+    if(existingEans.has(String(sku.ean).replace(/[\s-]/g, ''))){
+      errors.push('EAN already exists in your products');
+    } else if(seenInBatchEans.has(String(sku.ean).replace(/[\s-]/g, ''))){
+      errors.push('Duplicate EAN within this file');
+    }
+  }
+  // Numeric checks for RSP fields — soft warnings if non-numeric (still imports the value)
+  ['rspSEK','rspDKK','rspGBP','rspEUR','netPriceSEK','moq','leadDays','shelfLifeMonths'].forEach(function(k){
+    if(sku[k] && isNaN(parseFloat(String(sku[k]).replace(/[^\d.,-]/g,'').replace(',','.')))){
+      warnings.push(k + ' is not numeric: "' + sku[k] + '"');
+    }
+  });
+  return { errors: errors, warnings: warnings };
+}
+
+// Build validation results for the whole upload batch.
+// Returns array of { sku, errors, warnings, idx }, parallel to skuUploadRows.
+function _runSkuImportValidation(){
+  var existingEans = new Set();
+  if(typeof skus !== 'undefined' && Array.isArray(skus)){
+    skus.forEach(function(s){
+      if(s.ean) existingEans.add(String(s.ean).replace(/[\s-]/g, ''));
+    });
+  }
+  var seenInBatch = new Set();
+  return skuUploadRows.map(function(sku, idx){
+    var v = _validateSkuImportRow(sku, existingEans, seenInBatch);
+    if(sku.ean && v.errors.length === 0){
+      seenInBatch.add(String(sku.ean).replace(/[\s-]/g, ''));
+    }
+    return { sku: sku, errors: v.errors, warnings: v.warnings, idx: idx };
+  });
+}
+
+// Track which row indices the user has marked to skip (for partial imports)
+var skuImportSkippedIdx = {};
+
+function _toggleSkuImportSkip(idx, checked){
+  if(checked) skuImportSkippedIdx[idx] = true;
+  else delete skuImportSkippedIdx[idx];
+  // Update only the import button label without full re-render
+  _updateSkuImportButton();
+}
+
+function _updateSkuImportButton(){
+  var btn = document.getElementById('sku-import-confirm-btn');
+  if(!btn) return;
+  var validation = _runSkuImportValidation();
+  var skipCount = 0;
+  var importCount = 0;
+  validation.forEach(function(v){
+    if(skuImportSkippedIdx[v.idx]) skipCount++;
+    else if(v.errors.length === 0) importCount++;
+  });
+  // Count rows that have errors but aren't manually skipped — these are auto-skipped (strict mode)
+  var autoSkipped = validation.filter(function(v){ return v.errors.length > 0 && !skuImportSkippedIdx[v.idx]; }).length;
+  btn.textContent = 'Import ' + importCount + ' product' + (importCount !== 1 ? 's' : '') +
+                    (autoSkipped ? ' · ' + autoSkipped + ' invalid skipped' : '') +
+                    (skipCount ? ' · ' + skipCount + ' user-skipped' : '');
+  btn.disabled = importCount === 0;
+  btn.style.opacity = importCount === 0 ? '0.5' : '1';
+  btn.style.cursor  = importCount === 0 ? 'not-allowed' : 'pointer';
+}
+
+// Download .xlsx of just the invalid rows + their error messages, so the user can fix offline.
+function downloadSkuImportErrors(){
+  if(typeof XLSX === 'undefined') return;
+  var validation = _runSkuImportValidation();
+  var problemRows = validation.filter(function(v){ return v.errors.length > 0; });
+  if(!problemRows.length){
+    if(typeof showSuccess === 'function') showSuccess('No errors to export');
+    return;
+  }
+  var headers = ['Row #', 'Errors'].concat(SKU_FIELDS.map(function(f){ return f.label; }));
+  var aoa = [headers];
+  problemRows.forEach(function(v){
+    var row = [v.idx + 1, v.errors.join(' · ')];
+    SKU_FIELDS.forEach(function(f){
+      row.push(v.sku[f.key] || '');
+    });
+    aoa.push(row);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = headers.map(function(h){ return { wch: Math.max(12, h.length + 2) }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Errors');
+  XLSX.writeFile(wb, 'VeyaFlow_SKU_Import_Errors.xlsx');
+}
+
 
 /* ═══════════════════════════════════════════════════
    SKU FILE UPLOAD — CSV/Excel column mapper
@@ -12854,10 +13077,21 @@ function parseCSVText(text){
 function handleSkuFileUpload(input){
   var file=input.files[0];
   if(!file) return;
-  var ext=file.name.split('.').pop().toLowerCase();
   var errEl=document.getElementById('upload-error');
   var statEl=document.getElementById('upload-status');
   if(errEl) errEl.textContent='';
+  // 5MB hard cap — sufficient for ~500 SKUs in xlsx, much more in csv.
+  if(file.size > 5 * 1024 * 1024){
+    if(errEl){
+      errEl.innerHTML='<strong>File too large.</strong><br>Maximum size is 5MB. For larger imports, split the file into batches of ~500 SKUs and upload each separately.';
+    } else {
+      alert('File too large — maximum 5MB. Split into batches of ~500 SKUs.');
+    }
+    if(statEl) statEl.textContent='';
+    input.value=''; // clear so user can re-pick
+    return;
+  }
+  var ext=file.name.split('.').pop().toLowerCase();
   if(statEl) statEl.textContent='Reading file...';
 
   function processData(parsed){
@@ -12974,6 +13208,10 @@ function renderSkuChoice(el){
         <strong>Accepted formats:</strong> Excel (.xlsx, .xls), CSV (.csv), tab-separated (.tsv).<br>
         <strong>Retailer templates:</strong> Upload an existing Apotek Hjärtat or Matas Excel file — columns recognised automatically.
       </div>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;align-items:center;max-width:580px">
+        <span style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">Need a template?</span>
+        <button class="btn-outline" onclick="downloadSkuTemplate()" style="font-size:.62rem;padding:.3rem .65rem">↓ Download VeyaFlow .xlsx template</button>
+      </div>
     </div>
   `;
 }
@@ -13044,62 +13282,101 @@ function renderSkuPreview(el){
     el.innerHTML='<div class="page-wrap"><div class="card" style="padding:1rem"><p style="color:#991B1B">No products could be mapped. Check your column mapping.</p><button class="btn-outline" onclick="skuUploadMode=\'mapping\';renderPage(\'skus\')">\u2190 Back to mapping</button></div></div>';
     return;
   }
+  // Reset skip state when entering preview fresh — keep stale skips from mapping iterations
+  // means user lost track which rows were skipped if they went back-and-forth. Reset on each render.
+  skuImportSkippedIdx = {};
+  var validation = _runSkuImportValidation();
+  var validCount   = validation.filter(function(v){return v.errors.length===0;}).length;
+  var invalidCount = validation.length - validCount;
   el.innerHTML=`
     <div class="page-wrap">
       <div class="topbar">
         <div>
           <div class="page-title">Import preview</div>
-          <div class="page-sub">${skuUploadRows.length} products ready to import</div>
+          <div class="page-sub">${skuUploadRows.length} row${skuUploadRows.length!==1?'s':''} parsed · ${validCount} ready · ${invalidCount} with errors</div>
         </div>
         <button class="btn-outline" onclick="skuUploadMode='mapping';renderPage('skus')">\u2190 Back</button>
       </div>
-      <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.6rem .85rem;font-family:var(--mono);font-size:.62rem;color:#065F46;margin-bottom:1rem">
-        \u2713 ${skuUploadRows.length} products mapped \u2014 review then confirm import
-      </div>
+      ${invalidCount === 0 ? `
+        <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.6rem .85rem;font-family:var(--mono);font-size:.62rem;color:#065F46;margin-bottom:1rem">
+          \u2713 All ${validCount} row${validCount!==1?'s':''} ready to import — no errors found
+        </div>
+      ` : `
+        <div style="background:#FFFBEB;border:1px solid #FCD34D;border-left:3px solid #F59E0B;padding:.7rem 1rem;margin-bottom:1rem">
+          <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;font-weight:700;margin-bottom:.3rem;letter-spacing:.06em;text-transform:uppercase">${invalidCount} row${invalidCount!==1?'s':''} have errors and will be skipped</div>
+          <div style="font-family:var(--sans);font-size:.7rem;color:#78350F;line-height:1.55;margin-bottom:.4rem">Fix them in your file and re-upload, or proceed and import only the valid rows. Common issues: missing EAN, invalid EAN-13 checksum, duplicate EANs.</div>
+          <button class="btn-outline" onclick="downloadSkuImportErrors()" style="font-size:.6rem;padding:.25rem .55rem;border-color:#F59E0B;color:#92400E">↓ Download errors.xlsx for offline fix</button>
+        </div>
+      `}
       <div class="card" style="margin-bottom:1rem">
-        ${skuUploadRows.map(function(sku){
-          var r=skuReadiness(sku);
-          var barC=r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444';
-          return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
-              <div style="flex:1;min-width:150px">
-                <div style="font-family:var(--sans);font-size:.83rem;font-weight:600;color:var(--navy)">${sku.name||'\u2014'}</div>
-                <div style="font-family:var(--mono);font-size:.56rem;color:var(--muted);margin-top:.1rem">${sku.ean?'EAN '+sku.ean:'No EAN'}${sku.rspSEK?' \u00B7 '+sku.rspSEK+' SEK':''}${sku.cpnp?' \u00B7 CPNP \u2713':''}</div>
+        ${validation.map(function(v){
+          var sku = v.sku;
+          var hasErr = v.errors.length > 0;
+          var hasWarn = v.warnings.length > 0;
+          var r = (typeof skuReadiness === 'function') ? skuReadiness(sku) : {pct:0, missing:[]};
+          var barC = hasErr ? '#EF4444' : (r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444');
+          var rowBg = hasErr ? '#FEF2F2' : '#fff';
+          var rowBorder = hasErr ? '#FECACA' : 'var(--border)';
+          return `<div style="padding:.7rem .8rem;border-bottom:1px solid ${rowBorder};background:${rowBg}">
+            <div style="display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                  <span style="font-family:var(--mono);font-size:.5rem;color:var(--muted);min-width:24px">#${v.idx+1}</span>
+                  <div style="font-family:var(--sans);font-size:.83rem;font-weight:600;color:${hasErr?'#7F1D1D':'var(--navy)'}">${(sku.name||'\u2014').replace(/</g,'&lt;')}</div>
+                  ${hasErr ? '<span style="font-family:var(--mono);font-size:.5rem;background:#FEE2E2;color:#991B1B;padding:.1rem .35rem;font-weight:700;letter-spacing:.04em">INVALID</span>' : ''}
+                  ${(!hasErr && hasWarn) ? '<span style="font-family:var(--mono);font-size:.5rem;background:#FEF3C7;color:#92400E;padding:.1rem .35rem;letter-spacing:.04em">CHECK</span>' : ''}
+                </div>
+                <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.2rem">
+                  ${sku.ean?'EAN '+String(sku.ean).replace(/</g,'&lt;'):'<span style="color:#991B1B">No EAN</span>'}${sku.rspSEK?' · '+sku.rspSEK+' SEK':''}${sku.cpnp?' · CPNP \u2713':''}
+                </div>
+                ${hasErr ? `<div style="font-family:var(--sans);font-size:.66rem;color:#991B1B;margin-top:.35rem;line-height:1.5">${v.errors.map(function(e){return '\u2715 '+e.replace(/</g,'&lt;');}).join('<br>')}</div>` : ''}
+                ${(!hasErr && hasWarn) ? `<div style="font-family:var(--sans);font-size:.62rem;color:#92400E;margin-top:.3rem;line-height:1.5">${v.warnings.map(function(w){return '\u26A0 '+w.replace(/</g,'&lt;');}).join('<br>')}</div>` : ''}
               </div>
-              <div style="display:flex;align-items:center;gap:.35rem">
-                <div style="background:var(--border);width:50px;height:4px;border-radius:2px"><div style="background:${barC};height:4px;border-radius:2px;width:${r.pct}%"></div></div>
-                <span style="font-family:var(--mono);font-size:.58rem;color:${barC};font-weight:700">${r.pct}%</span>
+              <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+                ${!hasErr ? `
+                  <div style="background:var(--border);width:50px;height:4px;border-radius:2px"><div style="background:${barC};height:4px;border-radius:2px;width:${r.pct}%"></div></div>
+                  <span style="font-family:var(--mono);font-size:.58rem;color:${barC};font-weight:700;min-width:32px">${r.pct}%</span>
+                  <label style="display:flex;align-items:center;gap:.25rem;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer">
+                    <input type="checkbox" onchange="_toggleSkuImportSkip(${v.idx},this.checked)" style="margin:0">
+                    Skip
+                  </label>
+                ` : ''}
               </div>
             </div>
-            ${r.missing.length?`<div style="font-family:var(--mono);font-size:.53rem;color:var(--muted);margin-top:.15rem">Missing: ${r.missing.slice(0,4).join(', ')}${r.missing.length>4?' +'+(r.missing.length-4)+' more':''}</div>`:''}
           </div>`;
         }).join('')}
       </div>
-      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
         <button class="btn-outline" onclick="skuUploadMode='mapping';renderPage('skus')">\u2190 Adjust mapping</button>
-        <button class="btn-primary" onclick="confirmSkuImport()">Import ${skuUploadRows.length} product${skuUploadRows.length!==1?'s':''} \u2192</button>
+        <button id="sku-import-confirm-btn" class="btn-primary" onclick="confirmSkuImport()">Import ${validCount} product${validCount!==1?'s':''}${invalidCount?' · '+invalidCount+' invalid skipped':''}</button>
+        ${invalidCount ? '<button class="btn-outline" onclick="downloadSkuImportErrors()" style="font-size:.62rem">↓ errors.xlsx</button>' : ''}
       </div>
-      <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted);margin-top:.75rem;line-height:1.5">After import you can edit each product to fill in missing fields. Low-readiness products are highlighted.</div>
+      <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-top:.75rem;line-height:1.55">After import you can edit each product to fill in remaining fields. Rows with errors are not imported — fix them and re-upload to add them later.</div>
     </div>
   `;
 }
 
 function confirmSkuImport(){
-  var existingEans=new Set(skus.map(function(s){return s.ean;}).filter(Boolean));
-  var added=0,skipped=0;
-  skuUploadRows.forEach(function(row){
-    if(row.ean&&existingEans.has(row.ean)){skipped++;return;}
-    skus.push(row);
-    if(row.ean) existingEans.add(row.ean);
+  // Use the same validation pipeline as the preview screen so behaviour is consistent.
+  var validation = _runSkuImportValidation();
+  var added = 0;
+  var invalidSkipped = 0;
+  var userSkipped = 0;
+  validation.forEach(function(v){
+    if(v.errors.length > 0){ invalidSkipped++; return; }
+    if(skuImportSkippedIdx[v.idx]){ userSkipped++; return; }
+    skus.push(v.sku);
     added++;
   });
   saveSkus();
-  skuUploadMode=null; skuUploadData=null; skuUploadRows=[]; skuColumnMap={};
+  // Reset all upload state
+  skuUploadMode=null; skuUploadData=null; skuUploadRows=[]; skuColumnMap={}; skuImportSkippedIdx={};
   var el=document.getElementById('page-skus');
   el.innerHTML=`<div class="page-wrap"><div class="card" style="text-align:center;padding:2.5rem">
     <div style="font-size:2.5rem;margin-bottom:.75rem">\u2713</div>
     <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.35rem">${added} product${added!==1?'s':''} imported</div>
-    ${skipped?`<div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.75rem">${skipped} skipped (duplicate EAN)</div>`:''}
+    ${invalidSkipped?`<div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.2rem">${invalidSkipped} skipped (errors)</div>`:''}
+    ${userSkipped?`<div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.75rem">${userSkipped} skipped by you</div>`:''}
     <button class="btn-primary" onclick="renderPage('skus')">View my products \u2192</button>
   </div></div>`;
 }
@@ -17197,6 +17474,28 @@ function renderPrePitchBrief(retailerEntry, market){
     });
   }
 
+  // ── Past rejections at THIS retailer (from Trigger 5 events) ──
+  if(typeof getLoopRejectionsForRetailer === 'function'){
+    const pastRejList = getLoopRejectionsForRetailer(rid, rname);
+    if(pastRejList.length){
+      const lines = pastRejList.slice(0, 3).map(r=>{
+        const dateStr = r.loggedAt ? new Date(r.loggedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
+        const head = `<span style="font-family:var(--mono);font-size:.55rem;color:#374151;letter-spacing:.04em">${dateStr} · ${r.source==='portal'?'PORTAL':'LOGGED'}</span>`;
+        const body = r.learning
+          ? `<span style="font-family:var(--sans);font-size:.62rem;color:#1F2937;font-style:italic">${r.learning}</span>`
+          : (r.reason
+              ? `<span style="font-family:var(--sans);font-size:.62rem;color:#1F2937">${r.reason}</span>`
+              : `<span style="font-family:var(--sans);font-size:.62rem;color:#6B7280;opacity:.8">No reason captured</span>`);
+        return head + '<br>' + body;
+      }).join('<div style="height:.45rem"></div>');
+      rows.push({
+        icon:'✕', label:`Past rejections at ${rname}`,
+        color:'#374151', bg:'#F3F4F6', border:'#D1D5DB',
+        content: lines,
+      });
+    }
+  }
+
   if(openGaps.length){
     rows.push({
       icon:'◎', label:'Open category gaps',
@@ -17942,6 +18241,64 @@ HARD RULES FOR ALL THREE VARIANTS:
   }
 }
 
+// Build a mailto: URL for the active pitch variant and open it.
+// Falls back to clipboard copy if the encoded URL would exceed safe length limits
+// (most email clients break above ~8KB; we use 7000 as a conservative ceiling).
+// Pattern note: same approach as the contact buttons in Manufacturer Finder /
+// referral flows — encodeURIComponent on subject + body, no `to=` since the
+// retailer registry doesn't store buyer emails (user fills the recipient).
+function sendPitchViaEmail(variantIdx){
+  if(!pitchResult || !pitchResult.text) return;
+  // Re-parse pitchResult so the function works even if state changed since last render
+  var blocks = pitchResult.text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.includes('VARIANT:');});
+  var parsed = blocks.map(function(block){
+    var subjectMatch = block.match(/SUBJECT:\s*(.+)/);
+    var bodyMatch    = block.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/);
+    return { subject: subjectMatch?subjectMatch[1].trim():'', body: bodyMatch?bodyMatch[1].trim():'' };
+  }).filter(function(p){return p.body.length>20;});
+  var idx = (typeof variantIdx === 'number' && variantIdx >= 0 && variantIdx < parsed.length) ? variantIdx : 0;
+  var active = parsed[idx];
+  if(!active || !active.body) return;
+  // Substitute the magic link placeholder same as renderPitchResult does
+  var magicLink = (brand && brand.magicLinkUrl) || ('https://veyaflow.com/brand/' + ((brand && brand.shareId) || '')).replace(/\/+$/, '') || 'https://veyaflow.com';
+  var bodyWithLink = active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink);
+  var subject = active.subject || '';
+  // encodeURIComponent handles ä, ö, å, é, quotes, line breaks correctly
+  // (it produces percent-encoded UTF-8 — what mail clients expect)
+  var encSubject = encodeURIComponent(subject);
+  var encBody    = encodeURIComponent(bodyWithLink);
+  var mailtoUrl  = 'mailto:?subject=' + encSubject + '&body=' + encBody;
+  var noticeEl   = document.getElementById('pitch-mailto-notice-' + idx);
+  // 7000-char threshold: most clients comfortable up to ~2000, many break above ~8000.
+  // 7KB is a conservative safe ceiling that keeps Outlook/Gmail/Apple Mail happy.
+  if(mailtoUrl.length > 7000){
+    var fullText = (subject ? subject + '\n\n' : '') + bodyWithLink;
+    if(typeof copyToClipboard === 'function') copyToClipboard(fullText);
+    else if(navigator.clipboard) navigator.clipboard.writeText(fullText).catch(function(){});
+    if(noticeEl){
+      noticeEl.style.color = '#92400E';
+      noticeEl.textContent = 'Pitch too long for direct email — copied to clipboard. Paste into a new email.';
+      setTimeout(function(){ if(noticeEl) noticeEl.textContent = ''; }, 6000);
+    } else if(typeof showSuccess === 'function'){
+      showSuccess('Pitch copied to clipboard — paste into a new email');
+    }
+    return;
+  }
+  // Open mail client — window.location.href works more reliably than window.open
+  // for mailto: across browsers (some block window.open without a click context;
+  // we ARE in click context but location.href is the standard pattern)
+  try{
+    window.location.href = mailtoUrl;
+  }catch(e){
+    if(navigator.clipboard) navigator.clipboard.writeText(bodyWithLink).catch(function(){});
+    if(noticeEl){
+      noticeEl.style.color = '#991B1B';
+      noticeEl.textContent = 'Could not open email client — pitch copied to clipboard.';
+      setTimeout(function(){ if(noticeEl) noticeEl.textContent = ''; }, 6000);
+    }
+  }
+}
+
 function renderPitchResult(){
   if(!pitchResult) return '';
   // Guard: stale localStorage format — clear and show form
@@ -18052,17 +18409,18 @@ function renderPitchResult(){
       <div class="email-box" style="margin-bottom:.75rem">${bodyWithLink.replace(/\n/g,'<br>')}</div>
 
       <!-- Action buttons -->
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn-primary" style="font-size:.65rem"
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        <button class="btn-primary" style="font-size:.7rem;padding:.5rem 1rem"
+          onclick="sendPitchViaEmail(${pitchActiveVariant})">
+          ✉ Send via your email
+        </button>
+        <button class="btn-outline" style="font-size:.65rem"
           onclick="copyToClipboard('${active.subject?active.subject+'\\n\\n':''}${bodyWithLink.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">
           Copy full email
         </button>
-        ${active.subject?`<a href="mailto:?subject=${encodeURIComponent(active.subject)}&body=${encodeURIComponent(bodyWithLink)}"
-          style="display:inline-block;padding:.35rem .85rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--ink);text-decoration:none">
-          Open in email →
-        </a>`:''}
         <button class="btn-outline" style="font-size:.65rem"
           onclick="copyToClipboard('${active.subject.replace(/'/g,"\\'")}')">Copy subject only</button>
+        <span id="pitch-mailto-notice-${pitchActiveVariant}" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-left:.4rem"></span>
       </div>
     </div>
 
@@ -28578,6 +28936,73 @@ var FEEDBACK_LOOP_PROMPTS = {
         }
       ];
     }
+  },
+  // Trigger 3 — sell-through < 40% for 3 consecutive months → delisting risk
+  sell_through_low: {
+    build: function(ctx){
+      // ctx: { brandName, skuName, retailerName, market, category, months, percentages }
+      var avg = Math.round(ctx.percentages.reduce(function(a,b){ return a+b; }, 0) / ctx.percentages.length);
+      return [
+        { role:'user', content:
+          'You are a senior retail-account strategist. A brand has 3 consecutive months of weak sell-through at a retailer and faces real delisting risk.\n' +
+          'Write a brief diagnosis + concrete action plan in EXACTLY this format (no preamble, no closing):\n\n' +
+          'DIAGNOSIS: <2 sentences naming the most likely causes from these standard buckets — pricing vs category, in-store placement/visibility, lack of promotional support, packaging/shelf-presence, product-market fit. Pick the 1-2 most plausible given the data and brand context. Plain language, no hedging.>\n\n' +
+          'ACTIONS:\n' +
+          '1. <Specific next step the brand can take this month>\n' +
+          '2. <Specific next step within 30 days>\n' +
+          '3. <Specific next step if the first two don\'t move the number>\n\n' +
+          'Each action max 15 words. Concrete and operational, not generic. ~80 words total.\n\n' +
+          'Brand: ' + (ctx.brandName||'This brand') + '\n' +
+          'Product: ' + (ctx.skuName||'A product') + '\n' +
+          'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
+          'Category: ' + (ctx.category||'') + '\n' +
+          'Months of data: ' + ctx.months.join(', ') + '\n' +
+          'Sell-through per month: ' + ctx.percentages.map(function(p){ return p+'%'; }).join(', ') + '\n' +
+          'Average sell-through: ' + avg + '% (delisting threshold typically <40% sustained)'
+        }
+      ];
+    }
+  },
+  // Trigger 4 — buyer reorder logged → proof point + next-market hint
+  reorder: {
+    build: function(ctx){
+      // ctx: { brandName, skuName, retailerName, market, category, prevDelivered, currDelivered, currPct, nextMarket }
+      var increase = Math.round(((ctx.currDelivered - ctx.prevDelivered) / Math.max(1, ctx.prevDelivered)) * 100);
+      return [
+        { role:'user', content:
+          'A retail buyer has reordered with increased volume. Write TWO short paragraphs (4 sentences total max, ~50 words):\n\n' +
+          'PARAGRAPH 1 — Proof-point sentence the brand can paste into a pitch (sales-ready, plain commercial language, no hype).\n' +
+          'PARAGRAPH 2 — One-sentence next-market hint suggesting the brand pitch ' + (ctx.nextMarket||'a similar market') + ' while this proof is fresh. Mention specifically why the timing matters.\n\n' +
+          'Format: paragraph 1, blank line, paragraph 2. No preamble, no labels.\n\n' +
+          'Brand: ' + (ctx.brandName||'This brand') + '\n' +
+          'Product: ' + (ctx.skuName||'A product') + '\n' +
+          'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
+          'Category: ' + (ctx.category||'') + '\n' +
+          'Previous delivery: ' + ctx.prevDelivered + ' units\n' +
+          'New delivery: ' + ctx.currDelivered + ' units (+' + increase + '%)\n' +
+          'Current sell-through: ' + ctx.currPct + '%\n' +
+          'Next market to consider: ' + (ctx.nextMarket||'(not set)')
+        }
+      ];
+    }
+  },
+  // Trigger 5 — submission rejection → learning for Pre-Pitch Intel Brief
+  rejection: {
+    build: function(ctx){
+      // ctx: { brandName, retailerName, market, category, reason, source }
+      return [
+        { role:'user', content:
+          'A retailer rejected this brand\'s submission. Extract the operational learning a future-pitch should encode.\n' +
+          'Output 1-2 sentences (max 35 words). No commiseration, no advice, no preamble. Just the lesson — what changes for the next pitch to ' + (ctx.retailerName||'this retailer') + ' or similar retailers.\n' +
+          'If no specific reason was given, say so plainly and suggest the most likely category-level cause for this retailer type.\n\n' +
+          'Brand: ' + (ctx.brandName||'This brand') + '\n' +
+          'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
+          'Category: ' + (ctx.category||'') + '\n' +
+          'Rejection reason: ' + (ctx.reason || '(not provided by retailer)') + '\n' +
+          'Source: ' + (ctx.source || 'manual') + ' (manual = brand logged in tracker; portal = retailer set status via portal)'
+        }
+      ];
+    }
   }
 };
 
@@ -28735,15 +29160,227 @@ async function checkTrigger1SellThroughHigh(){
   }catch(e){ console.warn('Trigger 1 check failed:', e.message); }
 }
 
+// Find 3 consecutive months all <40% — returns the most-recent triplet only.
+// Returns [{a,b,c}] (single element) if found, [] otherwise.
+function _findConsecutiveLowMonths(entries){
+  if(!entries || entries.length < 3) return [];
+  var sorted = entries.slice().sort(function(a,b){
+    if(a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+  // Check only the LAST three elements — most-recent semantics, matches Trigger 1 pattern
+  var c1 = sorted[sorted.length - 3];
+  var c2 = sorted[sorted.length - 2];
+  var c3 = sorted[sorted.length - 1];
+  if(c1.pct >= 40 || c2.pct >= 40 || c3.pct >= 40) return [];
+  var i1 = c1.year*12 + c1.month;
+  var i2 = c2.year*12 + c2.month;
+  var i3 = c3.year*12 + c3.month;
+  if(i2 - i1 !== 1 || i3 - i2 !== 1) return [];
+  return [{ a: c1, b: c2, c: c3 }];
+}
+
+// Find a month-over-month delivery increase paired with high sell-through.
+// Returns {prev, curr} for the most recent qualifying pair, or null.
+// Qualifies when: most-recent month has sell-through ≥70% AND delivered > previous month's delivered AND months are consecutive.
+function _findReorderSignal(entries){
+  if(!entries || entries.length < 2) return null;
+  var sorted = entries.slice().sort(function(a,b){
+    if(a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+  var prev = sorted[sorted.length - 2];
+  var curr = sorted[sorted.length - 1];
+  // Consecutive month check
+  if(curr.year*12 + curr.month - (prev.year*12 + prev.month) !== 1) return null;
+  if(curr.pct < 70) return null;
+  if(!curr.delivered || !prev.delivered) return null;
+  if(curr.delivered <= prev.delivered) return null;
+  return { prev: prev, curr: curr };
+}
+
+// Pick the most likely "next market" for the reorder hint.
+// Strategy: first item in brand.targetMarkets[] that isn't the same as the current market.
+// Falls back to brand.targetMarkets[0] or empty string.
+function _nextMarketHint(currentMarket){
+  if(typeof brand === 'undefined' || !brand) return '';
+  var tgt = (brand.targetMarkets || []).filter(Boolean);
+  if(!tgt.length) return '';
+  // Prefer a market different from the current one
+  var alt = tgt.find(function(m){ return m && m !== currentMarket; });
+  return alt || tgt[0] || '';
+}
+
+// Trigger 3 — sell-through < 40% for 3 consecutive months → red persistent delisting-risk alert
+async function checkTrigger3SellThroughLow(){
+  try{
+    if(typeof retailPerformance === 'undefined' || !retailPerformance.length) return;
+    var groups = {};
+    retailPerformance.forEach(function(p){
+      if(!p.retailerId || !p.skuId) return;
+      var pct = p.sellThroughPct;
+      if(pct === undefined || pct === null) return;
+      var ym = _parseMonthString(p.month);
+      if(!ym) return;
+      var key = p.retailerId + '::' + p.skuId;
+      if(!groups[key]) groups[key] = [];
+      groups[key].push({ year: ym.year, month: ym.month, pct: pct, retailerId: p.retailerId, skuId: p.skuId });
+    });
+
+    var sessionId  = getSessionId();
+    var localSkus  = (typeof skus !== 'undefined' && Array.isArray(skus)) ? skus : [];
+    var keys       = Object.keys(groups);
+
+    for(var k=0; k<keys.length; k++){
+      var entries = groups[keys[k]];
+      var triplets = _findConsecutiveLowMonths(entries);
+      for(var t=0; t<triplets.length; t++){
+        var trip       = triplets[t];
+        var retailerId = entries[0].retailerId;
+        var skuId      = entries[0].skuId;
+        var retailerName = (typeof retailerNameFromId === 'function') ? retailerNameFromId(retailerId) : retailerId;
+        var market       = (typeof retailerMarketFromId === 'function') ? retailerMarketFromId(retailerId) : '';
+        var skuObj       = localSkus.find(function(s){ return String(s.id) === String(skuId); });
+        var skuName      = skuObj ? (skuObj.name || '') : '';
+        var dedupeKey    = sessionId + '::sell_through_low::' + retailerId + '::' + skuId + '::' +
+                            trip.a.year + '-' + (trip.a.month<10?'0':'') + trip.a.month + '..' +
+                            trip.c.year + '-' + (trip.c.month<10?'0':'') + trip.c.month;
+
+        await upsertLoopEvent({
+          trigger_type:  'sell_through_low',
+          severity:      'critical',
+          retailer_id:   retailerId,
+          retailer_name: retailerName,
+          sku_id:        String(skuId),
+          sku_name:      skuName,
+          market:        market,
+          context: {
+            months:       [_monthLabel(trip.a), _monthLabel(trip.b), _monthLabel(trip.c)],
+            percentages:  [trip.a.pct, trip.b.pct, trip.c.pct],
+            averagePct:   Math.round((trip.a.pct + trip.b.pct + trip.c.pct) / 3),
+            category:     (typeof brand !== 'undefined' && brand && brand.category) || '',
+            brandName:    (typeof brand !== 'undefined' && brand && brand.name) || '',
+          },
+          dedupe_key:    dedupeKey,
+        });
+      }
+    }
+  }catch(e){ console.warn('Trigger 3 check failed:', e.message); }
+}
+
+// Trigger 4 — buyer reorder (sell-through ≥70% + delivered increased month-over-month) → proof + next-market hint
+async function checkTrigger4Reorder(){
+  try{
+    if(typeof retailPerformance === 'undefined' || !retailPerformance.length) return;
+    var groups = {};
+    retailPerformance.forEach(function(p){
+      if(!p.retailerId || !p.skuId) return;
+      var pct = p.sellThroughPct;
+      if(pct === undefined || pct === null) return;
+      var ym = _parseMonthString(p.month);
+      if(!ym) return;
+      var key = p.retailerId + '::' + p.skuId;
+      if(!groups[key]) groups[key] = [];
+      groups[key].push({
+        year: ym.year, month: ym.month, pct: pct,
+        delivered: parseFloat(p.unitsDelivered)||0,
+        sold:      parseFloat(p.unitsSold)||0,
+        retailerId: p.retailerId, skuId: p.skuId,
+      });
+    });
+
+    var sessionId = getSessionId();
+    var localSkus = (typeof skus !== 'undefined' && Array.isArray(skus)) ? skus : [];
+    var keys      = Object.keys(groups);
+
+    for(var k=0; k<keys.length; k++){
+      var entries = groups[keys[k]];
+      var signal  = _findReorderSignal(entries);
+      if(!signal) continue;
+      var retailerId   = entries[0].retailerId;
+      var skuId        = entries[0].skuId;
+      var retailerName = (typeof retailerNameFromId === 'function') ? retailerNameFromId(retailerId) : retailerId;
+      var market       = (typeof retailerMarketFromId === 'function') ? retailerMarketFromId(retailerId) : '';
+      var skuObj       = localSkus.find(function(s){ return String(s.id) === String(skuId); });
+      var skuName      = skuObj ? (skuObj.name || '') : '';
+      var dedupeKey    = sessionId + '::reorder::' + retailerId + '::' + skuId + '::' +
+                          _formatMonthPair(signal.prev, signal.curr);
+      var nextMarket   = _nextMarketHint(market);
+
+      await upsertLoopEvent({
+        trigger_type:  'reorder',
+        severity:      'action',
+        retailer_id:   retailerId,
+        retailer_name: retailerName,
+        sku_id:        String(skuId),
+        sku_name:      skuName,
+        market:        market,
+        context: {
+          prevMonth:      _monthLabel(signal.prev),
+          currMonth:      _monthLabel(signal.curr),
+          prevDelivered:  signal.prev.delivered,
+          currDelivered:  signal.curr.delivered,
+          currPct:        signal.curr.pct,
+          increasePct:    Math.round(((signal.curr.delivered - signal.prev.delivered) / Math.max(1, signal.prev.delivered)) * 100),
+          nextMarket:     nextMarket,
+          category:       (typeof brand !== 'undefined' && brand && brand.category) || '',
+          brandName:      (typeof brand !== 'undefined' && brand && brand.name) || '',
+        },
+        dedupe_key:    dedupeKey,
+      });
+    }
+  }catch(e){ console.warn('Trigger 4 check failed:', e.message); }
+}
+
+// Trigger 5 — Rejection event
+// Created directly by the rejection-detection hooks (brand-side status change OR portal-side status sync).
+// Not detected by polling retailPerformance — this is a discrete event surfaced when it happens.
+// Helper that other code calls to log a rejection event.
+async function logRejectionLoopEvent(opts){
+  // opts: { submissionId, retailerId, retailerName, market, reason, source }
+  try{
+    var sessionId    = getSessionId();
+    var subId        = opts.submissionId || 'unknown';
+    var retailerId   = opts.retailerId   || '';
+    var retailerName = opts.retailerName || '';
+    var market       = opts.market       || '';
+    var reason       = opts.reason       || '';
+    var source       = opts.source       || 'manual'; // 'manual' or 'portal'
+    var dedupeKey    = sessionId + '::rejection::' + retailerId + '::' + subId;
+
+    await upsertLoopEvent({
+      trigger_type:  'rejection',
+      severity:      'action',
+      retailer_id:   retailerId,
+      retailer_name: retailerName,
+      sku_id:        '',
+      sku_name:      '',
+      market:        market,
+      context: {
+        submissionId: subId,
+        reason:       reason,
+        source:       source,
+        category:     (typeof brand !== 'undefined' && brand && brand.category) || '',
+        brandName:    (typeof brand !== 'undefined' && brand && brand.name) || '',
+        loggedAt:     new Date().toISOString(),
+      },
+      dedupe_key:    dedupeKey,
+    });
+  }catch(e){ console.warn('Trigger 5 (rejection) log failed:', e.message); }
+}
+
 /* ─── ENGINE DISPATCHER ─── */
 async function runFeedbackLoopEngine(){
   if(_loopEngineRunning) return;
   _loopEngineRunning = true;
   try{
     if(!_loopEventsLoaded) await loadLoopEvents();
-    // Phase 1: only Trigger 1 active
+    // Phase 1: Trigger 1 (sell-through high)
     await checkTrigger1SellThroughHigh();
-    // Phase 2 will add: checkTrigger3SellThroughLow, checkTrigger4Reorder, checkTrigger5Rejection
+    // Phase 2: Trigger 3 (sell-through low) + Trigger 4 (reorder)
+    // Trigger 5 (rejection) is event-driven, not poll-based — fired from hooks.
+    await checkTrigger3SellThroughLow();
+    await checkTrigger4Reorder();
     // Phase 2.5 will add: checkTrigger2ListingBoost
     // After any events were added, re-render if we're on a page that surfaces them
     if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
@@ -28775,14 +29412,48 @@ async function ensureEventDraft(eventId){
         months:       ev.context?.months       || [],
         percentages:  ev.context?.percentages  || [],
       });
+    } else if(ev.trigger_type === 'sell_through_low' && FEEDBACK_LOOP_PROMPTS.sell_through_low){
+      messages = FEEDBACK_LOOP_PROMPTS.sell_through_low.build({
+        brandName:    ev.context?.brandName    || (brand && brand.name) || '',
+        skuName:      ev.sku_name              || '',
+        retailerName: ev.retailer_name         || '',
+        market:       ev.market                || '',
+        category:     ev.context?.category     || '',
+        months:       ev.context?.months       || [],
+        percentages:  ev.context?.percentages  || [],
+      });
+    } else if(ev.trigger_type === 'reorder' && FEEDBACK_LOOP_PROMPTS.reorder){
+      messages = FEEDBACK_LOOP_PROMPTS.reorder.build({
+        brandName:     ev.context?.brandName    || (brand && brand.name) || '',
+        skuName:       ev.sku_name              || '',
+        retailerName:  ev.retailer_name         || '',
+        market:        ev.market                || '',
+        category:      ev.context?.category     || '',
+        prevDelivered: ev.context?.prevDelivered || 0,
+        currDelivered: ev.context?.currDelivered || 0,
+        currPct:       ev.context?.currPct       || 0,
+        nextMarket:    ev.context?.nextMarket    || '',
+      });
+    } else if(ev.trigger_type === 'rejection' && FEEDBACK_LOOP_PROMPTS.rejection){
+      messages = FEEDBACK_LOOP_PROMPTS.rejection.build({
+        brandName:    ev.context?.brandName    || (brand && brand.name) || '',
+        retailerName: ev.retailer_name         || '',
+        market:       ev.market                || '',
+        category:     ev.context?.category     || '',
+        reason:       ev.context?.reason       || '',
+        source:       ev.context?.source       || 'manual',
+      });
     }
     if(!messages) return null;
     if(typeof queuedCallAPI !== 'function'){
       console.warn('queuedCallAPI not available — skipping draft');
       return null;
     }
-    var response = await queuedCallAPI(messages, 200);
-    // queuedCallAPI → callAPI returns a plain text string (already extracted from content[0].text)
+    // Length budget: short for proof points, longer for diagnoses
+    var maxTokens = (ev.trigger_type === 'sell_through_low') ? 350
+                  : (ev.trigger_type === 'reorder')          ? 250
+                  : 200;
+    var response = await queuedCallAPI(messages, maxTokens);
     var text = (typeof response === 'string') ? response.trim() : '';
     if(!text) return null;
     await updateLoopEventRemote(ev.id, { drafted_content: text });
@@ -28806,21 +29477,43 @@ async function loopEventAccept(eventId){
   // Ensure we have drafted content to append
   var content = ev.drafted_content || await ensureEventDraft(eventId);
   if(!content){
-    if(typeof showError === 'function') showError('Could not draft proof point — try again.');
-    else console.warn('Could not draft proof point');
+    if(typeof showError === 'function') showError('Could not draft content — try again.');
+    else console.warn('Could not draft content');
     return;
   }
-  // Append to brand.proofPoints (avoid duplicates)
+  // Append to the right brand-level list based on trigger type
   if(typeof brand !== 'undefined' && brand){
-    brand.proofPoints = brand.proofPoints || [];
-    if(brand.proofPoints.indexOf(content) === -1){
-      brand.proofPoints.push(content);
+    if(ev.trigger_type === 'rejection'){
+      // Rejection learnings: structured records keyed by retailer
+      brand.rejectionLearnings = brand.rejectionLearnings || [];
+      var alreadyHave = brand.rejectionLearnings.some(function(r){ return r.eventId === ev.id; });
+      if(!alreadyHave){
+        brand.rejectionLearnings.push({
+          eventId:      ev.id,
+          retailerId:   ev.retailer_id   || '',
+          retailerName: ev.retailer_name || '',
+          market:       ev.market        || '',
+          reason:       (ev.context && ev.context.reason) || '',
+          source:       (ev.context && ev.context.source) || 'manual',
+          learning:     content,
+          loggedAt:     (ev.context && ev.context.loggedAt) || new Date().toISOString(),
+        });
+      }
+    } else {
+      // sell_through_high, reorder → both append a proof-point sentence
+      brand.proofPoints = brand.proofPoints || [];
+      if(brand.proofPoints.indexOf(content) === -1){
+        brand.proofPoints.push(content);
+      }
     }
     if(typeof saveBrandState === 'function') saveBrandState();
   }
   // Mark accepted remotely
   await updateLoopEventRemote(eventId, { accepted: true });
-  if(typeof showSuccess === 'function') showSuccess('Proof point added to your Brand Pack');
+  if(typeof showSuccess === 'function'){
+    if(ev.trigger_type === 'rejection') showSuccess('Learning saved · will appear in Pre-Pitch Brief');
+    else showSuccess('Proof point added to your Brand Pack');
+  }
   if(typeof currentPage!=='undefined' && typeof renderPage==='function') renderPage(currentPage);
 }
 
@@ -28828,6 +29521,23 @@ async function loopEventDismiss(eventId){
   var ev = loopEvents.find(function(e){ return e.id === eventId; });
   if(!ev) return;
   await updateLoopEventRemote(eventId, { dismissed: true });
+  if(typeof currentPage!=='undefined' && typeof renderPage==='function') renderPage(currentPage);
+}
+
+// Resolve action for critical events (Trigger 3 delisting risk).
+// Used instead of Dismiss — implies the user has acknowledged and acted on the alert.
+// The event stays in history (queryable) but no longer surfaces on Brand Home.
+async function loopEventResolve(eventId){
+  var ev = loopEvents.find(function(e){ return e.id === eventId; });
+  if(!ev) return;
+  var ok = window.confirm(
+    'Mark this delisting-risk alert as resolved?\n\n' +
+    'This means you\'ve reviewed the diagnosis and either acted on the recommendations, accepted the risk, or the issue has been addressed by the retailer.\n\n' +
+    'The alert will be removed from Brand Home but kept in history.'
+  );
+  if(!ok) return;
+  await updateLoopEventRemote(eventId, { resolved: true });
+  if(typeof showSuccess === 'function') showSuccess('Alert resolved · stays in history for reference');
   if(typeof currentPage!=='undefined' && typeof renderPage==='function') renderPage(currentPage);
 }
 
@@ -28865,6 +29575,9 @@ function renderLoopEventAlerts(){
 
 function renderLoopEventCard(ev){
   if(ev.trigger_type === 'sell_through_high') return _renderSellThroughHighCard(ev);
+  if(ev.trigger_type === 'sell_through_low')  return _renderSellThroughLowCard(ev);
+  if(ev.trigger_type === 'reorder')           return _renderReorderCard(ev);
+  if(ev.trigger_type === 'rejection')         return _renderRejectionCard(ev);
   return '';
 }
 
@@ -28895,6 +29608,122 @@ function _renderSellThroughHighCard(ev){
   html +=       '<button onclick="loopEventAccept(\'' + _retailEscSafe(ev.id) + '\')" ' + (hasDraft?'':'disabled') + ' style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:' + (hasDraft?'#78350F':'#E5E7EB') + ';color:' + (hasDraft?'#fff':'#9CA3AF') + ';border:none;cursor:' + (hasDraft?'pointer':'wait') + ';letter-spacing:.06em;text-transform:uppercase">Accept</button>';
   html +=       '<button onclick="loopEventEdit(\'' + _retailEscSafe(ev.id) + '\')" style="font-family:var(--mono);font-size:.58rem;padding:.35rem .7rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Edit</button>';
   html +=       '<button onclick="loopEventDismiss(\'' + _retailEscSafe(ev.id) + '\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#92400E;cursor:pointer;opacity:.7;letter-spacing:.06em;text-transform:uppercase">Dismiss</button>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+// Trigger 3 — red persistent card for delisting risk. No Dismiss button — only Resolve.
+function _renderSellThroughLowCard(ev){
+  var months = (ev.context && ev.context.months) || [];
+  var pcts   = (ev.context && ev.context.percentages) || [];
+  var avg    = (ev.context && ev.context.averagePct) || 0;
+  var draft  = ev.drafted_content || '';
+  var hasDraft = !!draft;
+  if(!hasDraft && !ev._drafting){
+    setTimeout(function(){ ensureEventDraft(ev.id); }, 100);
+  }
+  // Render the diagnosis + actions block. The AI returns "DIAGNOSIS: ...\n\nACTIONS:\n1. ...\n2. ...\n3. ..." — display verbatim (escaping HTML).
+  var draftHtml = '';
+  if(hasDraft){
+    var escaped = _retailEscSafe(draft);
+    // Lightweight formatting: bold the labels for readability
+    escaped = escaped.replace(/^DIAGNOSIS:/m, '<strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:#991B1B">DIAGNOSIS</strong>');
+    escaped = escaped.replace(/^ACTIONS:/m,   '<strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:#991B1B">ACTIONS</strong>');
+    // Convert newlines to <br>
+    escaped = escaped.replace(/\n/g, '<br>');
+    draftHtml = escaped;
+  }
+  var html = '';
+  html += '<div style="background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;padding:.9rem 1.15rem;margin-bottom:.75rem">';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">';
+  html +=     '<div style="flex:1;min-width:240px">';
+  html +=       '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#991B1B;margin-bottom:.25rem">⚠ Delisting risk</div>';
+  html +=       '<div style="font-family:var(--serif);font-size:1.02rem;color:#7F1D1D;line-height:1.3;margin-bottom:.35rem">' + _retailEscSafe(ev.sku_name || 'Your product') + ' · ' + avg + '% avg sell-through at ' + _retailEscSafe(ev.retailer_name || 'retailer') + '</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.56rem;color:#991B1B;opacity:.85;margin-bottom:.55rem">3 months below 40% · ' + _retailEscSafe(months.join(' · ')) + ' · ' + pcts.map(function(p){ return p+'%'; }).join(' / ') + '</div>';
+  if(hasDraft){
+    html +=     '<div style="background:#fff;border:1px dashed #FCA5A5;padding:.6rem .8rem;font-family:var(--sans);font-size:.74rem;color:#7F1D1D;line-height:1.6">' + draftHtml + '</div>';
+  } else {
+    html +=     '<div style="background:#fff;border:1px dashed #FCA5A5;padding:.55rem .75rem;font-family:var(--mono);font-size:.62rem;color:#991B1B;opacity:.6;letter-spacing:.04em">Drafting diagnosis & action plan…</div>';
+  }
+  html +=     '</div>';
+  html +=     '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;min-width:110px">';
+  html +=       '<button onclick="loopEventResolve(\'' + _retailEscSafe(ev.id) + '\')" style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:#7F1D1D;color:#fff;border:none;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Resolve</button>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+// Trigger 4 — amber card for buyer reorder, with Accept (proof point) + Dismiss
+function _renderReorderCard(ev){
+  var prevMonth = (ev.context && ev.context.prevMonth) || '';
+  var currMonth = (ev.context && ev.context.currMonth) || '';
+  var prevDel   = (ev.context && ev.context.prevDelivered) || 0;
+  var currDel   = (ev.context && ev.context.currDelivered) || 0;
+  var pct       = (ev.context && ev.context.currPct) || 0;
+  var inc       = (ev.context && ev.context.increasePct) || 0;
+  var nextMkt   = (ev.context && ev.context.nextMarket) || '';
+  var draft  = ev.drafted_content || '';
+  var hasDraft = !!draft;
+  if(!hasDraft && !ev._drafting){
+    setTimeout(function(){ ensureEventDraft(ev.id); }, 100);
+  }
+  var html = '';
+  html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:4px solid #D97706;padding:.9rem 1.15rem;margin-bottom:.75rem">';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">';
+  html +=     '<div style="flex:1;min-width:240px">';
+  html +=       '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#92400E;margin-bottom:.25rem">↻ Reorder · proof point + next-market hint</div>';
+  html +=       '<div style="font-family:var(--serif);font-size:1.02rem;color:#78350F;line-height:1.3;margin-bottom:.35rem">' + _retailEscSafe(ev.sku_name || 'Your product') + ' · buyer reorder at ' + _retailEscSafe(ev.retailer_name || 'retailer') + '</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.56rem;color:#92400E;opacity:.85;margin-bottom:.55rem">' + _retailEscSafe(prevMonth) + ': ' + prevDel + ' units → ' + _retailEscSafe(currMonth) + ': ' + currDel + ' units (+' + inc + '%) · ' + pct + '% sell-through</div>';
+  if(hasDraft){
+    var escaped = _retailEscSafe(draft).replace(/\n/g, '<br>');
+    html +=     '<div style="background:#fff;border:1px dashed #FCD34D;padding:.6rem .8rem;font-family:var(--sans);font-size:.76rem;color:#78350F;line-height:1.55;font-style:italic">' + escaped + '</div>';
+  } else {
+    html +=     '<div style="background:#fff;border:1px dashed #FCD34D;padding:.55rem .75rem;font-family:var(--mono);font-size:.62rem;color:#92400E;opacity:.6;letter-spacing:.04em">Drafting proof + next-market hint…</div>';
+  }
+  if(nextMkt){
+    html +=     '<div style="font-family:var(--mono);font-size:.55rem;color:#78350F;opacity:.7;margin-top:.45rem;letter-spacing:.04em">Next-market suggestion: ' + _retailEscSafe(nextMkt) + '</div>';
+  }
+  html +=     '</div>';
+  html +=     '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;min-width:110px">';
+  html +=       '<button onclick="loopEventAccept(\'' + _retailEscSafe(ev.id) + '\')" ' + (hasDraft?'':'disabled') + ' style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:' + (hasDraft?'#78350F':'#E5E7EB') + ';color:' + (hasDraft?'#fff':'#9CA3AF') + ';border:none;cursor:' + (hasDraft?'pointer':'wait') + ';letter-spacing:.06em;text-transform:uppercase">Accept</button>';
+  html +=       '<button onclick="loopEventEdit(\'' + _retailEscSafe(ev.id) + '\')" style="font-family:var(--mono);font-size:.58rem;padding:.35rem .7rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Edit</button>';
+  html +=       '<button onclick="loopEventDismiss(\'' + _retailEscSafe(ev.id) + '\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#92400E;cursor:pointer;opacity:.7;letter-spacing:.06em;text-transform:uppercase">Dismiss</button>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
+}
+
+// Trigger 5 — slate/neutral card for rejection learning
+function _renderRejectionCard(ev){
+  var reason = (ev.context && ev.context.reason) || '';
+  var source = (ev.context && ev.context.source) || 'manual';
+  var draft  = ev.drafted_content || '';
+  var hasDraft = !!draft;
+  if(!hasDraft && !ev._drafting){
+    setTimeout(function(){ ensureEventDraft(ev.id); }, 100);
+  }
+  var sourceLabel = source === 'portal' ? 'Retailer set status via portal' : 'Logged in tracker';
+  var html = '';
+  html += '<div style="background:#F3F4F6;border:1px solid #D1D5DB;border-left:4px solid #6B7280;padding:.9rem 1.15rem;margin-bottom:.75rem">';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">';
+  html +=     '<div style="flex:1;min-width:240px">';
+  html +=       '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#374151;margin-bottom:.25rem">✕ Submission rejection · learning captured</div>';
+  html +=       '<div style="font-family:var(--serif);font-size:1.02rem;color:#1F2937;line-height:1.3;margin-bottom:.35rem">Rejected at ' + _retailEscSafe(ev.retailer_name || 'retailer') + (ev.market ? ' · ' + _retailEscSafe(ev.market) : '') + '</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.56rem;color:#4B5563;opacity:.85;margin-bottom:.55rem">' + _retailEscSafe(sourceLabel) + (reason ? ' · Reason: ' + _retailEscSafe(reason) : ' · No reason provided') + '</div>';
+  if(hasDraft){
+    html +=     '<div style="background:#fff;border:1px dashed #D1D5DB;padding:.6rem .8rem;font-family:var(--sans);font-size:.76rem;color:#1F2937;line-height:1.55">' + _retailEscSafe(draft) + '</div>';
+  } else {
+    html +=     '<div style="background:#fff;border:1px dashed #D1D5DB;padding:.55rem .75rem;font-family:var(--mono);font-size:.62rem;color:#4B5563;opacity:.6;letter-spacing:.04em">Extracting learning…</div>';
+  }
+  html +=       '<div style="font-family:var(--mono);font-size:.5rem;color:#6B7280;opacity:.7;margin-top:.45rem;letter-spacing:.04em">This learning will appear in your Pre-Pitch Brief for ' + _retailEscSafe(ev.retailer_name || 'this retailer') + '.</div>';
+  html +=     '</div>';
+  html +=     '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;min-width:110px">';
+  html +=       '<button onclick="loopEventAccept(\'' + _retailEscSafe(ev.id) + '\')" ' + (hasDraft?'':'disabled') + ' style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:' + (hasDraft?'#1F2937':'#E5E7EB') + ';color:' + (hasDraft?'#fff':'#9CA3AF') + ';border:none;cursor:' + (hasDraft?'pointer':'wait') + ';letter-spacing:.06em;text-transform:uppercase">Save</button>';
+  html +=       '<button onclick="loopEventDismiss(\'' + _retailEscSafe(ev.id) + '\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#4B5563;cursor:pointer;opacity:.7;letter-spacing:.06em;text-transform:uppercase">Dismiss</button>';
   html +=     '</div>';
   html +=   '</div>';
   html += '</div>';
@@ -28941,6 +29770,150 @@ if(typeof saveRetailPerformanceMonth === 'function'){
     setTimeout(runFeedbackLoopEngine, 150);
   };
 }
+
+// Helper used by Pre-Pitch Brief — returns rejection records for a given retailer.
+// Prefers accepted records (with AI-distilled learning) from brand.rejectionLearnings,
+// falls back to raw loop_events that haven't been accepted yet so the brief still
+// surfaces "you've had a rejection here" even pre-acceptance.
+function getLoopRejectionsForRetailer(retailerId, retailerName){
+  var out = [];
+  var seen = {}; // dedupe by eventId
+  // 1. Accepted learnings live on brand.rejectionLearnings
+  if(typeof brand !== 'undefined' && brand && Array.isArray(brand.rejectionLearnings)){
+    brand.rejectionLearnings.forEach(function(r){
+      var match = (retailerId && r.retailerId === retailerId) ||
+                  (retailerName && r.retailerName === retailerName);
+      if(!match) return;
+      out.push({
+        eventId:      r.eventId,
+        retailerId:   r.retailerId,
+        retailerName: r.retailerName,
+        reason:       r.reason || '',
+        learning:     r.learning || '',
+        source:       r.source || 'manual',
+        loggedAt:     r.loggedAt || '',
+        accepted:     true,
+      });
+      if(r.eventId) seen[r.eventId] = 1;
+    });
+  }
+  // 2. Open loop events (not accepted yet, not dismissed) for the same retailer
+  if(typeof loopEvents !== 'undefined' && Array.isArray(loopEvents)){
+    loopEvents.forEach(function(e){
+      if(e.trigger_type !== 'rejection') return;
+      if(e.dismissed) return;
+      if(seen[e.id]) return;
+      var match = (retailerId && e.retailer_id === retailerId) ||
+                  (retailerName && e.retailer_name === retailerName);
+      if(!match) return;
+      out.push({
+        eventId:      e.id,
+        retailerId:   e.retailer_id,
+        retailerName: e.retailer_name,
+        reason:       (e.context && e.context.reason) || '',
+        learning:     e.drafted_content || '',
+        source:       (e.context && e.context.source) || 'manual',
+        loggedAt:     (e.context && e.context.loggedAt) || e.created_at || '',
+        accepted:     false,
+      });
+    });
+  }
+  // Sort newest first
+  out.sort(function(a,b){
+    var ta = a.loggedAt ? new Date(a.loggedAt).getTime() : 0;
+    var tb = b.loggedAt ? new Date(b.loggedAt).getTime() : 0;
+    return tb - ta;
+  });
+  return out;
+}
+
+
+// prompt for an optional reason and log a Trigger 5 (rejection) loop event.
+if(typeof updateRetailSubmissionStatus === 'function'){
+  var _loopPrevUpdateSubStatus = updateRetailSubmissionStatus;
+  updateRetailSubmissionStatus = function(id, status){
+    // Capture pre-state
+    var prior = null;
+    try{
+      var subs = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
+      prior = subs.find(function(x){ return x.id === id; });
+    }catch(e){}
+    var wasRejected = prior && prior.status === 'rejected';
+    var nowRejected = status === 'rejected';
+    // Run the original
+    _loopPrevUpdateSubStatus(id, status);
+    // Only fire on transition INTO rejected (not transitions within or out)
+    if(nowRejected && !wasRejected){
+      try{
+        var sub = null;
+        try{
+          var subs2 = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
+          sub = subs2.find(function(x){ return x.id === id; });
+        }catch(e2){}
+        if(!sub) return;
+        // Prompt — skippable by design (reason is optional)
+        var reason = window.prompt(
+          'Rejection logged for ' + (sub.retailerName||'this retailer') + '.\n\n' +
+          'Why was it rejected? (Optional — helps Pre-Pitch Brief learn from it.)\n' +
+          'Examples: "Buyer cited margin too low", "Range review timing", "Already have similar SKU".\n\n' +
+          'Leave blank to skip.',
+          ''
+        );
+        // window.prompt returns null if user clicked Cancel — treat that as skip-with-no-reason
+        // (still log the event, just without a reason). If they typed something, capture it.
+        var reasonText = (typeof reason === 'string') ? reason.trim() : '';
+        logRejectionLoopEvent({
+          submissionId: id,
+          retailerId:   sub.retailerId   || '',
+          retailerName: sub.retailerName || '',
+          market:       sub.market       || '',
+          reason:       reasonText,
+          source:       'manual',
+        });
+        // Re-render Brand Home (if there) so the new alert surfaces
+        setTimeout(function(){
+          if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
+            renderPage('home');
+          }
+        }, 200);
+      }catch(e3){ console.warn('Trigger 5 hook failed:', e3.message); }
+    }
+  };
+}
+
+// Wrap runPortalSync — when portal-side status sync brings a 'rejected' change,
+// log a Trigger 5 (rejection) loop event with source='portal'.
+if(typeof runPortalSync === 'function'){
+  var _loopPrevRunPortalSync = runPortalSync;
+  runPortalSync = async function(){
+    // Snapshot which submissions were ALREADY rejected before this sync
+    var rejectedBefore = {};
+    try{
+      var pre = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
+      pre.forEach(function(s){ if(s.status === 'rejected') rejectedBefore[s.id] = 1; });
+    }catch(e){}
+    // Run the original sync (which may apply status changes)
+    await _loopPrevRunPortalSync();
+    // Compare post-state — anything newly rejected via portal triggers a loop event
+    try{
+      var post = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
+      post.forEach(function(s){
+        if(s.status === 'rejected' && !rejectedBefore[s.id]){
+          logRejectionLoopEvent({
+            submissionId: s.id,
+            retailerId:   s.retailerId   || '',
+            retailerName: s.retailerName || '',
+            market:       s.market       || '',
+            reason:       '', // Portal rejection_reasons may have details — not pulled in this version
+            source:       'portal',
+          });
+        }
+      });
+    }catch(e2){ console.warn('Trigger 5 portal-sync hook failed:', e2.message); }
+  };
+}
+
+
 
 // Run engine on app load (once brand + retailPerformance are loaded).
 (function(){
