@@ -26,15 +26,22 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
 
-// Simple Supabase REST helper — uses service_role, bypasses RLS
+// Simple Supabase REST helper — uses service_role, bypasses RLS.
+// When the path contains 'on_conflict=', PostgREST needs the
+// 'resolution=merge-duplicates' Prefer header to actually upsert
+// (otherwise duplicates throw 409). Detect and add automatically.
 async function supabase(method, path, body) {
+  const isUpsert = method === 'POST' && /[?&]on_conflict=/.test(path);
+  const preferHeader = isUpsert
+    ? 'return=representation,resolution=merge-duplicates'
+    : 'return=representation';
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       'apikey': SUPABASE_ANON,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Prefer': 'return=representation',
+      'Prefer': preferHeader,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
