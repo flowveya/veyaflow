@@ -27765,6 +27765,7 @@ function renderRetailPerfAddForm(){
   html += '</select></div>';
   html += '<div><button class="btn-primary" style="font-size:.7rem;width:100%;padding:.45rem .6rem" onclick="saveRetailPerformanceMonth()">Save month</button></div>';
   html += '</div>';
+  html += '<div id="rperf-error" style="display:none;margin-top:.6rem;padding:.5rem .7rem;background:#FEF2F2;border:1px solid #FECACA;border-left:3px solid var(--red);font-family:var(--sans);font-size:.72rem;color:#991B1B;line-height:1.45"></div>';
   html += '<div style="margin-top:.55rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">';
   html += '<label style="font-family:var(--sans);font-size:.7rem;color:#555;display:inline-flex;align-items:center;gap:.35rem"><input type="checkbox" id="rperf-promo" '+(f.promotionActive?'checked':'')+' onchange="retailPerfForm.promotionActive=this.checked" style="margin:0;width:auto;min-height:auto"> Promotion active</label>';
   html += '<input type="text" placeholder="Promotion type (e.g. Beauty Days)" id="rperf-promo-type" value="'+retailEsc(f.promotionType)+'" oninput="retailPerfForm.promotionType=this.value" style="flex:1;min-width:160px;padding:.4rem .55rem;font-family:var(--sans);font-size:.72rem;border:1px solid var(--border)">';
@@ -27775,11 +27776,46 @@ function renderRetailPerfAddForm(){
 
 function saveRetailPerformanceMonth(){
   var f = retailPerfForm;
-  if(!retailPerfSelRetailer || !retailPerfSelSku){ alert('Pick a retailer and product first.'); return; }
-  if(!f.month){ alert('Pick a month.'); return; }
+  // Inline error helper — shows red banner under form, scoped to this page
+  function showFormError(msg){
+    var el = document.getElementById('rperf-error');
+    if(el){ el.textContent = msg; el.style.display = 'block'; }
+    else if(typeof alert === 'function'){ alert(msg); }
+  }
+  function clearFormError(){
+    var el = document.getElementById('rperf-error');
+    if(el){ el.textContent = ''; el.style.display = 'none'; }
+  }
+  clearFormError();
+
+  if(!retailPerfSelRetailer || !retailPerfSelSku){ showFormError('Pick a retailer and product first.'); return; }
+  if(!f.month){ showFormError('Pick a month.'); return; }
   var sold = parseFloat(f.unitsSold)||0;
   var delivered = parseFloat(f.unitsDelivered)||0;
-  var sellThrough = delivered>0 ? Math.round((sold/delivered)*100) : 0;
+
+  // ── Data quality validation ────────────────────────
+  // Hard block: nothing delivered means no sell-through to compute
+  if(delivered <= 0){
+    showFormError('Units delivered must be greater than zero. Without delivered units, sell-through cannot be calculated.');
+    return;
+  }
+  // Hard block: cannot sell more than was delivered (math is impossible)
+  if(sold > delivered){
+    showFormError('Units sold ('+sold+') cannot exceed units delivered ('+delivered+'). Sell-through is sold ÷ delivered, so sold must be ≤ delivered. If you have back-orders or replenishment in this month, add them as separate entries or roll into delivered.');
+    return;
+  }
+  // Soft confirm: 100% sell-through is possible but rare — usually a typo
+  if(sold > 0 && sold === delivered){
+    var ok = window.confirm('You\u2019re recording 100% sell-through ('+sold+' sold of '+delivered+' delivered).\n\nThis is mathematically valid but unusual — most listings retain at least some buffer stock. Was this intentional?\n\nClick OK to save, or Cancel to revise.');
+    if(!ok) return;
+  }
+  // Hard block: negative sold (defensive — input has min=0 but JS users can paste anything)
+  if(sold < 0){
+    showFormError('Units sold cannot be negative.');
+    return;
+  }
+
+  var sellThrough = Math.round((sold/delivered)*100);
   var reorderTriggered = sellThrough >= 70;
   loadRetailPerformance();
   // remove existing record for same retailer/sku/month
