@@ -19365,7 +19365,7 @@ function renderCircular(el){
         <div class="card">
           <div class="section-tag">Route unsold stock</div>
           <div class="field"><label class="lbl">Product name *</label>
-            <input type="text" id="c-prod" value="${circularForm.productName}" placeholder="e.g. Night cream 50ml, LED face mask, Protein powder 500g" oninput="circularForm.productName=this.value">
+            <input type="text" id="c-prod" value="${circularForm.productName}" placeholder="e.g. Night cream 50ml, LED face mask, Protein powder 500g" oninput="circularForm.productName=this.value;_circularValidate()">
           </div>
           <div class="field"><label class="lbl">Product category *</label>
             <select id="c-cat" onchange="circularForm.category=this.value;circularResult=null;renderCircular(document.getElementById('page-circular'))">
@@ -19383,7 +19383,7 @@ function renderCircular(el){
           `:''}
           <div class="grid-2">
             <div class="field"><label class="lbl">Units *</label>
-              <input type="number" id="c-units" value="${circularForm.units}" placeholder="e.g. 500" oninput="circularForm.units=this.value" min="1">
+              <input type="number" id="c-units" value="${circularForm.units}" placeholder="e.g. 500" oninput="circularForm.units=this.value;_circularValidate()" min="1">
             </div>
             <div class="field"><label class="lbl">RSP per unit (SEK)</label>
               <input type="number" id="c-rsp" value="${circularForm.rsp}" placeholder="e.g. 299" oninput="circularForm.rsp=this.value" min="0">
@@ -19450,6 +19450,19 @@ function renderCircular(el){
       </div>
     </div>
   `;
+  // Run validation once after mount, so button reflects current form state
+  // even on first render (Bug 2 fix — previously button stayed disabled until
+  // a dropdown change triggered re-render and re-evaluated canGenerate).
+  _circularValidate();
+}
+
+// Lightweight validation that toggles the Calculate button without re-rendering.
+// Called from text-input oninput handlers and after each renderCircular mount.
+function _circularValidate(){
+  var btn = document.getElementById('c-btn');
+  if(!btn) return;
+  var ok = !!(circularForm && circularForm.productName && circularForm.units && circularForm.category && parseInt(circularForm.units, 10) > 0);
+  btn.disabled = !ok;
 }
 
 async function generateCircularRoutes(){
@@ -25061,7 +25074,7 @@ function renderDPPFill(el){
   const f = existing.fields||{};
   const r = dppReadiness(sku);
   const carbon = estimateCarbon(sku);
-  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
 
   el.innerHTML=`
     <div class="page-wrap">
@@ -25276,7 +25289,7 @@ function renderDPPView(el){
   const dppId = d.dppId||getDPPId(dppActiveSkuId);
   const dppUrl = 'https://veyaflow.com/dpp/'+dppId;
   const versions = d.versions||[];
-  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic;
+  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
   const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
 
   el.innerHTML=`
