@@ -1519,7 +1519,7 @@ function renderSetupModal(){
       </div>
       <div class="field" style="margin-bottom:.35rem">
         <label class="lbl">Primary product category</label>
-        <select onchange="_setupDraft.categories=[this.value];renderSetupModal()" style="font-size:16px">
+        <select onchange="if(typeof isBlockedCategory==='function'&&isBlockedCategory(this.value)){var _v=this.value;this.value='';openCategorySoftBlock(_v,'setup_modal')}else{_setupDraft.categories=[this.value];renderSetupModal()}" style="font-size:16px">
           <option value="">Select…</option>
           ${cats.map(c=>`<option value="${c}"${_setupDraft.categories[0]===c?' selected':''}>${c}</option>`).join('')}
         </select>
@@ -1581,6 +1581,10 @@ function renderSetupModal(){
           const c2 = CATEGORY_COLORS[cat]||{bg:'#F3F4F6',text:'#374151',border:'#D1D5DB'};
           return `
             <div onclick="(function(){
+              if(typeof isBlockedCategory==='function' && isBlockedCategory('${cat}')){
+                openCategorySoftBlock('${cat}','setup_modal');
+                return;
+              }
               var d=_setupDraft.categories.slice();
               var i=d.indexOf('${cat}');
               if(i>=0){ d.splice(i,1); }
@@ -1708,6 +1712,10 @@ function renderSetupModal(){
           const c = CATEGORY_COLORS[cat]||{bg:'#F3F4F6',text:'#374151',border:'#D1D5DB'};
           return `
             <div onclick="(function(){
+              if(typeof isBlockedCategory==='function' && isBlockedCategory('${cat}')){
+                openCategorySoftBlock('${cat}','setup_modal');
+                return;
+              }
               var d=_setupDraft.categories.slice();
               var i=d.indexOf('${cat}');
               if(i>=0){ d.splice(i,1); }
@@ -2591,7 +2599,7 @@ function renderOnboardStep(){
       <div class="field"><label class="lbl">Brand name *</label><input type="text" id="ob-name" value="${onboardForm.name}" placeholder="e.g. Cloud & Glow" oninput="onboardForm.name=this.value;var b=document.getElementById('ob-continue-1');if(b)b.disabled=!onboardForm.name||!onboardForm.category"></div>
       <div class="field"><label class="lbl">Website</label><input type="text" id="ob-web" value="${onboardForm.website}" placeholder="e.g. cloudandglow.com" oninput="onboardForm.website=this.value"></div>
       <div class="field"><label class="lbl">Product category *</label>
-        <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="onboardForm.category='${c}';renderOnboardStep()">${c}</div>`).join('')}</div>
+        <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="if(typeof isBlockedCategory==='function'&&isBlockedCategory('${c}')){openCategorySoftBlock('${c}','onboarding')}else{onboardForm.category='${c}';renderOnboardStep()}">${c}</div>`).join('')}</div>
       </div>
       <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
       <button id="ob-continue-1" class="btn-primary" style="width:100%;margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
@@ -11813,13 +11821,152 @@ function saveSkus(){
 // SKU readiness score — what % complete and which retailers are unlocked
 // ── PRODUCT TYPES ─────────────────────────────────
 const PRODUCT_TYPES = [
-  {id:'cosmetic',    label:'Cosmetic / Skincare',    icon:'◎', desc:'Creams, serums, cleansers, masks, SPF'},
-  {id:'device',      label:'Beauty Device / Tool',   icon:'⚡', desc:'LED masks, microcurrent, gua sha, rollers'},
-  {id:'textile',     label:'Textile / Accessory',    icon:'◈', desc:'Silk pillowcases, eye masks, hair accessories'},
-  {id:'supplement',  label:'Supplement / Ingestible',icon:'⊕', desc:'Vitamins, collagen, powders, capsules'},
-  {id:'food',        label:'Food & Beverage',        icon:'◉', desc:'Functional food, drinks, snacks'},
-  {id:'garment',     label:'Garment / Apparel',      icon:'◫', desc:'Clothing, swimwear, activewear'},
+  {id:'cosmetic',          label:'Cosmetics / Skincare',  icon:'◎', desc:'Creams, serums, cleansers, masks, SPF, fragrance, color cosmetics, hair care, body care.'},
+  {id:'device',            label:'Beauty Device',         icon:'⚡', desc:'LED masks, microcurrent devices, electronic skincare tools, hair tools.'},
+  {id:'beauty_accessory',  label:'Beauty Accessories',    icon:'◈', desc:'Combs, brushes, hair scrunchies, gua sha, jade rollers, mirrors, applicators.'},
 ];
+
+// Legacy product types — SKUs created before the Round-1 narrowing may still
+// reference these. We don't delete them; we surface a "Legacy product type"
+// banner and prompt the user to update.
+const LEGACY_PRODUCT_TYPES = ['textile', 'supplement', 'food', 'garment'];
+
+function isLegacyProductType(t){ return LEGACY_PRODUCT_TYPES.indexOf(t) >= 0; }
+
+// Round-1 scope: VeyaFlow currently serves Beauty & Skincare and Wellness &
+// Supplements. Other categories are on the roadmap but not yet built. The
+// category list in onboarding STAYS visually broad to signal future direction,
+// but selecting one of these triggers a soft-block + email-capture modal.
+const BLOCKED_CATEGORIES = ['Fashion & Apparel', 'Food & Beverage'];
+function isBlockedCategory(c){ return BLOCKED_CATEGORIES.indexOf(c) >= 0; }
+
+// Soft-block modal state. Open via openCategorySoftBlock(category, source).
+// `source` is one of: 'onboarding', 'setup_modal', 'sku_type_feedback'.
+// `returnAction` is an optional fn called when user clicks "Pick a different
+// category" — typically rebinds to the picker step.
+var categorySoftBlockState = { open:false, category:'', source:'onboarding', email:'', submitted:false, error:'', submitting:false };
+
+function openCategorySoftBlock(category, source){
+  categorySoftBlockState = {
+    open:true,
+    category: category||'',
+    source: source||'onboarding',
+    email: '',
+    submitted: false,
+    error: '',
+    submitting: false,
+  };
+  renderCategorySoftBlockModal();
+}
+
+function closeCategorySoftBlock(){
+  categorySoftBlockState.open = false;
+  var modal = document.getElementById('vf-cat-softblock');
+  if(modal) modal.remove();
+}
+
+async function submitCategorySoftBlockEmail(){
+  var input = document.getElementById('vf-cat-softblock-email');
+  var email = (input && input.value || '').trim();
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    categorySoftBlockState.error = 'Enter a valid email address';
+    renderCategorySoftBlockModal();
+    return;
+  }
+  categorySoftBlockState.email = email;
+  categorySoftBlockState.error = '';
+  categorySoftBlockState.submitting = true;
+  renderCategorySoftBlockModal();
+  try{
+    var brandName = (typeof brand !== 'undefined' && brand && brand.name) || (typeof onboardForm !== 'undefined' && onboardForm && onboardForm.name) || '';
+    if(typeof dbCall === 'function'){
+      await dbCall('waitlist.create', {
+        email: email,
+        category: categorySoftBlockState.category,
+        source: categorySoftBlockState.source,
+        brandName: brandName,
+      });
+    }
+    categorySoftBlockState.submitted = true;
+  }catch(e){
+    categorySoftBlockState.error = 'Could not save — please try again, or email charlotte@veyaflow.com';
+  }finally{
+    categorySoftBlockState.submitting = false;
+    renderCategorySoftBlockModal();
+  }
+}
+
+function pickDifferentCategory(){
+  // User declined the soft-block — clear the bad selection and return to picker.
+  // We blank the category in whichever form is being edited so the user is back
+  // in the same picker state they were in before clicking.
+  closeCategorySoftBlock();
+  if(typeof onboardForm !== 'undefined' && onboardForm){
+    onboardForm.category = '';
+  }
+  if(typeof _setupDraft !== 'undefined' && _setupDraft){
+    _setupDraft.categories = (_setupDraft.categories || []).filter(function(c){ return !isBlockedCategory(c); });
+  }
+  // Re-render whichever picker is active. Both render functions are safe to call
+  // even if the page isn't currently displayed — they bail on missing elements.
+  if(typeof renderOnboardStep === 'function') {
+    try { renderOnboardStep(); } catch(e) {}
+  }
+  if(typeof renderSetupModal === 'function') {
+    try { renderSetupModal(); } catch(e) {}
+  }
+}
+
+function renderCategorySoftBlockModal(){
+  var existing = document.getElementById('vf-cat-softblock');
+  if(!categorySoftBlockState.open){
+    if(existing) existing.remove();
+    return;
+  }
+  var modal = existing || document.createElement('div');
+  if(!existing){
+    modal.id = 'vf-cat-softblock';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto';
+    document.body.appendChild(modal);
+  }
+  var cat = categorySoftBlockState.category || 'this category';
+  var s = categorySoftBlockState;
+  var html = '';
+  html += '<div style="background:#fff;max-width:520px;width:100%;padding:1.5rem 1.65rem;font-family:var(--sans);box-shadow:0 24px 60px rgba(15,23,42,.35);max-height:calc(100dvh - 2rem);overflow-y:auto">';
+  if(s.submitted){
+    // Confirmation state — after successful waitlist submit
+    html += '<div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem">';
+    html +=   '<div style="font-size:1.4rem;color:#10B981;line-height:1">✓</div>';
+    html +=   '<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:#10B981;font-weight:700">You\'re on the list</div>';
+    html += '</div>';
+    html += '<div style="font-family:var(--serif);font-size:1.15rem;color:var(--navy);line-height:1.35;margin-bottom:.55rem">Thanks — we\'ll be in touch when ' + (cat) + ' launches on VeyaFlow.</div>';
+    html += '<div style="font-family:var(--sans);font-size:.78rem;color:#444;line-height:1.6;margin-bottom:1.1rem">We logged ' + (s.email||'your email') + ' against ' + cat + '. You\'ll hear from us first when we open the platform for ' + cat + ' brands.</div>';
+    html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap">';
+    html +=   '<button class="btn-outline" style="font-size:.7rem" onclick="pickDifferentCategory()">Pick a different category</button>';
+    html +=   '<button class="btn-primary" style="font-size:.7rem" onclick="closeCategorySoftBlock()">Close</button>';
+    html += '</div>';
+  } else {
+    // Initial / error state — capture the email
+    html += '<div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:.4rem">Coming soon · not yet supported</div>';
+    html += '<div style="font-family:var(--serif);font-size:1.2rem;color:var(--navy);line-height:1.3;margin-bottom:.65rem">VeyaFlow doesn\'t support ' + cat + ' brands yet</div>';
+    html += '<div style="font-family:var(--sans);font-size:.78rem;color:#444;line-height:1.65;margin-bottom:1.1rem">';
+    html +=   'We\'re building VeyaFlow for ' + cat + ' brands next — but we\'re not there yet. Right now we\'re making the Beauty &amp; Skincare side of the platform genuinely excellent. ';
+    html +=   'If you want to be one of the first ' + cat + ' brands on VeyaFlow when we open up, leave your email below.';
+    html += '</div>';
+    html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.25rem">Your email</div>';
+    html += '<input type="email" id="vf-cat-softblock-email" placeholder="you@brand.com" value="' + (s.email||'') + '" ' +
+            'style="width:100%;padding:.55rem .75rem;font-family:var(--sans);font-size:.85rem;border:1px solid var(--border);margin-bottom:.5rem">';
+    if(s.error){
+      html += '<div style="font-family:var(--sans);font-size:.7rem;color:#991B1B;background:#FEF2F2;border:1px solid #FECACA;padding:.4rem .55rem;margin-bottom:.5rem">' + s.error + '</div>';
+    }
+    html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">';
+    html +=   '<button class="btn-primary" ' + (s.submitting?'disabled':'') + ' style="font-size:.72rem;padding:.5rem .9rem" onclick="submitCategorySoftBlockEmail()">' + (s.submitting?'⟳ Saving…':'Notify me when this launches') + '</button>';
+    html +=   '<button class="btn-outline" style="font-size:.7rem" onclick="pickDifferentCategory()">Pick a different category</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  modal.innerHTML = html;
+}
 
 // ── CLAIMS RULES — per product type ───────────────
 const CLAIMS_RULES = {
@@ -12488,7 +12635,7 @@ function renderSkus(el){
               <div style="padding:.85rem 0;border-bottom:1px solid var(--border)">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
                   <div style="flex:1;min-width:180px">
-                    <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}</div>
+                    <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}${isLegacyProductType(sku.productType)?` <span style="font-family:var(--mono);font-size:.5rem;background:#FFFBEB;color:#92400E;padding:.1rem .35rem;border:1px solid #FDE68A;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-left:.35rem;vertical-align:middle">Legacy type — update</span>`:''}</div>
                     <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.15rem">${sku.ean?'EAN '+sku.ean:'No EAN'}${sku.netContent?' · '+sku.netContent+' '+sku.netUnit:''}</div>
                   </div>
                   <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -13824,35 +13971,70 @@ function showSkuTypeFeedback(){
   const wrap = document.getElementById('sku-type-feedback-wrap');
   if(!wrap) return;
   wrap.innerHTML = `
-    <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.1rem">
+    <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.1rem;padding:.55rem .65rem;background:#F9F8F6;border:1px solid var(--border)">
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">What do you sell? · We'll add it to the roadmap.</div>
       <input type="text" id="sku-type-input" placeholder="e.g. Essential oil blend, Wax melt, Reed diffuser…"
-        style="padding:.3rem .6rem;border:1px solid var(--border);font-family:var(--mono);font-size:.65rem;color:var(--navy);flex:1;min-width:160px">
-      <button onclick="submitSkuTypeFeedback()"
-        style="padding:.3rem .7rem;background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer">
-        Submit
-      </button>
-      <button onclick="document.getElementById('sku-type-feedback-wrap').innerHTML=skuTypeFeedbackState()"
-        style="padding:.3rem .5rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">
-        Cancel
-      </button>
+        style="padding:.4rem .6rem;border:1px solid var(--border);font-family:var(--sans);font-size:.75rem;color:var(--navy)">
+      <input type="email" id="sku-type-email" placeholder="Your email — we'll let you know when we add support"
+        style="padding:.4rem .6rem;border:1px solid var(--border);font-family:var(--sans);font-size:.75rem;color:var(--navy)">
+      <div id="sku-type-feedback-error" style="display:none;font-family:var(--sans);font-size:.65rem;color:#991B1B;background:#FEF2F2;border:1px solid #FECACA;padding:.3rem .5rem"></div>
+      <div style="display:flex;gap:.4rem">
+        <button onclick="submitSkuTypeFeedback()" id="sku-type-submit-btn"
+          style="padding:.35rem .8rem;background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer">
+          Submit
+        </button>
+        <button onclick="document.getElementById('sku-type-feedback-wrap').innerHTML=skuTypeFeedbackState()"
+          style="padding:.35rem .6rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">
+          Cancel
+        </button>
+      </div>
     </div>
   `;
   setTimeout(()=>document.getElementById('sku-type-input')?.focus(), 50);
 }
 
-function submitSkuTypeFeedback(){
+async function submitSkuTypeFeedback(){
   const input = document.getElementById('sku-type-input');
+  const emailInput = document.getElementById('sku-type-email');
+  const errEl = document.getElementById('sku-type-feedback-error');
+  const btn = document.getElementById('sku-type-submit-btn');
   const v = input?.value?.trim();
+  const email = emailInput?.value?.trim();
+  function showErr(msg){
+    if(errEl){ errEl.textContent = msg; errEl.style.display = 'block'; }
+  }
+  function clearErr(){ if(errEl){ errEl.style.display = 'none'; errEl.textContent = ''; } }
+  clearErr();
   if(!v){
-    const ti=document.getElementById('sku-type-input'); if(ti){ti.style.borderColor='#EF4444'; ti.placeholder='Please enter a product type'; setTimeout(()=>{ti.style.borderColor='';},2000);}
+    showErr('Please tell us what you sell');
     return;
   }
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    showErr('Please enter a valid email so we can reach out when we add support');
+    return;
+  }
+  // Local fallback (kept for offline / proxy-failure resilience)
   const existing = safeJsonParse(localStorage.getItem('ns_sku_type_suggestions'), []);
-  existing.push({value:v, ts:new Date().toISOString()});
+  existing.push({value:v, email:email, ts:new Date().toISOString()});
   localStorage.setItem('ns_sku_type_suggestions', JSON.stringify(existing));
+  // Disable button while submitting
+  if(btn){ btn.disabled = true; btn.textContent = '⟳ Saving…'; }
+  try{
+    if(typeof dbCall === 'function'){
+      await dbCall('waitlist.create', {
+        email: email,
+        category: v, // the user's free-text product type goes into category
+        source: 'sku_type_feedback',
+        brandName: (typeof brand !== 'undefined' && brand && brand.name) || '',
+      });
+    }
+  }catch(e){
+    // Soft-fail: localStorage already has the entry. We still mark as submitted
+    // because the user has done their part.
+  }
   localStorage.setItem('ns_sku_type_submitted','1');
   const wrap = document.getElementById('sku-type-feedback-wrap');
-  if(wrap) wrap.innerHTML = '<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ Logged — thank you</span>';
+  if(wrap) wrap.innerHTML = '<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ Logged — thank you. We\'ll reach out when we add support for "' + v + '".</span>';
 }
 
 function renderSkuEdit(el){
@@ -13913,6 +14095,12 @@ function renderSkuEdit(el){
                 <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.1rem">${pt.desc}</div>
               </div>`).join('')}
           </div>
+          ${isLegacyProductType(skuForm.productType) ? `
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #F59E0B;padding:.55rem .8rem;margin-bottom:.6rem;font-family:var(--sans);font-size:.7rem;color:#92400E;line-height:1.55">
+              <strong>Legacy product type — please update.</strong> "${skuForm.productType}" is no longer supported in VeyaFlow's current scope (Beauty &amp; Skincare). Pick one of the three types above to get accurate compliance and listing requirements. Your other product data is preserved.
+            </div>
+          ` : ''}
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.45rem;font-style:italic">Wellness/Supplements support coming soon. Other categories on the roadmap.</div>
           <div id="sku-type-feedback-wrap" style="margin-top:.35rem">
             ${skuTypeFeedbackState()}
           </div>
@@ -24002,7 +24190,73 @@ const REG_MONITOR_SOURCES = {
     watchTerms:['Digital Product Passport','EUDR','ESPR','textile labelling','Regulation 1007/2011','extended producer responsibility','textile destruction ban'],
     regulators:['European Commission','ECHA','European Parliament'],
   },
+  // ── Product-type-keyed entries — used when brand has SKUs of these types
+  // (Round 1 beauty foundation). Keys prefixed `pt:` to avoid collision with
+  // brand-category keys above.
+  'pt:device': {
+    label:'Beauty Device',
+    searchQueries:[
+      'EU LVD Low Voltage Directive 2014/35 update {year}',
+      'EU EMC Directive 2014/30 update {year}',
+      'EU RoHS Directive 2011/65 substance restriction {year}',
+      'WEEE Directive 2012/19 compliance update {year}',
+      'EU Battery Directive 2006/66 enforcement {year}',
+    ],
+    watchTerms:['LVD','Low Voltage Directive','EMC Directive','RoHS','WEEE','Battery Directive','CE marking','MDR medical device','electronic skincare device'],
+    regulators:['European Commission DG GROW','ECHA','national WEEE registries','EMA (medical claim devices)'],
+  },
+  'pt:beauty_accessory': {
+    label:'Beauty Accessories',
+    searchQueries:[
+      'EU General Product Safety Regulation GPSR {year}',
+      'REACH Annex XVII restricted substances {year}',
+      'EU textile labelling regulation update {year}',
+    ],
+    watchTerms:['GPSR','General Product Safety','REACH Annex XVII','restricted substances','textile labelling','Regulation 1007/2011'],
+    regulators:['European Commission DG GROW','ECHA','national market surveillance'],
+  },
 };
+
+// Returns the regulatory dimensions relevant to the current brand. Combines:
+//  - brand categories (long-standing axis: cosmetics vs food vs supplements vs fashion)
+//  - product types present in the SKU list (Round 1: device, beauty_accessory)
+// Returns array of { key, label, kind, source } where kind is 'category' or 'product_type'.
+// Used by Compliance Radar to surface the right regulatory streams for THIS brand.
+function getRegulatoryDimensions(){
+  var dims = [];
+  var seen = {};
+  var cats = (typeof getBrandCategories === 'function') ? (getBrandCategories() || []) : [];
+  cats.forEach(function(c){
+    if(REG_MONITOR_SOURCES[c] && !seen[c]){
+      dims.push({ key: c, label: c, kind: 'category', source: REG_MONITOR_SOURCES[c] });
+      seen[c] = 1;
+    }
+  });
+  // Product types — only consider those present in SKUs
+  if(typeof skus !== 'undefined' && Array.isArray(skus)){
+    var typesSeen = {};
+    skus.forEach(function(s){
+      if(s && s.productType) typesSeen[s.productType] = 1;
+    });
+    Object.keys(typesSeen).forEach(function(t){
+      var srcKey = 'pt:' + t;
+      if(REG_MONITOR_SOURCES[srcKey] && !seen[srcKey]){
+        dims.push({ key: srcKey, label: REG_MONITOR_SOURCES[srcKey].label || t, kind: 'product_type', source: REG_MONITOR_SOURCES[srcKey] });
+        seen[srcKey] = 1;
+      }
+    });
+  } else {
+    // Brand has no SKUs yet — surface ALL beauty-relevant product-type dimensions
+    // as "may apply when you add products" (informational, not active). Caller
+    // decides how to render. We mark them with a `provisional: true` flag.
+    Object.keys(REG_MONITOR_SOURCES).filter(function(k){ return k.indexOf('pt:') === 0; }).forEach(function(k){
+      if(seen[k]) return;
+      dims.push({ key: k, label: REG_MONITOR_SOURCES[k].label || k.replace('pt:',''), kind: 'product_type', source: REG_MONITOR_SOURCES[k], provisional: true });
+      seen[k] = 1;
+    });
+  }
+  return dims;
+}
 
 function loadRegulatoryMonitor(){
   try{
@@ -24058,7 +24312,12 @@ async function runRegulatoryCheck(manual){
 
   const year = new Date().getFullYear();
   const newAlerts = [];
-  const sources = cats.flatMap(cat=>REG_MONITOR_SOURCES[cat]?.searchQueries||[]).slice(0,4);
+  // Pull search queries from all relevant dimensions (brand categories + product types).
+  // Don't include 'provisional' product-type dimensions in actual scans — only when brand
+  // has SKUs of that type does it make sense to spend search budget on it.
+  const dims = (typeof getRegulatoryDimensions === 'function') ? getRegulatoryDimensions().filter(function(d){ return !d.provisional; }) : [];
+  const dimSources = dims.length ? dims.flatMap(function(d){ return (d.source && d.source.searchQueries) || []; }) : cats.flatMap(cat=>REG_MONITOR_SOURCES[cat]?.searchQueries||[]);
+  const sources = dimSources.slice(0,4);
 
   try{
     for(const queryTemplate of sources){
@@ -24169,6 +24428,12 @@ function renderRegMonitorPage(el){
   const unread = all.filter(a=>!a.read);
   const last   = regulatoryMonitorState.lastChecked;
   const cats   = getBrandCategories();
+  // Round-1: dimensions = brand categories ∪ product types present in SKUs.
+  // Each dimension has a `kind` ('category'|'product_type') so the UI can
+  // distinguish them. `provisional:true` means "shown because brand has no
+  // products yet — this MAY apply when products are added".
+  const dims    = (typeof getRegulatoryDimensions === 'function') ? getRegulatoryDimensions() : [];
+  const dimLabels = dims.map(d=>d.label);
 
   const SEV = {
     high:   {color:'#991B1B', bg:'#FEF2F2', border:'#FCA5A5', icon:'⚑', label:'High priority'},
@@ -24182,7 +24447,7 @@ function renderRegMonitorPage(el){
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">Regulatory Monitor</div>
           <div class="page-title">Regulatory Monitoring</div>
-          <div class="page-sub">Weekly automated search · ${cats.join(' · ')} · ${(brand?.targetMarkets||[brand?.currentMarket||'Sweden']).join(', ')}</div>
+          <div class="page-sub">Weekly automated search · ${dimLabels.length ? dimLabels.join(' · ') : cats.join(' · ')} · ${(brand?.targetMarkets||[brand?.currentMarket||'Sweden']).join(', ')}</div>
         </div>
         <button onclick="runRegulatoryCheck(true)" class="${regulatoryMonitorState.checking?'btn-outline':'btn-primary'}" style="font-size:.65rem;${regulatoryMonitorState.checking?'opacity:.6':''}">
           ${regulatoryMonitorState.checking?'⟳ Checking…':'↻ Check now'}
@@ -24203,7 +24468,13 @@ function renderRegMonitorPage(el){
           </div>
         </div>
         <div style="display:flex;gap:.35rem;flex-wrap:wrap">
-          ${cats.map(c=>`<span style="font-family:var(--mono);font-size:.5rem;background:#EFF6FF;color:#1E40AF;padding:.1rem .35rem;border:1px solid #BFDBFE">${c}</span>`).join('')}
+          ${dims.map(d=>{
+            var bg = d.kind==='category' ? '#EFF6FF' : '#FFFBEB';
+            var col = d.kind==='category' ? '#1E40AF' : '#92400E';
+            var border = d.kind==='category' ? '#BFDBFE' : '#FCD34D';
+            var prov = d.provisional ? ' opacity:.7;font-style:italic' : '';
+            return `<span style="font-family:var(--mono);font-size:.5rem;background:${bg};color:${col};padding:.1rem .35rem;border:1px solid ${border};${prov}" title="${d.kind==='category'?'Brand category':'Product-type-driven'}${d.provisional?' · may apply when products added':''}">${d.label}</span>`;
+          }).join('')}
           ${(brand?.targetMarkets||[]).slice(0,3).map(m=>`<span style="font-family:var(--mono);font-size:.5rem;background:#F9F8F6;color:var(--muted);padding:.1rem .35rem;border:1px solid var(--border)">${m}</span>`).join('')}
         </div>
       </div>
@@ -24215,12 +24486,14 @@ function renderRegMonitorPage(el){
           <span style="color:var(--muted)">▼</span>
         </summary>
         <div style="padding:.65rem .85rem;border-top:1px solid var(--border);background:#F9F8F6">
-          ${cats.map(cat=>{
-            const src = REG_MONITOR_SOURCES[cat];
+          ${dims.map(d=>{
+            const src = d.source;
             if(!src) return '';
+            var kindLabel = d.kind === 'product_type' ? 'Product-type' : 'Brand category';
+            var prov = d.provisional ? ' <span style="font-family:var(--mono);font-size:.45rem;background:#FEF3C7;color:#78350F;padding:.05rem .25rem;margin-left:.25rem">may apply when products added</span>' : '';
             return `
               <div style="margin-bottom:.65rem">
-                <div style="font-family:var(--mono);font-size:.55rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">${cat}</div>
+                <div style="font-family:var(--mono);font-size:.55rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">${d.label} <span style="font-weight:400;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-left:.25rem">${kindLabel}</span>${prov}</div>
                 <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.6">Watch terms: ${src.watchTerms.slice(0,5).join(' · ')}</div>
                 <div style="font-family:var(--sans);font-size:.62rem;color:var(--muted);margin-top:.15rem">Sources: ${src.regulators.join(', ')}</div>
               </div>
@@ -27654,18 +27927,71 @@ const ARTICLE_TEMPLATES = {
   },
 };
 
+// Per-product-type compliance rows. Surfaced IN ADDITION to retailer-specific
+// rows in the Listing Checklist. The retailer rows handle commercial readiness
+// (EAN, language label, copy, masterdata, etc.); these handle the legal/technical
+// compliance that varies by product TYPE.
+//
+// Cosmetic — covered by retailer rows already (CPNP, EU RP, INCI, claims). No
+// extra type rows needed; the existing retailer-row CPNP/EU-RP entries will
+// continue to apply (they have productTypes:['cosmetic'] below).
+//
+// Beauty Device — adds LVD, EMC, RoHS, WEEE, manual, battery (if applicable).
+// Beauty Accessory — adds GPSR, REACH for materials.
+//
+// Each row mirrors the retailer-row shape: { id, label, autoCheck, fixPage }.
+// autoCheck:null means "user manually ticks once they've handled it" — same
+// pattern as existing retailer rows that aren't auto-derivable.
+var PRODUCT_TYPE_REQUIREMENTS = {
+  cosmetic: [],
+  device: [
+    { id:'ce_marking',     label:'CE marking applied to device + packaging',                       autoCheck:null, fixPage:'skus' },
+    { id:'lvd_compliance', label:'Low Voltage Directive 2014/35/EU compliance (if mains-powered)', autoCheck:null, fixPage:'skus' },
+    { id:'emc_compliance', label:'EMC Directive 2014/30/EU compliance',                            autoCheck:null, fixPage:'skus' },
+    { id:'rohs_decl',      label:'RoHS 2011/65/EU declaration on file',                            autoCheck:null, fixPage:'skus' },
+    { id:'weee_reg',       label:'WEEE registration in target market(s)',                          autoCheck:null, fixPage:'reg_monitor' },
+    { id:'user_manual',    label:'User manual with safety warnings (per market language)',         autoCheck:null, fixPage:'skus' },
+    { id:'battery_dir',    label:'Battery Directive 2006/66/EC compliance (if battery-powered)',   autoCheck:null, fixPage:'skus' },
+    { id:'mdr_review',     label:'MDR review — required only if device makes medical claims',      autoCheck:null, fixPage:'skus' },
+  ],
+  beauty_accessory: [
+    { id:'gpsr_compliance', label:'General Product Safety Regulation (GPSR) compliance',                 autoCheck:null, fixPage:'skus' },
+    { id:'reach_decl',      label:'REACH declaration for materials (plastics, metals, coatings)',       autoCheck:null, fixPage:'skus' },
+    { id:'material_decl',   label:'Material declaration if textile-containing (combs, brushes)',        autoCheck:null, fixPage:'skus' },
+  ],
+};
+
+// Returns the merged checklist for a retailer + sku. Filters retailer rows that
+// have a productTypes constraint, then appends product-type-specific rows.
+// If sku.productType is a legacy type (textile/supplement/food/garment), we
+// fall back to cosmetic checklist with a banner shown by the renderer.
+function getRequirementsForRetailerAndProduct(retailerId, sku){
+  var reqsObj = LISTING_REQUIREMENTS[retailerId];
+  if(!reqsObj || !reqsObj.requirements) return [];
+  var skuType = sku && sku.productType;
+  var effectiveType = (typeof isLegacyProductType === 'function' && isLegacyProductType(skuType)) ? 'cosmetic' : (skuType || 'cosmetic');
+  // Filter retailer rows: if a row has productTypes set, only keep it for matching types
+  var retailerRows = reqsObj.requirements.filter(function(r){
+    if(!r.productTypes) return true; // applies to all types
+    return r.productTypes.indexOf(effectiveType) >= 0;
+  });
+  // Append type-specific rows
+  var typeRows = (PRODUCT_TYPE_REQUIREMENTS[effectiveType] || []).slice();
+  return retailerRows.concat(typeRows);
+}
+
 const LISTING_REQUIREMENTS = {
   apotek_hjartat_se: {
     confidence: 'veyaflow_verified',
     requirements: [
       { id:'ean',                label:'EAN-13 barcode confirmed',                 autoCheck:'sku.ean',              fixPage:'skus' },
-      { id:'cpnp',               label:'CPNP reference on file',                   autoCheck:'sku.cpnp',             fixPage:'skus' },
-      { id:'eu_rp',              label:'EU Responsible Person confirmed',          autoCheck:'brand.euRP',           fixPage:'home' },
+      { id:'cpnp',               label:'CPNP reference on file',                   autoCheck:'sku.cpnp',             fixPage:'skus', productTypes:['cosmetic'] },
+      { id:'eu_rp',              label:'EU Responsible Person confirmed',          autoCheck:'brand.euRP',           fixPage:'home', productTypes:['cosmetic'] },
       { id:'se_label',           label:'Swedish-language label approved',          autoCheck:null,                   fixPage:'skus' },
       { id:'images',             label:'Product images (1000×1000px white BG)',    autoCheck:null,                   fixPage:'brandpack' },
       { id:'article_template',   label:'Article template submitted via portal',    autoCheck:null,                   fixPage:'retail-templates' },
       { id:'rsp_confirmed',      label:'RSP confirmed with buyer',                 autoCheck:null,                   fixPage:'retail-comms' },
-      { id:'safety_assessment',  label:'Safety Assessment on file',                autoCheck:'sku.safetyRef',        fixPage:'skus' },
+      { id:'safety_assessment',  label:'Safety Assessment on file',                autoCheck:'sku.safetyRef',        fixPage:'skus', productTypes:['cosmetic'] },
       { id:'masterdata',         label:'Masterdata live in Apotek system',        autoCheck:null,                   fixPage:'retail-tracker' },
       { id:'first_delivery',     label:'First delivery date agreed',               autoCheck:null,                   fixPage:'retail-comms' },
     ],
@@ -27674,7 +28000,7 @@ const LISTING_REQUIREMENTS = {
     confidence: 'veyaflow_verified',
     requirements: [
       { id:'ean',               label:'EAN-13 confirmed',                          autoCheck:'sku.ean',              fixPage:'skus' },
-      { id:'cpnp',              label:'CPNP reference confirmed',                  autoCheck:'sku.cpnp',             fixPage:'skus' },
+      { id:'cpnp',              label:'CPNP reference confirmed',                  autoCheck:'sku.cpnp',             fixPage:'skus', productTypes:['cosmetic'] },
       { id:'dk_label',          label:'Danish-language label approved',            autoCheck:null,                   fixPage:'skus' },
       { id:'dk_images',         label:'Product images (1200×1200px)',              autoCheck:null,                   fixPage:'brandpack' },
       { id:'dk_copy',           label:'Danish product description approved',       autoCheck:'sku.descDA',           fixPage:'skus' },
@@ -28508,12 +28834,15 @@ function renderRetailChecklist(el){
     retailChecklistSelRetailer = retailerKeys[0];
   }
   var reqsObj = LISTING_REQUIREMENTS[retailChecklistSelRetailer];
-  var reqs = reqsObj.requirements;
   var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
   if(!retailChecklistSelSku && skusList.length) retailChecklistSelSku = String(skusList[0].id);
   var sku = skusList.find(function(x){ return String(x.id)===String(retailChecklistSelSku); });
+  // Per-product-type-aware requirements list (Round 1 beauty foundation)
+  var reqs = sku ? getRequirementsForRetailerAndProduct(retailChecklistSelRetailer, sku) : (reqsObj ? reqsObj.requirements : []);
   var stateKey = retailChecklistSelRetailer+'::'+retailChecklistSelSku;
   var state = retailChecklistState[stateKey] || {};
+  var skuTypeMeta = sku ? PRODUCT_TYPES.find(function(pt){ return pt.id === sku.productType; }) : null;
+  var skuIsLegacy = sku && typeof isLegacyProductType === 'function' && isLegacyProductType(sku.productType);
 
   var html = '';
   html += '<div class="page-wrap"><div class="topbar">';
@@ -28549,6 +28878,24 @@ function renderRetailChecklist(el){
     html += '</div></div>';
     el.innerHTML = html;
     return;
+  }
+
+  // Legacy product type banner — shown BEFORE the checklist if the SKU is on
+  // a removed product type (textile/supplement/food/garment). Falls back to
+  // cosmetic checklist so the user still sees something useful.
+  if(skuIsLegacy){
+    html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #F59E0B;padding:.7rem 1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.74rem;color:#78350F;line-height:1.55">';
+    html +=   '<strong>Listing checklist for legacy product type.</strong> "' + retailEsc(sku.productType) + '" is no longer in VeyaFlow\'s scope. Showing cosmetic checklist as fallback. ';
+    html +=   '<span onclick="editSku(\'' + retailEsc(sku.id) + '\')" style="text-decoration:underline;cursor:pointer">Update product type →</span>';
+    html += '</div>';
+  } else if(skuTypeMeta){
+    // Show the active product type so user understands why this checklist looks the way it does
+    html += '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #1E40AF;padding:.55rem .85rem;margin-bottom:1rem;font-family:var(--sans);font-size:.72rem;color:#1E40AF;display:flex;align-items:center;gap:.4rem">';
+    html +=   '<span style="font-family:var(--mono);font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700">Product type</span>';
+    html +=   '<span style="font-size:.85rem">' + skuTypeMeta.icon + '</span>';
+    html +=   '<span style="font-weight:600">' + retailEsc(skuTypeMeta.label) + '</span>';
+    html +=   '<span style="margin-left:auto;font-family:var(--mono);font-size:.55rem;color:#1E40AF;opacity:.7">Checklist tailored to this type</span>';
+    html += '</div>';
   }
 
   // Progress
