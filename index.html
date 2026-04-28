@@ -1899,7 +1899,6 @@ const NAV=[
   {id:"pitch",    sec:"brand", icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"brandpack",sec:"brand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"bizcase",  sec:"brand", icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"crm",      sec:"brand", icon:"⊞", label:"Retailer CRM",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
   // ── SOURCE section ─────────────────────────────
   {id:"find",     sec:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
@@ -1909,7 +1908,8 @@ const NAV=[
   {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
-  // ── RETAIL section ─────────────────────────────
+  // ── RETAILER RELATIONS section ──────────────────
+  {id:"crm",               sec:"retail", icon:"⊞", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
   {id:"retail-tracker",    sec:"retail", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-templates",  sec:"retail", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-checklist",  sec:"retail", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
@@ -2066,7 +2066,7 @@ function buildNav(){
   html+='<div class="nav-section-tabs">';
   html+='<div class="nav-section-tab'+(navSection==='brand'?' active':'')+'" data-sec="brand" onclick="switchNavSection(this.dataset.sec)">Brand</div>';
   html+='<div class="nav-section-tab'+(navSection==='source'?' active':'')+'" data-sec="source" onclick="switchNavSection(this.dataset.sec)">Source</div>';
-  html+='<div class="nav-section-tab'+(navSection==='retail'?' active':'')+'" data-sec="retail" onclick="switchNavSection(this.dataset.sec)">Retail</div>';
+  html+='<div class="nav-section-tab'+(navSection==='retail'?' active':'')+'" data-sec="retail" onclick="switchNavSection(this.dataset.sec)">Retailer Relations</div>';
   html+='</div>';
 
   sectionItems.forEach(function(n){
@@ -2096,18 +2096,17 @@ function buildNav(){
   // Mobile nav — show current section items + section switcher
   var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
-    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','bizcase','crm','cfo'];
+    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','bizcase','cfo'];
     var sourcePages=['find','suppliers','sourcing','circular','dpp','csrd'];
-    var retailPages=['retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
+    var retailPages=['crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
     var inBrand=brandPages.includes(currentPage);
     var inSource=sourcePages.includes(currentPage);
     var inRetail=retailPages.includes(currentPage);
     var mobTabs=[
-      {id:'home',   icon:'\u2302', label:'Home',   direct:true},
-      {id:'brand',  icon:'\u25ce', label:'Brand',  direct:false, section:'brand'},
-      {id:'source', icon:'\u25cc', label:'Source', direct:false, section:'source'},
-      {id:'retail', icon:'\u25a4', label:'Retail', direct:false, section:'retail'},
-      {id:'crm',    icon:'\u229e', label:'Retailer CRM',    direct:true},
+      {id:'home',   icon:'\u2302', label:'Home',     direct:true},
+      {id:'brand',  icon:'\u25ce', label:'Brand',    direct:false, section:'brand'},
+      {id:'source', icon:'\u25cc', label:'Source',   direct:false, section:'source'},
+      {id:'retail', icon:'\u25a4', label:'Retailer', direct:false, section:'retail'},
     ];
     // Count stale retail submissions for tab badge (same rule as desktop sidebar)
     var staleRetail=0;
@@ -2121,7 +2120,9 @@ function buildNav(){
     }catch(e){}
     var mobHtml='';
     mobTabs.forEach(function(n){
-      var active=(n.id==='home'&&currentPage==='home')||(n.id==='crm'&&currentPage==='crm')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource)||(n.id==='retail'&&inRetail);
+      // CRM is now a sub-item of the Retailer section, so any time we're on
+      // currentPage 'crm' the Retailer tab is the active one.
+      var active=(n.id==='home'&&currentPage==='home')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource)||(n.id==='retail'&&inRetail);
       mobHtml+='<div class="mob-nav-item'+(active?' active':'')+'" onclick="'+( n.direct ? 'closeMobDrawer();showPage(\''+n.id+'\')' : 'toggleMobDrawer(\''+n.section+'\')' )+'">';
       if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
       var pendingSource=sourcingCRM.filter(function(x){return x.status==='enquiry_sent'||x.status==='awaiting';}).length;
@@ -2153,7 +2154,11 @@ function toggleMobDrawer(section){
     return true;
   });
 
-  var html = '<div style="padding:.5rem 1.25rem .35rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);opacity:.7">'+(section==='brand'?'Brand':'Source')+'</div>';
+  var sectionLabel = section==='brand' ? 'Brand'
+                   : section==='source' ? 'Source'
+                   : section==='retail' ? 'Retailer Relations'
+                   : '';
+  var html = '<div style="padding:.5rem 1.25rem .35rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);opacity:.7">'+sectionLabel+'</div>';
   items.forEach(function(n){
     var active = currentPage===n.id;
     var label  = getCatLabel(n.id)||n.label;
@@ -20503,7 +20508,7 @@ function renderCRM(el){
                         <div style="border-top:1px solid var(--border);padding-top:.5rem;margin-top:.35rem">
                           <div style="margin-bottom:.35rem">
                             <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Last contact</label>
-                            <input type="date" id="crm-date-${card.id}" value="${card.lastContact}"
+                            <input lang="en" type="date" id="crm-date-${card.id}" value="${card.lastContact}"
                               style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
                           </div>
                           <div style="margin-bottom:.35rem">
@@ -27985,39 +27990,84 @@ function renderRetailSubmissionCard(s){
 
   if(expanded){
     html += '<div onclick="event.stopPropagation()" style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border);cursor:default">';
-    // Status dropdown
+
+    // Determine portal sync status — used to set the right messaging on Section 1
+    // - portalSynced === true: retailer is on the portal, original submission landed there.
+    //   Edits to the "Sent to retailer" fields below are LOCAL-ONLY — retailer won't see them.
+    // - portalSynced === false: portal sync failed at create time (retailer not on portal yet).
+    //   Edits update the local record; if the retailer ever joins the portal, they would
+    //   need a fresh submission anyway (no retroactive sync — see handoff brief).
+    // - undefined (legacy/pre-Session-3 submissions): treat as "never synced".
+    var syncedToPortal = (s.portalSynced === true && !!s.portalSubmissionId);
+    var section1Banner;
+    if(syncedToPortal){
+      section1Banner = {
+        bg: '#EFF6FF', border: '#BFDBFE', accent: '#1E40AF',
+        icon: '◎',
+        text: 'Sent to ' + retailEsc(s.retailerName) + ' at submission. <strong>Edits below stay on your device — the retailer doesn\u2019t see updates to existing submissions.</strong>',
+      };
+    } else {
+      section1Banner = {
+        bg: '#F9F8F6', border: 'var(--border)', accent: '#6B6358',
+        icon: '○',
+        text: '<strong>Not synced to retailer portal.</strong> ' + retailEsc(s.retailerName) + ' isn\u2019t on VeyaFlow yet, or the original submission didn\u2019t reach the portal. Edits stay local.',
+      };
+    }
+
+    // ── SECTION 1 — "Sent to retailer at submission" ────
+    html += '<div style="background:' + section1Banner.bg + ';border:1px solid ' + section1Banner.border + ';border-left:3px solid ' + section1Banner.accent + ';padding:.7rem .85rem;margin-bottom:.85rem">';
+    html +=   '<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">';
+    html +=     '<span style="font-family:var(--mono);font-size:.6rem;color:' + section1Banner.accent + '">' + section1Banner.icon + '</span>';
+    html +=     '<span style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:' + section1Banner.accent + ';font-weight:700">Sent to retailer at submission</span>';
+    html +=   '</div>';
+    html +=   '<div style="font-family:var(--sans);font-size:.7rem;color:#444;line-height:1.55">' + section1Banner.text + '</div>';
+    html += '</div>';
+
+    // Status dropdown — bidirectional (retailer can update from portal side, brand can update from here too)
     html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
     html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Status</div>';
     html += '<select data-subid="'+s.id+'" onchange="updateRetailSubmissionStatus(this.dataset.subid,this.value)" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
     RETAIL_SUB_STATUSES.forEach(function(st2){
       html += '<option value="'+st2.id+'"'+(s.status===st2.id?' selected':'')+'>'+retailEsc(st2.label)+'</option>';
     });
-    html += '</select></div>';
-    html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Submitted date</div>';
-    html += '<input type="date" id="rsub-sdate-'+s.id+'" value="'+(s.submittedDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '</select>';
+    html += '<div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.2rem;letter-spacing:.04em">' + (syncedToPortal ? 'Retailer can also update this from their portal' : 'Local only') + '</div>';
     html += '</div>';
-    // Contact
-    html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
+    html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Submitted date</div>';
+    html += '<input lang="en" type="date" id="rsub-sdate-'+s.id+'" value="'+(s.submittedDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '</div>';
+    // Contact (was sent at submission)
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:1.25rem">';
     html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact name</div>';
     html += '<input type="text" id="rsub-cname-'+s.id+'" value="'+retailEsc(s.contactName||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact email</div>';
     html += '<input type="email" id="rsub-cemail-'+s.id+'" value="'+retailEsc(s.contactEmail||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     html += '</div>';
+
+    // ── SECTION 2 — "Your private notes" ─────────────────
+    html += '<div style="background:#F9F8F6;border:1px solid var(--border);border-left:3px solid #C4A882;padding:.7rem .85rem;margin-bottom:.85rem">';
+    html +=   '<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">';
+    html +=     '<span style="font-family:var(--mono);font-size:.6rem;color:#92400E">✎</span>';
+    html +=     '<span style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:#92400E;font-weight:700">Your private notes</span>';
+    html +=   '</div>';
+    html +=   '<div style="font-family:var(--sans);font-size:.7rem;color:#444;line-height:1.55">Only you can see these. Use them to track follow-ups, meeting outcomes, and rejection notes — not visible to ' + retailEsc(s.retailerName) + '.</div>';
+    html += '</div>';
+
     // Next action
     html += '<div style="display:flex;flex-wrap:wrap;gap:.8rem;margin-bottom:.85rem">';
     html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Next action</div>';
     html += '<input type="text" id="rsub-na-'+s.id+'" value="'+retailEsc(s.nextAction||'')+'" placeholder="e.g. Follow up on sample request" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Date</div>';
-    html += '<input type="date" id="rsub-nad-'+s.id+'" value="'+(s.nextActionDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+    html += '<input lang="en" type="date" id="rsub-nad-'+s.id+'" value="'+(s.nextActionDate||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     html += '</div>';
     // Stage-specific fields
     if(s.status === 'meeting_booked'){
       html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Meeting date</div>';
-      html += '<input type="date" id="rsub-mdate-'+s.id+'" value="'+(s.meetingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+      html += '<input lang="en" type="date" id="rsub-mdate-'+s.id+'" value="'+(s.meetingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     }
     if(s.status === 'listed' || s.status === 'live'){
       html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Listing date</div>';
-      html += '<input type="date" id="rsub-ldate-'+s.id+'" value="'+(s.listingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+      html += '<input lang="en" type="date" id="rsub-ldate-'+s.id+'" value="'+(s.listingDate||'')+'" style="width:100%;max-width:240px;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     }
     if(s.status === 'rejected'){
       html += '<div style="margin-bottom:.85rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Rejection reason</div>';
@@ -28216,6 +28266,11 @@ function saveRetailSubmissionEdit(id){
   loadRetailSubmissions();
   var s = retailSubmissions.find(function(x){ return x.id===id; });
   if(!s) return;
+  // Snapshot the "Sent to retailer" fields so we can detect after-save edits
+  // and tell the user honestly whether retailer would have seen the change.
+  var origSubmittedDate = s.submittedDate || '';
+  var origContactName   = s.contactName   || '';
+  var origContactEmail  = s.contactEmail  || '';
   var sDate = document.getElementById('rsub-sdate-'+id);
   var cName = document.getElementById('rsub-cname-'+id);
   var cEmail = document.getElementById('rsub-cemail-'+id);
@@ -28235,7 +28290,18 @@ function saveRetailSubmissionEdit(id){
   if(lDate) s.listingDate = lDate.value;
   if(rej)   s.rejectionReason = rej.value;
   saveRetailSubmissions();
-  if(typeof showSuccess === 'function') showSuccess('Submission saved');
+  // Decide which toast to show
+  var sentFieldsChanged = (s.submittedDate !== origSubmittedDate) ||
+                          (s.contactName   !== origContactName)   ||
+                          (s.contactEmail  !== origContactEmail);
+  var syncedToPortal = (s.portalSynced === true && !!s.portalSubmissionId);
+  if(typeof showSuccess === 'function'){
+    if(sentFieldsChanged && syncedToPortal){
+      showSuccess('Saved on this device · retailer doesn\u2019t see changes to sent-at-submission fields');
+    } else {
+      showSuccess('Saved');
+    }
+  }
 }
 
 function deleteRetailSubmission(id){
@@ -28682,7 +28748,7 @@ function renderRetailPerfAddForm(){
   var html = '<div style="background:#fff;border:1px solid var(--border);padding:.9rem 1rem">';
   html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Add monthly data</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;align-items:end">';
-  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Month</div><input type="month" id="rperf-month" value="'+retailEsc(f.month)+'" oninput="retailPerfForm.month=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
+  html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Month</div><input lang="en" type="month" id="rperf-month" value="'+retailEsc(f.month)+'" oninput="retailPerfForm.month=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
   html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Units sold</div><input type="number" min="0" id="rperf-sold" value="'+retailEsc(f.unitsSold)+'" oninput="retailPerfForm.unitsSold=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
   html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Units delivered</div><input type="number" min="0" id="rperf-deliv" value="'+retailEsc(f.unitsDelivered)+'" oninput="retailPerfForm.unitsDelivered=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
   html += '<div><div class="lbl" style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.2rem">Revenue</div><input type="number" min="0" step="0.01" id="rperf-rev" value="'+retailEsc(f.revenue)+'" oninput="retailPerfForm.revenue=this.value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border)"></div>';
@@ -28993,7 +29059,7 @@ function renderRetailCommsAddForm(retailerList){
   });
   html += '</select></div>';
   html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Date</div>';
-  html += '<input type="date" id="rcomms-date" value="'+retailEsc(f.date)+'" oninput="retailCommsAddForm.date=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '<input lang="en" type="date" id="rcomms-date" value="'+retailEsc(f.date)+'" oninput="retailCommsAddForm.date=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
   html += '<div style="flex:1;min-width:160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Type</div>';
   html += '<select id="rcomms-type" onchange="retailCommsAddForm.type=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);background:#fff">';
   COMMS_TYPES.forEach(function(t){
@@ -29015,7 +29081,7 @@ function renderRetailCommsAddForm(retailerList){
   html += '<div style="flex:1;min-width:200px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Next action</div>';
   html += '<input type="text" id="rcomms-na" value="'+retailEsc(f.nextAction)+'" oninput="retailCommsAddForm.nextAction=this.value" placeholder="e.g. Send CPNP doc" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
   html += '<div style="flex:0 0 160px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">By</div>';
-  html += '<input type="date" id="rcomms-nad" value="'+retailEsc(f.nextActionDate)+'" oninput="retailCommsAddForm.nextActionDate=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
+  html += '<input lang="en" type="date" id="rcomms-nad" value="'+retailEsc(f.nextActionDate)+'" oninput="retailCommsAddForm.nextActionDate=this.value" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
   html += '</div>';
 
   html += '<div style="margin-bottom:.9rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Attachment note (optional)</div>';
