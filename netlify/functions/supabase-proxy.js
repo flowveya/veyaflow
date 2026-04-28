@@ -545,6 +545,35 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, event: updated[0] || null }) };
     }
 
+    // ── Category waitlist (Round-1 beauty foundation) ──────────────────
+    // Captures emails for soft-blocked categories (Fashion & Apparel, Food &
+    // Beverage) and free-text product-type suggestions from My Products. No
+    // session_id required — onboarding may submit before a session is set.
+    if (action === 'waitlist.create') {
+      const email = (data && data.email || '').trim().toLowerCase();
+      const category = (data && data.category || '').trim();
+      const source = (data && data.source || 'onboarding').trim();
+      const brandName = (data && data.brandName || '').trim() || null;
+      // Basic format check — proxy is the last line of defence; the SQL CHECK
+      // constraint will reject malformed values too.
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid email' }) };
+      }
+      if (!category) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Category required' }) };
+      }
+      const allowedSources = ['onboarding', 'setup_modal', 'sku_type_feedback'];
+      const safeSource = allowedSources.indexOf(source) >= 0 ? source : 'onboarding';
+      const inserted = await supabase('POST', 'category_waitlist', {
+        email,
+        category,
+        source: safeSource,
+        brand_name: brandName,
+        session_id: session_id || null,
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, entry: inserted[0] || null }) };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
