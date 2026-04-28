@@ -766,7 +766,7 @@ function renderAddSupplierModal(){
           <span onclick="addSupplierOpen=false;renderSuppliers(document.getElementById('page-suppliers'))" style="cursor:pointer;font-size:1.2rem;color:var(--muted)">✕</span>
         </div>
         <div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-bottom:1.1rem;line-height:1.6">
-          Add a supplier you already work with. Once saved, the full Supplier Nudge workflow is available immediately — risk scoring, compliance tracking, and AI email generation.
+          Add a supplier you already work with. Once saved, the full Supplier Audit workflow is available immediately — risk scoring, compliance tracking, and AI email generation.
         </div>
 
         <div class="field"><label class="lbl">Supplier / company name *</label>
@@ -1145,7 +1145,12 @@ let pitchActiveVariant = 0; // which of the 3 variants is active in result view
 let pitchResult  = null;
 let circularForm = {productName:'',materials:'',units:'',rsp:'',category:'',reason:'End_of_season_overstock',condition:'sellable',location:'SE',timeline:'standard',confirmedRoute:null};
 let circularResult = null;
-let findForm     = {category:'',targetMarket:'',sustainability:'',maxMoq:'',mfrType:'',query:'',qualityTier:'',verificationTier:''};
+let findForm     = {category:'',targetMarket:'',sustainability:'',maxMoq:'',mfrType:'',query:'',qualityTier:'',verificationTier:'',
+  // Merged Find Manufacturers (Phase): new filters
+  region:'', cert:'', maxLead:'', trustTiers:[], capacity:'',
+  // NL search query (used for AI parsing; reuses Sourcing Agent flow)
+  nlQuery:'',
+};
 let supplierFilter = {query:'',status:'',missing:'',type:'',region:'',tier:'',eudr:''};
 // Non-persisted UI state
 let selectedSupplier=null;
@@ -1897,13 +1902,11 @@ const NAV=[
   {id:"crm",      sec:"brand", icon:"⊞", label:"Retailer CRM",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
   // ── SOURCE section ─────────────────────────────
-  {id:"find",     sec:"source", icon:"◌", label:"Manufacturer Finder", stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"agent",    sec:"source", icon:"✦", label:"Sourcing Agent",      stages:["idea","product","trading","expanding","scaling"], cats:null, badge:"New"},
-  {id:"suppliers",sec:"source", icon:"◈", label:"Supplier Nudge",      stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"find",     sec:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"suppliers",sec:"source", icon:"◈", label:"Supplier Audit",      stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"sourcing",  sec:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
   {id:"circular", sec:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
   {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"sourcing",  sec:"source", icon:"◌", label:"Sourcing CRM",         stages:["idea","product","trading","expanding","scaling"],  cats:null},
-  {id:"verified",  sec:"source", icon:"★", label:"Verified Directory",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
   {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
   // ── RETAIL section ─────────────────────────────
@@ -1998,9 +2001,9 @@ const MODULE_EXPLAINERS = {
   crm:       {title:'Retailer CRM',        what:'Track every retailer relationship from first contact to listing.',get:['5-stage pipeline per retailer','Range review action plan','Rejection pattern intelligence','Natural language search across 270+ retailers'],time:'Ongoing'},
   skus:      {title:'My Products',         what:'Your product data hub. Everything else in VeyaFlow reads from here.',get:['Reformulation Intelligence per ingredient','CPNP notification package generator','Packaging compliance checker','Text localisation for each retailer'],time:'5 minutes to set up'},
   claims:    {title:'Claim Localizer',     what:'Check your marketing copy is legally compliant in every target market.',get:['Traffic light per claim per market','Auto-rewrite suggestions','Safe harbour claims library','PIF Gap Checker and Label Scanner'],time:'60 seconds per analysis'},
-  find:      {title:'Manufacturer Finder', what:'Find the right manufacturer for your product with AI-powered matching.',get:['VeyaFlow-verified manufacturers','Fit score based on your certifications','AI-powered sourcing brief','Multi-supplier comparison'],time:'2 minutes to match'},
+  find:      {title:'Find Manufacturers', what:'Find the right manufacturer for your product. Describe your need in plain language or filter the verified directory.',get:['12 research-verified manufacturers (founder-verified tier opening Q3 2026)','AI-powered fit matching from natural-language search','Filter by region, certifications, MOQ, lead time, trust tier, capacity','Generate sourcing briefs and add to Supplier Pipeline'],time:'2 minutes to match'},
   cfo:       {title:'CFO View',            what:'Private financial modelling. Your cost data never leaves your browser.',get:['Margin stress-tester per retailer','Retail Math Backwards: what ex-works cost do I need?','Contract Terms Analyser with benchmarks','Multi-currency support'],time:'Ongoing'},
-  sourcing:  {title:'Sourcing Agent',      what:'AI agent that finds and briefs manufacturers matching your product spec.',get:['Natural language sourcing query','Fit-scored manufacturer results','AI-generated sourcing brief','Sourcing CRM to track enquiries'],time:'2 minutes per search'},
+  sourcing:  {title:'Supplier Pipeline',  what:'Track every manufacturer relationship — from first enquiry through approval to active supply.',get:['One row per manufacturer contact','Stage tracking (enquiry sent · in dialogue · approved · active)','Last-contact timestamps and feedback prompts','Inaccuracy reporting that improves Find Manufacturers data'],time:'Used continuously'},
   brandpack: {title:'Brand Pack',          what:'Generate a verified brand profile to share with buyers instead of a PDF deck.',get:['AI-written brand story and commercial proof points','Retailer-specific variant matching their priorities','Shareable magic link for every pitch email','Confidence tier badge'],time:'5 minutes to generate'},
   csrd:      {title:'CSRD Pack',           what:'Auto-generate your sustainability disclosure for retail partners legally required to collect ESG data.',get:['12 standard CSRD questions auto-filled from VeyaFlow data','Green/amber status per question showing what needs attention','Simple form to fill any gaps','Exportable PDF-ready document dated and signed'],time:'5 minutes to complete'},
 };
@@ -2094,7 +2097,7 @@ function buildNav(){
   var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
     var brandPages=['home','skus','report','compare','claims','pitch','brandpack','bizcase','crm','cfo'];
-    var sourcePages=['find','suppliers','circular','dpp'];
+    var sourcePages=['find','suppliers','sourcing','circular','dpp','csrd'];
     var retailPages=['retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
     var inBrand=brandPages.includes(currentPage);
     var inSource=sourcePages.includes(currentPage);
@@ -2104,7 +2107,7 @@ function buildNav(){
       {id:'brand',  icon:'\u25ce', label:'Brand',  direct:false, section:'brand'},
       {id:'source', icon:'\u25cc', label:'Source', direct:false, section:'source'},
       {id:'retail', icon:'\u25a4', label:'Retail', direct:false, section:'retail'},
-      {id:'crm',    icon:'\u229e', label:'CRM',    direct:true},
+      {id:'crm',    icon:'\u229e', label:'Retailer CRM',    direct:true},
     ];
     // Count stale retail submissions for tab badge (same rule as desktop sidebar)
     var staleRetail=0;
@@ -2177,6 +2180,10 @@ function closeMobDrawer(){
 let currentPage='home';
 let navSection='brand'; // 'brand' | 'source' | 'retail'
 function showPage(id){
+  // ── SOURCE restructure (Apr 2026) — Manufacturer Finder + Sourcing Agent +
+  // Verified Directory merged into "Find Manufacturers" (id 'find').
+  // Redirect any legacy callers / deep links to the new module.
+  if(id === 'agent' || id === 'verified') id = 'find';
   closeMobDrawer();
   currentPage=id;
   // Auto-switch section tab to match the page being shown
@@ -2520,7 +2527,7 @@ function renderPage(id){
   if(!el)return;
   if(id==='home')renderHome(el);
   else if(id==='find')renderFind(el);
-  else if(id==='agent')renderAgent(el);
+  else if(id==='agent'){ /* Merged into find — redirect any legacy callers */ renderFind(el); }
   else if(id==='report')renderReport(el);
   else if(id==='compare')renderCompare(el);
   else if(id==='pitch')renderPitch(el);
@@ -2531,7 +2538,7 @@ function renderPage(id){
   else if(id==='skus')renderSkus(el);
   else if(id==='claims')renderClaims(el);
   else if(id==='cfo')renderCFO(el);
-  else if(id==='verified')renderVerifiedDirectory(el);
+  else if(id==='verified'){ /* Merged into find — redirect any legacy callers */ renderFind(el); }
   else if(id==='reg_monitor'){loadRegulatoryMonitor();renderRegMonitorPage(el);}
   else if(id==='crm'){ loadCRM(); renderCRM(el); }
   else if(id==='dpp'){ loadDPP(); renderDPP(el); }
@@ -19134,7 +19141,7 @@ function renderSupplierRiskAlerts(){
           </div>
         `;
       }).join('')}
-      ${alerts.length>5?`<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;padding:.35rem 0">${alerts.length-5} more alerts — view in Supplier Nudge</div>`:''}
+      ${alerts.length>5?`<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;padding:.35rem 0">${alerts.length-5} more alerts — view in Supplier Audit</div>`:''}
     </div>
   `;
 }
@@ -19480,7 +19487,7 @@ function renderSuppliers(el){
   el.innerHTML=`
     <div class="topbar">
       <div>
-        <div class="page-title">Supplier Nudge AI</div>
+        <div class="page-title">Supplier Audit</div>
         <div class="page-sub">Automated risk scoring · Compliance data collection · Multi-language outreach · Audit tracking</div>
       </div>
     </div>
@@ -20905,11 +20912,11 @@ function renderAgent(el){
       <div class="topbar">
         <div>
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">New</div>
-          <div class="page-title">Sourcing Agent
-          <button onclick="showModuleExplainer('sourcing')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:pointer;font-size:.62rem;padding:.25rem .55rem;font-family:var(--mono);margin-top:.25rem">? How it works</button>
+          <div class="page-title">Find Manufacturers
+          <button onclick="showModuleExplainer('find')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:pointer;font-size:.62rem;padding:.25rem .55rem;font-family:var(--mono);margin-top:.25rem">? How it works</button>
             <span style="font-family:var(--mono);font-size:.5rem;background:#EDE9E1;color:var(--navy);padding:.1rem .4rem;margin-left:.6rem;vertical-align:middle">✦ AI</span>
           </div>
-          <div class="page-sub">Describe what you need — Agent finds matches, builds briefs, logs to CRM</div>
+          <div class="page-sub">Describe what you need — finds matches, builds briefs, logs to Supplier Pipeline</div>
         </div>
         ${st.step!=='input'?`<button class="btn-outline" onclick="agentState={query:'',step:'input',parsed:null,matches:[],briefs:{},error:null};renderAgent(document.getElementById('page-agent'))">← New search</button>`:''}
       </div>
@@ -21040,14 +21047,14 @@ function renderAgent(el){
             <button class="btn-primary" onclick="runAgentBriefs()">
               Generate briefs for all ${st.matches.length} + send via email →
             </button>
-            <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);align-self:center">Generates AI sourcing brief for each · Opens email client · Logs all to Sourcing CRM</div>
+            <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);align-self:center">Generates AI sourcing brief for each · Opens email client · Logs all to Supplier Pipeline</div>
           </div>
         `:''}
 
         ${st.step==='done'?`
           <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.75rem 1rem;font-family:var(--sans);font-size:.78rem;color:#065F46;line-height:1.6;margin-top:.5rem">
             ✓ <strong>${st.matches.length} sourcing briefs generated and logged to CRM.</strong> Open each email link above to send. Briefs are editable before sending.
-            <button class="btn-outline" style="margin-left:1rem;font-size:.62rem;color:#065F46;border-color:#A7F3D0" onclick="showPage('sourcing')">View Sourcing CRM →</button>
+            <button class="btn-outline" style="margin-left:1rem;font-size:.62rem;color:#065F46;border-color:#A7F3D0" onclick="showPage('sourcing')">View Supplier Pipeline →</button>
           </div>
         `:''}
       `:''}
@@ -21062,27 +21069,575 @@ function renderAgent(el){
   `;
 }
 
+// ── FIND MANUFACTURERS — merged module ──────────────
+// Combines what was: Manufacturer Finder + Sourcing Agent + Verified Directory.
+// Hero NL search bar (Sourcing Agent input) + structured filters (Verified Directory)
+// + manufacturer cards (Manufacturer Finder), per-card actions exposing every
+// existing capability (AI assessment, Compare, Generate Sourcing Brief, Add to
+// Pipeline, Send Enquiry).
+// Trust tier display:
+//   veyaflow_verified | founder_verified  →  ★★★ Founder verified
+//   research_verified                      →  ★★  Research verified
+//   anything else / undefined              →  ★   AI-estimated
+function _trustTierFor(m){
+  var v = (m && m.verification_tier) || '';
+  if(v === 'veyaflow_verified' || v === 'founder_verified') return 'founder';
+  if(v === 'research_verified') return 'research';
+  return 'ai';
+}
+var TRUST_TIER_META = {
+  founder:  { stars:'★★★', label:'Founder verified',  short:'Founder',
+              color:'#065F46', bg:'#ECFDF5', border:'#A7F3D0',
+              tooltip:'Direct contact confirmed with manufacturer leadership. Capability assessed in-person or via video. Reference clients verified. The highest tier of trust VeyaFlow offers.' },
+  research: { stars:'★★',   label:'Research verified', short:'Research',
+              color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE',
+              tooltip:'Publicly verifiable certifications, active website, demonstrable industry presence. Data confirmed against multiple public sources. No founder contact yet.' },
+  ai:       { stars:'★',     label:'AI-estimated',     short:'AI',
+              color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB',
+              tooltip:'Directory-sourced data — listed in industry databases or public registries but not yet directly verified by VeyaFlow. Approach with own due diligence.' },
+};
+// Tier counts for the page header (computed live from MANUFACTURERS data)
+function _trustTierCounts(){
+  var c = {founder:0, research:0, ai:0};
+  MANUFACTURERS.forEach(function(m){
+    if(m.accepting_clients === false) return;
+    c[_trustTierFor(m)]++;
+  });
+  return c;
+}
+
+// Build the candidate list for the merged module — extends getFilteredMfrs with
+// the new filters and the NL-query parsed-requirement overlay.
+function _getFilteredMfrsMerged(){
+  savePageState('ns_findForm', findForm);
+  // Lowercase free-text search input (the structured search box, not the NL hero search)
+  var q = (findForm.query || '').toLowerCase();
+  // NL-derived constraints — set when user clicks "Find matches" on hero search
+  var parsed = (typeof agentState !== 'undefined' && agentState && agentState.parsed) ? agentState.parsed : null;
+  var trustTiers = Array.isArray(findForm.trustTiers) ? findForm.trustTiers : [];
+
+  var results = MANUFACTURERS.filter(function(m){
+    // Search box (legacy structured search) — name, country, type, specialties, certs
+    var mQ = !q || [m.name, m.country, m.city, m.type]
+        .concat(m.specialties || [])
+        .concat(m.certifications || [])
+        .some(function(x){ return x && String(x).toLowerCase().includes(q); });
+    var mC   = !findForm.category     || (m.categories || []).includes(findForm.category);
+    var mReg = !findForm.region       || m.region === findForm.region || m.country === findForm.region;
+    var mCert= !findForm.cert         || (m.certifications || []).includes(findForm.cert);
+    var mMoq = !findForm.maxMoq       || (typeof m.moq === 'number' && m.moq <= parseInt(findForm.maxMoq, 10));
+    var mLead= !findForm.maxLead      || (typeof m.leadWeeks === 'number' && m.leadWeeks <= parseInt(findForm.maxLead, 10));
+    var mMkt = !findForm.targetMarket || (m.markets || []).includes(findForm.targetMarket);
+    var mTier= !trustTiers.length     || trustTiers.includes(_trustTierFor(m));
+    var mCap;
+    if(findForm.capacity === 'accepting')      mCap = m.accepting_clients !== false;
+    else if(findForm.capacity === 'waitlist')  mCap = m.accepting_clients === false;
+    else                                       mCap = true;
+    // NL parsed overlay (additive AND): cert intersection, MOQ ceiling, target market
+    var mNL = true;
+    if(parsed){
+      if(parsed.certifications && parsed.certifications.length){
+        var have = new Set((m.certifications || []).map(function(c){ return String(c).toLowerCase(); }));
+        var want = parsed.certifications.map(function(c){ return String(c).toLowerCase(); });
+        // A manufacturer matches the NL cert constraint if it has at least ONE of the requested certs
+        var anyMatch = want.some(function(c){ return have.has(c); });
+        if(!anyMatch) mNL = false;
+      }
+      if(mNL && parsed.moq && typeof m.moq === 'number' && m.moq > parsed.moq) mNL = false;
+      if(mNL && parsed.targetMarket && (m.markets || []).indexOf(parsed.targetMarket) < 0){
+        // Soft constraint — don't hard-filter, but rank lower (handled in sort below)
+      }
+    }
+    return mQ && mC && mReg && mCert && mMoq && mLead && mMkt && mTier && mCap && mNL;
+  });
+
+  // Sort: trust tier desc (founder > research > ai), then sustainability score desc, then name asc
+  var tierOrder = {founder:0, research:1, ai:2};
+  results.sort(function(a,b){
+    var ta = tierOrder[_trustTierFor(a)];
+    var tb = tierOrder[_trustTierFor(b)];
+    if(ta !== tb) return ta - tb;
+    var sa = (typeof calcSusScore === 'function') ? calcSusScore(a) : 0;
+    var sb = (typeof calcSusScore === 'function') ? calcSusScore(b) : 0;
+    if(sb !== sa) return sb - sa;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  return results;
+}
+
+// Reset hero NL search and structured filters
+function clearFindFilters(){
+  findForm.query = '';
+  findForm.nlQuery = '';
+  findForm.category = '';
+  findForm.region = '';
+  findForm.cert = '';
+  findForm.maxMoq = '';
+  findForm.maxLead = '';
+  findForm.targetMarket = '';
+  findForm.trustTiers = [];
+  findForm.capacity = '';
+  // Also reset the AI-parsed NL state so the parsed-requirement overlay clears
+  if(typeof agentState !== 'undefined' && agentState){
+    agentState.query = '';
+    agentState.parsed = null;
+    agentState.matches = [];
+    agentState.briefs = {};
+    agentState.error = null;
+    agentState.step = 'input';
+  }
+  renderFind(document.getElementById('page-find'));
+}
+
+// Toggle trust-tier multi-select chip
+function toggleTrustTier(tier){
+  if(!Array.isArray(findForm.trustTiers)) findForm.trustTiers = [];
+  var i = findForm.trustTiers.indexOf(tier);
+  if(i >= 0) findForm.trustTiers.splice(i, 1);
+  else findForm.trustTiers.push(tier);
+  renderFind(document.getElementById('page-find'));
+}
+
+// NL search — runs Sourcing Agent's parser, then re-renders. Matches still come
+// through _getFilteredMfrsMerged via the parsed-overlay path.
+async function runFindNlSearch(){
+  if(typeof agentState === 'undefined') return;
+  var q = (findForm.nlQuery || '').trim();
+  if(!q){ agentState.parsed = null; renderFind(document.getElementById('page-find')); return; }
+  agentState.query = q;
+  // runAgentParse handles loading state + error; we render after it completes
+  if(typeof runAgentParse === 'function'){
+    await runAgentParse();
+    // After parse, the agentState.parsed is set. Re-render Find — but runAgentParse
+    // may have already advanced state; we don't care because Find reads .parsed, not .step.
+    if(document.getElementById('page-find')) renderFind(document.getElementById('page-find'));
+  }
+}
+
+// Generate a sourcing brief for a single manufacturer — wraps Sourcing Agent's
+// per-match brief flow. Uses `buildBriefContext` to produce the same rich format
+// as the original Sourcing Agent's bulk brief flow, and auto-logs to Supplier
+// Pipeline (was Sourcing CRM) on completion — same behaviour as before.
+async function generateBriefForMfr(mfrId){
+  var mfr = MANUFACTURERS.find(function(m){ return m.id === mfrId; });
+  if(!mfr) return;
+  if(typeof agentState === 'undefined') return;
+  if(!agentState.briefs) agentState.briefs = {};
+  // Static fallback brief shown immediately (instant feedback while AI runs)
+  var staticBrief = (typeof generateInquiryBrief === 'function') ? generateInquiryBrief(mfr) : '';
+  agentState.briefs[mfrId] = { brief: staticBrief, loading: true, done: false };
+  renderFind(document.getElementById('page-find'));
+  try{
+    var ctx = (typeof buildBriefContext === 'function') ? buildBriefContext(mfr) : null;
+    var req = (agentState && agentState.parsed) || {};
+    var nl  = (findForm.nlQuery || agentState.query || '').trim();
+    if(ctx){
+      var prompt = 'Write a structured sourcing brief for ' + ctx.brandName + ' sourcing from ' + ctx.mfrName + '. Be specific and concise. Output ONLY the brief.\n\n' +
+        'SOURCING REQUIREMENT: ' + (req.summary || nl || '—') + '\n' +
+        'KEY REQUIREMENTS: ' + ((req.keyRequirements || []).join(', ')) + '\n' +
+        'Certifications needed: ' + ((req.certifications || []).join(', ') || ctx.certifications) + '\n' +
+        'Target MOQ: ' + (req.moq || ctx.moqNeeded) + ' | Timeline: ' + (req.timelineWeeks ? req.timelineWeeks + 'w' : (ctx.leadDays + ' days')) + ' | Market: ' + (req.targetMarket || ctx.targetMarkets) + '\n\n' +
+        'MANUFACTURER: ' + ctx.mfrName + ', ' + ctx.mfrLocation + ' (' + ctx.mfrType + ')\n' +
+        'Their certs: ' + ctx.mfrCerts + ' | Their MOQ: ' + ctx.mfrMoq + ' | Their lead: ' + ctx.mfrLeadWeeks + 'w\n\n' +
+        'RETAILER REQUIREMENTS: ' + (ctx.retailerReqs || '').slice(0, 200) + '\n' +
+        'DPP: ' + (ctx.dppData || '—') + '\n\n' +
+        'Write: FROM / TO / SOURCING REQUIREMENT / COMPLIANCE REQUIREMENTS / TIMELINE / QUESTIONS (5 gap-based questions)\n' +
+        'End: — ' + ctx.brandName + ' | ' + (ctx.website || '');
+      var text = (typeof callAPI === 'function') ? await callAPI([{role:'user', content: prompt}], 400) : '';
+      if(text){
+        agentState.briefs[mfrId] = { brief: text, loading: false, done: true };
+        if(typeof addToSourcingCRM === 'function') addToSourcingCRM(mfr, text);
+      } else {
+        agentState.briefs[mfrId] = { brief: staticBrief, loading: false, done: false };
+        if(typeof addToSourcingCRM === 'function') addToSourcingCRM(mfr, staticBrief);
+      }
+    } else {
+      agentState.briefs[mfrId] = { brief: staticBrief, loading: false, done: false };
+    }
+  }catch(e){
+    agentState.briefs[mfrId] = { brief: staticBrief, loading: false, done: false };
+    if(typeof addToSourcingCRM === 'function') addToSourcingCRM(mfr, staticBrief);
+  }
+  renderFind(document.getElementById('page-find'));
+}
+
+// Add manufacturer to Supplier Pipeline (sourcingCRM). Delegates to existing
+// addToSourcingCRM for behavioural parity. No brief — for the case where user
+// wants to track a relationship without generating an enquiry email yet.
+function addMfrToPipeline(mfrId){
+  var mfr = MANUFACTURERS.find(function(m){ return m.id === mfrId; });
+  if(!mfr) return;
+  if(typeof loadSourcingCRM === 'function') loadSourcingCRM();
+  if(typeof sourcingCRM === 'undefined') return;
+  var existing = sourcingCRM.find(function(e){ return e.mfrId === mfr.id; });
+  if(existing){
+    if(typeof showSuccess === 'function') showSuccess(mfr.name + ' is already in your Supplier Pipeline');
+    return;
+  }
+  if(typeof addToSourcingCRM === 'function'){
+    addToSourcingCRM(mfr, ''); // empty brief — user adds context later
+  } else {
+    sourcingCRM.unshift({
+      id: Date.now(), mfrId: mfr.id, mfrName: mfr.name,
+      mfrCountry: mfr.country, mfrType: mfr.type,
+      enquiryDate: new Date().toISOString(),
+      lastContact: new Date().toISOString(),
+      status: 'enquiry_sent', notes: '', brief: '',
+    });
+    if(typeof saveSourcingCRM === 'function') saveSourcingCRM();
+  }
+  if(typeof showSuccess === 'function') showSuccess(mfr.name + ' added to Supplier Pipeline');
+  renderFind(document.getElementById('page-find'));
+}
+
+// Toggle trust-tier tooltip popover (accessible via clicking the badge)
+var _findOpenTooltipMfrId = null;
+function toggleTrustTooltip(mfrId){
+  _findOpenTooltipMfrId = (_findOpenTooltipMfrId === mfrId) ? null : mfrId;
+  renderFind(document.getElementById('page-find'));
+}
+
 function renderFind(el){
-  findForm.category=findForm.category||brand?.category||'';
-  findForm.targetMarket=findForm.targetMarket||brand?.targetMarkets?.[0]||'';
+  if(!el) return;
+  // Pre-fill from brand profile on first render
+  findForm.category = findForm.category || (brand && brand.category) || '';
+  findForm.targetMarket = findForm.targetMarket || (brand && brand.targetMarkets && brand.targetMarkets[0]) || '';
 
-  const filtered=getFilteredMfrs();
-  const compareItems=compareListIds.map(id=>MANUFACTURERS.find(m=>m.id===id)).filter(Boolean);
+  var filtered = _getFilteredMfrsMerged();
+  var compareItems = compareListIds.map(function(id){ return MANUFACTURERS.find(function(m){ return m.id === id; }); }).filter(Boolean);
+  var tierCounts = _trustTierCounts();
+  // For region filter — derive from data
+  var allRegions = Array.from(new Set(MANUFACTURERS.map(function(m){ return m.region || m.country || ''; }).filter(Boolean))).sort();
+  var allCerts   = Array.from(new Set(MANUFACTURERS.flatMap(function(m){ return m.certifications || []; }).filter(Boolean))).sort();
+  var nlParsed = (typeof agentState !== 'undefined' && agentState && agentState.parsed) ? agentState.parsed : null;
+  var nlBusy   = (typeof agentState !== 'undefined' && agentState && agentState.step === 'parsing');
+  var hasAnyFilter = !!(findForm.query || findForm.nlQuery || findForm.category || findForm.region || findForm.cert || findForm.maxMoq || findForm.maxLead || findForm.targetMarket || (findForm.trustTiers && findForm.trustTiers.length) || findForm.capacity);
 
-  el.innerHTML=`
-    ${inquiryMfrId ? renderInquiryModal(MANUFACTURERS.find(m=>m.id===inquiryMfrId)||MANUFACTURERS[0]) : ''}
-    ${requestListedOpen ? renderRequestListedModal() : ''}
-    <div class="topbar">
-      <div>
-        <div class="page-title">Manufacturer Finder</div>
-        <div class="page-sub">${MANUFACTURERS.length} founder-verified manufacturers · Sustainability scored · Accepting clients</div>
-      </div>
-      ${compareListIds.length>=2?`<button class="btn-${compareMode?'outline':'gold'}" onclick="compareMode=!compareMode;renderFind(document.getElementById('page-find'))">${compareMode?'← Back to list':`Compare ${compareListIds.length} selected →`}</button>`:''}
-    </div>
-    <div class="content">
-      ${compareMode&&compareItems.length>=2?renderCompareTable(compareItems):renderFindList(filtered,compareItems)}
-    </div>
-  `;
+  var html = '';
+  // Modal layer (existing flows preserved)
+  if(typeof inquiryMfrId !== 'undefined' && inquiryMfrId){
+    var iMfr = MANUFACTURERS.find(function(m){ return m.id === inquiryMfrId; }) || MANUFACTURERS[0];
+    if(typeof renderInquiryModal === 'function') html += renderInquiryModal(iMfr);
+  }
+  if(typeof requestListedOpen !== 'undefined' && requestListedOpen && typeof renderRequestListedModal === 'function'){
+    html += renderRequestListedModal();
+  }
+
+  // Topbar
+  html += '<div class="topbar">';
+  html +=   '<div>';
+  html +=     '<div class="page-title">Find Manufacturers</div>';
+  html +=     '<div class="page-sub">' + MANUFACTURERS.length + ' research-verified manufacturers · founder-verified tier opening Q3 2026 · sustainability scored</div>';
+  html +=   '</div>';
+  if(compareListIds && compareListIds.length >= 2){
+    html += '<button class="btn-' + (compareMode ? 'outline' : 'gold') + '" onclick="compareMode=!compareMode;renderFind(document.getElementById(\'page-find\'))">' + (compareMode ? '← Back to list' : 'Compare ' + compareListIds.length + ' selected →') + '</button>';
+  }
+  html += '</div>';
+
+  if(compareMode && compareItems.length >= 2 && typeof renderCompareTable === 'function'){
+    html += '<div class="content">' + renderCompareTable(compareItems) + '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  html += '<div class="content">';
+
+  // ── HERO NL SEARCH ─────────────────────────────────
+  html += '<div class="card" style="margin-bottom:.85rem;background:#F9F8F6;border-left:3px solid var(--gold)">';
+  html +=   '<div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem">Describe what you need · AI parses + matches</div>';
+  html +=   '<div style="display:flex;gap:.5rem;align-items:flex-start;flex-wrap:wrap">';
+  html +=     '<textarea id="find-nl-query" rows="2" ' +
+              'style="flex:1;min-width:240px;font-family:var(--sans);font-size:.82rem;padding:.6rem .75rem;border:1px solid var(--border);resize:vertical;line-height:1.55" ' +
+              'placeholder="e.g. organic skincare factory in Italy, 500 MOQ, COSMOS certified" ' +
+              'oninput="findForm.nlQuery=this.value">' + (findForm.nlQuery || '') + '</textarea>';
+  html +=     '<div style="display:flex;flex-direction:column;gap:.35rem;flex-shrink:0">';
+  html +=       '<button class="btn-primary" ' + (nlBusy ? 'disabled' : '') + ' onclick="findForm.nlQuery=document.getElementById(\'find-nl-query\').value;runFindNlSearch()" style="font-size:.7rem;padding:.45rem 1rem">' + (nlBusy ? '⟳ Parsing…' : 'Find matches →') + '</button>';
+  if(hasAnyFilter){
+    html +=     '<button class="btn-outline" onclick="clearFindFilters()" style="font-size:.6rem;padding:.3rem .65rem">✕ Clear all</button>';
+  }
+  html +=     '</div>';
+  html +=   '</div>';
+  // Example queries (preserved from Sourcing Agent)
+  if(!findForm.nlQuery && !nlParsed){
+    html +=   '<div style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.35rem">';
+    [
+      'COSMOS certified face cream manufacturer, EU, MOQ 500, 10 weeks',
+      'FSC packaging supplier Sweden, recycled content >30%, small batches',
+      'Contract manufacturer for wellness supplements, GMP certified, Scandinavia',
+      'GOTS cotton fabric supplier, EUDR compliant, Asia or Portugal',
+    ].forEach(function(ex){
+      var safeEx = ex.replace(/'/g, "\\'");
+      html += '<div onclick="findForm.nlQuery=\'' + safeEx + '\';document.getElementById(\'find-nl-query\').value=\'' + safeEx + '\';runFindNlSearch()" ' +
+              'style="font-family:var(--sans);font-size:.7rem;padding:.3rem .65rem;border:1px solid var(--border);cursor:pointer;background:#fff;color:#555">' + ex + '</div>';
+    });
+    html +=   '</div>';
+  }
+  // Parsed requirement summary (when AI has run)
+  if(nlParsed){
+    html += '<div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.6rem .85rem;margin-top:.65rem;font-family:var(--sans);font-size:.74rem;line-height:1.55">';
+    html +=   '<div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:#1E40AF;margin-bottom:.25rem">Parsed requirement</div>';
+    html +=   '<strong>' + (nlParsed.summary || '') + '</strong>';
+    html +=   '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">';
+    if(nlParsed.certifications && nlParsed.certifications.length){
+      html += '<span style="font-family:var(--mono);font-size:.52rem;background:#DBEAFE;color:#1E40AF;padding:.1rem .35rem">Certs: ' + nlParsed.certifications.join(', ') + '</span>';
+    }
+    if(nlParsed.moq) html += '<span style="font-family:var(--mono);font-size:.52rem;background:#DBEAFE;color:#1E40AF;padding:.1rem .35rem">MOQ ≤ ' + nlParsed.moq + '</span>';
+    if(nlParsed.timelineWeeks) html += '<span style="font-family:var(--mono);font-size:.52rem;background:#DBEAFE;color:#1E40AF;padding:.1rem .35rem">' + nlParsed.timelineWeeks + 'w timeline</span>';
+    if(nlParsed.targetMarket)   html += '<span style="font-family:var(--mono);font-size:.52rem;background:#DBEAFE;color:#1E40AF;padding:.1rem .35rem">' + nlParsed.targetMarket + '</span>';
+    if(nlParsed.dppRequired)    html += '<span style="font-family:var(--mono);font-size:.52rem;background:#DCFCE7;color:#065F46;padding:.1rem .35rem">DPP required</span>';
+    if(nlParsed.eudrSensitive)  html += '<span style="font-family:var(--mono);font-size:.52rem;background:#FFFBEB;color:#92400E;padding:.1rem .35rem">⚑ EUDR sensitive</span>';
+    html +=   '</div>';
+    html += '</div>';
+  }
+  // Agent error
+  if(typeof agentState !== 'undefined' && agentState && agentState.error){
+    html += '<div style="font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.45rem">' + agentState.error + '</div>';
+  }
+  html += '</div>'; // end hero card
+
+  // ── STRUCTURED FILTERS ─────────────────────────────
+  html += '<div class="card" style="margin-bottom:.85rem">';
+  html +=   '<div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.55rem">Refine</div>';
+  html +=   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem;margin-bottom:.7rem">';
+  // Country / Region
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Country / Region</label><select onchange="findForm.region=this.value;renderFind(document.getElementById(\'page-find\'))"><option value="">Any</option>';
+  allRegions.forEach(function(r){ html += '<option' + (findForm.region === r ? ' selected' : '') + '>' + r + '</option>'; });
+  html +=     '</select></div>';
+  // Category
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Category</label><select onchange="findForm.category=this.value;renderFind(document.getElementById(\'page-find\'))"><option value="">All</option>';
+  MFR_CATS.forEach(function(c){ html += '<option' + (findForm.category === c ? ' selected' : '') + '>' + c + '</option>'; });
+  html +=     '</select></div>';
+  // Certifications
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Certifications</label><select onchange="findForm.cert=this.value;renderFind(document.getElementById(\'page-find\'))"><option value="">Any</option>';
+  allCerts.slice(0, 30).forEach(function(c){ html += '<option' + (findForm.cert === c ? ' selected' : '') + '>' + c + '</option>'; });
+  html +=     '</select></div>';
+  // Max MOQ
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Max MOQ</label><select onchange="findForm.maxMoq=this.value;renderFind(document.getElementById(\'page-find\'))"><option value="">Any</option>';
+  [100,300,500,1000,5000].forEach(function(n){ html += '<option value="' + n + '"' + (String(findForm.maxMoq) === String(n) ? ' selected' : '') + '>≤ ' + n.toLocaleString() + '</option>'; });
+  html +=     '</select></div>';
+  // Max Lead time
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Max Lead time</label><select onchange="findForm.maxLead=this.value;renderFind(document.getElementById(\'page-find\'))"><option value="">Any</option>';
+  [8,12,16,24].forEach(function(n){ html += '<option value="' + n + '"' + (String(findForm.maxLead) === String(n) ? ' selected' : '') + '>≤ ' + n + ' weeks</option>'; });
+  html +=     '</select></div>';
+  // Capacity status
+  html +=     '<div class="field" style="margin:0"><label class="lbl">Capacity</label><select onchange="findForm.capacity=this.value;renderFind(document.getElementById(\'page-find\'))">';
+  html +=       '<option value=""' + (!findForm.capacity ? ' selected' : '') + '>Any</option>';
+  html +=       '<option value="accepting"' + (findForm.capacity === 'accepting' ? ' selected' : '') + '>● Accepting clients</option>';
+  html +=       '<option value="waitlist"' + (findForm.capacity === 'waitlist' ? ' selected' : '') + '>○ Waitlist</option>';
+  html +=     '</select></div>';
+  html +=   '</div>';
+  // Trust tier multi-select chips
+  html +=   '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">';
+  html +=     '<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Trust tier</span>';
+  ['founder','research','ai'].forEach(function(t){
+    var meta = TRUST_TIER_META[t];
+    var on = (findForm.trustTiers || []).indexOf(t) >= 0;
+    html += '<button onclick="toggleTrustTier(\'' + t + '\')" ' +
+            'style="font-family:var(--mono);font-size:.58rem;padding:.25rem .55rem;cursor:pointer;' +
+            'background:' + (on ? meta.color : '#fff') + ';color:' + (on ? '#fff' : meta.color) + ';' +
+            'border:1px solid ' + meta.color + ';">' +
+            meta.stars + ' ' + meta.short + ' (' + tierCounts[t] + ')</button>';
+  });
+  // Free-text refine (kept from Manufacturer Finder)
+  html +=     '<input type="text" placeholder="Search name, country, cert…" value="' + (findForm.query || '') + '" ' +
+              'oninput="findForm.query=this.value;renderFind(document.getElementById(\'page-find\'))" ' +
+              'style="margin-left:auto;flex:1;min-width:160px;padding:.3rem .55rem;font-family:var(--sans);font-size:.7rem;border:1px solid var(--border)">';
+  html +=   '</div>';
+  html += '</div>'; // end filter card
+
+  // ── COMPARE LIST CARD (kept) ───────────────────────
+  if(compareListIds && compareListIds.length > 0){
+    html += '<div class="card" style="background:#EFF6FF;border-color:#BFDBFE;margin-bottom:.85rem">';
+    html +=   '<div style="font-family:var(--mono);font-size:.58rem;color:var(--blue);margin-bottom:.4rem">Comparing ' + compareListIds.length + '/3 selected</div>';
+    compareItems.forEach(function(m){ html += '<div style="font-family:var(--sans);font-size:.7rem;color:var(--navy)">· ' + m.name + '</div>'; });
+    if(compareListIds.length >= 2){
+      html += '<button class="btn-primary" style="margin-top:.5rem;font-size:.6rem;padding:.4rem .75rem" onclick="compareMode=true;renderFind(document.getElementById(\'page-find\'))">Compare now →</button>';
+    }
+    html += '</div>';
+  }
+
+  // ── RESULTS COUNT ──────────────────────────────────
+  html += '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.55rem">' + filtered.length + ' of ' + MANUFACTURERS.length + ' manufacturers</div>';
+
+  // ── EMPTY STATE ────────────────────────────────────
+  if(filtered.length === 0){
+    html += '<div class="card empty-state">' +
+            '<div class="empty-title">No manufacturers match these filters</div>' +
+            '<div class="empty-sub">Try widening MOQ, removing a certification filter, or changing the region. ' +
+            'If you need a manufacturer type not listed, <a href="mailto:support@veyaflow.com?subject=Manufacturer%20request" style="color:var(--gold)">request coverage</a>.</div></div>';
+  }
+
+  // ── RESULT CARDS ───────────────────────────────────
+  filtered.forEach(function(mfr){
+    var tierKey = _trustTierFor(mfr);
+    var tierMeta = TRUST_TIER_META[tierKey];
+    var sustainScore = (typeof calcSusScore === 'function') ? calcSusScore(mfr) : 0;
+    var sustainColor = SUS_COLORS[mfr.sustainability] || '#6B7280';
+    var sustainBg    = SUS_BG[mfr.sustainability]     || 'rgba(107,114,128,.08)';
+    var readiness   = (typeof calcReadiness === 'function') ? calcReadiness(mfr, findForm.targetMarket) : null;
+    var inCmp       = compareListIds.indexOf(mfr.id) >= 0;
+    var isSel       = findSelected === mfr.id;
+    var briefState  = (typeof agentState !== 'undefined' && agentState && agentState.briefs) ? (agentState.briefs[mfr.id] || {}) : {};
+    var alreadyInPipeline = (typeof sourcingCRM !== 'undefined' && Array.isArray(sourcingCRM)) ? sourcingCRM.some(function(e){ return e.mfrId === mfr.id; }) : false;
+    var healthHtml  = '';
+    if(typeof calcHealthScore === 'function' && typeof healthScoreColor === 'function' && typeof healthScoreLabel === 'function'){
+      var hs = calcHealthScore(mfr);
+      healthHtml = '<span style="display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .5rem;background:#F9F8F6;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:' + healthScoreColor(hs.score) + '"><strong>' + hs.score + '</strong> ' + healthScoreLabel(hs.score) + '</span>';
+    }
+    var tooltipOpen = _findOpenTooltipMfrId === mfr.id;
+
+    html += '<div class="mfr-card" style="border-left-color:' + sustainColor + ';' + (isSel ? 'background:#EFF6FF;' : '') + 'margin-bottom:.65rem;position:relative">';
+    // Header row
+    html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap;gap:.4rem">';
+    html +=     '<div style="flex:1;min-width:0">';
+    html +=       '<div style="font-size:.92rem;color:var(--navy);font-weight:600">' + mfr.name + '</div>';
+    html +=       '<div style="font-family:var(--sans);font-size:.66rem;color:var(--muted);margin-top:.1rem">' + (mfr.city || '') + ', ' + mfr.country + ' · ' + mfr.type + '</div>';
+    html +=     '</div>';
+    // Tier badge (clickable for tooltip) + sustainability + capacity
+    html +=     '<div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">';
+    // Trust tier badge (clickable)
+    html +=       '<button onclick="toggleTrustTooltip(' + mfr.id + ')" ' +
+                  'style="font-family:var(--mono);font-size:.55rem;padding:.2rem .5rem;cursor:pointer;' +
+                  'background:' + tierMeta.bg + ';color:' + tierMeta.color + ';border:1px solid ' + tierMeta.border + '" ' +
+                  'title="Click for explanation">' + tierMeta.stars + ' ' + tierMeta.short + '</button>';
+    // Sustainability badge
+    html +=       '<div style="display:flex;align-items:center;gap:.3rem;padding:.2rem .5rem;background:' + sustainBg + '">';
+    html +=         '<span style="font-family:var(--serif);font-size:.95rem;color:' + sustainColor + ';line-height:1">' + sustainScore + '</span>';
+    html +=         '<div><div style="font-family:var(--mono);font-size:.5rem;color:' + sustainColor + ';font-weight:700">' + mfr.sustainability + '</div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted)">sus.</div></div>';
+    html +=       '</div>';
+    if(readiness !== null){
+      html +=     '<div style="padding:.2rem .5rem;background:#EFF6FF;border:1px solid #BFDBFE"><div style="font-family:var(--mono);font-size:.5rem;color:var(--blue);font-weight:700">' + readiness + '% ready</div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted)">' + findForm.targetMarket + '</div></div>';
+    }
+    html +=       '<button class="compare-btn' + (inCmp ? ' active' : '') + '" onclick="event.stopPropagation();toggleFindCompare(' + mfr.id + ')" style="font-family:var(--mono);font-size:.55rem;padding:.2rem .5rem">' + (inCmp ? '✓ Comparing' : '+ Compare') + '</button>';
+    html +=     '</div>';
+    html +=   '</div>';
+
+    // Trust tier tooltip
+    if(tooltipOpen){
+      html += '<div style="background:' + tierMeta.bg + ';border:1px solid ' + tierMeta.border + ';padding:.55rem .75rem;margin-bottom:.5rem;font-family:var(--sans);font-size:.7rem;color:' + tierMeta.color + ';line-height:1.55"><strong>' + tierMeta.stars + ' ' + tierMeta.label + '</strong> — ' + tierMeta.tooltip + ' <span style="cursor:pointer;font-family:var(--mono);font-size:.55rem;opacity:.7;margin-left:.5rem" onclick="toggleTrustTooltip(' + mfr.id + ')">close</span></div>';
+    }
+
+    // Description
+    if(mfr.description){
+      html += '<div style="font-family:var(--sans);font-size:.72rem;color:#555;line-height:1.6;margin-bottom:.45rem">' + mfr.description + '</div>';
+    }
+
+    // Certifications (visible — never hidden behind a click)
+    html +=   '<div class="chips" style="margin-bottom:.45rem">';
+    (mfr.certifications || []).forEach(function(c){
+      var s = CERT_SCORES[c] || 0;
+      html += '<span class="tag ' + (s >= 4 ? 'tag-green' : s >= 3 ? 'tag-blue' : 'tag-gray') + '">' + c + '</span>';
+    });
+    if(mfr.eudrScope) html += '<span class="tag tag-amber">⚠ EUDR scope</span>';
+    html +=   '</div>';
+
+    // Stats row
+    html +=   '<div style="display:flex;gap:1.1rem;flex-wrap:wrap;margin-bottom:.45rem">';
+    [
+      ['MOQ',       (mfr.moq || 0).toLocaleString() + ' units'],
+      ['Lead time', (mfr.leadWeeks || '?') + ' weeks'],
+      ['Capacity',  mfr.annualCapacity || '—'],
+      ['Markets',   (mfr.markets || []).slice(0, 3).join(', ') + ((mfr.markets || []).length > 3 ? ' +' + ((mfr.markets || []).length - 3) : '')],
+    ].forEach(function(pair){
+      html += '<div><div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">' + pair[0] + '</div><div style="font-family:var(--sans);font-size:.68rem;color:#333">' + pair[1] + '</div></div>';
+    });
+    html +=   '</div>';
+
+    // Health + capacity badges (kept from Manufacturer Finder)
+    html +=   '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.45rem">';
+    html +=     healthHtml;
+    var capYes = (typeof getMfrCapacity === 'function') ? getMfrCapacity(mfr.id) : (mfr.accepting_clients !== false);
+    if(capYes){
+      html +=   '<span style="font-family:var(--mono);font-size:.5rem;background:#ECFDF5;color:#065F46;padding:.2rem .5rem;border:1px solid #A7F3D0">● Accepting clients</span>';
+    } else {
+      html +=   '<span style="font-family:var(--mono);font-size:.5rem;background:#F7F5F0;color:#6B6358;padding:.2rem .5rem;border:1px solid var(--border)">○ Waitlist</span>';
+    }
+    // Listing tier badge (kept)
+    if(typeof getMfrTier === 'function' && typeof LISTING_TIERS !== 'undefined'){
+      var t = getMfrTier(mfr.id);
+      var tier = LISTING_TIERS[t];
+      if(tier && t !== 'free'){
+        html += '<span style="font-family:var(--mono);font-size:.5rem;background:' + (t === 'featured' ? '#1E3A5F' : '#EFF6FF') + ';color:' + (t === 'featured' ? '#C4A882' : '#1E40AF') + ';padding:.2rem .5rem">' + tier.badge + '</span>';
+      }
+    }
+    if(mfr.quality_tier === 'premium'){
+      html +=   '<span style="font-family:var(--mono);font-size:.5rem;background:#FFF7ED;color:#C2410C;padding:.2rem .5rem">◈ Premium</span>';
+    }
+    html +=   '</div>';
+
+    // Per-card actions
+    html +=   '<div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;padding-top:.55rem;border-top:1px solid var(--border)">';
+    // Generate Sourcing Brief — opens the brief area on this card
+    if(briefState.loading){
+      html += '<button class="btn-outline" disabled style="font-size:.58rem;padding:.3rem .6rem">⟳ Drafting brief…</button>';
+    } else if(briefState.brief){
+      html += '<button class="btn-outline" onclick="generateBriefForMfr(' + mfr.id + ')" style="font-size:.58rem;padding:.3rem .6rem">↻ Regenerate brief</button>';
+    } else {
+      html += '<button class="btn-primary" onclick="generateBriefForMfr(' + mfr.id + ')" style="font-size:.58rem;padding:.3rem .6rem">✦ Generate Sourcing Brief</button>';
+    }
+    // Add to Pipeline
+    if(alreadyInPipeline){
+      html += '<button class="btn-outline" disabled style="font-size:.58rem;padding:.3rem .6rem;opacity:.6">✓ In Supplier Pipeline</button>';
+    } else {
+      html += '<button class="btn-outline" onclick="addMfrToPipeline(' + mfr.id + ')" style="font-size:.58rem;padding:.3rem .6rem">+ Add to Pipeline</button>';
+    }
+    // AI assessment (kept)
+    if(typeof toggleFindAi === 'function'){
+      var aiLabel = (isSel && findAiCache[mfr.id]) ? 'Hide assessment'
+                  : (findLoadingId === mfr.id) ? 'Loading…'
+                  : 'AI assessment →';
+      html += '<button class="btn-outline" onclick="toggleFindAi(' + mfr.id + ')" style="font-size:.58rem;padding:.3rem .6rem">' + aiLabel + '</button>';
+    }
+    // Send Enquiry (kept — separate flow)
+    if(typeof openInquiry === 'function'){
+      html += '<button onclick="openInquiry(' + mfr.id + ')" style="font-family:var(--mono);font-size:.58rem;color:var(--gold);background:none;border:none;cursor:pointer;padding:.3rem .15rem">✉ Send enquiry</button>';
+    }
+    if(mfr.website){
+      html += '<a href="https://' + mfr.website.replace(/^https?:\/\//, '') + '" target="_blank" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-decoration:none;margin-left:auto">↗ ' + mfr.website + '</a>';
+    }
+    html +=   '</div>';
+
+    // Brief output (when generated)
+    if(briefState.brief && !briefState.loading){
+      var subjLine = 'Sourcing enquiry — ' + ((brand && brand.name) || 'Brand') + ' × ' + mfr.name;
+      var mailtoUrl = 'mailto:' + (mfr.contact || '') + '?subject=' + encodeURIComponent(subjLine) + '&body=' + encodeURIComponent(briefState.brief);
+      html += '<div style="margin-top:.55rem;padding:.6rem;background:#F9F8F6;border:1px solid var(--border)">';
+      html +=   '<div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;flex-wrap:wrap;margin-bottom:.35rem">';
+      html +=     '<div style="font-family:var(--mono);font-size:.55rem;color:' + (briefState.done ? '#10B981' : '#92400E') + '">' + (briefState.done ? '✓ AI brief ready' : '◌ Static fallback brief') + '</div>';
+      html +=     '<div style="display:flex;gap:.35rem">';
+      html +=       '<a href="' + mailtoUrl + '" style="display:inline-block;padding:.3rem .65rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.55rem;text-decoration:none">✉ Open in email →</a>';
+      html +=       '<button onclick="addMfrToPipeline(' + mfr.id + ')" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .65rem;background:none;border:1px solid var(--border);cursor:pointer">+ Pipeline</button>';
+      html +=     '</div>';
+      html +=   '</div>';
+      html +=   '<textarea ' +
+                'oninput="if(agentState&&agentState.briefs&&agentState.briefs[' + mfr.id + ']){agentState.briefs[' + mfr.id + '].brief=this.value}" ' +
+                'style="width:100%;font-family:var(--mono);font-size:.6rem;line-height:1.6;height:130px;padding:.5rem;border:1px solid var(--border);background:#fff;resize:vertical;color:#333">' + (briefState.brief || '').replace(/</g, '&lt;') + '</textarea>';
+      // Escrow prompt (preserved)
+      if(briefState.done && typeof renderEscrowPrompt === 'function'){
+        html += renderEscrowPrompt(mfr.id, mfr.name);
+      }
+      html += '</div>';
+    }
+
+    // AI assessment panel (kept)
+    if(isSel && typeof renderMfrAiPanel === 'function'){
+      html += '<div id="ai-panel-' + mfr.id + '" style="margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border)">' + renderMfrAiPanel(mfr) + '</div>';
+    }
+
+    html += '</div>'; // end mfr-card
+  });
+
+  // ── Apply for listing CTA (preserved from Verified Directory) ──
+  html += '<div style="background:#F9F8F6;border:1px solid var(--border);padding:.85rem 1.1rem;margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem">';
+  html +=   '<div>';
+  html +=     '<div style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:.15rem">Are you a manufacturer?</div>';
+  html +=     '<div style="font-family:var(--sans);font-size:.7rem;color:var(--muted)">Get listed in VeyaFlow Find Manufacturers — reach 200+ Nordic brands actively sourcing.</div>';
+  html +=   '</div>';
+  html +=   '<button onclick="if(typeof openRequestListedModal===\'function\'){openRequestListedModal()}else{requestListedOpen=true;renderFind(document.getElementById(\'page-find\'))}" class="btn-primary" style="font-size:.62rem;white-space:nowrap">Apply for listing →</button>';
+  html += '</div>';
+
+  html += '</div>'; // end .content
+  el.innerHTML = html;
 }
 
 function renderFindList(filtered,compareItems){
@@ -25095,7 +25650,7 @@ const CSRD_QUESTIONS = [
   {id:'renewable_energy',category:'Climate',    question:'% of energy from renewable sources',                     unit:'%',            source:'manual',    hint:'e.g. green electricity tariff'},
   {id:'recycled_pkg',    category:'Circular',   question:'% recycled content in packaging',                        unit:'%',            source:'skus',      hint:'From packaging specs in My Products'},
   {id:'recyclable_pkg',  category:'Circular',   question:'Is primary packaging recyclable?',                       unit:'yes/no/partial',source:'skus',     hint:'Packaging type from My Products'},
-  {id:'social_audit',    category:'Social',     question:'Has manufacturing facility been audited in last 2 years? (SMETA/BSCI/SA8000)', unit:'yes/no + cert',source:'suppliers', hint:'From Supplier Nudge certificate data'},
+  {id:'social_audit',    category:'Social',     question:'Has manufacturing facility been audited in last 2 years? (SMETA/BSCI/SA8000)', unit:'yes/no + cert',source:'suppliers', hint:'From Supplier Audit certificate data'},
   {id:'living_wage',     category:'Social',     question:'Does your primary manufacturer pay living wage?',        unit:'yes/no/unknown',source:'manual',   hint:'Ask your manufacturer directly'},
   {id:'women_leadership',category:'Social',     question:'% women in management at your company',                 unit:'%',            source:'manual',    hint:'Internal HR data'},
   {id:'supplier_code',   category:'Governance', question:'Do you have a Supplier Code of Conduct?',               unit:'yes/no',       source:'manual',    hint:'A document setting standards for your suppliers'},
@@ -26483,7 +27038,7 @@ function renderReferralModal(){
       <div style="font-size:1.75rem;margin-bottom:.6rem">🤝</div>
       <div style="font-family:var(--sans);font-size:.95rem;font-weight:600;color:#065F46;margin-bottom:.3rem">Thank you — referral submitted</div>
       <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted);line-height:1.65;max-width:320px;margin:0 auto .9rem">
-        VeyaFlow will review ${f.mfrName} for listing in the Verified Directory. If listed, you'll be credited as the source — and other Nordic brands can reach out.
+        VeyaFlow will review ${f.mfrName} for listing in Find Manufacturers. If listed, you'll be credited as the source — and other Nordic brands can reach out.
       </div>
       <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.65rem 1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.72rem;color:#065F46">
         You've submitted <strong>${all.length}</strong> manufacturer referral${all.length!==1?'s':''} so far. Every referral earns VeyaFlow Referral Partner credit.
@@ -26501,7 +27056,7 @@ function renderReferralModal(){
     <div style="padding:.85rem 1.25rem .7rem;border-bottom:1px solid var(--border)">
       <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.15rem">Factory Referral</div>
       <div style="font-family:var(--sans);font-size:.92rem;font-weight:600;color:var(--navy)">Refer a manufacturer to VeyaFlow</div>
-      <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.15rem;line-height:1.5">Manufacturers you refer get listed in the VeyaFlow Verified Directory — other Nordic brands can find and contact them. You get credited as the source.</div>
+      <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted);margin-top:.15rem;line-height:1.5">Manufacturers you refer get listed in Find Manufacturers — other Nordic brands can find and contact them. You get credited as the source.</div>
     </div>
     <div style="padding:.85rem 1.25rem;overflow-y:auto">
       <!-- Mutual benefit callout -->
@@ -26812,11 +27367,11 @@ function renderInquiryModal(mfr){
     return `<div id="inquiry-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1.5rem">
       <div style="background:#fff;width:100%;max-width:480px;padding:1.75rem;text-align:center">
         <div style="font-size:2rem;margin-bottom:.75rem">✓</div>
-        <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.4rem">${mfr.name} added to Sourcing CRM</div>
+        <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.4rem">${mfr.name} added to Supplier Pipeline</div>
         <div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);line-height:1.6;margin-bottom:1.25rem">Brief saved. Open email client to send directly. VeyaFlow will prompt you for feedback in 14 days.</div>
         <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap">
           <a href="${mailtoUrl}" style="display:inline-block;padding:.65rem 1.25rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.68rem;text-decoration:none">Open in email client →</a>
-          <button class="btn-outline" onclick="showPage('sourcing')" style="font-size:.68rem">View Sourcing CRM →</button>
+          <button class="btn-outline" onclick="showPage('sourcing')" style="font-size:.68rem">View Supplier Pipeline →</button>
           <button class="btn-outline" onclick="inquiryMfrId=null;renderFind(document.getElementById('page-find'))" style="font-size:.65rem">Close</button>
         </div>
       </div>
@@ -26861,7 +27416,7 @@ function renderSourcingCRM(el){
     <div class="page-wrap">
       <div class="topbar">
         <div>
-          <div class="page-title">Sourcing CRM</div>
+          <div class="page-title">Supplier Pipeline</div>
           <div class="page-sub">Track manufacturer relationships · ${sourcingCRM.length} contact${sourcingCRM.length!==1?'s':''}</div>
         </div>
         <button class="btn-outline" style="font-size:.65rem" onclick="showPage('find')">← Find manufacturers</button>
@@ -26898,7 +27453,7 @@ function renderSourcingCRM(el){
           <div class="card empty-state">
             <div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">◌</div>
             <div class="empty-title">No manufacturer contacts yet</div>
-            <div class="empty-sub" style="margin-bottom:1.25rem">Send an enquiry in Manufacturer Finder — manufacturer is automatically added here.</div>
+            <div class="empty-sub" style="margin-bottom:1.25rem">Send an enquiry in Find Manufacturers — manufacturer is automatically added here.</div>
             <button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage('find')">Find manufacturers →</button>
           </div>
         `:`
