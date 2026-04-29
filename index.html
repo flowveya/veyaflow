@@ -28,7 +28,7 @@
   html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
 
   /* SHELL */
-  #app { display: flex; height: 100vh; overflow: hidden; }
+  #app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
   /* SIDEBAR */
   #sidebar {
@@ -404,7 +404,7 @@
 
     /* Onboarding */
     .onboard-wrap { padding: .85rem .75rem; align-items: flex-start; }
-    .onboard-inner { padding-bottom: env(safe-area-inset-bottom, 1.5rem); }
+    .onboard-inner { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem); }
     .onboard-title { font-size: 1.2rem; }
     .onboard-sub { font-size: .85rem; }
     .cat-option { padding: .65rem .75rem; font-size: .78rem; min-height: 44px; }
@@ -527,6 +527,54 @@
   @media (max-width: 680px) {
     #mobile-nav { display: flex; }
     #mobile-header { display: flex; }
+  }
+
+  /* ── Sticky action bar for multi-step forms ──────────────────────
+     Used by: SKU edit (Add Product), setup modal, any other step-paginated form.
+     Bug context: on iOS Safari, an inline action row at the bottom of a long
+     form scrolls into the dynamic bottom toolbar's "danger zone" — visible
+     during scroll, hidden the moment scroll-momentum stops. Sticky positioning
+     pins the bar to the visible viewport; the form content scrolls under it.
+     Mobile: bar sits ABOVE the fixed bottom nav (which reserves 5.5rem at
+     content's bottom-padding). Safe-area-inset adds extra padding for notched
+     iOS devices. */
+  .vf-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    padding: .75rem 1rem;
+    margin: 1rem -1rem 0;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem;
+    z-index: 50;
+    box-shadow: 0 -2px 8px rgba(15,23,42,.04);
+  }
+  @media (max-width: 680px) {
+    .vf-sticky-actions {
+      bottom: 5.5rem;
+      padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+      margin: 1rem -.85rem 0;
+    }
+  }
+  /* Modal-context sticky actions (e.g. setup modal). The modal scrolls inside
+     itself, so sticky bottom is at modal viewport bottom — no need to clear
+     mobile bottom nav (modals overlay it). */
+  .vf-sticky-actions-modal {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+    margin: 1rem -1rem -1rem;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem;
+    z-index: 50;
+    box-shadow: 0 -2px 8px rgba(15,23,42,.04);
   }
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1682,7 +1730,7 @@ function renderSetupModal(){
         </div>
         <!-- Footer nav — only for numeric steps 1-3 -->
         ${showFooterNav?`
-        <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+        <div style="padding:.85rem 1.25rem calc(.85rem + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;z-index:50">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
           <button onclick="completeSetupStep()"
             style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
@@ -1804,7 +1852,7 @@ function renderSetupModal(){
         <!-- Inline error slot — populated by completeSetupStep when validation fails -->
         <div id="vf-setup-error" style="display:none;margin:0 1.25rem;padding:.55rem .8rem;background:#FEF2F2;border:1px solid #FECACA;font-family:var(--sans);font-size:.72rem;color:#991B1B;flex-shrink:0"></div>
         <!-- Footer (always visible) -->
-        <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-shrink:0">
+        <div style="padding:.85rem 1.25rem calc(.85rem + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-shrink:0">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
           <button onclick="completeSetupStep()"
             style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
@@ -4838,6 +4886,27 @@ function renderNextActions(){
    and markets. The feature that gives a founder
    a complete compliance picture in 30 seconds.
 ═══════════════════════════════════════════════════ */
+// Compliance threshold helpers — reads brand.complianceThresholds with safe
+// defaults. Used by Citeo (FR), Norwegian VAT, and any future threshold-aware
+// rules. Returns numbers (or undefined when user hasn't filled the field).
+function getComplianceThresholds(b){
+  var t = (b && b.complianceThresholds) || {};
+  function num(v){
+    if(v === undefined || v === null || v === '') return undefined;
+    var n = parseFloat(v);
+    return isFinite(n) ? n : undefined;
+  }
+  return {
+    revenueEUR:    num(t.revenueEUR),
+    revenueNOK:    num(t.revenueNOK),
+    unitsSold:     num(t.unitsSold),
+    // Future-proofing — explicit "I confirmed I'm below threshold" checkboxes
+    // let users dismiss false-positives without entering exact revenue.
+    belowCiteoFR:  !!t.belowCiteoFR,
+    belowMvaNO:    !!t.belowMvaNO,
+  };
+}
+
 const COMPLIANCE_RADAR_ITEMS = [
   // Cosmetics — EU
   {id:'cpnp',          label:'CPNP notification',              categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.cpnpRef||s?.cpnp||s?.cpnpNumber?'green':'red',     actionPage:'skus',        actionLabel:'Add in My Products'},
@@ -4855,11 +4924,63 @@ const COMPLIANCE_RADAR_ITEMS = [
   // Packaging registers
   {id:'lucid_de',      label:'Lucid packaging register',       categories:['all'],                      markets:['Germany'],                     check:(b,s)=>b?.lucidRegistered?'green':'red', urgency:'critical',  actionPage:'home',        actionLabel:'Register at verpackungsregister.org', fineRisk:'Up to €200,000'},
   {id:'fti_se',        label:'FTI producer responsibility',    categories:['all'],                      markets:['Sweden'],                      check:(b,s)=>b?.ftiRegistered?'green':'amber',                      actionPage:'home',        actionLabel:'Register at ftiab.se'},
-  {id:'citeo_fr',      label:'Citeo packaging register',       categories:['all'],                      markets:['France'],                      check:(b,s)=>b?.citeoRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at citeo.com'},
+  // Citeo (France) — turnover-thresholded. Required only above EUR 500K turnover OR 10K items/year sold in FR.
+  // If brand has confirmed registration → green. If thresholds known and below → info. If thresholds unknown → amber. If above threshold and unregistered → red.
+  {id:'citeo_fr',      label:'Citeo packaging register',       categories:['all'],                      markets:['France'],
+    check:(b,s)=>{
+      if(b?.citeoRegistered) return 'green';
+      var t = getComplianceThresholds(b);
+      var aboveRev   = (t.revenueEUR !== undefined) && t.revenueEUR > 500000;
+      var aboveUnits = (t.unitsSold  !== undefined) && t.unitsSold  > 10000;
+      if(aboveRev || aboveUnits) return 'red';
+      // User explicitly self-confirmed below threshold → info card
+      if(t.belowCiteoFR) return 'info';
+      // User filled both fields and both are at/below threshold → info card
+      if(t.revenueEUR !== undefined && t.unitsSold !== undefined && !aboveRev && !aboveUnits) return 'info';
+      return 'amber';
+    },
+    actionPage:'home',
+    actionLabel:(b)=>{
+      if(b?.citeoRegistered) return 'Registered with Citeo';
+      var t = getComplianceThresholds(b);
+      var aboveRev   = (t.revenueEUR !== undefined) && t.revenueEUR > 500000;
+      var aboveUnits = (t.unitsSold  !== undefined) && t.unitsSold  > 10000;
+      if(aboveRev || aboveUnits) return 'Above the EUR 500K / 10K-units threshold — Citeo registration required. Register at citeo.com';
+      if(t.belowCiteoFR || (t.revenueEUR !== undefined && t.unitsSold !== undefined)) return 'Below threshold — Citeo not required today. Required if French sales exceed EUR 500K or 10,000 items per year.';
+      return 'Confirm whether your French sales exceed EUR 500K turnover or 10,000 items per year — if yes, Citeo registration is required.';
+    },
+  },
   {id:'groent_punkt',  label:'Grønt Punkt Norge',              categories:['all'],                      markets:['Norway'],                      check:(b,s)=>b?.groentPunktRegistered?'green':'amber',              actionPage:'home',        actionLabel:'Register at grontpunkt.no'},
+  // CONAI (Italy) — packaging consortium. No turnover threshold; mandatory for all brands placing packaged
+  // goods on the Italian market. Pattern matches FTI / Grønt Punkt.
+  {id:'conai_it',      label:'CONAI packaging register',       categories:['all'],                      markets:['Italy'],                       check:(b,s)=>b?.conaiRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register with CONAI for Italian packaging compliance'},
   // Norway
   {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
-  {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],                      check:(b,s)=>b?.noVatRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register at skatteetaten.no if >NOK 50k/yr'},
+  // Norwegian VAT (MVA) — registration required only when annual NO sales exceed NOK 50,000.
+  // Below threshold + confirmed → info. Threshold unknown → amber. Above + unregistered → red. Registered → green.
+  {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],
+    check:(b,s)=>{
+      if(b?.noVatRegistered) return 'green';
+      var t = getComplianceThresholds(b);
+      if(t.revenueNOK !== undefined){
+        return t.revenueNOK > 50000 ? 'red' : 'info';
+      }
+      if(t.belowMvaNO) return 'info';
+      return 'amber';
+    },
+    actionPage:'home',
+    actionLabel:(b)=>{
+      if(b?.noVatRegistered) return 'Registered for Norwegian VAT (MVA)';
+      var t = getComplianceThresholds(b);
+      if(t.revenueNOK !== undefined){
+        return t.revenueNOK > 50000
+          ? 'Above NOK 50,000/yr threshold — MVA registration required. Register at skatteetaten.no'
+          : 'Below NOK 50,000/yr threshold — MVA registration not required today.';
+      }
+      if(t.belowMvaNO) return 'Self-confirmed below NOK 50,000/yr — MVA registration not required today.';
+      return 'Confirm whether your Norwegian sales exceed NOK 50,000 per year — if yes, VAT registration is required.';
+    },
+  },
   // Cross-category
   {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>s?.eudrCompliant||b?.eudrCompliant?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
   {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
@@ -4901,12 +5022,19 @@ function renderComplianceRadar(){
   // Evaluate each item
   const evaluated = relevant.map(item=>{
     const status = item.check(brand, sku0);
-    return {...item, status};
+    // actionLabel can be a string OR a function (for threshold-aware items
+    // whose copy depends on which branch fires). Resolve to a string here so
+    // the renderer is always working with literal text.
+    const actionLabel = (typeof item.actionLabel === 'function')
+      ? item.actionLabel(brand, sku0)
+      : item.actionLabel;
+    return {...item, status, actionLabel};
   });
 
   const reds    = evaluated.filter(i=>i.status==='red').sort((a,b)=>(b.urgency==='critical'?1:0)-(a.urgency==='critical'?1:0));
   const ambers  = evaluated.filter(i=>i.status==='amber');
   const greens  = evaluated.filter(i=>i.status==='green');
+  const infos   = evaluated.filter(i=>i.status==='info'); // below threshold / not yet required
   const criticalCount = reds.filter(i=>i.urgency==='critical').length;
 
   const summaryColor = reds.length>0?'#991B1B':ambers.length>0?'#92400E':'#065F46';
@@ -4917,6 +5045,7 @@ function renderComplianceRadar(){
       red:   {icon:'🔴',bg:'#FEF2F2',border:'#FCA5A5',accent:'#EF4444',text:'#991B1B'},
       amber: {icon:'⚠',  bg:'#FFFBEB',border:'#FCD34D',accent:'#F59E0B',text:'#92400E'},
       green: {icon:'✅', bg:'#F0FDF4',border:'#A7F3D0',accent:'#10B981',text:'#065F46'},
+      info:  {icon:'ℹ',  bg:'#EFF6FF',border:'#BFDBFE',accent:'#3B82F6',text:'#1E40AF'},
     }[item.status]||{icon:'○',bg:'#F9F8F6',border:'#E5E7EB',accent:'#9CA3AF',text:'#555'};
 
     const mktLabel = item.markets.includes('all_eu')?'EU':
@@ -4951,7 +5080,7 @@ function renderComplianceRadar(){
       <!-- Summary strip -->
       <div style="background:${summaryBg};border:1px solid ${reds.length?'#FCA5A5':ambers.length?'#FCD34D':'#A7F3D0'};padding:.55rem .85rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
         <div style="font-family:var(--sans);font-size:.75rem;color:${summaryColor};font-weight:500">
-          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
+          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${infos.length?`${infos.length} below threshold · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
         </div>
         <span style="font-family:var(--mono);font-size:.52rem;color:${summaryColor}">${relevant.length} applicable to your profile</span>
       </div>
@@ -4961,6 +5090,9 @@ function renderComplianceRadar(){
 
       <!-- Amber items -->
       ${ambers.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${ambers.map(radarCard).join('')}</div>`:''}
+
+      <!-- Info items — below threshold, no action today -->
+      ${infos.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${infos.map(radarCard).join('')}</div>`:''}
 
       <!-- Green items — collapsed -->
       ${greens.length?`
@@ -4974,6 +5106,110 @@ function renderComplianceRadar(){
           </div>
         </div>
       `:''}
+
+      ${renderComplianceThresholdsEditor()}
+    </div>
+  `;
+}
+
+// Compliance thresholds editor — collapsible disclosure inside Compliance Radar.
+// Surfaces optional revenue/units fields used by Citeo (FR) and Norwegian VAT (MVA)
+// threshold logic, plus the registered-flag toggles for CONAI (Italy) and MVA.
+// Users can skip the form — checks fall back to amber when thresholds are unknown.
+function renderComplianceThresholdsEditor(){
+  if(!brand) return '';
+  var t = (brand.complianceThresholds) || {};
+  // Stable id (not Date.now()) so the disclosure's open state can be reapplied
+  // after re-render. window._radarThresholdsOpen tracks the user's intent.
+  var toggleId = 'compliance-thresholds-panel';
+  var open = !!window._radarThresholdsOpen;
+  function v(x){ return (x === undefined || x === null) ? '' : String(x); }
+  return `
+    <div style="margin-top:.7rem">
+      <div onclick="window._radarThresholdsOpen=!window._radarThresholdsOpen;var d=document.getElementById('${toggleId}');d.style.display=window._radarThresholdsOpen?'block':'none'"
+        style="font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.3rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:.3rem">
+        <span style="color:#3B82F6">⚙</span> Compliance thresholds (optional) <span style="opacity:.5;margin-left:.2rem">▾</span>
+      </div>
+      <div id="${toggleId}" style="display:${open?'block':'none'};background:#F9F8F6;border:1px solid var(--border);padding:.7rem .85rem;margin-top:.35rem">
+        <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.55;margin-bottom:.7rem">
+          Some compliance triggers depend on per-market revenue or unit volumes. These help apply thresholds correctly.
+          <strong>Skip if you'd rather see all alerts uniformly</strong> — checks default to amber when thresholds are unknown.
+        </div>
+
+        <!-- Citeo France (turnover-thresholded) -->
+        <div style="margin-bottom:.7rem">
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:.3rem">France · Citeo packaging register</div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem">
+            <label style="flex:1;min-width:160px;font-family:var(--sans);font-size:.68rem;color:#444">
+              <span style="display:block;margin-bottom:.15rem">Annual French revenue (EUR)</span>
+              <input type="number" lang="en" placeholder="e.g. 250000" value="${v(t.revenueEUR)}"
+                onchange="if(!brand.complianceThresholds)brand.complianceThresholds={};brand.complianceThresholds.revenueEUR=this.value===''?undefined:parseFloat(this.value)||0;saveBrandState()"
+                style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)">
+            </label>
+            <label style="flex:1;min-width:160px;font-family:var(--sans);font-size:.68rem;color:#444">
+              <span style="display:block;margin-bottom:.15rem">Annual units sold in France</span>
+              <input type="number" lang="en" placeholder="e.g. 5000" value="${v(t.unitsSold)}"
+                onchange="if(!brand.complianceThresholds)brand.complianceThresholds={};brand.complianceThresholds.unitsSold=this.value===''?undefined:parseInt(this.value,10)||0;saveBrandState()"
+                style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)">
+            </label>
+          </div>
+          <label style="display:flex;align-items:center;gap:.4rem;font-family:var(--sans);font-size:.68rem;color:#444;cursor:pointer">
+            <input type="checkbox" ${t.belowCiteoFR?'checked':''}
+              onchange="if(!brand.complianceThresholds)brand.complianceThresholds={};brand.complianceThresholds.belowCiteoFR=this.checked;saveBrandState();renderPage('home')">
+            I confirm we're below the EUR 500K turnover and 10,000-units thresholds in France
+          </label>
+          ${brand.citeoRegistered ? `
+            <div style="margin-top:.35rem;font-family:var(--mono);font-size:.55rem;color:#065F46">✓ Marked as registered with Citeo</div>
+          ` : `
+            <label style="display:flex;align-items:center;gap:.4rem;font-family:var(--sans);font-size:.68rem;color:#444;cursor:pointer;margin-top:.2rem">
+              <input type="checkbox"
+                onchange="brand.citeoRegistered=this.checked;saveBrandState();renderPage('home')">
+              Mark as registered with Citeo
+            </label>
+          `}
+        </div>
+
+        <!-- Norwegian VAT (MVA) — NOK 50K threshold -->
+        <div style="margin-bottom:.7rem;padding-top:.6rem;border-top:1px dashed var(--border)">
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:.3rem">Norway · VAT (MVA)</div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem">
+            <label style="flex:1;min-width:160px;font-family:var(--sans);font-size:.68rem;color:#444">
+              <span style="display:block;margin-bottom:.15rem">Annual Norwegian revenue (NOK)</span>
+              <input type="number" lang="en" placeholder="e.g. 100000" value="${v(t.revenueNOK)}"
+                onchange="if(!brand.complianceThresholds)brand.complianceThresholds={};brand.complianceThresholds.revenueNOK=this.value===''?undefined:parseFloat(this.value)||0;saveBrandState()"
+                style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)">
+            </label>
+          </div>
+          <label style="display:flex;align-items:center;gap:.4rem;font-family:var(--sans);font-size:.68rem;color:#444;cursor:pointer">
+            <input type="checkbox" ${t.belowMvaNO?'checked':''}
+              onchange="if(!brand.complianceThresholds)brand.complianceThresholds={};brand.complianceThresholds.belowMvaNO=this.checked;saveBrandState();renderPage('home')">
+            I confirm our Norwegian sales are below NOK 50,000/yr
+          </label>
+          ${brand.noVatRegistered ? `
+            <div style="margin-top:.35rem;font-family:var(--mono);font-size:.55rem;color:#065F46">✓ Marked as MVA registered</div>
+          ` : `
+            <label style="display:flex;align-items:center;gap:.4rem;font-family:var(--sans);font-size:.68rem;color:#444;cursor:pointer;margin-top:.2rem">
+              <input type="checkbox"
+                onchange="brand.noVatRegistered=this.checked;saveBrandState();renderPage('home')">
+              Mark as registered for Norwegian VAT (MVA)
+            </label>
+          `}
+        </div>
+
+        <!-- CONAI Italy -->
+        <div style="padding-top:.6rem;border-top:1px dashed var(--border)">
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:.3rem">Italy · CONAI packaging register</div>
+          ${brand.conaiRegistered ? `
+            <div style="font-family:var(--mono);font-size:.55rem;color:#065F46">✓ Marked as registered with CONAI</div>
+          ` : `
+            <label style="display:flex;align-items:center;gap:.4rem;font-family:var(--sans);font-size:.68rem;color:#444;cursor:pointer">
+              <input type="checkbox"
+                onchange="brand.conaiRegistered=this.checked;saveBrandState();renderPage('home')">
+              Mark as registered with CONAI
+            </label>
+          `}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -14290,7 +14526,7 @@ function renderSkuEdit(el){
 
       ${skuTab===6?renderIngredientTraceabilityTab(skuForm):''}
 
-      <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:.5rem">
+      <div class="vf-sticky-actions">
         <div style="display:flex;gap:.5rem">
           ${skuTab>1?`<button class="btn-outline" onclick="skuTab--;renderSkuEdit(document.getElementById('page-skus'))">← Previous</button>`:''}
         </div>
@@ -28512,9 +28748,12 @@ function renderRetailAddSubmissionForm(){
   html += '<div style="margin-bottom:.9rem"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Notes</div>';
   html += '<textarea id="rsub-new-notes" oninput="retailTrackerAddForm.notes=this.value" placeholder="Submission context, attachments, route…" style="width:100%;min-height:60px;padding:.5rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);resize:vertical">'+retailEsc(retailTrackerAddForm.notes)+'</textarea></div>';
 
+  html += '<div class="vf-sticky-actions">';
+  html += '<div></div>'; // spacer for justify-content: space-between
   html += '<div style="display:flex;gap:.5rem">';
-  html += '<button class="btn-primary" style="font-size:.72rem" onclick="createRetailSubmission()">Create submission</button>';
   html += '<button class="btn-outline" style="font-size:.72rem" onclick="closeAddRetailSubmission()">Cancel</button>';
+  html += '<button class="btn-primary" style="font-size:.72rem" onclick="createRetailSubmission()">Create submission</button>';
+  html += '</div>';
   html += '</div>';
   html += '</div>';
   return html;
