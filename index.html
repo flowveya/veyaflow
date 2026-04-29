@@ -1499,6 +1499,11 @@ function completeSetupStep(){
   brand.stage         = stage;
   brand.currentMarket = market;
   brand.setupComplete = true;
+  // Derive categoryTags from the (possibly multi-) category selection. Setup modal
+  // is multi-select, so a brand picking both Beauty + Wellness gets the union for free
+  // — no separate dual-flag question needed here. (Onboarding is single-select and uses
+  // an explicit dual-flag question; both code paths converge on brand.categoryTags.)
+  brand.categoryTags = deriveCategoryTagsFromCategories(cats);
 
   saveBrandState();
   buildNav();
@@ -2616,7 +2621,7 @@ function renderPage(id){
    HOME PAGE
 ═══════════════════════════════════════════════════ */
 let onboardStep=1;
-let onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:'',heroSkuName:'',heroSkuType:'cosmetic',heroSkuEan:'',heroSkuRsp:'',heroSkuCpnp:''};
+let onboardForm={name:'',website:'',category:'',secondaryCategoryFlag:null,currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:'',heroSkuName:'',heroSkuType:'cosmetic',heroSkuEan:'',heroSkuRsp:'',heroSkuCpnp:''};
 
 function renderHome(el){
   if(!brand){
@@ -2647,10 +2652,11 @@ function renderOnboardStep(){
       <div class="field"><label class="lbl">Brand name *</label><input type="text" id="ob-name" value="${onboardForm.name}" placeholder="e.g. Cloud & Glow" oninput="onboardForm.name=this.value;var b=document.getElementById('ob-continue-1');if(b)b.disabled=!onboardForm.name||!onboardForm.category"></div>
       <div class="field"><label class="lbl">Website</label><input type="text" id="ob-web" value="${onboardForm.website}" placeholder="e.g. cloudandglow.com" oninput="onboardForm.website=this.value"></div>
       <div class="field"><label class="lbl">Product category *</label>
-        <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="if(typeof isBlockedCategory==='function'&&isBlockedCategory('${c}')){openCategorySoftBlock('${c}','onboarding')}else{onboardForm.category='${c}';renderOnboardStep()}">${c}</div>`).join('')}</div>
+        <div class="grid-2">${CATEGORIES.map(c=>`<div class="cat-option${onboardForm.category===c?' selected':''}" onclick="if(typeof isBlockedCategory==='function'&&isBlockedCategory('${c}')){openCategorySoftBlock('${c}','onboarding')}else{onboardForm.category='${c}';onboardForm.secondaryCategoryFlag=null;renderOnboardStep()}">${c}</div>`).join('')}</div>
       </div>
+      ${renderDualFlagQuestion()}
       <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
-      <button id="ob-continue-1" class="btn-primary" style="width:100%;margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category?'disabled':''}>Continue →</button>
+      <button id="ob-continue-1" class="btn-primary" style="width:100%;margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category||!isDualFlagAnswered()?'disabled':''}>Continue →</button>
     `;
   } else if(onboardStep===2){
     inner.innerHTML=`
@@ -2935,10 +2941,86 @@ function completeOnboardWithSku(){
 
 function completeOnboard(){
   brand={...onboardForm,createdAt:new Date().toISOString()};
+  // Derive categoryTags from primary category + secondary-flag answer (Apr 2026 brief).
+  // Tags drive presentation-layer filtering across pickers, prompts, and search.
+  brand.categoryTags = deriveCategoryTagsFromOnboardForm(onboardForm);
   saveBrandState();
   onboardStep=1;
-  onboardForm={name:'',website:'',category:'',currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:''};
+  onboardForm={name:'',website:'',category:'',secondaryCategoryFlag:null,currentMarket:'Sweden',targetMarkets:[],skus:'',stage:'trading',sustainabilityGoals:[],usp:'',userName:'',teamEmails:'',proofType:'revenue',annualRevenue:'',revenueGrowth:'',unitsSold:'',repeatRate:'',avgOrderValue:'',dtcRevenue:'',waitlistCount:'',socialFollowers:'',pressCount:'',awardsCount:'',reviewScore:'',wholesaleEnquiries:'',clinicalClaims:'',routineStep:'',basketImpact:''};
   renderPage('home');
+}
+
+// ── Dual-flag onboarding helpers (Apr 2026) ──
+// Beauty brands sometimes also do ingestible beauty (collagen, beauty drinks) → wellness flag.
+// Wellness brands sometimes also do topical skincare → beauty flag. One-time onboarding question.
+// Non-Beauty/Wellness primary categories don't see the question; their tags derive from the primary alone.
+
+// Which categories carry a paired-flag question
+function dualFlagPairForCategory(cat){
+  if(cat==='Skincare & Beauty')      return {primary:'beauty',  secondary:'wellness', label:'wellness — supplements, vitamins, ingestible beauty (collagen, beauty drinks)'};
+  if(cat==='Wellness & Supplements') return {primary:'wellness',secondary:'beauty',   label:'beauty — topical skincare, cosmetics, fragrance'};
+  return null;
+}
+
+// Render the inline dual-flag question (returns HTML string, empty when not applicable)
+function renderDualFlagQuestion(){
+  const pair = dualFlagPairForCategory(onboardForm.category);
+  if(!pair) return '';
+  const v = onboardForm.secondaryCategoryFlag;
+  return `
+    <div class="field" style="background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.25);padding:.75rem .9rem;border-radius:0">
+      <label class="lbl" style="margin-bottom:.4rem">Do any of your products fall into ${pair.label}?</label>
+      <div style="display:flex;gap:.5rem">
+        <div class="cat-option${v===true?' selected':''}" style="flex:1;padding:.55rem .8rem;font-size:.78rem" onclick="onboardForm.secondaryCategoryFlag=true;renderOnboardStep()">Yes</div>
+        <div class="cat-option${v===false?' selected':''}" style="flex:1;padding:.55rem .8rem;font-size:.78rem" onclick="onboardForm.secondaryCategoryFlag=false;renderOnboardStep()">No</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.45rem;letter-spacing:.04em">Helps VeyaFlow surface the right retailers. Editable later in brand settings.</div>
+    </div>
+  `;
+}
+
+// Continue button gating — dual-flag must be answered if applicable
+function isDualFlagAnswered(){
+  const pair = dualFlagPairForCategory(onboardForm.category);
+  if(!pair) return true;
+  return onboardForm.secondaryCategoryFlag === true || onboardForm.secondaryCategoryFlag === false;
+}
+
+// Derive categoryTags array from primary category + secondary-flag answer
+function deriveCategoryTagsFromOnboardForm(f){
+  const cat = f && f.category || '';
+  const tags = [];
+  // Primary
+  if(cat==='Skincare & Beauty') tags.push('beauty');
+  else if(cat==='Wellness & Supplements') tags.push('wellness');
+  else if(cat==='Fashion & Apparel') tags.push('fashion');
+  else if(cat==='Home & Lifestyle') tags.push('home');
+  else if(cat==='Food & Beverage') tags.push('food');
+  // Secondary (from dual-flag question)
+  const pair = dualFlagPairForCategory(cat);
+  if(pair && f.secondaryCategoryFlag===true && tags.indexOf(pair.secondary)<0){
+    tags.push(pair.secondary);
+  }
+  return tags;
+}
+
+// Derive categoryTags from a multi-category array (used by setup modal).
+// Each broad-axis category maps to one categoryTag; union deduped.
+function deriveCategoryTagsFromCategories(cats){
+  if(!Array.isArray(cats)) return [];
+  const map = {
+    'Skincare & Beauty':      'beauty',
+    'Wellness & Supplements': 'wellness',
+    'Fashion & Apparel':      'fashion',
+    'Home & Lifestyle':       'home',
+    'Food & Beverage':        'food',
+  };
+  const tags = [];
+  cats.forEach(function(c){
+    const t = map[c];
+    if(t && tags.indexOf(t)<0) tags.push(t);
+  });
+  return tags;
 }
 
 
@@ -3845,6 +3927,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   const skuType   = sku&&sku.productType ? sku.productType : (catMap[(getBrandCategories()||[])[0]||brand?.category||'']||'cosmetic');
   const isCosm    = skuType==='cosmetic';
   const isDevice  = skuType==='device';
+  const isAccessory = skuType==='beauty_accessory';
   const isSupp    = skuType==='supplement';
   const isFood    = skuType==='food';
   const isTextile = skuType==='textile'||skuType==='garment';
@@ -3918,7 +4001,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
     }
 
     // Claims check — uses correct ruleset per category
-    const ruleKey = isCosm?'cosmetic':isDevice?'device':isFood?'food':isSupp?'supplement':isTextile?'textile':'cosmetic';
+    const ruleKey = isCosm?'cosmetic':isDevice?'device':isAccessory?'beauty_accessory':isFood?'food':isSupp?'supplement':isTextile?'textile':'cosmetic';
     const activeRules = CLAIMS_RULES[ruleKey]||CLAIMS_RULES.cosmetic;
     const redClaims  = (sku.claims||[]).filter(cl=>{ const r=activeRules[cl.toLowerCase()]; return r&&r.status==='red'; });
     const amberClaims= (sku.claims||[]).filter(cl=>{ const r=activeRules[cl.toLowerCase()]; return r&&r.status==='amber'; });
@@ -4032,7 +4115,7 @@ function scoreMarketForSequencer(marketCode, brand, sku){
   const originMap={VERY_POSITIVE:1,POSITIVE:0.7,NEUTRAL:0.35,HOME_MARKET:0,NEGATIVE:0};
   const originScore = originMap[market.nordicsOriginSignal]||0.35;
   const total = Math.round(overlap*30 + unlockScore*25 + costScore*25 + originScore*20);
-  const keyRetailers = RETAILER_REGISTRY.filter(r=>(r.market===marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(marketCode)))&&(r.categories||[]).includes(cat)&&(!r.futureMarket||(brand&&brand.stage==='scaling'))).slice(0,2).map(r=>r.name);
+  const keyRetailers = RETAILER_REGISTRY.filter(r=>(r.market===marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(marketCode)))&&retailerMatchesBrandTags(r,brand)&&(!r.futureMarket||(brand&&brand.stage==='scaling'))).slice(0,2).map(r=>r.name);
   return {marketCode, market, total, overlap, costScore, originScore, unlockScore, entryCost, keyRetailers, leverage};
 }
 
@@ -4048,7 +4131,7 @@ function renderReadinessScore(){
   const sku = skus[0]||null;
   const allMarkets = Object.keys(MARKET_REGISTRY).filter(k=>k!==({Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'}[brand?.currentMarket||'Sweden']||'SE'));
   if(!readinessState.marketCode) readinessState.marketCode = allMarkets[0]||'DK';
-  const marketRetailers = RETAILER_REGISTRY.filter(r=>(r.market===readinessState.marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(readinessState.marketCode)))&&(r.categories||[]).includes(brand?.category||'')&&(!r.futureMarket));
+  const marketRetailers = RETAILER_REGISTRY.filter(r=>(r.market===readinessState.marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(readinessState.marketCode)))&&retailerMatchesBrandTags(r,brand)&&(!r.futureMarket));
   if(!readinessState.retailerId||!marketRetailers.find(r=>r.id===readinessState.retailerId)){
     readinessState.retailerId = marketRetailers[0]?.id||RETAILER_REGISTRY[0]?.id;
   }
@@ -4424,7 +4507,7 @@ function calcVerificationTier(){
     ({'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'}[brand?.currentMarket||'Sweden']||'SE'));
   const sku0 = skus[0]||{};
   const hasGoodReadiness = allMktCodes.some(mc=>{
-    const retailersForMarket = RETAILER_REGISTRY.filter(r=>r.market===mc&&(r.categories||[]).includes(brand?.category||'')&&!r.futureMarket);
+    const retailersForMarket = RETAILER_REGISTRY.filter(r=>r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket);
     if(!retailersForMarket.length) return false;
     const rs = scoreReadiness(brand||{}, sku0, mc, retailersForMarket[0]?.id||'');
     return rs.total>=70;
@@ -4648,7 +4731,7 @@ function renderVerificationCard(){
   const sku0 = skus[0]||{};
   let bestReadiness = 0, bestMarket = '';
   allMktCodes.forEach(mc=>{
-    const ret = RETAILER_REGISTRY.filter(r=>r.market===mc&&(r.categories||[]).includes(brand?.category||'')&&!r.futureMarket);
+    const ret = RETAILER_REGISTRY.filter(r=>r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket);
     if(!ret.length) return;
     const rs = scoreReadiness(brand||{}, sku0, mc, ret[0]?.id||'');
     if(rs.total>bestReadiness){bestReadiness=rs.total;bestMarket=MARKET_REGISTRY[mc]?.name||mc;}
@@ -4757,7 +4840,7 @@ function renderReadinessHero(){
   var nameToCode={'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'};
   var tgtCodes=(brand.targetMarkets||[brand.currentMarket||'Sweden']).map(function(m){return nameToCode[m]||'SE';});
   tgtCodes.forEach(function(mc){
-    var ret=RETAILER_REGISTRY.filter(function(r){return r.market===mc&&(r.categories||[]).includes((getBrandCategories()||[])[0]||brand.category||'')&&!r.futureMarket;});
+    var ret=RETAILER_REGISTRY.filter(function(r){return r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket;});
     if(!ret.length) return;
     var rs=scoreReadiness(brand||{},sku0,mc,ret[0]&&ret[0].id||'');
     if(rs.total>bestScore){bestScore=rs.total;bestMktName=(MARKET_REGISTRY[mc]&&MARKET_REGISTRY[mc].name)||mc;bestBlockers=rs.blockers||[];}
@@ -5463,7 +5546,7 @@ function renderPresetForm(){
   const marketObj = Object.values(MARKET_REGISTRY).find(m=>m.name===market)||{};
   const mId = marketObj.id;
   const retailers = RETAILER_REGISTRY
-    .filter(r=>(r.market===mId||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(mId)))&&(r.categories||[]).includes(reportForm.category)&&(!r.futureMarket))
+    .filter(r=>(r.market===mId||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(mId)))&&retailerMatchesBrandTags(r,brand)&&(!r.futureMarket))
     .sort(function(a,b){var t={tier_1:1,tier_2:2,tier_3:3};return (t[a.accessTier]||9)-(t[b.accessTier]||9);})
     .map(r=>r.name);
 
@@ -5787,6 +5870,7 @@ const RETAILER_REGISTRY = [
     id:"matas_dk", accessTier:"tier_2", name:"Matas", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_beauty", storeCount:290, onlinePresence:"HIGH",
     strategy2026:"Win the Nordics — unified Matas+Kicks buying desk. Clinical Confidence and Eco-Evaluation as twin pillars. Growing Matas Balance private label. Automating Taastrup logistics centre.",
     buyerPriority:"Dermocosmetic brands bridging science and sustainability. Brands with Danish consumer data.",
@@ -5807,6 +5891,7 @@ const RETAILER_REGISTRY = [
     id:"lyko_se", accessTier:"tier_1", name:"Lyko", market:"SE", marketName:"Sweden",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:30, onlinePresence:"VERY_HIGH",
     strategy2026:"Sworsk dual-market Sweden+Norway expansion. TikTok-first discovery. Fast brand onboarding — 2-week listing decision standard. Building clinical credibility alongside trend positioning.",
     buyerPriority:"Social-proof brands with active content. Clinical brands with before/after evidence. Sustainable packaging.",
@@ -5826,6 +5911,7 @@ const RETAILER_REGISTRY = [
     id:"kicks_se", accessTier:"tier_2", name:"Kicks", market:"SE", marketName:"Sweden",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"beauty_retail", storeCount:220, onlinePresence:"HIGH",
     strategy2026:"Post-Matas acquisition integration. TikTok-first product curation. Digital-physical omnichannel. Separate buyer teams for Sweden and Norway.",
     buyerPriority:"TikTok-friendly products. Visual shareability. Gen Z appeal. Fragrance and body care growing faster than skincare.",
@@ -5845,6 +5931,7 @@ const RETAILER_REGISTRY = [
     id:"apotek_hjartat_se", accessTier:"tier_2", name:"Apotek Hjärtat", market:"SE", marketName:"Sweden",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:390, onlinePresence:"HIGH",
     strategy2026:"Clinical beauty expansion. Sustainability credibility. Nordic Swan and COSMOS preferred. In-house pharmacist-led product evaluation.",
     buyerPriority:"Clinical efficacy. Complete PIF and CPNP documentation. Pharmacy-channel exclusive SKUs. Dermatologist or pharmacist recommendation.",
@@ -5865,6 +5952,7 @@ const RETAILER_REGISTRY = [
     id:"dm_de", accessTier:"tier_2", name:"dm-drogerie markt", market:"DE", marketName:"Germany",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore", storeCount:2100, onlinePresence:"MEDIUM",
     strategy2026:"2026 Clean Beauty bay expansion — 40 new SKU slots across 500 stores for Nordic and natural brands. Sustainability certification fast-track. Growing private label Alverde.",
     buyerPriority:"Certified natural/organic. Refillable and waterless formats on fast-track. Nordic provenance positive. VerpackG compliance mandatory.",
@@ -5885,6 +5973,7 @@ const RETAILER_REGISTRY = [
   {
     id:"rossmann_de", name:"Rossmann", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "food", "wellness"],
     type:"drugstore", storeCount:2300, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -5905,6 +5994,7 @@ const RETAILER_REGISTRY = [
   {
     id:"douglas_de", name:"Douglas", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:450, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -5925,6 +6015,7 @@ const RETAILER_REGISTRY = [
   {
     id:"mueller_de", name:"Müller", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore_general", storeCount:950, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -5944,6 +6035,7 @@ const RETAILER_REGISTRY = [
   {
     id:"rituals_de", name:"Rituals", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"premium_wellness_beauty", storeCount:160, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -5962,6 +6054,7 @@ const RETAILER_REGISTRY = [
   {
     id:"flaconi_de", name:"Flaconi", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Fragrance","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -5981,6 +6074,7 @@ const RETAILER_REGISTRY = [
   {
     id:"notino_de", name:"Notino", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"online_beauty_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6001,6 +6095,7 @@ const RETAILER_REGISTRY = [
   {
     id:"breuninger_de", name:"Breuninger", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements","Fragrance"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"premium_department", storeCount:13, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6020,6 +6115,7 @@ const RETAILER_REGISTRY = [
   {
     id:"reformhaus_de", name:"Reformhaus", market:"DE", marketName:"Germany",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_health_franchise", storeCount:1200, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6038,6 +6134,7 @@ const RETAILER_REGISTRY = [
   {
     id:"tegut_de", name:"Tegut", market:"DE", marketName:"Germany",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"premium_grocery", storeCount:320, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6059,6 +6156,7 @@ const RETAILER_REGISTRY = [
     id:"boots_uk", accessTier:"tier_2", name:"Boots UK", market:"UK", marketName:"United Kingdom",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_beauty", storeCount:2200, onlinePresence:"HIGH",
     strategy2026:"Premium Beauty category expansion. Boots Beauty incubator for emerging brands. Advantage Card data-driven ranging. Online-first entry route increasingly available.",
     buyerPriority:"UK consumer demand evidence. Advantage Card basket correlation. Premium positioning GBP 15-40. Clinical claims with UK substantiation.",
@@ -6078,6 +6176,7 @@ const RETAILER_REGISTRY = [
     id:"holland_barrett_uk", accessTier:"tier_1", name:"Holland & Barrett", market:"UK", marketName:"United Kingdom",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Wellness & Supplements","Skincare & Beauty","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_retail", storeCount:800, onlinePresence:"HIGH",
     strategy2026:"Ingestible beauty fast-track. B Corp and sustainability credentials prioritised. Expanding own-label but actively seeking branded Nordic wellness.",
     buyerPriority:"Natural/organic certification mandatory. Vegan preferred. Ingestible beauty (collagen, hyaluronic) on fast-track. Nordic provenance positive differentiator.",
@@ -6098,6 +6197,7 @@ const RETAILER_REGISTRY = [
     id:"kicks_no", accessTier:"tier_1", name:"Kicks Norway", market:"NO", marketName:"Norway",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"beauty_retail", storeCount:75, onlinePresence:"HIGH",
     strategy2026:"Digital-first pivot — online listing now precedes physical rollout. TikTok-driven discovery. Separate from Kicks Sweden despite same ownership.",
     buyerPriority:"Social proof. Online-first brands. Norwegian consumer relevance. Sustainable credentials.",
@@ -6117,6 +6217,7 @@ const RETAILER_REGISTRY = [
     id:"etos_nl", accessTier:"tier_2", name:"Etos", market:"NL", marketName:"Netherlands",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements","Personal Care"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_drugstore", storeCount:520, onlinePresence:"HIGH",
     strategy2026:"Premium beauty expansion within A.S. Watson group. Sustainability push. Seeking Nordic and natural brands to fill Clean Beauty gaps.",
     buyerPriority:"Natural/organic. Sustainability. Clinical efficacy. Premium mid-range positioning EUR 10-25.",
@@ -6136,6 +6237,7 @@ const RETAILER_REGISTRY = [
     id:"kruidvat_nl", accessTier:"tier_1", name:"Kruidvat", market:"NL", marketName:"Netherlands",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore", storeCount:1100, onlinePresence:"HIGH",
     strategy2026:"Value-positioned but Clean Beauty growing. A.S. Watson group. Largest drugstore network in Netherlands and Belgium combined.",
     buyerPriority:"Mass-premium positioning EUR 5-15. High velocity. Promotions-friendly.",
@@ -6155,6 +6257,7 @@ const RETAILER_REGISTRY = [
     id:"douglas_nl", accessTier:"tier_2", name:"Douglas Netherlands", market:"NL", marketName:"Netherlands",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:180, onlinePresence:"HIGH",
     strategy2026:"Premiumisation. D-Beauty private label growth. Luxury and clinical positioning. Strong online growth via douglas.nl.",
     buyerPriority:"Prestige brands EUR 30+. Clinical efficacy with clinical study on file. Distinctive brand story. Fragrance growing.",
@@ -6174,6 +6277,7 @@ const RETAILER_REGISTRY = [
     id:"sephora_eu", name:"Sephora", market:"EU_WIDE", marketName:"EU + UK",
     markets:["FR","UK","DE","SE","DK","NO","NL","BE","IT","ES"],
     categories:["Skincare & Beauty","Fragrance","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"eu_wide_beauty_specialist", storeCount:450, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6196,6 +6300,7 @@ const RETAILER_REGISTRY = [
   {
     id:"space_nk_uk", name:"Space NK", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"premium_indie_beauty", storeCount:70, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6215,6 +6320,7 @@ const RETAILER_REGISTRY = [
   {
     id:"liberty_uk", name:"Liberty London", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Hair","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"heritage_prestige", storeCount:1, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6234,6 +6340,7 @@ const RETAILER_REGISTRY = [
   {
     id:"selfridges_uk", name:"Selfridges", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel","Hair"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:4, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6253,6 +6360,7 @@ const RETAILER_REGISTRY = [
   {
     id:"harvey_nichols_uk", name:"Harvey Nichols", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:9, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6272,6 +6380,7 @@ const RETAILER_REGISTRY = [
   {
     id:"john_lewis_uk", name:"John Lewis", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements","Fashion & Apparel","Home"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"premium_department", storeCount:34, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6292,6 +6401,7 @@ const RETAILER_REGISTRY = [
   {
     id:"cult_beauty_uk", name:"Cult Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6311,6 +6421,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lookfantastic_uk", name:"Lookfantastic", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty_mass", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6330,6 +6441,7 @@ const RETAILER_REGISTRY = [
   {
     id:"asos_beauty_uk", name:"ASOS Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_fashion_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6350,6 +6462,7 @@ const RETAILER_REGISTRY = [
   {
     id:"superdrug_uk", name:"Superdrug", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements","Hair"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_drugstore", storeCount:800, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6369,6 +6482,7 @@ const RETAILER_REGISTRY = [
   {
     id:"marks_spencer_uk", name:"Marks & Spencer Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"premium_mass", storeCount:300, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -6390,6 +6504,7 @@ const RETAILER_REGISTRY = [
   {
     id:"wholefoods_uk", name:"Whole Foods Market UK", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"premium_natural_grocery", storeCount:10, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6409,6 +6524,7 @@ const RETAILER_REGISTRY = [
   {
     id:"planet_organic_uk", name:"Planet Organic", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_specialist", storeCount:12, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6428,6 +6544,7 @@ const RETAILER_REGISTRY = [
   {
     id:"revital_uk", name:"Revital", market:"UK", marketName:"United Kingdom",
     categories:["Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "wellness"],
     type:"health_pharmacy", storeCount:15, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6448,6 +6565,7 @@ const RETAILER_REGISTRY = [
   {
     id:"waitrose_uk", name:"Waitrose", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"premium_grocery", storeCount:330, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6467,6 +6585,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ocado_uk", name:"Ocado", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"online_premium_grocery", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6487,6 +6606,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ulta_beauty_us", name:"Ulta Beauty", market:"US", marketName:"United States",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements","Fragrance"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_mass_prestige", storeCount:1400, onlinePresence:"VERY_HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6510,6 +6630,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kicks_dk", name:"Kicks Denmark", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"beauty_retail", storeCount:40, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6527,6 +6648,7 @@ const RETAILER_REGISTRY = [
   {
     id:"normal_dk", name:"Normal", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"discount_beauty", storeCount:120, onlinePresence:"LOW",
     accessTier:"tier_1",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -6543,6 +6665,7 @@ const RETAILER_REGISTRY = [
   {
     id:"hm_beauty_dk", name:"H&M Beauty", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Hair"],
+    categoryTags:["beauty"],
     type:"fashion_beauty", storeCount:60, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6560,6 +6683,7 @@ const RETAILER_REGISTRY = [
   {
     id:"apotek1_no", name:"Apotek 1", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:480, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6576,6 +6700,7 @@ const RETAILER_REGISTRY = [
   {
     id:"vitusapotek_no", name:"Vitusapotek", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:310, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6593,6 +6718,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ici_paris_xl_nl", name:"ICI PARIS XL", market:"NL", marketName:"Netherlands",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:180, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6610,6 +6736,7 @@ const RETAILER_REGISTRY = [
   {
     id:"magasin_dk", name:"Magasin du Nord", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"premium_department", storeCount:6, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6627,6 +6754,7 @@ const RETAILER_REGISTRY = [
   {
     id:"illum_dk", name:"Illum", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"luxury_department", storeCount:1, onlinePresence:"MEDIUM",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6644,6 +6772,7 @@ const RETAILER_REGISTRY = [
   {
     id:"boozt_dk", name:"Boozt", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Fashion & Apparel","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"online_fashion_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6661,6 +6790,7 @@ const RETAILER_REGISTRY = [
   {
     id:"zalando_dk", name:"Zalando Beauty", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Fashion & Apparel","Hair"],
+    categoryTags:["beauty", "fashion"],
     type:"online_fashion_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6679,6 +6809,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ahlens_se", name:"Åhléns", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"department_store", storeCount:60, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6696,6 +6827,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nk_se", name:"NK / Nordiska Kompaniet", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:2, onlinePresence:"MEDIUM",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6713,6 +6845,7 @@ const RETAILER_REGISTRY = [
   {
     id:"eleven_se", name:"Eleven Sweden", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6730,6 +6863,7 @@ const RETAILER_REGISTRY = [
   {
     id:"normal_se", name:"Normal Sweden", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"discount_beauty", storeCount:80, onlinePresence:"LOW",
     accessTier:"tier_1",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -6748,6 +6882,7 @@ const RETAILER_REGISTRY = [
   {
     id:"farmasiet_no", name:"Farmasiet", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6765,6 +6900,7 @@ const RETAILER_REGISTRY = [
   {
     id:"life_no", name:"Life Helsekost", market:"NO", marketName:"Norway",
     categories:["Wellness & Supplements","Food & Beverage","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_specialty", storeCount:200, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6782,6 +6918,7 @@ const RETAILER_REGISTRY = [
   {
     id:"boozt_no", name:"Boozt Norway", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Fashion & Apparel","Hair"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"online_fashion_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6800,6 +6937,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bijenkorf_nl", name:"De Bijenkorf", market:"NL", marketName:"Netherlands",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:5, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6818,6 +6956,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bol_nl", name:"Bol.com", market:"NL", marketName:"Netherlands",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "food", "wellness"],
     type:"online_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6837,6 +6976,7 @@ const RETAILER_REGISTRY = [
   {
     id:"holland_barrett_nl", name:"Holland & Barrett Netherlands", market:"NL", marketName:"Netherlands",
     categories:["Wellness & Supplements","Skincare & Beauty","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_retail", storeCount:100, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6855,6 +6995,7 @@ const RETAILER_REGISTRY = [
   {
     id:"trekpleister_nl", name:"Trekpleister", market:"NL", marketName:"Netherlands",
     categories:["Skincare & Beauty","Wellness & Supplements","Personal Care"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_drugstore", storeCount:540, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6874,6 +7015,7 @@ const RETAILER_REGISTRY = [
   {
     id:"vitaminstore_nl", name:"Vitaminstore", market:"NL", marketName:"Netherlands",
     categories:["Wellness & Supplements","Skincare & Beauty","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"wellness_specialist", storeCount:75, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6893,6 +7035,7 @@ const RETAILER_REGISTRY = [
   {
     id:"albert_heijn_nl", name:"Albert Heijn", market:"NL", marketName:"Netherlands",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery_chain", storeCount:1000, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6914,6 +7057,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ici_paris_xl_be", name:"ICI Paris XL Belgium", market:"BE", marketName:"Belgium",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty"],
     type:"prestige_beauty_chain", storeCount:85, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6933,6 +7077,7 @@ const RETAILER_REGISTRY = [
   {
     id:"di_be", name:"Di (Parfuma)", market:"BE", marketName:"Belgium",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements","Fragrance"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_drugstore_chain", storeCount:180, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6951,6 +7096,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kruidvat_be", name:"Kruidvat Belgium", market:"BE", marketName:"Belgium",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore_chain", storeCount:320, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6971,6 +7117,7 @@ const RETAILER_REGISTRY = [
   {
     id:"zalando_de", name:"Zalando Beauty Germany", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Fashion & Apparel","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"online_fashion_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -6988,6 +7135,7 @@ const RETAILER_REGISTRY = [
   {
     id:"alnatura_de", name:"Alnatura", market:"DE", marketName:"Germany",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_supermarket", storeCount:150, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7005,6 +7153,7 @@ const RETAILER_REGISTRY = [
   {
     id:"budni_de", name:"Budni", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"regional_drugstore", storeCount:200, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7023,6 +7172,7 @@ const RETAILER_REGISTRY = [
   {
     id:"sephora_fr", accessTier:"tier_3", name:"Sephora France", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Fragrance","Hair","Wellness & Supplements","Fashion & Apparel"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_specialist", storeCount:350, onlinePresence:"VERY_HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"HQ market for Sephora EU. A Sephora France listing is the master relationship — it cascades automatically to all EU Sephora markets (DE, IT, ES, PL, PT, SE, DK, NL, BE, CH). The Champs-Élysées flagship is the launch and proof-of-concept store for all European Sephora markets. Sephora's 2026 Clean + Clinical brief is the most important open brief in European beauty.",
@@ -7044,6 +7194,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nocibe_fr", accessTier:"tier_2", name:"Nocibé", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"beauty_chain", storeCount:750, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"France's largest beauty chain by store count. Part of Douglas Group — FR relationship directly informs Douglas DE and Douglas NL conversations. Growing premium and indie beauty. A Nocibé listing is a proof point for the entire Douglas Group across Europe.",
@@ -7065,6 +7216,7 @@ const RETAILER_REGISTRY = [
   {
     id:"marionnaud_fr", accessTier:"tier_2", name:"Marionnaud", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Fragrance","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_beauty", storeCount:530, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"A.S. Watson group — same parent as Kruidvat NL/BE, ICI PARIS XL NL/BE, Superdrug UK, Trekpleister NL, Etos NL. The most significant group leverage in European beauty: Marionnaud FR + Kruidvat NL/BE + ICI PARIS XL + Superdrug UK = one group relationship. Growing dermocosmetic and Nordic clinical range.",
@@ -7086,6 +7238,7 @@ const RETAILER_REGISTRY = [
   {
     id:"galeries_lafayette_fr", accessTier:"tier_3", name:"Galeries Lafayette Beauté", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:60, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Paris Boulevard Haussmann flagship is Europe's largest in-store beauty space and the most visited beauty destination globally. GL listing is an international prestige credential — buyers from Selfridges, Bijenkorf, KaDeWe visit Haussmann to scout brands. A listing here is globally visible.",
@@ -7104,6 +7257,7 @@ const RETAILER_REGISTRY = [
   {
     id:"monoprix_fr", accessTier:"tier_2", name:"Monoprix", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"urban_premium_grocery", storeCount:780, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Casino Group — same parent as Naturalia (organic) and Cdiscount (online marketplace). Monoprix is the premium urban grocery format; Naturalia is the organic specialist. Casino Group cross-channel: one group relationship covers Monoprix premium + Naturalia organic + Cdiscount digital. 780 stores across French cities — highest urban density of any French grocery chain.",
@@ -7121,6 +7275,7 @@ const RETAILER_REGISTRY = [
   {
     id:"naturalia_fr", accessTier:"tier_2", name:"Naturalia", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_specialist", storeCount:220, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Casino Group — same parent as Monoprix and Cdiscount. France's leading organic specialist retail chain. Best organic and natural beauty entry for brands with Ecocert, COSMOS, or certified organic credentials. French consumer trust in Naturalia certification extremely high.",
@@ -7139,6 +7294,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ohmy_cream_fr", accessTier:"tier_1", name:"Oh My Cream", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"indie_beauty_specialist", storeCount:22, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"France's Cult Beauty equivalent. Highly curated — only 200-300 SKUs total across the entire range. Editorial authority in French clean beauty press. A listing here generates press, influencer and buyer attention far beyond the store count. Excellent discovery platform for Nordic brands entering France.",
@@ -7155,6 +7311,7 @@ const RETAILER_REGISTRY = [
   {
     id:"parapharmacie_fr", accessTier:"tier_1", name:"Parapharmacie.fr / Pharmasimple", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharma_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"France's leading online parapharmacie — 22M+ annual visitors. Clinical and dermocosmetic positioning preferred. Low barrier for brands with CPNP and full PIF. Good for generating French consumer data before physical retail.",
@@ -7172,6 +7329,7 @@ const RETAILER_REGISTRY = [
   {
     id:"pharmacies_ocp_fr", accessTier:"tier_2", name:"French Independent Pharmacies (OCP Network)", market:"FR", marketName:"France",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_channel", storeCount:22000, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"France has 22,000+ independent pharmacies — the largest parapharmacie channel in Europe. Approach via OCP Répartition (the dominant French pharma distributor) rather than individually. OCP is France's largest pharmaceutical wholesaler — covers 80% of French pharmacies. One OCP relationship reaches 17,000+ pharmacies simultaneously.",
@@ -7191,6 +7349,7 @@ const RETAILER_REGISTRY = [
   {
     id:"apoteket_se", name:"Apoteket", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"state_pharmacy", storeCount:380, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7207,6 +7366,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bangerhead_se", name:"Bangerhead", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7223,6 +7383,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nordicfeel_se", name:"NordicFeel", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7239,6 +7400,7 @@ const RETAILER_REGISTRY = [
   {
     id:"cocopanda_se", name:"Cocopanda", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7256,6 +7418,7 @@ const RETAILER_REGISTRY = [
   {
     id:"salling_dk", name:"Salling Group (Føtex / Bilka)", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "food", "wellness"],
     type:"department_hypermarket", storeCount:220, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7272,6 +7435,7 @@ const RETAILER_REGISTRY = [
   {
     id:"cocopanda_dk", name:"Cocopanda.dk", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7288,6 +7452,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lookfantastic_dk", name:"Lookfantastic.dk", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty_mass", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7305,6 +7470,7 @@ const RETAILER_REGISTRY = [
   {
     id:"vita_no", name:"VITA", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_drugstore", storeCount:330, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7321,6 +7487,7 @@ const RETAILER_REGISTRY = [
   {
     id:"fredrik_louisa_no", name:"Fredrik & Louisa", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Fragrance"],
+    categoryTags:["beauty"],
     type:"premium_indie_beauty", storeCount:8, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7337,6 +7504,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lyko_no", name:"Lyko Norway", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7353,6 +7521,7 @@ const RETAILER_REGISTRY = [
   {
     id:"blivakker_no", name:"Blivakker", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7370,6 +7539,7 @@ const RETAILER_REGISTRY = [
   {
     id:"stockmann_fi", name:"Stockmann", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"luxury_department", storeCount:3, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7390,6 +7560,7 @@ const RETAILER_REGISTRY = [
   {
     id:"sokos_fi", name:"Sokos", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"department_store", storeCount:12, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7409,6 +7580,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kicks_fi", name:"Kicks Finland", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"beauty_retail", storeCount:40, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7425,6 +7597,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lyko_fi", name:"Lyko Finland", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Hair","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7441,6 +7614,7 @@ const RETAILER_REGISTRY = [
   {
     id:"yliopiston_apteekki_fi", name:"Yliopiston Apteekki", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:17, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7460,6 +7634,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bangerhead_fi", name:"Bangerhead Finland", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"online_beauty", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7477,6 +7652,7 @@ const RETAILER_REGISTRY = [
   {
     id:"life_fi", name:"Life Finland", market:"FI", marketName:"Finland",
     categories:["Wellness & Supplements","Food & Beverage","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_specialty", storeCount:85, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7496,6 +7672,7 @@ const RETAILER_REGISTRY = [
   {
     id:"tamro_fi", name:"Tamro (Pharmacy Wholesale)", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_wholesaler", storeCount:0, onlinePresence:"LOW",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7514,6 +7691,7 @@ const RETAILER_REGISTRY = [
   {
     id:"verkkokauppa_fi", name:"Verkkokauppa.com", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty"],
+    categoryTags:["beauty"],
     type:"consumer_electronics_online", storeCount:5, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7534,6 +7712,7 @@ const RETAILER_REGISTRY = [
   {
     id:"life_se", name:"Life Sweden", market:"SE", marketName:"Sweden",
     categories:["Wellness & Supplements","Food & Beverage","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_specialty", storeCount:250, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7550,6 +7729,7 @@ const RETAILER_REGISTRY = [
   {
     id:"apotea_se", name:"Apotea", market:"SE", marketName:"Sweden",
     categories:["Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7566,6 +7746,7 @@ const RETAILER_REGISTRY = [
   {
     id:"meds_se", name:"Meds.se", market:"SE", marketName:"Sweden",
     categories:["Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7582,6 +7763,7 @@ const RETAILER_REGISTRY = [
   {
     id:"gymgrossisten_se", name:"Gymgrossisten", market:"SE", marketName:"Sweden",
     categories:["Wellness & Supplements","Food & Beverage"],
+    categoryTags:["food", "wellness"],
     type:"sports_nutrition_online", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7598,6 +7780,7 @@ const RETAILER_REGISTRY = [
   {
     id:"svenskt_kosttillskott_se", name:"Svenskt Kosttillskott", market:"SE", marketName:"Sweden",
     categories:["Wellness & Supplements"],
+    categoryTags:["wellness"],
     type:"supplement_specialist", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7615,6 +7798,7 @@ const RETAILER_REGISTRY = [
   {
     id:"helsam_dk", name:"Helsam", market:"DK", marketName:"Denmark",
     categories:["Wellness & Supplements","Food & Beverage","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_specialty", storeCount:120, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7631,6 +7815,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bodylab_dk", name:"Bodylab", market:"DK", marketName:"Denmark",
     categories:["Wellness & Supplements","Food & Beverage"],
+    categoryTags:["food", "wellness"],
     type:"sports_nutrition", storeCount:30, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7647,6 +7832,7 @@ const RETAILER_REGISTRY = [
   {
     id:"natur_helse_dk", name:"Natur & Helse", market:"DK", marketName:"Denmark",
     categories:["Wellness & Supplements","Food & Beverage","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_health_specialist", storeCount:60, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7663,6 +7849,7 @@ const RETAILER_REGISTRY = [
   {
     id:"weightworld_dk", name:"WeightWorld.dk", market:"DK", marketName:"Denmark",
     categories:["Wellness & Supplements"],
+    categoryTags:["wellness"],
     type:"wellness_online", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7680,6 +7867,7 @@ const RETAILER_REGISTRY = [
   {
     id:"sunkost_no", name:"Sunkost", market:"NO", marketName:"Norway",
     categories:["Wellness & Supplements","Food & Beverage"],
+    categoryTags:["food", "wellness"],
     type:"health_specialty", storeCount:150, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7696,6 +7884,7 @@ const RETAILER_REGISTRY = [
   {
     id:"gymgrossisten_no", name:"Gymgrossisten Norway", market:"NO", marketName:"Norway",
     categories:["Wellness & Supplements","Food & Beverage"],
+    categoryTags:["food", "wellness"],
     type:"sports_nutrition_online", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7713,6 +7902,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ruohonjuuri_fi", name:"Ruohonjuuri", market:"FI", marketName:"Finland",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_specialty", storeCount:12, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7732,6 +7922,7 @@ const RETAILER_REGISTRY = [
   {
     id:"hyvinvointi_fi", name:"Hyvinvoinnin Tavaratalo", market:"FI", marketName:"Finland",
     categories:["Wellness & Supplements","Food & Beverage"],
+    categoryTags:["food", "wellness"],
     type:"health_department", storeCount:5, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7750,6 +7941,7 @@ const RETAILER_REGISTRY = [
     id:"about_you_eu", name:"About You", market:"EU_WIDE", marketName:"EU + Nordic",
     markets:["DE","SE","DK","NO","FI","NL","FR","AT","CH","PL"],
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"online_fashion_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7767,6 +7959,7 @@ const RETAILER_REGISTRY = [
     id:"nelly_eu", name:"Nelly.com", market:"EU_WIDE", marketName:"Nordic + EU",
     markets:["SE","NO","DK","FI","DE","NL"],
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"online_fashion", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7784,6 +7977,7 @@ const RETAILER_REGISTRY = [
     id:"bubbleroom_eu", name:"Bubbleroom", market:"EU_WIDE", marketName:"Nordic + EU",
     markets:["SE","NO","DK","FI","DE"],
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"online_fashion", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7801,6 +7995,7 @@ const RETAILER_REGISTRY = [
     id:"miinto_eu", name:"Miinto", market:"EU_WIDE", marketName:"Nordic + EU",
     markets:["DK","SE","NO","FI","NL","DE"],
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"fashion_marketplace", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7818,6 +8013,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lindex_se", name:"Lindex", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"fashion_retail", storeCount:450, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -7835,6 +8031,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kappahl_se", name:"KappAhl", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"fashion_retail", storeCount:380, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -7852,6 +8049,7 @@ const RETAILER_REGISTRY = [
   {
     id:"stadium_se", name:"Stadium", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["fashion", "wellness"],
     type:"sports_fashion", storeCount:185, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -7869,6 +8067,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nilson_se", name:"NilsonGroup (Rizzo, Skopunkten, Din Sko)", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"footwear_retail", storeCount:300, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7886,6 +8085,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bestseller_dk", name:"Bestseller Group (Jack & Jones, Vero Moda, Only, Vila)", market:"DK", marketName:"Denmark",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"fashion_group", storeCount:3000, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -7903,6 +8103,7 @@ const RETAILER_REGISTRY = [
   {
     id:"samsoe_samsoe_dk", name:"Samsøe Samsøe", market:"DK", marketName:"Denmark",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"premium_fashion", storeCount:50, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7920,6 +8121,7 @@ const RETAILER_REGISTRY = [
   {
     id:"varner_no", name:"Varner Group (Cubus, Bik Bok, Carlings, Dressmann)", market:"NO", marketName:"Norway",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"fashion_group", storeCount:1200, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7936,6 +8138,7 @@ const RETAILER_REGISTRY = [
   {
     id:"høyer_no", name:"Høyer", market:"NO", marketName:"Norway",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"premium_fashion", storeCount:12, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7952,6 +8155,7 @@ const RETAILER_REGISTRY = [
   {
     id:"steen_strom_no", name:"Steen & Strøm", market:"NO", marketName:"Norway",
     categories:["Fashion & Apparel","Skincare & Beauty","Fragrance"],
+    categoryTags:["beauty", "fashion"],
     type:"luxury_shopping_centre", storeCount:6, onlinePresence:"MEDIUM",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7969,6 +8173,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kekale_fi", name:"Kekäle", market:"FI", marketName:"Finland",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"premium_fashion", storeCount:14, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -7985,6 +8190,7 @@ const RETAILER_REGISTRY = [
   {
     id:"halonen_fi", name:"Halonen", market:"FI", marketName:"Finland",
     categories:["Fashion & Apparel"],
+    categoryTags:["fashion"],
     type:"fashion_retail", storeCount:50, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8002,6 +8208,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ica_se", name:"ICA Group (ICA Maxi, ICA Kvantum, ICA Supermarket)", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_chain", storeCount:1300, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8018,6 +8225,7 @@ const RETAILER_REGISTRY = [
   {
     id:"axfood_se", name:"Axfood (Willys, Hemköp)", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_chain", storeCount:350, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8034,6 +8242,7 @@ const RETAILER_REGISTRY = [
   {
     id:"coop_se", name:"Coop Sweden", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_cooperative", storeCount:800, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8050,6 +8259,7 @@ const RETAILER_REGISTRY = [
   {
     id:"matsmart_se", name:"Matsmart", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"surplus_online", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8067,6 +8277,7 @@ const RETAILER_REGISTRY = [
   {
     id:"coop_dk", name:"Coop Denmark (Kvickly, SuperBrugsen, Fakta)", market:"DK", marketName:"Denmark",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_cooperative", storeCount:1100, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8083,6 +8294,7 @@ const RETAILER_REGISTRY = [
   {
     id:"rema1000_dk", name:"Rema 1000 Denmark", market:"DK", marketName:"Denmark",
     categories:["Food & Beverage"],
+    categoryTags:["food"],
     type:"discount_grocery", storeCount:380, onlinePresence:"LOW",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8099,6 +8311,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nemlig_dk", name:"Nemlig.com", market:"DK", marketName:"Denmark",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"online_grocery", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8115,6 +8328,7 @@ const RETAILER_REGISTRY = [
   {
     id:"komplett_no", name:"Komplett.no", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty"],
+    categoryTags:["beauty"],
     type:"consumer_electronics_online", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8133,6 +8347,7 @@ const RETAILER_REGISTRY = [
   {
     id:"norgesgruppen_no", name:"NorgesGruppen (Meny, Spar, Kiwi, Joker)", market:"NO", marketName:"Norway",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_group", storeCount:1800, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8149,6 +8364,7 @@ const RETAILER_REGISTRY = [
   {
     id:"rema1000_no", name:"Rema 1000 Norway", market:"NO", marketName:"Norway",
     categories:["Food & Beverage"],
+    categoryTags:["food"],
     type:"discount_grocery", storeCount:680, onlinePresence:"LOW",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8165,6 +8381,7 @@ const RETAILER_REGISTRY = [
   {
     id:"oda_no", name:"Oda", market:"NO", marketName:"Norway",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"online_grocery", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8181,6 +8398,7 @@ const RETAILER_REGISTRY = [
   {
     id:"coop_no", name:"Coop Norge (Obs, Extra, Mega)", market:"NO", marketName:"Norway",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_cooperative", storeCount:1100, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8198,6 +8416,7 @@ const RETAILER_REGISTRY = [
   {
     id:"s_group_fi", name:"S-Group (Prisma, S-market, Alepa)", market:"FI", marketName:"Finland",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_cooperative", storeCount:900, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8214,6 +8433,7 @@ const RETAILER_REGISTRY = [
   {
     id:"k_group_fi", name:"K-Group / Kesko (K-Citymarket, K-Supermarket)", market:"FI", marketName:"Finland",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"grocery_chain", storeCount:1200, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8230,6 +8450,7 @@ const RETAILER_REGISTRY = [
   {
     id:"wolt_fi", name:"Wolt Market Finland", market:"FI", marketName:"Finland",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"qcommerce_grocery", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8247,6 +8468,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kronans_apotek_se", name:"Kronans Apotek", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:340, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8264,6 +8486,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lloyds_apotek_se", name:"Lloyds Apotek", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:80, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8281,6 +8504,7 @@ const RETAILER_REGISTRY = [
   {
     id:"halsans_kok_se", name:"Hälsans Kök", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"natural_health_food", storeCount:60, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8298,6 +8522,7 @@ const RETAILER_REGISTRY = [
   {
     id:"hm_se", name:"H&M", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"mass_fashion", storeCount:170, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -8316,6 +8541,7 @@ const RETAILER_REGISTRY = [
   {
     id:"arket_se", name:"Arket", market:"SE", marketName:"Sweden",
     categories:["Fashion & Apparel","Skincare & Beauty"],
+    categoryTags:["beauty", "fashion"],
     type:"premium_fashion_concept", storeCount:25, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -8334,6 +8560,7 @@ const RETAILER_REGISTRY = [
   {
     id:"other_stories_se", name:"& Other Stories", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"premium_beauty_fashion", storeCount:80, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"hybrid", externalBrandsAccepted:true,
@@ -8352,6 +8579,7 @@ const RETAILER_REGISTRY = [
   {
     id:"citygross_se", name:"Citygross", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"superstore_grocery", storeCount:65, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8369,6 +8597,7 @@ const RETAILER_REGISTRY = [
   {
     id:"mathem_se", name:"Mathem", market:"SE", marketName:"Sweden",
     categories:["Food & Beverage","Wellness & Supplements"],
+    categoryTags:["food", "wellness"],
     type:"online_grocery", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8387,6 +8616,7 @@ const RETAILER_REGISTRY = [
   {
     id:"fenwick_uk", name:"Fenwick", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"premium_department", storeCount:9, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8404,6 +8634,7 @@ const RETAILER_REGISTRY = [
   {
     id:"asda_uk", name:"ASDA Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"mass_grocery_beauty", storeCount:640, onlinePresence:"HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8421,6 +8652,7 @@ const RETAILER_REGISTRY = [
   {
     id:"tesco_uk", name:"Tesco Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"mass_grocery_beauty", storeCount:3800, onlinePresence:"VERY_HIGH",
     accessTier:"tier_3",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8438,6 +8670,7 @@ const RETAILER_REGISTRY = [
   {
     id:"amazon_uk", name:"Amazon UK Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"online_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8455,6 +8688,7 @@ const RETAILER_REGISTRY = [
   {
     id:"next_beauty_uk", name:"Next Beauty", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"fashion_beauty", storeCount:500, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8472,6 +8706,7 @@ const RETAILER_REGISTRY = [
   {
     id:"very_uk", name:"Very.co.uk", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"mass_online", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8489,6 +8724,7 @@ const RETAILER_REGISTRY = [
   {
     id:"as_nature_intended_uk", name:"As Nature Intended", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"natural_health_specialist", storeCount:8, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8506,6 +8742,7 @@ const RETAILER_REGISTRY = [
   {
     id:"nourish_uk", name:"Nourish", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"natural_health_specialist", storeCount:10, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8523,6 +8760,7 @@ const RETAILER_REGISTRY = [
   {
     id:"gnc_uk", name:"GNC UK", market:"UK", marketName:"United Kingdom",
     categories:["Wellness & Supplements"],
+    categoryTags:["wellness"],
     type:"supplement_specialist", storeCount:120, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8540,6 +8778,7 @@ const RETAILER_REGISTRY = [
   {
     id:"lloydspharmacy_uk", name:"LloydsPharmacy", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:1400, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8557,6 +8796,7 @@ const RETAILER_REGISTRY = [
   {
     id:"well_pharmacy_uk", name:"Well Pharmacy", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy", storeCount:770, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8574,6 +8814,7 @@ const RETAILER_REGISTRY = [
   {
     id:"chemist_direct_uk", name:"Chemist Direct", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8591,6 +8832,7 @@ const RETAILER_REGISTRY = [
   {
     id:"pharmacy2u_uk", name:"Pharmacy2U", market:"UK", marketName:"United Kingdom",
     categories:["Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8608,6 +8850,7 @@ const RETAILER_REGISTRY = [
   {
     id:"medino_uk", name:"Medino", market:"UK", marketName:"United Kingdom",
     categories:["Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy_wellness", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8625,6 +8868,7 @@ const RETAILER_REGISTRY = [
   {
     id:"debenhams_uk", name:"Debenhams", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fragrance","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"online_marketplace", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8642,6 +8886,7 @@ const RETAILER_REGISTRY = [
   {
     id:"sainsburys_uk", name:"Sainsbury's", market:"UK", marketName:"United Kingdom",
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"premium_grocery", storeCount:1400, onlinePresence:"VERY_HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8659,6 +8904,7 @@ const RETAILER_REGISTRY = [
   {
     id:"anthropologie_uk", name:"Anthropologie UK", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"lifestyle_premium", storeCount:12, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8676,6 +8922,7 @@ const RETAILER_REGISTRY = [
   {
     id:"urban_outfitters_uk", name:"Urban Outfitters", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"lifestyle_fashion_beauty", storeCount:14, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8693,6 +8940,7 @@ const RETAILER_REGISTRY = [
   {
     id:"oliver_bonas_uk", name:"Oliver Bonas", market:"UK", marketName:"United Kingdom",
     categories:["Skincare & Beauty","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion"],
     type:"lifestyle_gift", storeCount:80, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8712,6 +8960,7 @@ const RETAILER_REGISTRY = [
     id:"meds_eu", name:"Meds (SE/DK/NO/FI/DE)", market:"EU_WIDE", marketName:"Nordic + Germany",
     markets:["SE","DK","NO","FI","DE"],
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy_pan_nordic", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8730,6 +8979,7 @@ const RETAILER_REGISTRY = [
   {
     id:"apohem_se", name:"Apohem", market:"SE", marketName:"Sweden",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8748,6 +8998,7 @@ const RETAILER_REGISTRY = [
   {
     id:"apoteket_dk", name:"Apoteket.dk", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8765,6 +9016,7 @@ const RETAILER_REGISTRY = [
   {
     id:"farmazonline_dk", name:"Farmazonline.dk", market:"DK", marketName:"Denmark",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"MEDIUM",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8783,6 +9035,7 @@ const RETAILER_REGISTRY = [
   {
     id:"boots_no", name:"Boots Norway", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_beauty", storeCount:50, onlinePresence:"HIGH",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8800,6 +9053,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ditt_apotek_no", name:"Ditt Apotek", market:"NO", marketName:"Norway",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_network", storeCount:200, onlinePresence:"MEDIUM",
     accessTier:"tier_2",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8818,6 +9072,7 @@ const RETAILER_REGISTRY = [
   {
     id:"verkkoapteekki_fi", name:"Verkkoapteekki", market:"FI", marketName:"Finland",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8836,6 +9091,7 @@ const RETAILER_REGISTRY = [
   {
     id:"docmorris_de", name:"DocMorris", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8854,6 +9110,7 @@ const RETAILER_REGISTRY = [
   {
     id:"shop_apotheke_de", name:"Shop Apotheke", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"VERY_HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8872,6 +9129,7 @@ const RETAILER_REGISTRY = [
   {
     id:"medpex_de", name:"Medpex", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8889,6 +9147,7 @@ const RETAILER_REGISTRY = [
   {
     id:"zur_rose_de", name:"Zur Rose", market:"DE", marketName:"Germany",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_pharmacy", storeCount:0, onlinePresence:"HIGH",
     accessTier:"tier_1",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -8909,6 +9168,7 @@ const RETAILER_REGISTRY = [
     id:"kicks_dk", accessTier:"tier_2", name:"Kicks Denmark", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Hair","Fragrance"],
+    categoryTags:["beauty"],
     type:"beauty_retail", storeCount:20, onlinePresence:"HIGH",
     strategy2026:"Post-Matas acquisition integration. Unified Nordic buying desk — Kicks SE and Kicks NO are bought by the same team. A Danish listing conversation often opens Sweden and Norway simultaneously.",
     buyerPriority:"TikTok-friendly products. Visual shareability. Gen Z appeal. Fragrance and body care growing faster than skincare.",
@@ -8928,6 +9188,7 @@ const RETAILER_REGISTRY = [
     id:"magasin_dk", accessTier:"tier_2", name:"Magasin du Nord", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "wellness"],
     type:"premium_department", storeCount:6, onlinePresence:"HIGH",
     strategy2026:"Denmark's leading premium department store. Beauty hall expansion 2026 with focus on Nordic indie and clinical brands. Salling Group ownership — shared buying infrastructure with Føtex and Bilka, but Beauty Hall has its own specialist buyer.",
     buyerPriority:"Premium positioning DKK 200-600. Nordic provenance strongly positive. Clinical or luxury brand story. Premium packaging essential.",
@@ -8947,6 +9208,7 @@ const RETAILER_REGISTRY = [
     id:"illum_dk", accessTier:"tier_3", name:"Illum", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"luxury_department", storeCount:1, onlinePresence:"MEDIUM",
     strategy2026:"Copenhagen's only true luxury department store. Single flagship on Strøget. Highly selective curation — fewer than 30 new brands listed per year across all categories. Prestige positioning, international tourist footfall.",
     buyerPriority:"Luxury or ultra-premium positioning DKK 400+. Exceptional packaging. International brand narrative. Unique or exclusive product not available in other DK doors.",
@@ -8965,6 +9227,7 @@ const RETAILER_REGISTRY = [
     id:"helsam_dk", accessTier:"tier_1", name:"Helsam", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Wellness & Supplements","Skincare & Beauty","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_wellness_specialist", storeCount:55, onlinePresence:"HIGH",
     strategy2026:"Denmark's largest health and wellness specialist retailer. Strong supplement and natural beauty positioning. Very accessible for Nordic wellness brands — local provenance is a strong buying signal. Growing online revenue via helsam.dk.",
     buyerPriority:"Natural/organic credentials. Nordic or Scandinavian provenance. Wellness and supplement positioning. Eco-certified packaging preferred.",
@@ -8983,6 +9246,7 @@ const RETAILER_REGISTRY = [
     id:"normal_dk", accessTier:"tier_1", name:"Normal", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"discount_beauty_variety", storeCount:180, onlinePresence:"LOW",
     strategy2026:"Denmark's fastest-growing discount beauty and variety chain. Rapid EU expansion — now present in Denmark, Norway, Sweden, Germany, Netherlands, and Belgium. Fixed pricing at DKK 20, 30, or 50 per item. Very high volume, very low margin. EU expansion creates multi-market listing opportunity from a single agreement.",
     buyerPriority:"Products that work at DKK 20-50 price points. High visual appeal on shelf. Impulse purchase positioning. Proven category. No clinical or prestige positioning — mass discovery channel.",
@@ -9002,6 +9266,7 @@ const RETAILER_REGISTRY = [
     id:"irma_dk", accessTier:"tier_2", name:"Irma", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"premium_grocery", storeCount:70, onlinePresence:"MEDIUM",
     strategy2026:"Denmark's premium Coop DK grocery banner. Strongest food and wellness entry point in DK grocery channel. Irma actively curates Danish and Nordic artisan brands. Growing beauty and wellness bay alongside core grocery.",
     buyerPriority:"Danish or Nordic provenance — local sourcing is Irma's core identity. Premium food/wellness positioning. Organic certification strongly preferred. B Corp or sustainability story.",
@@ -9021,6 +9286,7 @@ const RETAILER_REGISTRY = [
     id:"fotex_dk", accessTier:"tier_1", name:"Føtex", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"superstore", storeCount:85, onlinePresence:"MEDIUM",
     strategy2026:"Salling Group mid-market superstore. Broad category coverage — grocery, non-food, beauty, and wellness. Strong suburban and regional coverage. Mainstream consumer positioning.",
     buyerPriority:"Mainstream pricing DKK 30-150. Broad consumer appeal. Proven category. Danish or Nordic brand preferred but not required.",
@@ -9039,6 +9305,7 @@ const RETAILER_REGISTRY = [
     id:"bilka_dk", accessTier:"tier_1", name:"Bilka", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Food & Beverage","Wellness & Supplements","Skincare & Beauty","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "food", "wellness"],
     type:"hypermarket", storeCount:19, onlinePresence:"MEDIUM",
     strategy2026:"Salling Group hypermarket format. Large format, broad range, value-to-mid positioning. Bilka.dk is a growing online channel. Key locations near Copenhagen (Hundige, Ishøj) serve high-population catchment.",
     buyerPriority:"Competitive pricing. Mainstream consumer. Proven volume sellers. Cross-category appeal.",
@@ -9057,6 +9324,7 @@ const RETAILER_REGISTRY = [
     id:"nomeco_dk", accessTier:"tier_2", name:"Nomeco (Pharmacy Wholesale)", market:"DK", marketName:"Denmark",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_wholesaler", storeCount:0, onlinePresence:"LOW",
     strategy2026:"Denmark's largest pharmaceutical and health product wholesaler. Not a consumer-facing retailer — Nomeco supplies the majority of Danish independent pharmacies. Approaching Nomeco as a wholesale partner is the most efficient route to reach the fragmented Danish pharmacy market at scale.",
     buyerPriority:"CPNP-registered cosmetics and compliant supplements. Full regulatory documentation. Pharmacy-channel positioning. Danish-language labelling.",
@@ -9076,6 +9344,7 @@ const RETAILER_REGISTRY = [
   {
     id:"ici_paris_xl_be", accessTier:"tier_1", name:"ICI PARIS XL Belgium", market:"BE", marketName:"Belgium",
     type:"Specialty beauty", storeCount:55, categories:["Skincare & Beauty"],
+    categoryTags:["beauty"],
     marginMin:0.50, marginMax:0.60, moq:200, currency:"EUR",
     rangeReviewCycle:["March","September"],
     nonNegotiable:"French AND Dutch labelling both mandatory. FAMHP cosmetics notification required. EAN-13.",
@@ -9094,6 +9363,7 @@ const RETAILER_REGISTRY = [
   {
     id:"di_be", accessTier:"tier_2", name:"Di (Drogisterij Di)", market:"BE", marketName:"Belgium",
     type:"Drugstore chain", storeCount:180, categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     marginMin:0.45, marginMax:0.55, moq:300, currency:"EUR",
     rangeReviewCycle:["February","August"],
     nonNegotiable:"French AND Dutch bilingual labelling mandatory. FAMHP registration. EAN-13. SPF products need separate FAMHP notification.",
@@ -9111,6 +9381,7 @@ const RETAILER_REGISTRY = [
   {
     id:"kruidvat_be", accessTier:"tier_1", name:"Kruidvat Belgium", market:"BE", marketName:"Belgium",
     type:"Drugstore chain (mass)", storeCount:230, categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     marginMin:0.48, marginMax:0.58, moq:500, currency:"EUR",
     rangeReviewCycle:["January","July"],
     nonNegotiable:"French AND Dutch bilingual labelling. EAN-13 mandatory. FAMHP. VerpackVO BE packaging registration. EDI integration required for orders above 500 units.",
@@ -9131,6 +9402,7 @@ const RETAILER_REGISTRY = [
   {
     id:"bipa_at", accessTier:"tier_1", name:"Bipa", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore", storeCount:570, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Austria's largest drugstore chain and the dominant AT beauty retail entry point. REWE Group ownership — same group as Billa and Billa Plus grocery Austria, and as REWE DE (Penny, REWE supermarkets). Bipa actively seeking Nordic clean beauty brands to differentiate from dm private label expansion.",
@@ -9150,6 +9422,7 @@ const RETAILER_REGISTRY = [
   {
     id:"dm_at", accessTier:"tier_2", name:"dm Austria", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore", storeCount:430, onlinePresence:"MEDIUM",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"dm Austria operates under the same parent as dm Germany (dm-drogerie markt GmbH) — buying is partially coordinated. A dm DE listing is the strongest path to dm AT. Austrian stores frequently list products already proven in Germany, making AT a natural extension of a DE dm listing.",
@@ -9167,6 +9440,7 @@ const RETAILER_REGISTRY = [
   {
     id:"douglas_at", accessTier:"tier_2", name:"Douglas Austria", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:47, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Part of Douglas DACHNL buying segment — same buying team as Douglas DE, CH, NL, and BE. Austria is a natural extension of a Douglas DE listing. Premium positioning, Vienna flagship on Kärntner Straße.",
@@ -9187,6 +9461,7 @@ const RETAILER_REGISTRY = [
   {
     id:"mueller_at", accessTier:"tier_1", name:"Müller Austria", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"drugstore_general", storeCount:110, onlinePresence:"MEDIUM",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Same parent as Müller DE (Müller GmbH, Ulm). Strong Austria coverage — 110 stores. Buying is coordinated with DE, making AT a natural extension of a Müller DE relationship. Growing fast in Austria, particularly in natural beauty.",
@@ -9204,6 +9479,7 @@ const RETAILER_REGISTRY = [
   {
     id:"billa_at", accessTier:"tier_2", name:"Billa / Billa Plus", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery_premium", storeCount:1100, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"REWE Group Austria — same group as Bipa drugstore. Billa is Austria's largest grocery chain (1,100+ stores). Billa Plus is the premium format. Beauty section growing in Billa Plus — natural and organic beauty fits premium grocery trend.",
@@ -9220,6 +9496,7 @@ const RETAILER_REGISTRY = [
   {
     id:"steffl_at", accessTier:"tier_3", name:"Steffl Department Store", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements"],
+    categoryTags:["beauty", "fashion", "home", "wellness"],
     type:"luxury_department", storeCount:1, onlinePresence:"MEDIUM",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Vienna's most prestigious department store — Kärntner Straße, directly opposite the Vienna State Opera. Beauty hall is the highest-prestige beauty retail address in Austria. A Steffl listing is an international credential — visited by buyers from KaDeWe Berlin, Galeries Lafayette Paris, and Selfridges London.",
@@ -9237,6 +9514,7 @@ const RETAILER_REGISTRY = [
   {
     id:"reformhaus_at", accessTier:"tier_1", name:"Reformhaus Austria", market:"AT", marketName:"Austria",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"health_specialist", storeCount:270, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Austrian health food and natural beauty specialist chain — same Reformhaus concept as Germany. 270 stores across Austria. Organic and natural certification essential. Strong wellness and supplement positioning.",
@@ -9256,6 +9534,7 @@ const RETAILER_REGISTRY = [
   {
     id:"douglas_ch", accessTier:"tier_2", name:"Douglas Switzerland", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:35, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Part of Douglas DACHNL buying segment — same buying team as Douglas DE, AT, NL, and BE. Switzerland is included in DACHNL contract. CHF pricing allows premium RSP above eurozone. Swiss premium consumer is highly receptive to Nordic clinical beauty.",
@@ -9277,6 +9556,7 @@ const RETAILER_REGISTRY = [
   {
     id:"manor_ch", accessTier:"tier_2", name:"Manor", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Fashion & Apparel","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "fashion", "food", "home", "wellness"],
     type:"department_store", storeCount:61, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Switzerland's largest department store chain. Central Group parent — same group as Globus CH. 61 stores across Switzerland. Premium beauty floor is the primary beauty entry point for brands not in Douglas. Central Group is actively expanding premium and Nordic beauty.",
@@ -9296,6 +9576,7 @@ const RETAILER_REGISTRY = [
   {
     id:"globus_ch", accessTier:"tier_3", name:"Globus", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "home"],
     type:"luxury_department", storeCount:10, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Switzerland's most prestigious department store. Central Group parent — same as Manor. 10 stores in premium Swiss locations. Zürich Globus on Bahnhofstrasse is a global luxury retail credential. Nordic clinical premium brands actively sought.",
@@ -9314,6 +9595,7 @@ const RETAILER_REGISTRY = [
   {
     id:"coop_ch", accessTier:"tier_2", name:"Coop Switzerland", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery", storeCount:2500, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Switzerland's second-largest retailer. 2,500+ stores across all formats. Natural and organic beauty growing in premium grocery section. Separate buyer from Coop Vitality (pharmacy/wellness). Food, wellness and accessible beauty entry point.",
@@ -9332,6 +9614,7 @@ const RETAILER_REGISTRY = [
   {
     id:"coop_vitality_ch", accessTier:"tier_2", name:"Coop Vitality", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_wellness", storeCount:170, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Coop's pharmacy and wellness format — completely separate buyer from Coop grocery. 170 stores. Switzerland's leading wellness pharmacy channel. Clinical and dermocosmetic positioning essential. Equivalent to Apotek Hjärtat in Sweden — the pharmacy beauty channel.",
@@ -9350,6 +9633,7 @@ const RETAILER_REGISTRY = [
   {
     id:"migros_ch", accessTier:"tier_2", name:"Migros Switzerland", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery", storeCount:640, onlinePresence:"VERY_HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Switzerland's largest retailer. Own-brand dominant (M-Budget, M-Classic, Migros Bio) but external beauty actively listed in premium and organic segments. Migros also owns Galaxus (digital marketplace) — Migros and Galaxus are separate conversations but same parent. Natural and Nordic beauty strongly growing.",
@@ -9369,6 +9653,7 @@ const RETAILER_REGISTRY = [
   {
     id:"galaxus_ch", accessTier:"tier_1", name:"Galaxus", market:"CH", marketName:"Switzerland",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage","Fashion & Apparel"],
+    categoryTags:["beauty", "fashion", "food", "wellness"],
     type:"online_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"HIGHEST CROSS-MARKET LEVERAGE IN VEYAFLOW REGISTRY. Galaxus is Migros Digital — a single listing on Galaxus covers 9 markets simultaneously: CH + DE + AT + FR + IT + NL + BE + LU + UK. No other single retailer relationship in Europe covers this many markets from one contract. Actively expanding product range across all categories.",
@@ -9389,6 +9674,7 @@ const RETAILER_REGISTRY = [
   {
     id:"wells_pt", accessTier:"tier_1", name:"Wells", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"beauty_specialist", storeCount:35, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Portugal's most important beauty entry point. Sonae Group ownership — same group as Continente grocery (230+ stores) and Worten electronics. Elected Consumer Choice 2026. Actively expanding to 60+ stores. Scandinavian clinical beauty is an explicitly stated 2026 sourcing priority — Scandi brands are underrepresented relative to French and Spanish competitors. Most accessible premium beauty buyer in Portugal.",
@@ -9410,6 +9696,7 @@ const RETAILER_REGISTRY = [
   {
     id:"pingo_doce_pt", accessTier:"tier_2", name:"Pingo Doce", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery_premium", storeCount:460, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Jerónimo Martins Group — same parent as Hebe PL (Poland's fastest growing beauty chain, 200+ stores) and Biedronka PL (3,500+ Polish stores). Ahold Delhaize owns 49% of Jerónimo Martins = same group as Albert Heijn NL and Etos NL. Most underappreciated cross-market connection in the VeyaFlow registry: PT Pingo Doce + PL Hebe + PL Biedronka + NL Albert Heijn + NL Etos from one group relationship.",
@@ -9429,6 +9716,7 @@ const RETAILER_REGISTRY = [
   {
     id:"continente_pt", accessTier:"tier_2", name:"Continente", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"grocery", storeCount:230, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Sonae Group — same parent as Wells beauty and Worten electronics. Portugal's largest retailer by revenue. Continente Bio is the organic fast-track section (equivalent to Alnatura DE or Naturalia FR) — COSMOS/EU organic certification opens a direct route. Beauty section growing in Continente Modelo and Continente Bom Dia formats.",
@@ -9448,6 +9736,7 @@ const RETAILER_REGISTRY = [
   {
     id:"douglas_pt", accessTier:"tier_3", name:"Douglas Portugal", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Fragrance","Hair"],
+    categoryTags:["beauty"],
     type:"prestige_beauty", storeCount:28, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Part of Douglas Group Southern Europe segment — Portugal is third priority after Italy and Spain within the SE segment. Buying team is shared with Douglas IT and Douglas ES. Most efficient approach: via an existing Douglas IT or ES relationship, not independently. Premium positioning, Lisbon and Porto flagship stores.",
@@ -9467,6 +9756,7 @@ const RETAILER_REGISTRY = [
   {
     id:"perfumes_companhia_pt", accessTier:"tier_1", name:"Perfumes & Companhia", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Fragrance","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"pharmacy_beauty", storeCount:155, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Portugal's leading pharmacy beauty chain — 155 stores nationwide with parapharmacy adjacency. Clinical and dermocosmetic positioning essential. Strong digital presence and loyalty programme. Part of the established PT beauty retail infrastructure alongside Wells and Douglas.",
@@ -9484,6 +9774,7 @@ const RETAILER_REGISTRY = [
   {
     id:"celeiro_pt", accessTier:"tier_1", name:"Celeiro", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Food & Beverage","Wellness & Supplements"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"organic_specialist", storeCount:50, onlinePresence:"HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Portugal's leading organic and natural specialist — same role as NaturaSì IT, Naturalia FR, or Reformhaus DE/AT. 50 stores with knowledgeable staff and loyal organic consumer base. COSMOS certification = fast-track listing. Strong natural beauty and wellness sections.",
@@ -9502,6 +9793,7 @@ const RETAILER_REGISTRY = [
   {
     id:"notino_pt", accessTier:"tier_1", name:"Notino Portugal", market:"PT", marketName:"Portugal",
     categories:["Skincare & Beauty","Fragrance","Wellness & Supplements"],
+    categoryTags:["beauty", "wellness"],
     type:"online_marketplace", storeCount:0, onlinePresence:"VERY_HIGH",
     brandModel:"multi_brand", externalBrandsAccepted:true,
     strategy2026:"Czech-owned pan-European beauty marketplace — strong Portuguese market presence. Recommended as FIRST step in the PT entry sequence: lowest barrier, fastest listing, generates Portuguese consumer data before physical retail approach. Notino.pt listing gives proof of PT consumer demand for Wells and Douglas pitch.",
@@ -9526,6 +9818,7 @@ const RETAILER_REGISTRY = [
     id:"heinemann_tr", accessTier:"tier_2", name:"Gebr. Heinemann", market:"EU_WIDE", marketName:"Travel Retail — Europe",
     channelType:"travel_retail",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"travel_retail",
     storeCount:100, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -9550,6 +9843,7 @@ const RETAILER_REGISTRY = [
     id:"avolta_tr", accessTier:"tier_2", name:"Avolta / World Duty Free", market:"EU_WIDE", marketName:"Travel Retail — Europe/UK",
     channelType:"travel_retail",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"travel_retail",
     storeCount:500, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -9574,6 +9868,7 @@ const RETAILER_REGISTRY = [
     id:"lagardere_tr", accessTier:"tier_2", name:"Lagardère / Aelia Duty Free", market:"EU_WIDE", marketName:"Travel Retail — Europe",
     channelType:"travel_retail",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"travel_retail",
     storeCount:160, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -9595,6 +9890,7 @@ const RETAILER_REGISTRY = [
     id:"trn_tr", accessTier:"tier_1", name:"Travel Retail Norway (TRN)", market:"NO", marketName:"Travel Retail — Norway",
     channelType:"travel_retail",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"travel_retail",
     storeCount:12, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -9617,6 +9913,7 @@ const RETAILER_REGISTRY = [
     id:"ari_tr", accessTier:"tier_2", name:"ARI (Airport Retail International)", market:"EU_WIDE", marketName:"Travel Retail — Ireland/Europe",
     channelType:"travel_retail",
     categories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],
+    categoryTags:["beauty", "food", "wellness"],
     type:"travel_retail",
     storeCount:14, onlinePresence:"LOW",
     brandModel:"multi_brand", externalBrandsAccepted:true,
@@ -9972,6 +10269,14 @@ async function generateReport(){
   const isWellness = cat==='Wellness & Supplements';
   const isFashion = cat==='Fashion & Apparel';
 
+  // Product-type awareness (Apr 2026) — surfaces device/accessory specifics that
+  // brand category alone misses. Built at runtime here (not at module load) so it
+  // reflects current SKUs. Augments the top-level brandCtx for prompt use.
+  const _productTypesPromptCtx = getProductTypesPromptContext(skus);
+  const brandCtxWithTypes = _productTypesPromptCtx
+    ? brandCtx.replace(/CATEGORY: ([^\n]+)\n/, 'CATEGORY: $1\n'+_productTypesPromptCtx+'\n')
+    : brandCtx;
+
   // Switzerland compliance alert — injected into every module when CH selected
   const isSwiss = mkt==='Switzerland';
   const swissComplianceBlock = isSwiss ? `
@@ -10085,7 +10390,7 @@ Galaxus (Migros Digital): single listing covers 9 EU markets — highest cross-m
       confidence: confidence.market,
       prompt: `You are VeyaFlow AI — specialist Nordic brand market entry intelligence. April 2026. Board-ready output.
 
-${brandCtx}
+${brandCtxWithTypes}
 
 ADDRESSABLE SHELF DATA FOR ${reportForm.targetMarket.toUpperCase()}:
 Key retailers: ${categoryRetailers.slice(0,300)}
@@ -10140,7 +10445,7 @@ THE GAP: One sentence — exact positioning territory available right now.`
       confidence: confidence.retail,
       prompt: `You are VeyaFlow AI. April 2026. Writing for a founder preparing for a buyer meeting.
 
-${brandCtx}
+${brandCtxWithTypes}
 
 FOUNDER-VERIFIED NEGOTIATION INTELLIGENCE (inject as facts):
 ${(relevantNegIntel||targetRetailerIntel||categoryRetailers).slice(0,600)}
@@ -10185,7 +10490,7 @@ Yes/no: is this market profitable at Year 1 realistic volumes?`
       confidence: confidence.compliance,
       prompt: `You are VeyaFlow AI — compliance specialist. April 2026.
 
-${brandCtx}
+${brandCtxWithTypes}
 TARGET MARKET: ${reportForm.targetMarket}
 ${reportForm.targetMarket==='Germany'?'\n⚠ GERMANY CLAIMS NOTE: Germany has Europe\'s strictest claims enforcement. All claims require review before DE market entry under UWG (Gesetz gegen den unlauteren Wettbewerb). Anti-aging must be rephrased. Natural requires % breakdown. Clinically proven requires German-standard study. Budget 3-6 weeks claims review and EUR 2,000-6,000 legal review cost.\n':''}
 COMPLIANCE RULES: ${euBase.slice(0,400)}
@@ -10194,7 +10499,7 @@ CATEGORY EXTRA: ${categoryCompliance.slice(0,200)}
 ${(()=>{
   // Inject distributor intelligence for retailers in target market
   const mktCode = ({Denmark:'DK',Sweden:'SE','United Kingdom':'UK',Germany:'DE',Norway:'NO',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'}[reportForm.targetMarket])||'';
-  const mktRetailers = RETAILER_REGISTRY.filter(r=>r.market===mktCode&&(r.categories||[]).includes(reportForm.category||''));
+  const mktRetailers = RETAILER_REGISTRY.filter(r=>r.market===mktCode&&retailerMatchesBrandTags(r,brand));
   const distLines = mktRetailers.slice(0,4).map(r=>{
     const d = getDistributorIntel(r.id);
     if(!d) return null;
@@ -10209,7 +10514,7 @@ ${(()=>{
 ${(()=>{
   // Inject category gap intelligence for top 3 retailers in target market
   const mktCode2 = ({Denmark:'DK',Sweden:'SE','United Kingdom':'UK',Germany:'DE',Norway:'NO',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'}[reportForm.targetMarket])||'';
-  const mktR2 = RETAILER_REGISTRY.filter(r=>r.market===mktCode2&&(r.categories||[]).includes(reportForm.category||'')).slice(0,3);
+  const mktR2 = RETAILER_REGISTRY.filter(r=>r.market===mktCode2&&retailerMatchesBrandTags(r,brand)).slice(0,3);
   const gapTexts = mktR2.map(r=>categoryGapsPromptText(r.id, reportForm.category||'')).filter(Boolean);
   return gapTexts.length ? gapTexts.join('\n\n') : '';
 })()}
@@ -10289,7 +10594,7 @@ Month by month April 2026 → first sale. Total investment: LOW — HIGH`
       confidence: confidence.financial,
       prompt: `You are VeyaFlow AI — market entry strategist. April 2026. Board-document quality.
 
-${brandCtx}
+${brandCtxWithTypes}
 DISTRIBUTOR OPTIONS: ${distributors}
 NEGOTIATION INTEL: ${relevantNegIntel.slice(0,400)||'Key retailers: '+categoryRetailers}
 
@@ -10664,7 +10969,7 @@ function scoreMarketDimension(dim, marketCode, brand, sku){
     return {score, display:`~${Math.round(cost/1000)}K SEK`, rawCost:cost, detail:_costDetail(marketCode, cat, cost)};
   }
   if(dim==='retailerFit'){
-    const retailers = RETAILER_REGISTRY.filter(r=>(r.market===marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(marketCode)))&&(r.categories||[]).includes(cat)&&(!r.futureMarket));
+    const retailers = RETAILER_REGISTRY.filter(r=>(r.market===marketCode||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(marketCode)))&&retailerMatchesBrandTags(r,brand)&&(!r.futureMarket));
     const score = retailers.length>=3?95:retailers.length===2?75:retailers.length===1?50:15;
     const fitLabel = score>=90?'HIGH':score>=70?'MEDIUM':'LOW';
     return {score, display:fitLabel, detail:_retailerDetail(marketCode, cat, retailers)};
@@ -10688,7 +10993,7 @@ function scoreMarketDimension(dim, marketCode, brand, sku){
   if(dim==='revenueY1'){
     const rsp = parseFloat(sku?.rspDKK||sku?.rspGBP||sku?.rspEUR||sku?.rspSEK||0);
     const vatRate = {DK:0.25,DE:0.19,UK:0.20,NO:0.25,NL:0.21,FR:0.20,SE:0.25}[marketCode]||0.25;
-    const topRetailer = RETAILER_REGISTRY.find(r=>r.market===marketCode&&(r.categories||[]).includes(cat));
+    const topRetailer = RETAILER_REGISTRY.find(r=>r.market===marketCode&&retailerMatchesBrandTags(r,brand));
     const margin = topRetailer?.marginMin||0.48;
     const velocity = (CATEGORY_VELOCITY[cat]||{})[marketCode]||1.5;
     const phase1 = topRetailer?PHASE1_STORES[topRetailer.id]||15:15;
@@ -11199,7 +11504,7 @@ function renderBizCase(el){
   const _bizMktId = _bizMktObj.id||'DK';
   const _bizCat = brand?.category||'Skincare & Beauty';
   const retailers = RETAILER_REGISTRY
-    .filter(r=>r.market===_bizMktId&&(r.categories||[]).includes(_bizCat)&&!r.futureMarket&&r.brandModel!=='own_brand')
+    .filter(r=>r.market===_bizMktId&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket&&r.brandModel!=='own_brand')
     .sort((a,b)=>{const t={tier_1:1,tier_2:2,tier_3:3};return (t[a.accessTier]||9)-(t[b.accessTier]||9);})
     .map(r=>r.name)
     .slice(0,8);
@@ -11335,9 +11640,12 @@ CONFIDENCE: HIGH — calculated from brand-verified inputs` : 'RSP not set — u
   const rangeReview = retailerEntry.rangeReviewCycle?.join(' or ')||'upcoming range review';
   const deadlineDate = retailer==='Matas'?'May 8 2026':retailer==='Lyko'?'Rolling — apply now':retailer==='Boots UK'?'May 15 2026':'April 30 2026';
 
+  // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
+  const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
   const catmanPrompt = `You are writing an internal listing approval document for a category manager at ${retailer}, ${market}. This is NOT a pitch — it is a pre-built justification for the category manager to present upward to their director. April 2026.
 
-BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}
+BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 TARGET RETAILER: ${retailer} | MARKET: ${market}
 
 ${plTable}
@@ -11403,7 +11711,7 @@ HARD RULES:
   const magicLinkUrl = brand?.magicLinkUrl || 'https://veyaflow.com/brand/' + (brand?.shareId||'');
   const buyerPrompt = `You are writing a concise Retail Business Case for a buyer at ${retailer}, ${market}. April 2026. First-contact justification — the buyer has never heard of this brand.
 
-BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}
+BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 
 ${plTable}
 
@@ -11750,10 +12058,13 @@ ${basketPairs.map(p=>`Step ${p.step}: avg addition ${p.val} ${p.currency}`).join
 Total basket uplift potential: ${basketTotal} ${basket.currency} per transaction.
 Category manager argument: "We don't just add one SKU — we lift the entire routine bay by ${basketTotal} ${basket.currency}."`;
 
+  // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
+  const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
   const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. April 2026.
 
 BRAND CONTEXT:
-Brand: ${brand.name} | Category: ${brand.category} | Stage: ${brand.stage}
+Brand: ${brand.name} | Category: ${brand.category} | Stage: ${brand.stage}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 USP: ${brand.usp||'[see brand description]'}
 Price point: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':brand.pricePoint||'Premium'}
 ${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.certifications?.length?' | Certs: '+heroSku.certifications.join(', '):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
@@ -12072,6 +12383,74 @@ const LEGACY_PRODUCT_TYPES = ['textile', 'supplement', 'food', 'garment'];
 
 function isLegacyProductType(t){ return LEGACY_PRODUCT_TYPES.indexOf(t) >= 0; }
 
+// Build prompt context for product types — used by Market Entry Report,
+// Retailer Pitch, Brand Pack, and Business Case so AI prompts know whether
+// they're working with cosmetics, devices, accessories, or a mix. Closes the
+// product-type-awareness gap surfaced in the BRAND audit (Apr 2026).
+// Returns:
+//   ''  — no SKUs, or no productType set on any SKU (caller should omit the line)
+//   'PRODUCT TYPES: <comma-separated labels>\n<tailoring instruction>'
+function getProductTypesPromptContext(skuList){
+  if(!Array.isArray(skuList)||skuList.length===0) return '';
+  const labelMap = {
+    cosmetic:        'Cosmetics / Skincare',
+    device:          'Beauty Device',
+    beauty_accessory:'Beauty Accessories',
+    // Legacy fallbacks — SKUs created pre-Round-1 may still reference these.
+    supplement:'Supplement',
+    food:      'Food & Beverage',
+    textile:   'Textile',
+    garment:   'Garment',
+  };
+  const seen = new Set();
+  const labels = [];
+  skuList.forEach(function(s){
+    const t = s && s.productType;
+    if(!t || seen.has(t)) return;
+    seen.add(t);
+    labels.push(labelMap[t] || t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}));
+  });
+  if(labels.length===0) return '';
+  return 'PRODUCT TYPES: '+labels.join(', ')+
+    '\nTailor compliance, retailer dynamics, and content emphasis to the listed product types. '+
+    'For Beauty Device, surface LVD/EMC/RoHS/WEEE considerations. '+
+    'For Beauty Accessories, focus on GPSR and material safety rather than cosmetic claims.';
+}
+
+// Map brand.category (broad-axis: "Skincare & Beauty", "Wellness & Supplements", etc.)
+// to the low-cardinality categoryTags vocabulary (beauty / wellness / fashion / home / food).
+// Beauty + Wellness brands carry both flags; this is set during onboarding via the dual-flag prompt.
+// Returns: array of categoryTag strings (possibly empty if brand has no resolvable category).
+function getBrandCategoryTags(b){
+  if(!b) return [];
+  // brand.categoryTags is the persisted union (set during onboarding dual-flag step).
+  if(Array.isArray(b.categoryTags) && b.categoryTags.length) return b.categoryTags.slice();
+  // Fallback: derive from brand.category for brands that haven't been through the dual-flag step yet.
+  const cat = (b.category||'').toLowerCase();
+  const tags = [];
+  if(cat.indexOf('beauty')>=0||cat.indexOf('skincare')>=0||cat.indexOf('hair')>=0||cat.indexOf('fragrance')>=0||cat.indexOf('personal care')>=0) tags.push('beauty');
+  if(cat.indexOf('wellness')>=0||cat.indexOf('supplement')>=0) tags.push('wellness');
+  if(cat.indexOf('fashion')>=0||cat.indexOf('apparel')>=0) tags.push('fashion');
+  if(cat.indexOf('home')>=0) tags.push('home');
+  if(cat.indexOf('food')>=0||cat.indexOf('beverage')>=0) tags.push('food');
+  return tags;
+}
+
+// Does retailer r match the brand's categoryTags? Used by all presentation-layer
+// filter sites in BRAND, Retailer Relations, and CRM. Beauty-only brand sees
+// retailers tagged `beauty`; Beauty+Wellness brand sees union of both. If the
+// retailer has no categoryTags array (shouldn't happen post-Apr-2026 commit but
+// defensive), passes through to avoid hiding it.
+function retailerMatchesBrandTags(r, b){
+  if(!r) return false;
+  const rTags = r.categoryTags;
+  if(!Array.isArray(rTags) || rTags.length===0) return true; // defensive: don't hide untagged
+  const brandTags = getBrandCategoryTags(b);
+  if(brandTags.length===0) return true; // brand has no resolvable category — show all (e.g. fresh onboarding)
+  for(let i=0;i<brandTags.length;i++){ if(rTags.indexOf(brandTags[i])>=0) return true; }
+  return false;
+}
+
 // Round-1 scope: VeyaFlow currently serves Beauty & Skincare and Wellness &
 // Supplements. Other categories are on the roadmap but not yet built. The
 // category list in onboarding STAYS visually broad to signal future direction,
@@ -12297,6 +12676,54 @@ const CLAIMS_RULES = {
 };
 // garment uses textile rules
 CLAIMS_RULES.garment = CLAIMS_RULES.textile;
+
+// Beauty accessories — sparse rules for non-applied items (combs, brushes, gua sha,
+// jade rollers, scrunchies, mirrors, applicators). Skin/hair efficacy claims are
+// inappropriate (no clinical pathway exists for non-applied products); focus on
+// material safety, ergonomics, durability, and sustainability. Closes the
+// CLAIMS_RULES.beauty_accessory gap surfaced in the BRAND audit (Apr 2026).
+CLAIMS_RULES.beauty_accessory = {
+  // ── Material & safety ──
+  'bpa free':              {status:'green', note:'Acceptable with material certificate on file'},
+  'phthalate free':        {status:'green', note:'Acceptable with material certificate on file'},
+  'food grade':            {status:'green', note:'Acceptable for items with food contact (e.g., reusable straws) with FCM 1935/2004 evidence'},
+  'fda food contact':      {status:'amber', note:'US standard — verify EU FCM 1935/2004 equivalence before use in EU markets'},
+  'hypoallergenic material':{status:'amber', note:'OK only if tested on the accessory\'s actual skin-contact pattern; generic hypoallergenic claim is not substantiable for accessories'},
+  // ── Ergonomic & functional ──
+  'ergonomic':             {status:'amber', note:'Acceptable with usability or pressure-distribution test data on file'},
+  'detangling':            {status:'green', note:'Functional descriptor — widely accepted'},
+  'gentle on hair':        {status:'amber', note:'Acceptable as functional claim if backed by user testing — avoid medical/therapeutic phrasing'},
+  'reduces breakage':      {status:'amber', note:'Functional claim — requires comparative test data; do not phrase as therapeutic'},
+  'anti-static':           {status:'amber', note:'Acceptable with material/coating evidence'},
+  // ── Durability & build ──
+  'handcrafted':           {status:'green', note:'Acceptable if production process documented'},
+  'durable':               {status:'amber', note:'Substantiate with use-cycle or stress test data'},
+  'reusable':              {status:'green', note:'Acceptable factual claim'},
+  'lifetime guarantee':    {status:'amber', note:'Requires written warranty terms — UK/EU consumer law applies'},
+  // ── Sustainability ──
+  'recycled':              {status:'green', note:'Acceptable with material % stated and traceability evidence'},
+  'biodegradable':         {status:'amber', note:'Green Claims Directive: must specify conditions and timeframe'},
+  'sustainable':           {status:'amber', note:'Green Claims Directive 2026: requires certification or specific evidence'},
+  'plastic free':          {status:'amber', note:'Substantiate with material composition document; do not use if any plastic component present'},
+  'cruelty free':          {status:'green', note:'Accepted'},
+  'vegan':                 {status:'green', note:'Accepted — relevant for natural-fibre brushes vs boar bristle, etc.'},
+  'organic':               {status:'amber', note:'Requires certification (GOTS for natural fibres) — cannot self-certify'},
+  'gots certified':        {status:'green', note:'Strong claim for natural-fibre accessories — include certificate number'},
+  // ── Cosmetic / efficacy claims — DISALLOWED for non-applied products ──
+  'dermatologist tested':  {status:'red',   note:'Inappropriate for accessories — implies cosmetic efficacy on a non-applied product'},
+  'dermatologist approved':{status:'red',   note:'Inappropriate for accessories — implies endorsement of cosmetic effect'},
+  'clinically proven':     {status:'red',   note:'Inappropriate for accessories — no clinical pathway exists for non-applied products'},
+  'clinically tested':     {status:'red',   note:'Inappropriate for accessories — no clinical pathway exists for non-applied products'},
+  'anti-aging':            {status:'red',   note:'Cosmetic efficacy claim — not permitted for accessories'},
+  'anti-ageing':           {status:'red',   note:'Cosmetic efficacy claim — not permitted for accessories'},
+  'reduces wrinkles':      {status:'red',   note:'Cosmetic efficacy claim — not permitted for accessories'},
+  'firms skin':            {status:'red',   note:'Cosmetic efficacy claim — not permitted for accessories'},
+  'lifts skin':            {status:'red',   note:'Cosmetic efficacy claim — not permitted for accessories'},
+  'medical grade':         {status:'red',   note:'Triggers MDR pathway — not appropriate for an accessory'},
+  'heals':                 {status:'red',   note:'Medical claim — not permitted'},
+  'pain relief':           {status:'red',   note:'Medical claim — would push accessory into medical-device pathway'},
+  'hypoallergenic':        {status:'red',   note:'Generic hypoallergenic claim is not substantiable for accessories — see "hypoallergenic material" if testing on actual skin-contact pattern exists'},
+};
 
 // ── READINESS RULES — per product type ────────────
 const FIELD_LABELS = {
@@ -18034,8 +18461,11 @@ function renderPitch(el){
   var _pitchMktObj = Object.values(MARKET_REGISTRY).find(function(m){return m.name===pitchForm.targetMarket;})||{};
   var _pitchMktId = _pitchMktObj.id;
   var _pitchCat = pitchForm.category||brand?.category||'Skincare & Beauty';
+  // Backstop (Apr 2026): _showAllRetailers bypasses the brand-categoryTags filter when
+  // the brand wants to see retailers outside their primary category (e.g. cross-merchandising).
+  var _pitchShowAll = !!pitchForm._showAllRetailers;
   var retailers = RETAILER_REGISTRY
-    .filter(function(r){return (r.market===_pitchMktId||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(_pitchMktId)))&&(r.categories||[]).includes(_pitchCat)&&(!r.futureMarket);})
+    .filter(function(r){return (r.market===_pitchMktId||(r.market==='EU_WIDE'&&r.markets&&r.markets.includes(_pitchMktId)))&&(_pitchShowAll||retailerMatchesBrandTags(r,brand))&&(!r.futureMarket);})
     .sort(function(a,b){var t={tier_1:1,tier_2:2,tier_3:3};return (t[a.accessTier]||9)-(t[b.accessTier]||9);})
     .map(function(r){return r.name;});
   if(!retailers.length) retailers = RETAILER_REGISTRY.filter(function(r){return r.market===_pitchMktId&&!r.futureMarket;}).map(function(r){return r.name;});
@@ -18068,6 +18498,11 @@ function renderPitch(el){
               <option value="">Select retailer…</option>
               ${retailers.map(r=>`<option${pitchForm.retailer===r?' selected':''}>${r}</option>`).join('')}
             </select>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem;letter-spacing:.04em">
+              ${_pitchShowAll
+                ? `Showing all retailers in ${pitchForm.targetMarket}. <span onclick="pitchForm._showAllRetailers=false;pitchForm.retailer='';renderPitch(document.getElementById('page-pitch'))" style="color:var(--gold);cursor:pointer;text-decoration:underline">← back to filtered</span>`
+                : `Filtered to your brand categories. <span onclick="pitchForm._showAllRetailers=true;renderPitch(document.getElementById('page-pitch'))" style="color:var(--gold);cursor:pointer;text-decoration:underline">Don't see your retailer? Show all</span>`}
+            </div>
           </div>
         </div>
         <div class="grid-2">
@@ -18609,10 +19044,13 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
     ? numbers.join(' | ')
     : 'Include 2-3 credible commercial proof points based on the brand description — flag clearly as estimates';
 
+  // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
+  const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
   const prompt = `You are a retail sales expert writing buyer pitch emails for a ${brand?.category||'consumer'} brand entering ${pitchForm.targetMarket}.
 
 BRAND: ${brand?.name||pitchForm.brandName}
-CATEGORY: ${brand?.category||pitchForm.category}
+CATEGORY: ${brand?.category||pitchForm.category}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 USP: ${brand?.usp||pitchForm.brandDesc}
 PRICE POINT: ${pitchForm.pricePoint||'Premium'}
 TARGET RETAILER: ${retailer}
@@ -20545,7 +20983,7 @@ function initCRMCards(){
   return RETAILER_REGISTRY
     .filter(r=>{
       // Always include retailers that explicitly list this brand category
-      if(brandCat && (r.categories||[]).includes(brandCat)) return true;
+      if(retailerMatchesBrandTags(r,brand)) return true;
       // If no specific category match, include if retailer type is channel-relevant
       if(relevantTypes && r.type && relevantTypes.includes(r.type)) return true;
       // If no brand category set, include everything
@@ -20583,8 +21021,12 @@ async function runCRMNLSearch(){
   renderPage('crm');
 
   // Build minimal registry context — enough for matching, not full spec
+  // Filter by brand categoryTags (Apr 2026): a beauty brand's NL search shouldn't
+  // surface fashion-only or food-only retailers. The "Don't see your retailer?" backstop
+  // (Task E) gives users an unfiltered escape hatch.
   const regContext = RETAILER_REGISTRY
     .filter(r=>!r.channelType)  // exclude travel retail
+    .filter(r=>retailerMatchesBrandTags(r,brand))
     .map(r=>({
       id:r.id, name:r.name, market:r.market, marketName:r.marketName,
       type:r.type||'', categories:r.categories||[],
@@ -23239,15 +23681,14 @@ function renderTargetRetailersPicker(){
   if(typeof RETAILER_REGISTRY === 'undefined') return '';
   var open = isTargetRetailersPickerOpen();
   var search = (window._targetRetailersSearch || '').toLowerCase().trim();
-  var brandCats = (typeof getBrandCategories === 'function') ? (getBrandCategories() || []) : [];
   var explicitTargets = (brand.targetRetailers || []);
   var effectiveTargets = getEffectiveTargetRetailers();
+  // Backstop (Apr 2026): _showAll bypasses the categoryTags filter for cross-merchandising cases
+  var showAll = !!window._targetRetailersShowAll;
 
-  // Filter retailers by brand category (if brand has none, show all). Then by
-  // the search input (matches name or marketName).
+  // Filter retailers by brand categoryTags. Then by search input (matches name or marketName).
   var filtered = RETAILER_REGISTRY.filter(function(r){
-    var catMatch = brandCats.length === 0 || (r.categories || []).some(function(c){ return brandCats.includes(c); });
-    if(!catMatch) return false;
+    if(!showAll && !retailerMatchesBrandTags(r, brand)) return false;
     if(!search) return true;
     var hay = ((r.name || '') + ' ' + (r.marketName || '')).toLowerCase();
     return hay.indexOf(search) >= 0;
@@ -23291,7 +23732,16 @@ function renderTargetRetailersPicker(){
         <div style="background:#fff;border:1px solid var(--border);padding:.85rem 1rem;margin-top:.4rem">
           <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.55;margin-bottom:.7rem">
             Choose retailers you're actively pursuing or planning to approach. We'll surface their range review windows, submission portal openings, and seasonal deadlines on your Brand Home.
-            ${brandCats.length ? `<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:block;margin-top:.25rem">Filtered to ${brandCats.join(' · ')}.</span>` : ''}
+            ${(function(){
+              var tags = (typeof getBrandCategoryTags === 'function') ? getBrandCategoryTags(brand) : [];
+              if(showAll){
+                return '<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:block;margin-top:.25rem">Showing all retailers across all categories. <span onclick="window._targetRetailersShowAll=false;renderPage(\'home\')" style="color:var(--gold);cursor:pointer;text-decoration:underline">← back to filtered</span></span>';
+              }
+              if(tags.length){
+                return '<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:block;margin-top:.25rem">Filtered to '+tags.join(' · ')+'. <span onclick="window._targetRetailersShowAll=true;renderPage(\'home\')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Don\'t see your retailer? Show all</span></span>';
+              }
+              return '';
+            })()}
           </div>
           <input type="text" placeholder="Search retailer name or market…" value="${(window._targetRetailersSearch||'').replace(/"/g, '&quot;')}"
             oninput="setTargetRetailersSearch(this.value);clearTimeout(window._targetRetailersSearchTimer);window._targetRetailersSearchTimer=setTimeout(function(){renderPage('home');setTimeout(function(){var s=document.getElementById('target-retailers-search');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},20)},200)"
@@ -23429,7 +23879,7 @@ function renderExpansionOverview(){
   const targetMkts = (brand.targetMarkets||[]).slice(0,3);
   const mktScores = targetMkts.map(mkt=>{
     const code = NAME_TO_CODE[mkt]||'DK';
-    const retailer = RETAILER_REGISTRY.find(r=>r.market===code&&(r.categories||[]).includes(brand.category||'')&&!r.futureMarket&&!r.channelType);
+    const retailer = RETAILER_REGISTRY.find(r=>r.market===code&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket&&!r.channelType);
     try{
       const rs = scoreReadiness(brand, sku||{}, code, retailer?.id||'');
       return {mkt: mkt.replace('United Kingdom','UK'), score: rs.total};
@@ -26042,7 +26492,7 @@ function smartEmpty(moduleId){
     return scored[0];
   })() : null;
   const topMarketName = topMarket?.market?.name||'Denmark';
-  const topRetailer = topMarket ? RETAILER_REGISTRY.find(r=>r.market===topMarket.marketCode&&(r.categories||[]).includes(brand?.category||'')) : RETAILER_REGISTRY[0];
+  const topRetailer = topMarket ? RETAILER_REGISTRY.find(r=>r.market===topMarket.marketCode&&retailerMatchesBrandTags(r,brand)) : RETAILER_REGISTRY[0];
   const topRetailerName = topRetailer?.name||'Matas';
 
   const configs = {
