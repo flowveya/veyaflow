@@ -4842,9 +4842,10 @@ function renderNextActions(){
     }
   }catch(e){}
 
-  const daysToMay8 = Math.ceil((new Date('2026-05-08')-new Date())/86400000);
-  if(daysToMay8>0&&daysToMay8<=30&&(getBrandCategories()||[]).some(c=>c.includes('Beauty')||c.includes('Skincare')||c.includes('Wellness')))
-    actions.push({icon:'🏪',label:'Apotek Hjärtat deadline in '+daysToMay8+'d',desc:'Prepare pitch before May 8 range review',page:'pitch',time:'15 min',urgent:true});
+  // Note: the Apotek Hjärtat May 8 deadline that previously appeared here as a
+  // hardcoded action is now governed by BRAND_HOME_ALERTS (with retailer gating
+  // via requiredRetailers). This deduplicates the alert and ensures all retailers
+  // are equal in the system — the brand's targeting determines what surfaces.
 
   if(!savedReports.length)
     actions.push({icon:'◎',label:'Generate your first Market Report',desc:'Full intelligence brief for your target market',page:'report',time:'3 min'});
@@ -5248,6 +5249,8 @@ function renderDashboard(el){
       ${renderSeasonalAlerts()}
       ${renderReferralNudge()}
       ${renderOverdueMilestoneAlert()}
+      ${renderTargetRetailersNudge()}
+      ${renderTargetRetailersPicker()}
 
       <!-- ══ COMPLIANCE RADAR ══════════════════════ -->
       ${renderComplianceRadar()}
@@ -23123,6 +23126,10 @@ const BRAND_HOME_ALERTS = [
     earlyShowDays: 60,  // start showing 60 days before
     requiredMarkets: ['Sweden'],  // at least one must match brand.targetMarkets OR brand.currentMarket
     requiredCategories: ['Skincare & Beauty', 'Wellness & Supplements'],  // at least one must match brand.category
+    // Retailer-specific: only surfaces when the brand is targeting Apotek Hjärtat
+    // (explicitly via brand.targetRetailers, OR implicitly via a CRM card or
+    // Submission Tracker entry for this retailer).
+    requiredRetailers: ['apotek_hjartat_se'],
     title: 'APOTEK HJÄRTAT — ARTICLE SUBMISSION DEADLINE',
     body: 'Apotek Hjärtat closes article submissions for the autumn/winter range on May 8. Miss this window and the next opportunity is the spring 2027 cycle. Sweden\'s largest pharmacy chain — 390 stores, 4M+ loyalty members.',
     primaryCta: { label: 'Generate Apotek Hjärtat pitch →', page: 'pitch' },
@@ -23137,12 +23144,177 @@ const BRAND_HOME_ALERTS = [
   //   earlyShowDays: 45,
   //   requiredMarkets: ['Denmark'],          // [] = show to all markets
   //   requiredCategories: ['Skincare & Beauty'],  // [] = show to all categories
+  //   requiredRetailers: ['matas_dk'],       // [] / omit = not retailer-specific
   //   title: 'RETAILER — SUBMISSION DEADLINE',
   //   body: 'Description of deadline and consequence.',
   //   primaryCta: { label: 'CTA text →', page: 'pitch' },
   //   secondaryCta: { label: 'CTA text →', page: 'report' },
   // },
 ];
+
+// Effective target retailers — the union of three signals:
+//   1. brand.targetRetailers (explicit picker selections)
+//   2. crmCards entries — any retailer the brand has a CRM card for, regardless of stage
+//   3. retailSubmissions entries — any retailer the brand has submitted to
+// Returns a deduplicated array of retailer ids (matching RETAILER_REGISTRY[].id).
+// "Engagement is the signal" — brands actively using the platform for a retailer
+// don't have to also explicitly mark it as a target.
+function getEffectiveTargetRetailers(){
+  if(!brand) return [];
+  var ids = new Set();
+  // 1. Explicit picker selections
+  (brand.targetRetailers || []).forEach(function(id){ if(id) ids.add(id); });
+  // 2. CRM cards. crmCards[].id IS the retailer-registry id (see initCRMCards).
+  if(typeof crmCards !== 'undefined' && Array.isArray(crmCards)){
+    crmCards.forEach(function(c){
+      // We previously cared only about "Pitched or higher" engagement, but the
+      // brief is explicit: any CRM card counts. A brand researching a retailer
+      // before pitching is still "in pursuit", and seeing the deadline helps.
+      if(c && c.id){
+        // Filter to "engaged" stages, otherwise every retailer in the seeded
+        // CRM (which includes all category-relevant retailers at not_contacted)
+        // would count, defeating the purpose.
+        if(c.stage && c.stage !== 'not_contacted') ids.add(c.id);
+      }
+    });
+  }
+  // 3. Submission Tracker entries
+  if(typeof retailSubmissions !== 'undefined' && Array.isArray(retailSubmissions)){
+    retailSubmissions.forEach(function(s){
+      if(s && s.retailerId) ids.add(s.retailerId);
+    });
+  }
+  return Array.from(ids);
+}
+
+// Picker open state — separate from the dismiss nudge state. Persists across
+// re-renders so checkbox toggles don't collapse the panel.
+function isTargetRetailersPickerOpen(){ return !!window._targetRetailersPickerOpen; }
+
+// Toggle a retailer in/out of brand.targetRetailers. Saves and re-renders.
+function toggleTargetRetailer(retailerId){
+  if(!brand) return;
+  if(!Array.isArray(brand.targetRetailers)) brand.targetRetailers = [];
+  var i = brand.targetRetailers.indexOf(retailerId);
+  if(i >= 0) brand.targetRetailers.splice(i, 1);
+  else brand.targetRetailers.push(retailerId);
+  saveBrandState();
+  renderPage('home');
+}
+
+// Search input — held on window so it survives re-render of the picker panel.
+function setTargetRetailersSearch(v){ window._targetRetailersSearch = v; }
+
+// One-line nudge shown when brand has zero effective targets AND has dismissed
+// nothing. Dismissable. Suppressed once user opens the picker for the first time.
+function renderTargetRetailersNudge(){
+  if(!brand) return '';
+  // Don't nudge if the user has already targeted retailers in any way
+  if(getEffectiveTargetRetailers().length > 0) return '';
+  // Don't nudge if dismissed
+  if(localStorage.getItem('ns_dismiss_target_retailers_nudge')) return '';
+  // Don't nudge if the picker is currently open (it's about to be visible
+  // anyway — no need to also nudge for it)
+  if(isTargetRetailersPickerOpen()) return '';
+  return `
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #3B82F6;padding:.65rem .9rem;margin-bottom:.85rem;display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap">
+      <div style="font-family:var(--sans);font-size:.72rem;color:#1E40AF;line-height:1.5">
+        <strong>Targeting specific retailers?</strong> Add them in your profile to see their deadlines here.
+      </div>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        <button onclick="window._targetRetailersPickerOpen=true;renderPage('home');setTimeout(function(){var el=document.getElementById('target-retailers-picker');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},80)"
+          class="btn-primary" style="font-size:.62rem;padding:.35rem .8rem">Pick retailers →</button>
+        <button onclick="localStorage.setItem('ns_dismiss_target_retailers_nudge','1');renderPage('home')"
+          style="background:none;border:1px solid #BFDBFE;font-family:var(--mono);font-size:.55rem;color:#1E40AF;cursor:pointer;padding:.25rem .55rem">Dismiss</button>
+      </div>
+    </div>
+  `;
+}
+
+// Picker block — surfaces inside the Compliance Radar area. Collapsible. Lists
+// retailers from RETAILER_REGISTRY filtered by the brand's category, grouped by
+// market. Search input narrows the list further.
+function renderTargetRetailersPicker(){
+  if(!brand) return '';
+  if(typeof RETAILER_REGISTRY === 'undefined') return '';
+  var open = isTargetRetailersPickerOpen();
+  var search = (window._targetRetailersSearch || '').toLowerCase().trim();
+  var brandCats = (typeof getBrandCategories === 'function') ? (getBrandCategories() || []) : [];
+  var explicitTargets = (brand.targetRetailers || []);
+  var effectiveTargets = getEffectiveTargetRetailers();
+
+  // Filter retailers by brand category (if brand has none, show all). Then by
+  // the search input (matches name or marketName).
+  var filtered = RETAILER_REGISTRY.filter(function(r){
+    var catMatch = brandCats.length === 0 || (r.categories || []).some(function(c){ return brandCats.includes(c); });
+    if(!catMatch) return false;
+    if(!search) return true;
+    var hay = ((r.name || '') + ' ' + (r.marketName || '')).toLowerCase();
+    return hay.indexOf(search) >= 0;
+  });
+
+  // Group by marketName
+  var byMarket = {};
+  filtered.forEach(function(r){
+    var m = r.marketName || 'Other';
+    if(!byMarket[m]) byMarket[m] = [];
+    byMarket[m].push(r);
+  });
+  var marketOrder = Object.keys(byMarket).sort();
+
+  function row(r){
+    var explicitlyChecked = explicitTargets.indexOf(r.id) >= 0;
+    var implicitFromEngagement = !explicitlyChecked && effectiveTargets.indexOf(r.id) >= 0;
+    var labelSuffix = implicitFromEngagement
+      ? '<span style="font-family:var(--mono);font-size:.5rem;color:#065F46;background:#ECFDF5;padding:.05rem .3rem;margin-left:.3rem;border:1px solid #A7F3D0">via CRM/Tracker</span>'
+      : '';
+    return '<label style="display:flex;align-items:center;gap:.4rem;padding:.3rem .15rem;cursor:pointer;font-family:var(--sans);font-size:.72rem;color:#333">' +
+      '<input type="checkbox" ' + (explicitlyChecked || implicitFromEngagement ? 'checked' : '') + ' ' +
+      (implicitFromEngagement ? 'disabled title="Auto-included because you have a CRM card or Submission Tracker entry for this retailer"' : '') +
+      ' onchange="toggleTargetRetailer(\'' + r.id + '\')">' +
+      r.name + labelSuffix +
+      '</label>';
+  }
+
+  return `
+    <div id="target-retailers-picker" style="margin-bottom:1.25rem">
+      <div onclick="window._targetRetailersPickerOpen=!window._targetRetailersPickerOpen;renderPage('home')"
+        style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:.4rem 0;display:flex;align-items:center;gap:.4rem;border-top:1px solid var(--border)">
+        <span style="color:#3B82F6">◎</span>
+        Target retailers
+        <span style="font-family:var(--mono);font-size:.5rem;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:.3rem">
+          ${effectiveTargets.length > 0 ? effectiveTargets.length + ' selected' : 'none — add to see deadlines'}
+        </span>
+        <span style="opacity:.5;margin-left:auto">${open ? '▴' : '▾'}</span>
+      </div>
+      ${open ? `
+        <div style="background:#fff;border:1px solid var(--border);padding:.85rem 1rem;margin-top:.4rem">
+          <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.55;margin-bottom:.7rem">
+            Choose retailers you're actively pursuing or planning to approach. We'll surface their range review windows, submission portal openings, and seasonal deadlines on your Brand Home.
+            ${brandCats.length ? `<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:block;margin-top:.25rem">Filtered to ${brandCats.join(' · ')}.</span>` : ''}
+          </div>
+          <input type="text" placeholder="Search retailer name or market…" value="${(window._targetRetailersSearch||'').replace(/"/g, '&quot;')}"
+            oninput="setTargetRetailersSearch(this.value);clearTimeout(window._targetRetailersSearchTimer);window._targetRetailersSearchTimer=setTimeout(function(){renderPage('home');setTimeout(function(){var s=document.getElementById('target-retailers-search');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},20)},200)"
+            id="target-retailers-search"
+            style="width:100%;padding:.45rem .65rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border);margin-bottom:.7rem">
+          ${marketOrder.length === 0 ? `
+            <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);padding:.7rem 0;text-align:center">No retailers match — try a different search term.</div>
+          ` : marketOrder.map(function(m){
+            return '<div style="margin-bottom:.65rem">' +
+              '<div style="font-family:var(--mono);font-size:.55rem;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:.3rem;padding-bottom:.2rem;border-bottom:1px solid var(--border)">' + m + ' · ' + byMarket[m].length + '</div>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.1rem">' +
+                byMarket[m].map(row).join('') +
+              '</div>' +
+            '</div>';
+          }).join('')}
+          <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.65rem;padding-top:.55rem;border-top:1px solid var(--border)">
+            Retailers with active CRM cards or Submission Tracker entries are auto-included. ${filtered.length} retailers shown.
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
 
 // Core gate function — returns true only if brand matches BOTH market AND category conditions
 function alertMatchesBrand(alertDef) {
@@ -23165,6 +23337,16 @@ function alertMatchesBrand(alertDef) {
     const brandCatsForAlert = getBrandCategories()||[brand?.category||''];
   const catMatch = reqCats.length===0 || reqCats.some(rc=>brandCatsForAlert.includes(rc));
     if (!catMatch) return false;
+  }
+
+  // Retailer gate — requiredRetailers: at least one must match brand's effective
+  // targeted retailers (explicit picker + CRM cards + Submission Tracker entries).
+  // If unset/empty, alert is not retailer-specific and passes this gate.
+  const reqRetailers = alertDef.requiredRetailers || [];
+  if (reqRetailers.length > 0) {
+    const targeted = getEffectiveTargetRetailers();
+    const retailerMatch = reqRetailers.some(r => targeted.includes(r));
+    if (!retailerMatch) return false;
   }
 
   return true;
