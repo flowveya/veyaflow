@@ -1233,6 +1233,24 @@ function loadState(){
     const sf=localStorage.getItem('ns_supplierFilter');
 
     if(b) brand=safeJsonParse(b);
+    // Self-healing migration (Apr 2026): if onboarding flow ran in a prior
+    // session before the categories[] sync fix, brand.categories[] may be stale
+    // or missing while brand.category is current. Re-sync from canonical
+    // brand.category so Profile panel and sidebar agree. Idempotent — runs every
+    // load, no-ops once fields agree. Touches only brand.categories[] (the array
+    // form); brand.categoryTags is unaffected.
+    if(brand && brand.category){
+      const canonical = [brand.category];
+      const cur = Array.isArray(brand.categories) ? brand.categories : null;
+      const outOfSync = !cur || cur.length !== 1 || cur[0] !== brand.category;
+      // Preserve genuine multi-category state set via setup modal (e.g. ['Beauty','Wellness'])
+      // — only resync when categories[] is missing, empty, or single-element-but-mismatched.
+      const isGenuineMulti = cur && cur.length > 1 && cur.indexOf(brand.category) >= 0;
+      if(outOfSync && !isGenuineMulti){
+        brand.categories = canonical;
+        try{localStorage.setItem('ns_brand', JSON.stringify(brand));}catch(e){}
+      }
+    }
     if(r) savedReports=safeJsonParse(r)||[];
     if(rf){ const v=safeJsonParse(rf); Object.assign(reportForm,v); }
     if(rs){ const v=safeJsonParse(rs); if(v.result) reportState=v; }
@@ -2941,6 +2959,15 @@ function completeOnboardWithSku(){
 
 function completeOnboard(){
   brand={...onboardForm,createdAt:new Date().toISOString()};
+  // Sync brand.categories[] from current onboarding pick (Apr 2026 fix).
+  // PRE-fix: completeOnboard spread {...onboardForm} into brand without explicitly
+  // setting categories[]. If a user used Edit→ to re-onboard, brand.categories[]
+  // from the old session was copied into onboardForm by resetBrand and then
+  // spread back into brand — preserving stale data while brand.category took the
+  // new pick. Profile panel (reads getBrandCategories → categories[]) and sidebar
+  // (reads brand.category) diverged. Setting categories[] explicitly here keeps
+  // both write paths (onboarding + setup modal) in lockstep.
+  brand.categories = onboardForm.category ? [onboardForm.category] : [];
   // Derive categoryTags from primary category + secondary-flag answer (Apr 2026 brief).
   // Tags drive presentation-layer filtering across pickers, prompts, and search.
   brand.categoryTags = deriveCategoryTagsFromOnboardForm(onboardForm);
@@ -5480,12 +5507,18 @@ function markPresetReportRun(market){
 }
 
 function renderReport(el){
-  // Layer 1 — Brand Constants: pull from profile, never ask again
-  if(!reportForm.brandName)    reportForm.brandName    = brand?.name||'';
-  if(!reportForm.category)     reportForm.category     = brand?.category||'';
-  if(!reportForm.currentMarket)reportForm.currentMarket= brand?.currentMarket||'Sweden';
-  if(!reportForm.skus)         reportForm.skus         = brand?.skus||'';
-  if(!reportForm.brandDesc)    reportForm.brandDesc    = brand?.usp||'';
+  // Layer 1 — Brand Constants: ground-truth from canonical brand state on every entry.
+  // PRE-Apr-2026: these were `if(!reportForm.X) reportForm.X = brand?.X` — fallback-only-if-empty.
+  // That preserved stale persisted reportForm values across category/SKU changes (e.g. a user
+  // who ran a Wellness report a week ago would keep generating Wellness reports even after
+  // switching their brand to Beauty, because reportForm.category was already truthy). Now:
+  // brand is canonical, reportForm is working draft, draft syncs from canonical on entry.
+  // Same pattern applied uniformly across all mirrored fields.
+  reportForm.brandName     = brand?.name           || reportForm.brandName     || '';
+  reportForm.category      = brand?.category       || reportForm.category      || '';
+  reportForm.currentMarket = brand?.currentMarket  || reportForm.currentMarket || 'Sweden';
+  reportForm.skus          = brand?.skus           || reportForm.skus          || '';
+  reportForm.brandDesc     = brand?.usp            || reportForm.brandDesc     || '';
 
   const loadingHTML = `
     <div style="padding:1.25rem">
@@ -11368,8 +11401,9 @@ function renderCompareResult(){
 }
 
 function renderCompare(el){
-  if(!compareForm.brandName) compareForm.brandName=brand?.name||'';
-  if(!compareForm.category)  compareForm.category=brand?.category||'';
+  // Always refresh from canonical brand state (Apr 2026 — same pattern as renderReport)
+  compareForm.brandName = brand?.name     || compareForm.brandName || '';
+  compareForm.category  = brand?.category || compareForm.category  || '';
   el.innerHTML=`
     <div class="topbar">
       <div>
@@ -18505,12 +18539,12 @@ function renderPrePitchBrief(retailerEntry, market){
 function renderPitch(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  // Pre-fill from brand profile
-  if(!pitchForm.brandName)       pitchForm.brandName       = brand?.name||'';
-  if(!pitchForm.category)        pitchForm.category        = brand?.category||'';
-  if(!pitchForm.existingMarkets) pitchForm.existingMarkets = brand?.currentMarket||'Sweden';
-  if(!pitchForm.brandDesc)       pitchForm.brandDesc       = brand?.usp||'';
-  if(!pitchForm.pricePoint)      pitchForm.pricePoint      = brand?.pricePoint||'';
+  // Pre-fill from brand profile — always refresh from canonical brand state (Apr 2026)
+  pitchForm.brandName       = brand?.name          || pitchForm.brandName       || '';
+  pitchForm.category        = brand?.category      || pitchForm.category        || '';
+  pitchForm.existingMarkets = brand?.currentMarket || pitchForm.existingMarkets || 'Sweden';
+  pitchForm.brandDesc       = brand?.usp           || pitchForm.brandDesc       || '';
+  pitchForm.pricePoint      = brand?.pricePoint    || pitchForm.pricePoint      || '';
 
   // Retailer options by market
   // Build retailer list from registry — always current, includes all new retailers
