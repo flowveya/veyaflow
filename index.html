@@ -576,6 +576,146 @@
     z-index: 50;
     box-shadow: 0 -2px 8px rgba(15,23,42,.04);
   }
+
+  /* ── Print stylesheet — Market Entry Report PDF export (Apr 2026) ─────── */
+  /* On screen, .vf-print-only elements are hidden. On print, .vf-no-print
+     elements are hidden. Print-only header/footer are position:fixed so the
+     browser paints them on every printed page. The .vf-printing body class
+     is added by exportReportPdf() before window.print() and lets us trigger
+     print-specific layout for browsers that don't fully respect @media print
+     during dialog preview (Safari historically). */
+  .vf-print-only { display: none; }
+
+  @media print {
+    /* Page geometry */
+    @page {
+      size: A4;
+      margin: 22mm 18mm 18mm 18mm;
+    }
+
+    /* Color fidelity — keep brand navy and traffic-light statuses on print */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
+    /* Hide app chrome and interactive surfaces */
+    .vf-no-print,
+    #sidebar, #sidebar-nav, .s-nav, .s-footer,
+    #brand-pill, .brand-pill, #reg-strip, .reg-strip,
+    #mobile-nav, #mob-drawer, #mob-drawer-overlay,
+    .mob-nav-icon, .mob-nav-label, .mob-header-title, .mob-header-brand, .mob-header-sub,
+    .topbar, .nav-section-tabs, #sidebar-trial-badge,
+    .vf-sticky-actions,
+    button, .btn-primary, .btn-outline, .btn-gold,
+    #vf-pricing-modal, #vf-setup-modal,
+    .vf-tip {
+      display: none !important;
+    }
+
+    /* Reveal print-only elements */
+    .vf-print-only { display: block !important; }
+
+    /* Reset body so the report fills the page */
+    html, body {
+      background: #fff !important;
+      color: #1a1a1a;
+      font-size: 11pt;
+      line-height: 1.4;
+    }
+    body, #app, .layout, .main, .content, .page, .page-wrap {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      display: block !important;
+      grid-template-columns: none !important;
+    }
+
+    /* Print-only header (top of every page) and footer (bottom of every page).
+       position:fixed elements outside the flow are repeated by the browser on
+       each printed page. */
+    .vf-print-header, .vf-print-footer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+      font-size: 8pt;
+      color: #555;
+      letter-spacing: .04em;
+      display: flex !important;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4mm 0;
+    }
+    .vf-print-header { top: 0; border-bottom: .3pt solid #d4cdc2; }
+    .vf-print-footer { bottom: 0; border-top: .3pt solid #d4cdc2; }
+    .vf-print-header span, .vf-print-footer span { display: inline-block; }
+
+    /* Force section breaks at each numbered section heading */
+    .report-section {
+      page-break-before: always;
+      break-before: page;
+      page-break-inside: auto; /* allow long sections to flow across pages */
+      padding: 4mm 0 6mm 0 !important;
+      margin: 0 !important;
+      border-left: none !important;
+      border-bottom: .3pt solid #d4cdc2 !important;
+    }
+    /* First section (Executive Summary) doesn't need a page break — flows
+       directly under the report header */
+    .report-section:first-of-type {
+      page-break-before: avoid;
+      break-before: avoid;
+    }
+
+    /* Avoid splitting tables, cards, and confidence pills across pages */
+    table, .saved-report, .compliance-pill, .confidence-card {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 4pt 6pt; border-bottom: .3pt solid #d4cdc2; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+
+    /* Report header — preserve brand navy on print */
+    .report-header {
+      background: #1B2D4F !important;
+      color: #fff !important;
+      padding: 8mm 6mm !important;
+      margin: 0 0 6mm 0 !important;
+    }
+    .report-header * { color: rgba(255,255,255,.92) !important; }
+    .report-brand { font-size: 18pt !important; }
+
+    /* Section title typography */
+    .report-section-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 13pt;
+      color: #1B2D4F !important;
+      margin: 0 0 3mm 0;
+    }
+
+    /* Anchor jump-buttons row, section nav, expand controls — hide */
+    #section-jump { display: none !important; }
+
+    /* Headings shouldn't orphan from body */
+    h1, h2, h3, .report-section-title {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    /* Links: print URL after for context, but only for external links */
+    a[href^="http"]::after {
+      content: " (" attr(href) ")";
+      font-size: 8pt;
+      color: #888;
+    }
+    /* But not for internal anchors or the brand-pack magic link inside the report */
+    a[href^="#"]::after, a.no-print-url::after { content: ""; }
+  }
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- jsPDF loaded lazily on first PDF export -->
@@ -5474,6 +5614,69 @@ function deleteReport(id){
   updateSidebarBrand();
   renderPage('home');
 }
+
+// ── Small HTML-escape util (Apr 2026) ───────────────────────────────────
+// Used by print-only header/footer where brand name and market names are
+// interpolated into the DOM. Defends against any user-supplied brand name
+// containing characters that would break HTML rendering in the print layout.
+function escapeHtml(s){
+  if(s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ── PDF export — Market Entry Report (Apr 2026) ─────────────────────────
+// Uses the browser's native Save-as-PDF flow via window.print(). The print
+// stylesheet hides app chrome and forces clean section breaks. document.title
+// is set to a descriptive pattern before printing so most browsers use it as
+// the default save filename, then restored on afterprint.
+function _sanitizeForFilename(s){
+  if(!s) return '';
+  return String(s)
+    .replace(/&/g, 'and')
+    .replace(/[^A-Za-z0-9]+/g, '')
+    .slice(0, 50);
+}
+
+function exportReportPdf(){
+  const r = reportState && reportState.result;
+  if(!r){ alert('No report to export.'); return; }
+
+  // Mobile graceful fallback — print-to-PDF is unreliable on mobile browsers.
+  // Surface the feature but redirect users to desktop.
+  if(window.innerWidth < 768){
+    alert('Export to PDF works best on desktop. Open this report on a laptop or desktop browser to save as PDF.');
+    return;
+  }
+
+  // Build descriptive filename: VeyaFlow_MarketEntryReport_CloudGlow_Norway_2026-04-30.pdf
+  const today = new Date().toISOString().slice(0,10);
+  const brandSafe  = _sanitizeForFilename(r.brandName) || 'Brand';
+  const marketSafe = _sanitizeForFilename(r.targetMarket) || 'Market';
+  const filename = 'VeyaFlow_MarketEntryReport_' + brandSafe + '_' + marketSafe + '_' + today;
+
+  const _originalTitle = document.title;
+  document.title = filename;
+
+  // Restore title after print dialog closes (or is cancelled).
+  // afterprint fires in Chrome/Safari/Firefox after the dialog is dismissed.
+  const restore = function(){
+    document.title = _originalTitle;
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+
+  // Belt-and-braces: fallback timeout in case afterprint doesn't fire (rare,
+  // but possible on some browser/version combinations)
+  setTimeout(function(){ if(document.title === filename) document.title = _originalTitle; }, 30000);
+
+  window.print();
+}
+
 function expandReport(id){
   const r=savedReports.find(x=>x.id===id);
   if(!r)return;
@@ -10894,6 +11097,16 @@ function renderReportResult(){
   const sectionAccents=["#1E3A5F","#10B981","#F59E0B","#EF4444","#8B5CF6","#0EA5E9","#C4A882","#1E3A5F"];
 
   return `
+    <!-- Print-only header + footer (Apr 2026 — PDF export) -->
+    <div class="vf-print-only vf-print-header">
+      <span>VeyaFlow Market Entry Report</span>
+      <span>${escapeHtml(r.brandName||'')} · ${escapeHtml(r.currentMarket||'Sweden')} → ${escapeHtml(r.targetMarket||'')}</span>
+    </div>
+    <div class="vf-print-only vf-print-footer">
+      <span>Generated ${new Date(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})||r.date} · veyaflow.com</span>
+      <span>Page <span class="vf-page-num"></span></span>
+    </div>
+
     <div class="report-header">
       <div class="report-badge">Market Entry Intelligence Report · VeyaFlow</div>
       <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.3);letter-spacing:.08em;margin-bottom:.2rem">GENERATED FOR</div>
@@ -10991,15 +11204,16 @@ function renderReportResult(){
     </div>
 
     <!-- Action bar -->
-    <div style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1.25rem;margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+    <div class="vf-no-print" style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1.25rem;margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
       <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Generated ${new Date(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})||r.date} · Data current April 2026</div>
       <button class="btn-outline" onclick="reportForm.competitorsVerified=false;generateReport()" style="font-size:.65rem">↻ Update report</button>
     </div>
-    <div style="display:flex;gap:.75rem;margin-top:.75rem;padding-bottom:1.5rem;flex-wrap:wrap">
+    <div class="vf-no-print" style="display:flex;gap:.75rem;margin-top:.75rem;padding-bottom:1.5rem;flex-wrap:wrap">
       <button class="btn-outline" onclick="reportState={loading:false,result:null,sections:[]};reportForm.targetMarket='';renderPage('report')">← New report</button>
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
+      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Export to PDF</button>
     </div>
   `;
 }
