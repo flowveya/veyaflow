@@ -5348,6 +5348,7 @@ function renderDashboard(el){
             <button class="btn-outline" onclick="showPage('report')" style="font-size:.65rem;padding:.3rem .7rem">+ New report</button>
           </div>
           ${reports.length===0?smartEmpty("report"):reports.map(r=>`
+            ${renderContextFixNotice(r.id)}
             <div class="saved-report" onclick="expandReport('${r.id}')">
               <div style="display:flex;justify-content:space-between">
                 <div>
@@ -5390,6 +5391,56 @@ function resetBrand(){
   brand=null;
   renderPage('home');
 }
+// ── Context-fix notice (Apr 2026) ────────────────────────────────────────
+// Reports generated before this date used the broken module-top-level brandCtx
+// pattern that froze user state at module load. Surfacing a notice on those
+// saved reports so users can regenerate against current state.
+// Remove this block + the renderContextFixNotice usage after one release cycle.
+const CONTEXT_FIX_DEPLOY_DATE = '2026-04-29T00:00:00.000Z';
+
+function isReportPreContextFix(r){
+  if(!r) return false;
+  // Prefer explicit generatedAt; fall back to numeric id (Date.now() string).
+  let ts = null;
+  if(r.generatedAt) ts = new Date(r.generatedAt).getTime();
+  else if(r.id && /^\d+$/.test(r.id)) ts = parseInt(r.id, 10);
+  if(ts == null || isNaN(ts)) return true; // unknown timestamp → assume pre-fix
+  return ts < new Date(CONTEXT_FIX_DEPLOY_DATE).getTime();
+}
+
+function isContextFixNoticeDismissed(reportId){
+  try {
+    const raw = localStorage.getItem('ns_report_notice_dismissed');
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) && list.indexOf(String(reportId)) >= 0;
+  } catch(e) { return false; }
+}
+
+function dismissContextFixNotice(reportId){
+  try {
+    const raw = localStorage.getItem('ns_report_notice_dismissed');
+    const list = (raw ? JSON.parse(raw) : []) || [];
+    if(list.indexOf(String(reportId)) < 0) list.push(String(reportId));
+    localStorage.setItem('ns_report_notice_dismissed', JSON.stringify(list));
+  } catch(e) {}
+  renderPage('home');
+}
+
+function renderContextFixNotice(reportId){
+  if(!isReportPreContextFix({id:reportId, generatedAt:null}) && !savedReports.find(function(r){return String(r.id)===String(reportId);})) return '';
+  const r = savedReports.find(function(x){return String(x.id)===String(reportId);});
+  if(!r) return '';
+  if(!isReportPreContextFix(r)) return '';
+  if(isContextFixNoticeDismissed(reportId)) return '';
+  return '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-left:3px solid #F59E0B;padding:.55rem .75rem;margin:0 0 .35rem 0;display:flex;align-items:flex-start;gap:.5rem;font-family:var(--sans);font-size:.7rem;line-height:1.5;color:#78350F">' +
+    '<span style="font-family:var(--mono);font-size:.55rem;color:#92400E;letter-spacing:.04em;flex-shrink:0;margin-top:.05rem">⚠</span>' +
+    '<div style="flex:1">' +
+      'This report was generated before April 29, 2026, when a context-handling bug was fixed. Output may be incomplete. Regenerate for accurate results.' +
+    '</div>' +
+    '<span onclick="event.stopPropagation();dismissContextFixNotice(\'' + reportId + '\')" style="cursor:pointer;color:#92400E;font-family:var(--mono);font-size:.65rem;flex-shrink:0;padding:0 .25rem">✕</span>' +
+  '</div>';
+}
+
 function deleteReport(id){
   savedReports=savedReports.filter(r=>r.id!==id);
   saveReportState();
@@ -10214,13 +10265,34 @@ function confirmPricingAndGenerate(){
   generateReport();
 }
 
-  // EU BASE LAYER — shared across all EU/EEA markets
+
+async function generateReport(){
+  // Always clear previous result and render loading state immediately
+  reportState={loading:true,result:null,sections:[]};
+  renderPage('report');
+  // Category-aware retailer intelligence
+  const cat = reportForm.category;
+  const mkt = reportForm.targetMarket;
+  const isBeauty = cat==='Skincare & Beauty';
+  const isFood = cat==='Food & Beverage';
+  const isWellness = cat==='Wellness & Supplements';
+  const isFashion = cat==='Fashion & Apparel';
+
+  // ── Prompt context (built at runtime against current user state) ───────────
+  // PRE-Apr-2026: these declarations lived as module-top-level orphans, capturing
+  // empty reportForm / brand / skus snapshots at module load. Every Market Entry
+  // Report shipped with frozen "BRAND: " (empty), "CATEGORY: " (empty), etc. —
+  // the AI then fell through to structural-assumption output ("NOTICE: INCOMPLETE
+  // BRIEF"). Moved inside generateReport so they evaluate against current state.
+
+  // EU base layer — shared across all EU/EEA markets (no per-country repetition)
   const EU_BASE = {
     "Skincare & Beauty": "EU COSMETICS REGULATION (EC) 1223/2009 applies across all EU/EEA markets: (1) CPNP notification at portal.cpnp.eu before placing on market, (2) EU Responsible Person with EU address mandatory, (3) Product Information File (PIF) including safety assessment by qualified safety assessor, (4) INCI ingredient list in descending order, (5) CMR substance restrictions. These requirements are IDENTICAL in Denmark, Germany, Netherlands, France, Belgium, Austria, Sweden, Norway, Finland — do not repeat them per-country. Instead note only the country-specific additions below.",
     "Food & Beverage": "EU FOOD INFORMATION REGULATION (EU) 1169/2011 applies across all EU/EEA markets: mandatory nutrition declaration, 14 major allergens highlighted, net quantity, best before/use by, storage conditions, country of origin for certain products. These apply identically in all EU markets. Note only country-specific additions.",
     "Wellness & Supplements": "EU FOOD SUPPLEMENTS DIRECTIVE 2002/46/EC applies across all EU/EEA markets: notification to national authority before first placement, EU health claims from Regulation 1924/2006 only (no disease claims), INCI/ingredient list. These apply identically in all EU markets. Note only country-specific additions.",
   };
 
+  // Per-market compliance detail — indexed by reportForm.targetMarket × category
   const complianceDetail={
     "United Kingdom":{"Skincare & Beauty":"UK SI 2019/696 (post-Brexit, separate from EU): UK Responsible Person with UK address required, SCPN notification via OPSS portal (opss.gov.uk), English-language INCI, UKCA mark. EU CPNP does NOT cover UK — separate UK notification mandatory. Timeline 4-8 weeks, cost GBP 500-1500. UK organic: Soil Association (EU organic logo not valid).","Food & Beverage":"UK FIR 2014: English ingredients, 14 allergens, UK Nutrition Facts format (not EU format). FSA novel food approval if applicable. UK importer address on pack. UKORG for organic. APHA health certs for animal products.","Wellness & Supplements":"MHRA borderline product review. UK Nutrition and Health Claims Regs 2007. UK Food Supplements Regs 2003. UK Responsible Person if borderline medicine."},
     "Germany":{"Skincare & Beauty":"EU BASE applies (see above). Germany-specific additions: VerpackG packaging registration mandatory (Der Gruene Punkt or Interseroh) — register at verpackungsregister.org before first sale. German-language INCI preferred. INCI warning texts in German. Timeline 6-10 weeks total, cost EUR 800-2000.","Food & Beverage":"EU BASE applies. Germany-specific: VerpackG mandatory. BVL notification for supplements. German-language labels mandatory. Organic: DE-OeKO-006 logo.","Wellness & Supplements":"EU BASE applies. Germany-specific: LFGB German Food Code compliance. Notify BVL (bvl.bund.de) before market placement. VerpackG mandatory. Nahrungsergaenzungsmittelverordnung (NemV)."},
@@ -10239,12 +10311,15 @@ function confirmPricingAndGenerate(){
     "Singapore":{"Skincare & Beauty":"Health Sciences Authority (HSA) — notification via PRISM portal before import. Singapore standard (SS ISO 22716 GMP) compliance. English labelling. HSA active on illegal whitening/anti-ageing claims. Halal certification useful for broader market access. Singapore importer required.","Food & Beverage":"Singapore Food Agency (SFA). English labelling. Novel food notification. Halal (MUIS) for Muslim consumer segment.","Wellness & Supplements":"HSA health products regulation. English labelling. No unsubstantiated health claims."},
   }[reportForm.targetMarket]?.[reportForm.category] || `Consult local regulatory counsel in ${reportForm.targetMarket} for ${reportForm.category} requirements.`;
 
-  // Build verified competitor pricing context
-  // Competitor prices not collected — AI to describe ranges honestly
+  // Static pricing-context guardrail — keeps AI honest about what we did/didn't verify
   const priceContext = 'COMPETITOR PRICING: Do not invent specific competitor prices or name specific brand prices. Instead describe the pricing tier landscape: what the mass, mid, premium, and prestige tiers look like in this market and category (price ranges only). If you cannot verify a specific figure, say so.';
 
+  // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
+  const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
+  // Brand context — single template literal, evaluated against CURRENT user state
   const brandCtx = `BRAND: ${reportForm.brandName}
-CATEGORY: ${reportForm.category}
+CATEGORY: ${reportForm.category}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 KEY PRODUCTS/SKUs: ${reportForm.skus||'Premium products in this category'}
 PRICE POSITIONING: ${reportForm.pricePoint||'Premium'} (${brand?.annualRevenue?'Revenue: '+brand.annualRevenue:''})
 HOME MARKET: ${reportForm.currentMarket||'Sweden'}
@@ -10256,26 +10331,6 @@ PROOF POINTS: ${[brand?.annualRevenue,brand?.socialFollowers,brand?.pressCount,b
 ${reportForm.newProof?'NEW SINCE LAST REPORT: '+reportForm.newProof:''}
 ${reportForm.launchBudget?'LAUNCH BUDGET: '+reportForm.launchBudget+' SEK':''}${reportForm.additionalInfo?'\nSPECIFIC FOCUS: '+reportForm.additionalInfo:''}
 ${priceContext}`;
-
-async function generateReport(){
-  // Always clear previous result and render loading state immediately
-  reportState={loading:true,result:null,sections:[]};
-  renderPage('report');
-  // Category-aware retailer intelligence
-  const cat = reportForm.category;
-  const mkt = reportForm.targetMarket;
-  const isBeauty = cat==='Skincare & Beauty';
-  const isFood = cat==='Food & Beverage';
-  const isWellness = cat==='Wellness & Supplements';
-  const isFashion = cat==='Fashion & Apparel';
-
-  // Product-type awareness (Apr 2026) — surfaces device/accessory specifics that
-  // brand category alone misses. Built at runtime here (not at module load) so it
-  // reflects current SKUs. Augments the top-level brandCtx for prompt use.
-  const _productTypesPromptCtx = getProductTypesPromptContext(skus);
-  const brandCtxWithTypes = _productTypesPromptCtx
-    ? brandCtx.replace(/CATEGORY: ([^\n]+)\n/, 'CATEGORY: $1\n'+_productTypesPromptCtx+'\n')
-    : brandCtx;
 
   // Switzerland compliance alert — injected into every module when CH selected
   const isSwiss = mkt==='Switzerland';
@@ -10390,7 +10445,7 @@ Galaxus (Migros Digital): single listing covers 9 EU markets — highest cross-m
       confidence: confidence.market,
       prompt: `You are VeyaFlow AI — specialist Nordic brand market entry intelligence. April 2026. Board-ready output.
 
-${brandCtxWithTypes}
+${brandCtx}
 
 ADDRESSABLE SHELF DATA FOR ${reportForm.targetMarket.toUpperCase()}:
 Key retailers: ${categoryRetailers.slice(0,300)}
@@ -10445,7 +10500,7 @@ THE GAP: One sentence — exact positioning territory available right now.`
       confidence: confidence.retail,
       prompt: `You are VeyaFlow AI. April 2026. Writing for a founder preparing for a buyer meeting.
 
-${brandCtxWithTypes}
+${brandCtx}
 
 FOUNDER-VERIFIED NEGOTIATION INTELLIGENCE (inject as facts):
 ${(relevantNegIntel||targetRetailerIntel||categoryRetailers).slice(0,600)}
@@ -10490,7 +10545,7 @@ Yes/no: is this market profitable at Year 1 realistic volumes?`
       confidence: confidence.compliance,
       prompt: `You are VeyaFlow AI — compliance specialist. April 2026.
 
-${brandCtxWithTypes}
+${brandCtx}
 TARGET MARKET: ${reportForm.targetMarket}
 ${reportForm.targetMarket==='Germany'?'\n⚠ GERMANY CLAIMS NOTE: Germany has Europe\'s strictest claims enforcement. All claims require review before DE market entry under UWG (Gesetz gegen den unlauteren Wettbewerb). Anti-aging must be rephrased. Natural requires % breakdown. Clinically proven requires German-standard study. Budget 3-6 weeks claims review and EUR 2,000-6,000 legal review cost.\n':''}
 COMPLIANCE RULES: ${euBase.slice(0,400)}
@@ -10594,7 +10649,7 @@ Month by month April 2026 → first sale. Total investment: LOW — HIGH`
       confidence: confidence.financial,
       prompt: `You are VeyaFlow AI — market entry strategist. April 2026. Board-document quality.
 
-${brandCtxWithTypes}
+${brandCtx}
 DISTRIBUTOR OPTIONS: ${distributors}
 NEGOTIATION INTEL: ${relevantNegIntel.slice(0,400)||'Key retailers: '+categoryRetailers}
 
@@ -10731,6 +10786,7 @@ Full 3-year total: LOW — HIGH | Payback: X months from first listing`
     targetMarket:reportForm.targetMarket,
     pricePoint:reportForm.pricePoint,
     date:new Date().toLocaleDateString('sv-SE'),
+    generatedAt:new Date().toISOString(),  // Apr 2026 — explicit ISO timestamp for context-fix notice gating
     generatedBy:brand?.userName||null,
     sections:completedSections
   };
