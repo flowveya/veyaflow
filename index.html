@@ -11142,6 +11142,15 @@ function renderReportResult(){
       </div>
     </div>
 
+    <!-- Top action bar — mirrors the bottom row (Apr 2026) -->
+    <div class="vf-no-print" style="display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+      <button class="btn-outline" onclick="reportState={loading:false,result:null,sections:[]};reportForm.targetMarket='';renderPage('report')">← New report</button>
+      <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
+      <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
+      <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
+      <span class="vf-pdf-hint" style="margin-left:auto;align-self:center;font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.04em;line-height:1.4;max-width:14rem;text-align:right">Choose 'Save as PDF' as destination in the print dialog</span><button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF">⤓ Save as PDF</button>
+    </div>
+
     <!-- Section navigation -->
     <div id="section-jump" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.25rem;padding:.75rem 1rem;background:#fff;border:1px solid var(--border)">
       <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);align-self:center;margin-right:.25rem">Jump to:</span>
@@ -11213,7 +11222,7 @@ function renderReportResult(){
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
-      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Export to PDF</button>
+      <span class="vf-pdf-hint" style="margin-left:auto;align-self:center;font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.04em;line-height:1.4;max-width:14rem;text-align:right">Choose 'Save as PDF' as destination in the print dialog</span><button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF">⤓ Save as PDF</button>
     </div>
   `;
 }
