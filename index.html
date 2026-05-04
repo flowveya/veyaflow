@@ -10284,6 +10284,446 @@ const RETAILER_INTEL = Object.fromEntries(
 
 
 /* ═══════════════════════════════════════════════════
+   ATM STAGE 1 — Versioned schema model + storage primitives
+   (May 2026, Task A)
+
+   ATM = Active Template Management. Converts a brand's structured
+   masterdata (My Products) into retailer-specific submission files.
+
+   This section is the data layer ONLY:
+     - Storage primitives (localStorage keys, init, read/write helpers)
+     - Constructor functions for the three record types
+     - Staleness skeleton (Task C will flesh out)
+     - General-purpose calibration outcome primitive (Task G)
+     - SHA-256 content hash via SubtleCrypto (async)
+
+   Tasks B (admin UI) and C (staleness signals) build on top.
+   No UI here. No behaviour change visible to users. New empty arrays
+   in localStorage on first load.
+
+   Operational commitments (per founder brief):
+     - Not coupled to Market Entry Report or any current artifact shape
+     - Records addressable by primitive identifiers (retailerId, brandId,
+       skuIds, timestamp, templateVersion) — any future module can consume
+     - Staleness queryable via getTemplateStaleness(retailerId) primitive,
+       not via a Compliance-Radar-shaped read
+     - Outcome record is general-purpose calibration data, not ATM-specific:
+       fields support Readiness Score recalibration, Compare Markets axis
+       weighting, AI prompt accuracy validation in addition to ATM template
+       staleness signals (Task C Layer 2).
+
+   Storage migration: localStorage acceptable for Stage 1. Cross-device
+   sync flagged before Stage 3 — see [HEADLINE] cross-device sync pending.
+═══════════════════════════════════════════════════ */
+
+// ── Storage keys ──────────────────────────────────
+const ATM_STORAGE_KEY_TEMPLATES = 'ns_atm_templates';
+const ATM_STORAGE_KEY_OUTCOMES  = 'ns_atm_outcomes';
+const ATM_STORAGE_KEY_AUDIT     = 'ns_atm_audit';
+
+// ── Staleness thresholds (days) ───────────────────
+// Per brief Task C Layer 1:
+//   Green: verified within last 90 days
+//   Amber: 90–365 days
+//   Red:   365+ days, or never verified
+const ATM_STALENESS_GREEN_DAYS = 90;
+const ATM_STALENESS_AMBER_DAYS = 365;
+
+// ── Module state (loaded lazily on first read) ────
+// Three arrays, kept in memory after first load to avoid repeated
+// JSON.parse on every read. All writes go through saveTemplate /
+// recordSubmissionOutcome / recordGenerationAudit which write-through
+// to localStorage immediately. No optimistic local mutation.
+let _atmTemplates = null; // null = not yet loaded; array once loaded
+let _atmOutcomes  = null;
+let _atmAudit     = null;
+
+// ── Init ──────────────────────────────────────────
+// Idempotent. Called on app load (next to other ns_* initializations)
+// and again on first read access to be defensive. Ensures localStorage
+// keys exist with empty arrays. Returns true if initialization happened
+// (first-run); false if already initialized.
+function _atmInitStorage(){
+  let didInit = false;
+  try {
+    if(localStorage.getItem(ATM_STORAGE_KEY_TEMPLATES) === null){
+      localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, '[]');
+      didInit = true;
+    }
+    if(localStorage.getItem(ATM_STORAGE_KEY_OUTCOMES) === null){
+      localStorage.setItem(ATM_STORAGE_KEY_OUTCOMES, '[]');
+      didInit = true;
+    }
+    if(localStorage.getItem(ATM_STORAGE_KEY_AUDIT) === null){
+      localStorage.setItem(ATM_STORAGE_KEY_AUDIT, '[]');
+      didInit = true;
+    }
+  } catch(e){
+    // localStorage may be unavailable (private mode, quota exceeded).
+    // We surface this only when a write fails — read paths fall back to
+    // empty in-memory state. Standing principle: surface gaps, don't hide
+    // them; but don't crash the app on init.
+    console.warn('ATM storage init failed:', e);
+  }
+  return didInit;
+}
+
+// ── Internal load helpers ─────────────────────────
+// Lazy: reads from localStorage on first access, caches in module state.
+// All three follow the same shape so the pattern is greppable.
+function _atmLoadTemplates(){
+  if(_atmTemplates !== null) return _atmTemplates;
+  _atmInitStorage();
+  try {
+    const raw = localStorage.getItem(ATM_STORAGE_KEY_TEMPLATES) || '[]';
+    _atmTemplates = JSON.parse(raw);
+    if(!Array.isArray(_atmTemplates)) _atmTemplates = [];
+  } catch(e){
+    console.warn('ATM templates load failed:', e);
+    _atmTemplates = [];
+  }
+  return _atmTemplates;
+}
+function _atmLoadOutcomes(){
+  if(_atmOutcomes !== null) return _atmOutcomes;
+  _atmInitStorage();
+  try {
+    const raw = localStorage.getItem(ATM_STORAGE_KEY_OUTCOMES) || '[]';
+    _atmOutcomes = JSON.parse(raw);
+    if(!Array.isArray(_atmOutcomes)) _atmOutcomes = [];
+  } catch(e){
+    console.warn('ATM outcomes load failed:', e);
+    _atmOutcomes = [];
+  }
+  return _atmOutcomes;
+}
+function _atmLoadAudit(){
+  if(_atmAudit !== null) return _atmAudit;
+  _atmInitStorage();
+  try {
+    const raw = localStorage.getItem(ATM_STORAGE_KEY_AUDIT) || '[]';
+    _atmAudit = JSON.parse(raw);
+    if(!Array.isArray(_atmAudit)) _atmAudit = [];
+  } catch(e){
+    console.warn('ATM audit load failed:', e);
+    _atmAudit = [];
+  }
+  return _atmAudit;
+}
+
+// ── Internal write-through helpers ────────────────
+function _atmSaveTemplates(){
+  try { localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, JSON.stringify(_atmTemplates||[])); }
+  catch(e){ console.warn('ATM templates save failed:', e); throw e; }
+}
+function _atmSaveOutcomes(){
+  try { localStorage.setItem(ATM_STORAGE_KEY_OUTCOMES, JSON.stringify(_atmOutcomes||[])); }
+  catch(e){ console.warn('ATM outcomes save failed:', e); throw e; }
+}
+function _atmSaveAudit(){
+  try { localStorage.setItem(ATM_STORAGE_KEY_AUDIT, JSON.stringify(_atmAudit||[])); }
+  catch(e){ console.warn('ATM audit save failed:', e); throw e; }
+}
+
+// ── ID generator ──────────────────────────────────
+// Format: {prefix}_{ts}_{rand5}. Prefix lets us spot record types in
+// localStorage dumps. Timestamp first so id sort = chronological sort.
+function _atmId(prefix){
+  return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+// ── Constructors ──────────────────────────────────
+// All constructors are SYNCHRONOUS. The async bit (SHA-256 hashing of
+// raw template bytes) happens in the caller before the constructor runs.
+// Pattern: caller does `const hash = await _atmHashContent(rawBytes);`
+// then `const rec = createTemplateRecord({..., sourceHash: hash})`.
+
+/**
+ * Create a versioned retailer template record.
+ *
+ * Required: retailerId (references RETAILER_REGISTRY[].id), templateVersion.
+ * Optional but recommended: verifiedAt, verifiedBy, sourceProvenance,
+ *   sourceHash, schema, productTypeRouting, notes, supersedes.
+ *
+ * schema shape (Task D will populate for Åhléns):
+ *   {
+ *     sheets: [
+ *       { name: 'Data sheet', order: 0, columns: [
+ *         { id: 'col_001', position: 0, header: 'EAN Code',
+ *           dataType: 'string', required: true, maxLength: 13,
+ *           validation: { pattern: '^\\d{13}$' },
+ *           mapping: { source: 'sku.ean' } }
+ *       ]}
+ *     ],
+ *     conditionalRules: []
+ *   }
+ *
+ * productTypeRouting shape:
+ *   - {} (empty) for single-sheet retailers (Åhléns, Boozt) — Stage 1 default
+ *   - { cosmetic: 'Sheet_Cosmetic', device: 'Sheet_Devices', ... } for
+ *     multi-sheet retailers like Apotea (Stage 2+, 19 conditional sheets)
+ */
+function createTemplateRecord(data){
+  if(!data || !data.retailerId) throw new Error('createTemplateRecord requires retailerId');
+  if(!data.templateVersion) throw new Error('createTemplateRecord requires templateVersion');
+  return {
+    id:                  data.id || _atmId('tpl'),
+    retailerId:          String(data.retailerId),
+    templateVersion:     String(data.templateVersion),
+    verifiedAt:          data.verifiedAt || new Date().toISOString(),
+    verifiedBy:          data.verifiedBy || 'system',
+    sourceProvenance:    data.sourceProvenance || '',
+    sourceHash:          data.sourceHash || '',  // pre-computed via _atmHashContent
+    schema:              data.schema || { sheets: [], conditionalRules: [] },
+    productTypeRouting:  data.productTypeRouting || {},  // empty stub for single-sheet
+    notes:               data.notes || '',
+    supersedes:          data.supersedes || null,         // id of prior version
+    createdAt:           new Date().toISOString(),
+  };
+}
+
+/**
+ * Create a submission outcome record. GENERAL-PURPOSE CALIBRATION PRIMITIVE,
+ * not ATM-specific. Per founder brief Concern 5:
+ *
+ *   "ATM Stage 1 Task G IS the delivery vehicle for the calibration capture
+ *    infrastructure named in the audit. Worth being explicit so this isn't
+ *    later rediscovered as a missing workstream."
+ *
+ * Fields support Readiness Score recalibration, Compare Markets axis
+ * weighting, AI prompt accuracy validation, AND ATM template staleness
+ * (Task C Layer 2). Future calibration work consumes this record shape.
+ *
+ * Required: brandId, retailerId, outcomeType.
+ * outcomeType: 'accepted' | 'rejected' | 'listed' | 'declined' | 'listed_then_delisted'
+ */
+function createOutcomeRecord(data){
+  if(!data || !data.brandId || !data.retailerId || !data.outcomeType){
+    throw new Error('createOutcomeRecord requires brandId, retailerId, outcomeType');
+  }
+  return {
+    id:                          data.id || _atmId('out'),
+    brandId:                     String(data.brandId),
+    retailerId:                  String(data.retailerId),
+    marketId:                    data.marketId || '',                     // ISO market code if applicable
+    skuIds:                      Array.isArray(data.skuIds) ? data.skuIds.slice() : [],
+    submissionTimestamp:         data.submissionTimestamp || null,        // ISO; when the brand submitted
+    outcomeType:                 String(data.outcomeType),
+    outcomeTimestamp:            data.outcomeTimestamp || new Date().toISOString(),
+    outcomeReason:               data.outcomeReason || '',                // free-text from user
+    outcomeReasonStructured:     data.outcomeReasonStructured || null,    // enum, when known
+    templateVersionUsed:         data.templateVersionUsed || '',
+    readinessScoreAtSubmission:  (data.readinessScoreAtSubmission != null) ? Number(data.readinessScoreAtSubmission) : null,
+    contextSnapshot:             data.contextSnapshot || null,            // brand + SKU state at moment of submission
+    createdAt:                   new Date().toISOString(),
+  };
+}
+
+/**
+ * Create a generation audit record (Task H primitive — every ATM submission
+ * generation logs one of these). Surfaced in admin view (Task B); foundation
+ * for future "this template version was flagged stale, notify all brands
+ * who used it" workflow.
+ *
+ * Required: brandId, retailerId, templateVersionUsed, outputFileHash.
+ */
+function createAuditRecord(data){
+  if(!data || !data.brandId || !data.retailerId){
+    throw new Error('createAuditRecord requires brandId and retailerId');
+  }
+  return {
+    id:                   data.id || _atmId('aud'),
+    brandId:              String(data.brandId),
+    retailerId:           String(data.retailerId),
+    timestamp:            data.timestamp || new Date().toISOString(),
+    templateVersionUsed:  data.templateVersionUsed || '',
+    skuIds:               Array.isArray(data.skuIds) ? data.skuIds.slice() : [],
+    outputFileHash:       data.outputFileHash || '',
+    createdAt:            new Date().toISOString(),
+  };
+}
+
+// ── Read API ──────────────────────────────────────
+function getAllTemplates(){
+  return _atmLoadTemplates().slice();
+}
+function getTemplateById(id){
+  return _atmLoadTemplates().find(function(t){ return t.id === id; }) || null;
+}
+/**
+ * Get the most recent verified template for a retailer.
+ * "Most recent" = highest verifiedAt timestamp; ties broken by createdAt.
+ * Returns null if no template exists for that retailer yet.
+ */
+function getTemplateForRetailer(retailerId){
+  if(!retailerId) return null;
+  const matching = _atmLoadTemplates().filter(function(t){ return t.retailerId === retailerId; });
+  if(!matching.length) return null;
+  matching.sort(function(a, b){
+    const av = a.verifiedAt || a.createdAt || '';
+    const bv = b.verifiedAt || b.createdAt || '';
+    if(av !== bv) return bv.localeCompare(av);
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+  return matching[0];
+}
+/** Same as getTemplateForRetailer but explicit alias for clarity at call sites. */
+function getCurrentTemplate(retailerId){
+  return getTemplateForRetailer(retailerId);
+}
+
+function getAllOutcomes(){ return _atmLoadOutcomes().slice(); }
+function getOutcomesForRetailer(retailerId){
+  if(!retailerId) return [];
+  return _atmLoadOutcomes().filter(function(o){ return o.retailerId === retailerId; });
+}
+function getOutcomesForBrand(brandId){
+  if(!brandId) return [];
+  return _atmLoadOutcomes().filter(function(o){ return o.brandId === brandId; });
+}
+
+function getAllAuditRecords(){ return _atmLoadAudit().slice(); }
+function getAuditRecordsForTemplate(templateVersion){
+  if(!templateVersion) return [];
+  return _atmLoadAudit().filter(function(a){ return a.templateVersionUsed === templateVersion; });
+}
+
+// ── Write API ─────────────────────────────────────
+/**
+ * Save a template record. New record (no existing id match): appended.
+ * Existing id: replaced in-place.
+ * Returns the saved record.
+ */
+function saveTemplate(record){
+  if(!record || !record.id) throw new Error('saveTemplate requires a record with an id');
+  const list = _atmLoadTemplates();
+  const idx = list.findIndex(function(t){ return t.id === record.id; });
+  if(idx >= 0) list[idx] = record;
+  else list.push(record);
+  _atmSaveTemplates();
+  return record;
+}
+
+function recordSubmissionOutcome(outcomeData){
+  const rec = (outcomeData && outcomeData.id && outcomeData.brandId && outcomeData.outcomeType)
+    ? outcomeData                              // already shaped
+    : createOutcomeRecord(outcomeData || {});  // build from partial input
+  const list = _atmLoadOutcomes();
+  list.push(rec);
+  _atmSaveOutcomes();
+  return rec;
+}
+
+function recordGenerationAudit(auditData){
+  const rec = (auditData && auditData.id && auditData.brandId && auditData.retailerId)
+    ? auditData
+    : createAuditRecord(auditData || {});
+  const list = _atmLoadAudit();
+  list.push(rec);
+  _atmSaveAudit();
+  return rec;
+}
+
+// ── Staleness primitive (Task C skeleton) ─────────
+/**
+ * Compute time-based staleness signal for a retailer's current template.
+ * Layer 1 of three (per brief Task C). Layers 2 (outcome-based) and 3
+ * (source-based detection) wire in during Task C's full implementation.
+ *
+ * Returns: {
+ *   templateId:               string | null,
+ *   templateVersion:          string | null,
+ *   verifiedAt:               ISO string | null,
+ *   daysSinceVerification:    integer | null,
+ *   status:                   'green' | 'amber' | 'red' | 'unverified',
+ *   hasTemplate:              boolean,
+ * }
+ *
+ * `unverified` = no template record exists for the retailer (most retailers
+ * in Stage 1 will be in this state until Tasks D-H ingest specific schemas).
+ * Standing principle: surface gaps, don't hide them. UI surfaces (Task B,
+ * Task G) MUST distinguish unverified-vs-stale rather than collapsing both
+ * to a single "no data" state.
+ */
+function getTemplateStaleness(retailerId){
+  const t = getTemplateForRetailer(retailerId);
+  if(!t){
+    return {
+      templateId:            null,
+      templateVersion:       null,
+      verifiedAt:            null,
+      daysSinceVerification: null,
+      status:                'unverified',
+      hasTemplate:           false,
+    };
+  }
+  const verifiedAt = t.verifiedAt || t.createdAt;
+  let days = null;
+  let status = 'unverified';
+  if(verifiedAt){
+    const ms = Date.now() - new Date(verifiedAt).getTime();
+    days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    if(days < 0) days = 0; // future-dated verifications snap to 0
+    if(days <= ATM_STALENESS_GREEN_DAYS) status = 'green';
+    else if(days <= ATM_STALENESS_AMBER_DAYS) status = 'amber';
+    else status = 'red';
+  }
+  return {
+    templateId:            t.id,
+    templateVersion:       t.templateVersion,
+    verifiedAt:            verifiedAt,
+    daysSinceVerification: days,
+    status:                status,
+    hasTemplate:           true,
+  };
+}
+
+// ── SHA-256 content hash (async via SubtleCrypto) ──
+/**
+ * Compute SHA-256 hex digest of content (string or ArrayBuffer/Uint8Array).
+ * Used for sourceHash in template records (proves what file the schema was
+ * extracted from) and outputFileHash in audit records (proves what file the
+ * platform generated for a brand).
+ *
+ * Returns a Promise<string> (lowercase hex, 64 chars).
+ *
+ * Pattern at call site:
+ *   const hash = await _atmHashContent(rawTemplateBytes);
+ *   const rec  = createTemplateRecord({ retailerId, templateVersion,
+ *                                        sourceHash: hash, ... });
+ *   saveTemplate(rec);
+ *
+ * Sync constructors + async hash is the right shape: async where the API
+ * requires it (SubtleCrypto), sync where caller convenience matters
+ * (record construction). Don't flatten to one or the other.
+ */
+async function _atmHashContent(content){
+  if(content == null) return '';
+  if(typeof crypto === 'undefined' || !crypto.subtle){
+    // Surface gap loudly. Return marker so it's obvious in storage.
+    console.warn('SubtleCrypto unavailable — sourceHash cannot be computed');
+    return 'unavailable';
+  }
+  let bytes;
+  if(typeof content === 'string'){
+    bytes = new TextEncoder().encode(content);
+  } else if(content instanceof ArrayBuffer){
+    bytes = new Uint8Array(content);
+  } else if(content instanceof Uint8Array){
+    bytes = content;
+  } else {
+    bytes = new TextEncoder().encode(String(content));
+  }
+  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// ── Boot: ensure storage exists on app load ───────
+// Runs once at script-evaluation time. Idempotent — safe to call again.
+_atmInitStorage();
+
+/* ═══════════════════════════════════════════════════
    PRICING VERIFICATION FLOW
    Search → Verify → Generate
 ═══════════════════════════════════════════════════ */
