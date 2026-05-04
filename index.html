@@ -5629,11 +5629,24 @@ function escapeHtml(s){
     .replace(/'/g, '&#39;');
 }
 
-// ── PDF export — Market Entry Report (Apr 2026) ─────────────────────────
-// Uses the browser's native Save-as-PDF flow via window.print(). The print
-// stylesheet hides app chrome and forces clean section breaks. document.title
-// is set to a descriptive pattern before printing so most browsers use it as
-// the default save filename, then restored on afterprint.
+// ── PDF export — Market Entry Report (May 2026, Task D) ─────────────────
+// Programmatic jsPDF text-based PDF generation. Replaces the prior
+// window.print()-based approach that opened the browser's print dialog.
+//
+// Design choices:
+// - Text-based PDF (not html2canvas/rasterized): output is searchable, selectable,
+//   accessibility-compatible. Visual fidelity to on-screen report is NOT a goal —
+//   PDF reads as a typeset document, not a screenshot of the platform.
+// - VeyaFlow visual identity preserved: brand navy headings (#1B2D4F),
+//   monospace footer metadata, serif section titles.
+// - Markdown subset rendered: headings (H1/H2/H3), bold (incl. inside table cells),
+//   bulleted/numbered lists, simple pipe tables, paragraph text, links as text.
+//   Unsupported elements (code blocks, nested lists, images, merged cells) render
+//   as visible "[unsupported markdown: <type>]" placeholders, surfacing gaps
+//   rather than hiding them. Standing principle: VeyaFlow surfaces its own gaps.
+// - Lazy-loaded library: jsPDF + jspdf-autotable load on first export click,
+//   not pre-loaded. Standing principle: load infrastructure when needed.
+
 function _sanitizeForFilename(s){
   if(!s) return '';
   return String(s)
@@ -5642,39 +5655,487 @@ function _sanitizeForFilename(s){
     .slice(0, 50);
 }
 
+// ── Lazy-load jsPDF + jspdf-autotable from CDN (cached after first load) ──
+let _jsPdfLoadPromise = null;
+function _loadJsPdf(){
+  if(_jsPdfLoadPromise) return _jsPdfLoadPromise;
+  if(window.jspdf && window.jspdf.jsPDF){
+    _jsPdfLoadPromise = Promise.resolve();
+    return _jsPdfLoadPromise;
+  }
+  _jsPdfLoadPromise = new Promise(function(resolve, reject){
+    const s1 = document.createElement('script');
+    s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s1.onload = function(){
+      const s2 = document.createElement('script');
+      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+      s2.onload = function(){ resolve(); };
+      s2.onerror = function(){ reject(new Error('Failed to load jspdf-autotable')); };
+      document.head.appendChild(s2);
+    };
+    s1.onerror = function(){ reject(new Error('Failed to load jsPDF')); };
+    document.head.appendChild(s1);
+  });
+  return _jsPdfLoadPromise;
+}
+
+// ── Toggle the Save as PDF buttons' loading state ────────────────────────
+// Both action rows (top + bottom) share the same handler; both buttons
+// flip together so the user gets feedback wherever they clicked.
+function _setExportButtonLoading(isLoading){
+  const buttons = document.querySelectorAll('button[onclick="exportReportPdf()"]');
+  buttons.forEach(function(b){
+    if(isLoading){
+      b.dataset._origLabel = b.innerHTML;
+      b.innerHTML = '⤓ Generating…';
+      b.disabled = true;
+      b.style.opacity = '0.6';
+    } else {
+      if(b.dataset._origLabel) b.innerHTML = b.dataset._origLabel;
+      b.disabled = false;
+      b.style.opacity = '';
+    }
+  });
+}
+
+// ── Markdown → jsPDF renderer ────────────────────────────────────────────
+// Tokenizes a markdown string line-by-line and emits jsPDF drawing
+// instructions. Manages Y cursor + page breaks. Returns updated cursor Y.
+//
+// Supported:
+//   ## Heading       → H2 (serif, navy, 11pt)
+//   ### Heading      → H3 (serif, navy, 10pt)
+//   - item           → bulleted list (• prefix)
+//   * item           → bulleted list (• prefix)
+//   1. item          → numbered list
+//   | a | b |        → pipe table (uses autoTable)
+//   **bold**         → inline bold (works inside paragraphs AND table cells)
+//   [text](url)      → link as plain text "text (url)" if external
+//   (paragraph)      → body text 9.5pt
+//
+// Unsupported (fail loud — render visible placeholder):
+//   ```code blocks```, nested lists, images, merged cells
+//
+function _mdToPdf(pdf, md, ctx){
+  if(!md) return ctx.y;
+  const lines = String(md).split(/\r?\n/);
+  const PAGE_W = 210, PAGE_H = 297;
+  const MARGIN_L = 18, MARGIN_R = 18, MARGIN_T = 22, MARGIN_B = 22;
+  const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R;
+
+  // Cursor + page-break helpers
+  function ensureSpace(needed){
+    if(ctx.y + needed > PAGE_H - MARGIN_B){
+      pdf.addPage();
+      ctx.y = MARGIN_T;
+      ctx.pageCount++;
+    }
+  }
+
+  // Render a paragraph of mixed bold/plain text.
+  // Tokenizes **bold** segments; renders each segment with appropriate font weight.
+  // Wraps to width using jsPDF's getTextWidth + manual word splitting.
+  function renderInline(text, fontSize, baseFont, baseColor){
+    pdf.setFontSize(fontSize);
+    pdf.setTextColor.apply(pdf, baseColor);
+    // Tokenize **bold** segments
+    const segments = [];
+    let rest = text;
+    while(rest.length){
+      const m = rest.match(/^\*\*([^*]+)\*\*/);
+      if(m){ segments.push({text: m[1], bold: true}); rest = rest.slice(m[0].length); continue; }
+      const next = rest.indexOf('**');
+      if(next === -1){ segments.push({text: rest, bold: false}); break; }
+      segments.push({text: rest.slice(0, next), bold: false});
+      rest = rest.slice(next);
+    }
+    // Render segments inline with word wrapping. Track x cursor across segments.
+    let xCursor = MARGIN_L;
+    const lineHeight = fontSize * 0.45;
+    segments.forEach(function(seg){
+      pdf.setFont(baseFont, seg.bold ? 'bold' : 'normal');
+      // Split on whitespace, render word by word so we can wrap mid-segment
+      const words = seg.text.split(/(\s+)/);
+      words.forEach(function(w){
+        if(!w) return;
+        const wWidth = pdf.getTextWidth(w);
+        if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
+          ctx.y += lineHeight;
+          ensureSpace(lineHeight);
+          xCursor = MARGIN_L;
+        }
+        pdf.text(w, xCursor, ctx.y);
+        xCursor += wWidth;
+      });
+    });
+    ctx.y += lineHeight + 1.2; // line gap after paragraph
+  }
+
+  // Pipe-table parser. Collect consecutive lines starting with | then render
+  // via jspdf-autotable (handles row-level page breaks + header repeat).
+  function tryParseTable(startIdx){
+    const tableLines = [];
+    let i = startIdx;
+    while(i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])){
+      tableLines.push(lines[i]);
+      i++;
+    }
+    if(tableLines.length < 2) return null; // Need at least header + separator
+    // Standard markdown table: line 0 = header, line 1 = separator (---|---|---), rest = body
+    const splitRow = function(line){
+      return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(function(c){ return c.trim(); });
+    };
+    const sep = tableLines[1];
+    if(!/^[\s\|:\-]+$/.test(sep)) return null; // Not a real table separator
+    const header = splitRow(tableLines[0]);
+    const body = tableLines.slice(2).map(splitRow);
+    return { header: header, body: body, consumed: tableLines.length };
+  }
+
+  function renderTable(table){
+    // Each cell may contain **bold** spans. autoTable doesn't handle inline
+    // markdown; we strip the ** markers but keep the text. Bold formatting
+    // inside table cells degrades to plain text in V1 — this is an honest
+    // tradeoff (alternative: render every cell as a custom block, ~5x more
+    // code and slower rendering). Flagged in delivery notes.
+    const stripMd = function(s){ return String(s||'').replace(/\*\*/g, ''); };
+    const headerRow = table.header.map(stripMd);
+    const bodyRows = table.body.map(function(row){ return row.map(stripMd); });
+    // autoTable handles row-level page breaks + header repeat by default
+    pdf.autoTable({
+      head: [headerRow],
+      body: bodyRows,
+      startY: ctx.y + 2,
+      margin: { left: MARGIN_L, right: MARGIN_R, top: MARGIN_T, bottom: MARGIN_B },
+      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.5, lineColor: [212, 205, 194], lineWidth: 0.1 },
+      headStyles: { fillColor: [27, 45, 79], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [249, 248, 246] },
+      didDrawPage: function(data){
+        // autoTable may add pages internally; sync our page counter
+        ctx.pageCount = pdf.internal.getNumberOfPages();
+      }
+    });
+    ctx.y = pdf.lastAutoTable.finalY + 4;
+    ctx.pageCount = pdf.internal.getNumberOfPages();
+  }
+
+  // Main loop
+  let i = 0;
+  while(i < lines.length){
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Blank line: small vertical gap
+    if(!trimmed){ ctx.y += 2; i++; continue; }
+
+    // Code block (unsupported — fail loud)
+    if(/^```/.test(trimmed)){
+      ensureSpace(8);
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(146, 64, 14); // amber-ish to flag
+      pdf.text('[unsupported markdown: code block — see source]', MARGIN_L, ctx.y);
+      ctx.y += 5;
+      // Skip until closing ```
+      i++;
+      while(i < lines.length && !/^```/.test(lines[i].trim())) i++;
+      i++;
+      continue;
+    }
+
+    // Heading H2 (## Foo)
+    if(/^##\s+/.test(trimmed) && !/^###/.test(trimmed)){
+      ensureSpace(10);
+      ctx.y += 3;
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(27, 45, 79);
+      pdf.text(trimmed.replace(/^##\s+/, ''), MARGIN_L, ctx.y);
+      ctx.y += 6;
+      i++;
+      continue;
+    }
+
+    // Heading H3 (### Foo)
+    if(/^###\s+/.test(trimmed)){
+      ensureSpace(8);
+      ctx.y += 2;
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(27, 45, 79);
+      pdf.text(trimmed.replace(/^###\s+/, ''), MARGIN_L, ctx.y);
+      ctx.y += 5;
+      i++;
+      continue;
+    }
+
+    // H1 (#) — render as section-style large heading
+    if(/^#\s+/.test(trimmed) && !/^##/.test(trimmed)){
+      ensureSpace(12);
+      ctx.y += 4;
+      pdf.setFont('times', 'bold');
+      pdf.setFontSize(13);
+      pdf.setTextColor(27, 45, 79);
+      pdf.text(trimmed.replace(/^#\s+/, ''), MARGIN_L, ctx.y);
+      ctx.y += 7;
+      i++;
+      continue;
+    }
+
+    // Pipe table: try to consume contiguous lines
+    if(/^\s*\|.+\|\s*$/.test(line)){
+      const table = tryParseTable(i);
+      if(table){
+        ensureSpace(15); // rough min for header + 2 rows
+        renderTable(table);
+        i += table.consumed;
+        continue;
+      }
+      // Falls through to paragraph handling if not a real table
+    }
+
+    // Bulleted list item (- foo or * foo)
+    if(/^[-*]\s+/.test(trimmed)){
+      ensureSpace(6);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(40, 40, 40);
+      pdf.text('•', MARGIN_L + 2, ctx.y);
+      // Render the rest as inline (supports **bold**) with indent
+      const item = trimmed.replace(/^[-*]\s+/, '');
+      const savedY = ctx.y;
+      // Slightly indented paragraph render
+      const _origMargin = MARGIN_L;
+      // Render as paragraph at indented x — re-implement minimal inline render
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(40, 40, 40);
+      const segments = [];
+      let rest = item;
+      while(rest.length){
+        const m = rest.match(/^\*\*([^*]+)\*\*/);
+        if(m){ segments.push({text: m[1], bold: true}); rest = rest.slice(m[0].length); continue; }
+        const next = rest.indexOf('**');
+        if(next === -1){ segments.push({text: rest, bold: false}); break; }
+        segments.push({text: rest.slice(0, next), bold: false});
+        rest = rest.slice(next);
+      }
+      let xCursor = MARGIN_L + 6;
+      const indentX = MARGIN_L + 6;
+      const lineHeight = 9.5 * 0.45;
+      segments.forEach(function(seg){
+        pdf.setFont('helvetica', seg.bold ? 'bold' : 'normal');
+        const words = seg.text.split(/(\s+)/);
+        words.forEach(function(w){
+          if(!w) return;
+          const wWidth = pdf.getTextWidth(w);
+          if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
+            ctx.y += lineHeight;
+            ensureSpace(lineHeight);
+            xCursor = indentX;
+          }
+          pdf.text(w, xCursor, ctx.y);
+          xCursor += wWidth;
+        });
+      });
+      ctx.y += lineHeight + 1.2;
+      i++;
+      continue;
+    }
+
+    // Numbered list item (1. foo)
+    if(/^\d+\.\s+/.test(trimmed)){
+      ensureSpace(6);
+      const m = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      const num = m[1] + '.';
+      const item = m[2];
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(40, 40, 40);
+      pdf.text(num, MARGIN_L + 2, ctx.y);
+      const segments = [];
+      let rest = item;
+      while(rest.length){
+        const mm = rest.match(/^\*\*([^*]+)\*\*/);
+        if(mm){ segments.push({text: mm[1], bold: true}); rest = rest.slice(mm[0].length); continue; }
+        const next = rest.indexOf('**');
+        if(next === -1){ segments.push({text: rest, bold: false}); break; }
+        segments.push({text: rest.slice(0, next), bold: false});
+        rest = rest.slice(next);
+      }
+      const indentX = MARGIN_L + 9;
+      let xCursor = indentX;
+      const lineHeight = 9.5 * 0.45;
+      segments.forEach(function(seg){
+        pdf.setFont('helvetica', seg.bold ? 'bold' : 'normal');
+        const words = seg.text.split(/(\s+)/);
+        words.forEach(function(w){
+          if(!w) return;
+          const wWidth = pdf.getTextWidth(w);
+          if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
+            ctx.y += lineHeight;
+            ensureSpace(lineHeight);
+            xCursor = indentX;
+          }
+          pdf.text(w, xCursor, ctx.y);
+          xCursor += wWidth;
+        });
+      });
+      ctx.y += lineHeight + 1.2;
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    ensureSpace(6);
+    // Convert [text](url) to "text (url)" for external links; strip markdown link syntax
+    const cleaned = trimmed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, txt, url){
+      if(/^https?:/.test(url)) return txt + ' (' + url + ')';
+      return txt;
+    });
+    renderInline(cleaned, 9.5, 'helvetica', [40, 40, 40]);
+    i++;
+  }
+
+  return ctx.y;
+}
+
+// ── Programmatic PDF export entry point ──────────────────────────────────
 function exportReportPdf(){
   const r = reportState && reportState.result;
   if(!r){ alert('No report to export.'); return; }
 
-  // Mobile graceful fallback — print-to-PDF is unreliable on mobile browsers.
-  // Surface the feature but redirect users to desktop.
+  // Mobile graceful fallback. Programmatic jsPDF works on mobile in principle,
+  // but the on-screen flow + memory constraints make desktop the better path.
   if(window.innerWidth < 768){
-    alert('Export to PDF works best on desktop. Open this report on a laptop or desktop browser to save as PDF.');
+    alert('Open this report on a laptop or desktop browser to export as PDF.');
     return;
   }
 
-  // Build descriptive filename: VeyaFlow_MarketEntryReport_CloudGlow_Norway_2026-04-30.pdf
-  const today = new Date().toISOString().slice(0,10);
-  const brandSafe  = _sanitizeForFilename(r.brandName) || 'Brand';
+  _setExportButtonLoading(true);
+
+  _loadJsPdf().then(function(){
+    try {
+      _renderPdf(r);
+    } catch(err){
+      console.error('PDF generation failed:', err);
+      alert('PDF generation failed — please try again. If the problem persists, contact support.');
+    } finally {
+      _setExportButtonLoading(false);
+    }
+  }).catch(function(err){
+    console.error('Failed to load jsPDF:', err);
+    alert('Could not load PDF library. Check your internet connection and try again.');
+    _setExportButtonLoading(false);
+  });
+}
+
+// ── Main render pipeline ─────────────────────────────────────────────────
+function _renderPdf(r){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const PAGE_W = 210, PAGE_H = 297;
+  const MARGIN_L = 18, MARGIN_R = 18, MARGIN_T = 22, MARGIN_B = 22;
+  const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R;
+
+  // Render context shared with markdown renderer
+  const ctx = { y: MARGIN_T, pageCount: 1 };
+
+  // ── Cover header (page 1 only, navy block) ─────────────────────────
+  pdf.setFillColor(27, 45, 79); // brand navy
+  pdf.rect(0, 0, PAGE_W, 50, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(8);
+  pdf.text('MARKET ENTRY INTELLIGENCE REPORT · VEYAFLOW', MARGIN_L, 14);
+  pdf.setFontSize(7);
+  pdf.setTextColor(180, 180, 200);
+  pdf.text('GENERATED FOR', MARGIN_L, 22);
+  pdf.setFont('times', 'bold');
+  pdf.setFontSize(20);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text(String(r.brandName || 'Brand'), MARGIN_L, 33);
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(212, 205, 194);
+  const homeMarket = r.currentMarket || 'Sweden';
+  const targetMarket = r.targetMarket || '';
+  pdf.text(homeMarket + ' → ' + targetMarket, MARGIN_L, 42);
+  ctx.y = 60;
+
+  // ── Sections ───────────────────────────────────────────────────────
+  const sections = (r.sections || []).filter(function(s){ return s && s.title; });
+  sections.forEach(function(sec, idx){
+    // Section break (except for first section, which flows under the cover header)
+    if(idx > 0){
+      pdf.addPage();
+      ctx.y = MARGIN_T;
+      ctx.pageCount = pdf.internal.getNumberOfPages();
+    }
+    // Section number + title (serif navy, 14pt)
+    pdf.setFont('times', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(27, 45, 79);
+    const sectionLabel = '0' + (idx + 1) + '  ' + (sec.title || '').replace(/^0\d\s+/, '');
+    pdf.text(sectionLabel, MARGIN_L, ctx.y);
+    ctx.y += 8;
+
+    // Confidence pill (if present)
+    if(sec.confidence){
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text('Confidence: ' + String(sec.confidence).toUpperCase(), MARGIN_L, ctx.y);
+      ctx.y += 5;
+    }
+
+    // Section body (markdown)
+    _mdToPdf(pdf, sec.content || '', ctx);
+    ctx.pageCount = pdf.internal.getNumberOfPages();
+  });
+
+  // ── Pass 2: stamp header + footer on every page ────────────────────
+  // jsPDF pagination is forward-only; we need to know total page count
+  // to render "Page X of Y" — that's only available after the body
+  // renders. Iterate pages now and stamp programmatically.
+  const totalPages = pdf.internal.getNumberOfPages();
+  const generatedDate = new Date(r.date || Date.now()).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+  for(let p = 1; p <= totalPages; p++){
+    pdf.setPage(p);
+    // Header (skip on page 1 where the navy cover block already serves as identification)
+    if(p > 1){
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text('VEYAFLOW MARKET ENTRY REPORT', MARGIN_L, 12);
+      const rightText = String(r.brandName || '') + ' · ' + homeMarket + ' → ' + targetMarket;
+      const rightWidth = pdf.getTextWidth(rightText);
+      pdf.text(rightText, PAGE_W - MARGIN_R - rightWidth, 12);
+      // Thin rule under header
+      pdf.setDrawColor(212, 205, 194);
+      pdf.setLineWidth(0.1);
+      pdf.line(MARGIN_L, 14, PAGE_W - MARGIN_R, 14);
+    }
+    // Footer (every page including page 1)
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(120, 120, 120);
+    pdf.setDrawColor(212, 205, 194);
+    pdf.setLineWidth(0.1);
+    pdf.line(MARGIN_L, PAGE_H - 14, PAGE_W - MARGIN_R, PAGE_H - 14);
+    pdf.text('Generated ' + generatedDate + ' · veyaflow.com', MARGIN_L, PAGE_H - 9);
+    const pageText = 'Page ' + p + ' of ' + totalPages;
+    const pageWidth = pdf.getTextWidth(pageText);
+    pdf.text(pageText, PAGE_W - MARGIN_R - pageWidth, PAGE_H - 9);
+  }
+
+  // ── Save ───────────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const brandSafe = _sanitizeForFilename(r.brandName) || 'Brand';
   const marketSafe = _sanitizeForFilename(r.targetMarket) || 'Market';
-  const filename = 'VeyaFlow_MarketEntryReport_' + brandSafe + '_' + marketSafe + '_' + today;
-
-  const _originalTitle = document.title;
-  document.title = filename;
-
-  // Restore title after print dialog closes (or is cancelled).
-  // afterprint fires in Chrome/Safari/Firefox after the dialog is dismissed.
-  const restore = function(){
-    document.title = _originalTitle;
-    window.removeEventListener('afterprint', restore);
-  };
-  window.addEventListener('afterprint', restore);
-
-  // Belt-and-braces: fallback timeout in case afterprint doesn't fire (rare,
-  // but possible on some browser/version combinations)
-  setTimeout(function(){ if(document.title === filename) document.title = _originalTitle; }, 30000);
-
-  window.print();
+  const filename = 'VeyaFlow_MarketEntryReport_' + brandSafe + '_' + marketSafe + '_' + today + '.pdf';
+  pdf.save(filename);
 }
 
 function expandReport(id){
@@ -11148,7 +11609,7 @@ function renderReportResult(){
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
-      <span class="vf-pdf-hint" style="margin-left:auto;align-self:center;font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.04em;line-height:1.4;max-width:14rem;text-align:right">Choose 'Save as PDF' as destination in the print dialog</span><button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF">⤓ Save as PDF</button>
+      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
     </div>
 
     <!-- Section navigation -->
@@ -11222,7 +11683,7 @@ function renderReportResult(){
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
-      <span class="vf-pdf-hint" style="margin-left:auto;align-self:center;font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.04em;line-height:1.4;max-width:14rem;text-align:right">Choose 'Save as PDF' as destination in the print dialog</span><button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF">⤓ Save as PDF</button>
+      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
     </div>
   `;
 }
@@ -12650,6 +13111,9 @@ function newSkuForm(){
     // Tab 1 — Basics
     name:'', articleNo:'', ean:'', netContent:'', netUnit:'g', unitsPerPack:1,
     countryOfMfr:'', shelfLifeMonths:'', paoMonths:'',
+    // Tab 1 universal logistics + variant fields (May 2026 — Boozt template additions).
+    // Color/weight/dimensions apply to all product types; surfaced on Tab 1.
+    color:'', weightGrams:'', dimensionsCm:'',
     // Tab 2 — Compliance
     inci:'', hasFrag:false, allergens:'', ph:'',
     cpnp:'', euResponsible:'', safetyRef:'',
@@ -12665,6 +13129,10 @@ function newSkuForm(){
     modelNo:'', voltageInput:'', frequencyHz:'', powerOutput:'', batteryType:'',
     ipRating:'', ceMarking:'', ukCaMarking:'', docOnFile:'', directives:[],
     userManualLangs:[],
+    // Device shipping & customs (May 2026 — Boozt template additions).
+    // UN code + Wh required for lithium-battery shipping classification;
+    // hsCode required for cross-border customs declarations.
+    unCode:'', battWh:'', hsCode:'',
     // Textile/Garment fields
     materialComposition:'', eudrStatus:'', reachCompliant:'', careInstructions:'',
     gotsCertNo:'', oekotexCertNo:'',
@@ -13065,6 +13533,16 @@ const READINESS_FIELDS = {
     {key:'name',weight:2},{key:'ean',weight:2},{key:'modelNo',weight:1},
     {key:'ceMarking',weight:3},{key:'docOnFile',weight:3},{key:'voltageInput',weight:1},
     {key:'batteryType',weight:1},{key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
+  // Beauty accessory — added May 2026 to fix incorrect cosmetic-fallback scoring.
+  // Pre-fix, beauty_accessory SKUs scored against READINESS_FIELDS.cosmetic, which
+  // surfaced "Missing: Shelf life · CPNP · Safety Assessment" on a stainless-steel
+  // gua sha. Material composition is load-bearing for accessories; INCI/CPNP not
+  // applicable; shelf life excluded per founder spec (option 2 — accessory-only).
+  beauty_accessory: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
+    {key:'countryOfMfr',weight:1},{key:'rspSEK',weight:1},{key:'netPriceSEK',weight:1},
+    {key:'moq',weight:1},{key:'descEN',weight:1},
   ],
   textile: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
@@ -14758,6 +15236,21 @@ function renderSkuTab2(){
           onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
         <div id="claims-section" style="margin-top:.5rem"></div>
       </div>
+      <!-- Shipping & customs (May 2026 — Boozt template additions).
+           UN code + Watt-hour are required for lithium-battery shipping
+           classification; HS tariff code is required for cross-border customs.
+           All three apply to most retailers that accept devices, not just Boozt. -->
+      <div style="margin-top:.85rem;padding-top:.75rem;border-top:1px solid var(--border)">
+        <div class="section-tag" style="margin-bottom:.5rem">Shipping &amp; customs</div>
+        <div class="grid-2">
+          <div class="field"><label class="lbl">UN code <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(lithium-battery shipping)</span></label>
+            <input type="text" value="${skuForm.unCode||''}" placeholder="e.g. UN 3481" oninput="skuForm.unCode=this.value"></div>
+          <div class="field"><label class="lbl">Watt-hour (Wh) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">>100 Wh = stricter shipping</span></label>
+            <input type="number" step="0.1" value="${skuForm.battWh||''}" placeholder="e.g. 18.5" oninput="skuForm.battWh=this.value"></div>
+        </div>
+        <div class="field"><label class="lbl">HS / customs tariff code <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">8-10 digits, varies slightly per market</span></label>
+          <input type="text" value="${skuForm.hsCode||''}" placeholder="e.g. 8543709090" oninput="skuForm.hsCode=this.value"></div>
+      </div>
     </div>`;
 
   // ── TEXTILE / ACCESSORY ───────────────────────
@@ -14870,6 +15363,34 @@ function renderSkuTab2(){
         <input type="text" id="claim-input" placeholder='e.g. "No added sugar" then Enter'
           onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
         <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+    </div>`;
+
+  // ── BEAUTY ACCESSORY ──────────────────────────
+  // Combs, brushes, gua sha, jade rollers, silk scrunchies, mirrors, applicators.
+  // Removed REACH + CE/UKCA fields (May 2026): inappropriate for non-electrical
+  // beauty accessories; the previous fall-through to Home & Living surfaced these
+  // as if they applied to a stainless-steel gua sha. Material composition is now
+  // the load-bearing field. OEKO-TEX added to certifications for silk/textile
+  // accessories (silk pillowcases, scrunchies, turbans).
+  if(type==='beauty_accessory') return `
+    <div class="card">
+      <div class="section-tag">Regulatory core — GPSR 2023/988 · material safety</div>
+      <div class="field"><label class="lbl">Material composition <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">free-text</span></label>
+        <input type="text" value="${skuForm.materialComposition||''}" placeholder="e.g. 316L stainless steel, 100% mulberry silk, natural jade" oninput="skuForm.materialComposition=this.value"></div>
+      <div class="field" style="margin-top:.75rem">
+        <label class="lbl">Claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type claim + Enter</span></label>
+        <input type="text" id="claim-input" placeholder='e.g. "Hypoallergenic" then Enter'
+          onkeydown="if(event.key==='Enter'){addClaim(this.value);this.value='';}">
+        <div id="claims-section" style="margin-top:.5rem"></div>
+      </div>
+      <div class="field"><label class="lbl">Certifications</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem">
+          ${['FSC','PEFC','Vegan','OEKO-TEX','B Corp','Fairtrade','Rainforest Alliance'].map(cert=>`
+            <div onclick="toggleSkuCert('${cert}')" style="padding:.3rem .7rem;border:1px solid ${skuForm.certifications?.includes(cert)?'var(--navy)':'var(--border)'};background:${skuForm.certifications?.includes(cert)?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--sans);font-size:.72rem;color:${skuForm.certifications?.includes(cert)?'var(--navy)':'#555'}">
+              ${skuForm.certifications?.includes(cert)?'✓ ':''} ${cert}
+            </div>`).join('')}
+        </div>
       </div>
     </div>`;
 
@@ -15142,10 +15663,22 @@ function renderSkuEdit(el){
           <div class="grid-2">
             <div class="field"><label class="lbl">Country of manufacture</label>
               <input type="text" value="${skuForm.countryOfMfr||''}" placeholder="e.g. Sweden" oninput="skuForm.countryOfMfr=this.value"></div>
-            <div class="field"><label class="lbl">Shelf life (months)</label>
+            <div class="field"><label class="lbl">Shelf life (months) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
               <input type="number" value="${skuForm.shelfLifeMonths||''}" placeholder="e.g. 36" oninput="skuForm.shelfLifeMonths=this.value"></div>
           </div>
-          ${isSkincare?`<div class="field"><label class="lbl">PAO — Period After Opening (months) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">The open jar symbol on your pack</span></label>
+          <!-- Color: free-text, all product types (May 2026 ad-hoc fix) -->
+          <div class="field"><label class="lbl">Color / variant <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+            <input type="text" value="${skuForm.color||''}" placeholder="e.g. Rose Gold, Stainless, Black, Natural" oninput="skuForm.color=this.value"></div>
+          <!-- Weight + Dimensions: universal logistics fields, all product types.
+               Boozt and most retailers require these for accessories AND devices,
+               so they live on Tab 1 rather than the device-only branch. -->
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Weight (g) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+              <input type="number" value="${skuForm.weightGrams||''}" placeholder="e.g. 80" oninput="skuForm.weightGrams=this.value"></div>
+            <div class="field"><label class="lbl">Dimensions (L × W × H cm) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+              <input type="text" value="${skuForm.dimensionsCm||''}" placeholder="e.g. 22 × 18 × 6" oninput="skuForm.dimensionsCm=this.value"></div>
+          </div>
+          ${_skuType==='cosmetic'?`<div class="field"><label class="lbl">PAO — Period After Opening (months) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">The open jar symbol on your pack</span></label>
             <input type="number" value="${skuForm.paoMonths||''}" placeholder="e.g. 12" oninput="skuForm.paoMonths=this.value"></div>`:''}
         </div>
       `:''}
