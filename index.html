@@ -958,7 +958,7 @@ function renderAddSupplierModal(){
         </div>
 
         <div class="field"><label class="lbl">Supplier / company name *</label>
-          <input type="text" id="as-name" placeholder="e.g. Senwell Cosmetics Ltd" value="${addSupplierForm.name}" oninput="addSupplierForm.name=this.value">
+          <input type="text" id="as-name" placeholder="e.g. Acme Cosmetics Ltd" value="${addSupplierForm.name}" oninput="addSupplierForm.name=this.value">
         </div>
 
         <div class="grid-2">
@@ -4549,7 +4549,7 @@ function renderExpansionSequencer(){
         `:''}
         <div style="margin-top:.5rem">
           <button class="btn-outline" style="font-size:.6rem;padding:.22rem .55rem"
-            onclick="readinessState.marketCode='${m.marketCode}';document.getElementById('readiness-panel').outerHTML=renderReadinessScore();document.getElementById('readiness-panel').scrollIntoView({behavior:'smooth'})">
+            onclick="readinessState.marketCode='${m.marketCode}';renderPage('home');setTimeout(function(){var el=document.getElementById('readiness-panel');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},80)">
             Check readiness →
           </button>
         </div>
@@ -11854,7 +11854,7 @@ function renderBizCase(el){
             </select>
           </div>
           <div class="field"><label class="lbl">Retailer</label>
-            <select onchange="bizCaseState.retailer=this.value">
+            <select onchange="bizCaseState.retailer=this.value;renderBizCase(document.getElementById('page-bizcase'))">
               <option value="">Select retailer…</option>
               ${retailerList.map(r=>`<option${bizCaseState.retailer===r?' selected':''}>${r}</option>`).join('')}
             </select>
@@ -15019,7 +15019,40 @@ async function submitSkuTypeFeedback(){
 function renderSkuEdit(el){
   const r = skuReadiness(skuForm);
   const isNew = skuEditId === 'new';
-  const tabLabels = ['Product Basics','Ingredients & Compliance','Commercial & Logistics','Digital Assets','Packaging','Ingredient Traceability'];
+  // Tab spec is product-type-aware (Apr 2026 — bug-fix brief Task A).
+  // Tab 2's label changes per type to reflect what the tab actually contains:
+  //   cosmetic   → 'Ingredients & Compliance' (INCI list + cosmetic compliance fields)
+  //   device     → 'Compliance & Certification' (LVD/EMC/CE/UKCA/Declaration of Conformity)
+  //   accessory  → 'Compliance & Materials' (REACH/CE/WEEE/material safety)
+  // Tab 6 (Ingredient Traceability) is INCI-traceability mapping — only meaningful
+  // for cosmetic SKUs. Hidden entirely for device/beauty_accessory; data preserved
+  // in storage (not deleted) so a round-trip back to cosmetic restores the tab.
+  // Legacy product types (textile/garment/supplement/food) keep the original label
+  // and full tab visibility — out of scope for this fix.
+  const _skuType = skuForm.productType || 'cosmetic';
+  const _tab2LabelByType = {
+    cosmetic:         'Ingredients & Compliance',
+    device:           'Compliance & Certification',
+    beauty_accessory: 'Compliance & Materials',
+  };
+  const _tab2Label = _tab2LabelByType[_skuType] || 'Ingredients & Compliance';
+  const _tab6Visible = _skuType === 'cosmetic';
+  // Build the tab spec: each entry is {n, label, visible}. Position numbers stay
+  // stable (Tab 6 is always position 6) so existing handlers referencing skuTab===N
+  // still target the right content. Hidden tabs simply don't render in the nav row.
+  const tabSpec = [
+    {n:1, label:'Product Basics',           visible:true},
+    {n:2, label:_tab2Label,                 visible:true},
+    {n:3, label:'Commercial & Logistics',   visible:true},
+    {n:4, label:'Digital Assets',           visible:true},
+    {n:5, label:'Packaging',                visible:true},
+    {n:6, label:'Ingredient Traceability',  visible:_tab6Visible},
+  ];
+  const visibleTabs = tabSpec.filter(t=>t.visible);
+  // If user is on a tab that's been hidden by a product-type switch, redirect to
+  // tab 1. Without this, switching type while on tab 6 leaves the user on a tab
+  // whose nav button has disappeared while the content still renders.
+  if(!visibleTabs.find(t=>t.n===skuTab)) skuTab = 1;
   const hasDK = brand?.targetMarkets?.includes('Denmark');
   const isSkincare = brand?.category==='Skincare & Beauty'||brand?.category==='Wellness & Supplements';
 
@@ -15053,11 +15086,11 @@ function renderSkuEdit(el){
 
       <!-- Tab nav -->
       <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">
-        ${tabLabels.map((t,i)=>`
-          <div onclick="skuTab=${i+1};renderSkuEdit(document.getElementById('page-skus'))"
+        ${visibleTabs.map(t=>`
+          <div onclick="skuTab=${t.n};renderSkuEdit(document.getElementById('page-skus'))"
             style="padding:.5rem 1rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-            ${skuTab===i+1?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
-            ${i+1}. ${t}
+            ${skuTab===t.n?'color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:-2px;font-weight:700':'color:var(--muted)'}">
+            ${t.n}. ${t.label}
           </div>`).join('')}
       </div>
 
@@ -15271,11 +15304,24 @@ function renderSkuEdit(el){
 
       <div class="vf-sticky-actions">
         <div style="display:flex;gap:.5rem">
-          ${skuTab>1?`<button class="btn-outline" onclick="skuTab--;renderSkuEdit(document.getElementById('page-skus'))">← Previous</button>`:''}
+          ${(function(){
+            // Previous visible tab (or none if currently on first visible)
+            const idx = visibleTabs.findIndex(t=>t.n===skuTab);
+            if(idx <= 0) return '';
+            const prevN = visibleTabs[idx-1].n;
+            return `<button class="btn-outline" onclick="skuTab=${prevN};renderSkuEdit(document.getElementById('page-skus'))">← Previous</button>`;
+          })()}
         </div>
         <div style="display:flex;gap:.5rem">
-          ${skuTab<6?`<button class="btn-primary" onclick="skuTab++;renderSkuEdit(document.getElementById('page-skus'))">Next →</button>`:
-          `<button class="btn-primary" onclick="saveSkuForm()">Save product ✓</button>`}
+          ${(function(){
+            // Next visible tab — or save if currently on last visible tab
+            const idx = visibleTabs.findIndex(t=>t.n===skuTab);
+            if(idx >= 0 && idx < visibleTabs.length - 1){
+              const nextN = visibleTabs[idx+1].n;
+              return `<button class="btn-primary" onclick="skuTab=${nextN};renderSkuEdit(document.getElementById('page-skus'))">Next →</button>`;
+            }
+            return `<button class="btn-primary" onclick="saveSkuForm()">Save product ✓</button>`;
+          })()}
         </div>
       </div>
     </div>
@@ -21869,7 +21915,7 @@ function renderRequestListedModal(){
         </div>
 
         <div class="field"><label class="lbl">Company name *</label>
-          <input type="text" placeholder="e.g. Senwell Cosmetics Ltd" value="${requestListedForm.companyName}" oninput="requestListedForm.companyName=this.value">
+          <input type="text" placeholder="e.g. Acme Cosmetics Ltd" value="${requestListedForm.companyName}" oninput="requestListedForm.companyName=this.value">
         </div>
         <div class="grid-2">
           <div class="field"><label class="lbl">Contact name</label>
@@ -29011,7 +29057,7 @@ function renderRequestListedModal(){
         <span onclick="requestListedOpen=false;renderFind(document.getElementById('page-find'))" style="cursor:pointer;font-size:1.2rem;color:var(--muted)">✕</span>
       </div>
       <div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.65rem .85rem;margin-bottom:1rem;font-family:var(--mono);font-size:.58rem;color:#92400E">◈ Listings are reviewed before going live. VeyaFlow verifies certifications and client references before publishing.</div>
-      <div class="field"><label class="lbl">Company name *</label><input type="text" placeholder="e.g. Senwell Cosmetics Ltd" value="${requestListedForm.companyName}" oninput="requestListedForm.companyName=this.value"></div>
+      <div class="field"><label class="lbl">Company name *</label><input type="text" placeholder="e.g. Acme Cosmetics Ltd" value="${requestListedForm.companyName}" oninput="requestListedForm.companyName=this.value"></div>
       <div class="grid-2">
         <div class="field"><label class="lbl">Contact name</label><input type="text" placeholder="e.g. Li Wei" value="${requestListedForm.contactName}" oninput="requestListedForm.contactName=this.value"></div>
         <div class="field"><label class="lbl">Contact email *</label><input type="email" placeholder="e.g. li.wei@co.com" value="${requestListedForm.contactEmail}" oninput="requestListedForm.contactEmail=this.value"></div>
