@@ -580,10 +580,9 @@
   /* ── Print stylesheet — Market Entry Report PDF export (Apr 2026) ─────── */
   /* On screen, .vf-print-only elements are hidden. On print, .vf-no-print
      elements are hidden. Print-only header/footer are position:fixed so the
-     browser paints them on every printed page. The .vf-printing body class
-     is added by exportReportPdf() before window.print() and lets us trigger
-     print-specific layout for browsers that don't fully respect @media print
-     during dialog preview (Safari historically). */
+     browser paints them on every printed page. This stylesheet is retained
+     as a Cmd+P fallback path; the primary "Save as PDF" button uses the
+     programmatic jsPDF generator (generateMarketEntryReportPDF) instead. */
   .vf-print-only { display: none; }
 
   @media print {
@@ -5627,515 +5626,6 @@ function escapeHtml(s){
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-// ── PDF export — Market Entry Report (May 2026, Task D) ─────────────────
-// Programmatic jsPDF text-based PDF generation. Replaces the prior
-// window.print()-based approach that opened the browser's print dialog.
-//
-// Design choices:
-// - Text-based PDF (not html2canvas/rasterized): output is searchable, selectable,
-//   accessibility-compatible. Visual fidelity to on-screen report is NOT a goal —
-//   PDF reads as a typeset document, not a screenshot of the platform.
-// - VeyaFlow visual identity preserved: brand navy headings (#1B2D4F),
-//   monospace footer metadata, serif section titles.
-// - Markdown subset rendered: headings (H1/H2/H3), bold (incl. inside table cells),
-//   bulleted/numbered lists, simple pipe tables, paragraph text, links as text.
-//   Unsupported elements (code blocks, nested lists, images, merged cells) render
-//   as visible "[unsupported markdown: <type>]" placeholders, surfacing gaps
-//   rather than hiding them. Standing principle: VeyaFlow surfaces its own gaps.
-// - Lazy-loaded library: jsPDF + jspdf-autotable load on first export click,
-//   not pre-loaded. Standing principle: load infrastructure when needed.
-
-function _sanitizeForFilename(s){
-  if(!s) return '';
-  return String(s)
-    .replace(/&/g, 'and')
-    .replace(/[^A-Za-z0-9]+/g, '')
-    .slice(0, 50);
-}
-
-// ── Lazy-load jsPDF + jspdf-autotable from CDN (cached after first load) ──
-let _jsPdfLoadPromise = null;
-function _loadJsPdf(){
-  if(_jsPdfLoadPromise) return _jsPdfLoadPromise;
-  if(window.jspdf && window.jspdf.jsPDF){
-    _jsPdfLoadPromise = Promise.resolve();
-    return _jsPdfLoadPromise;
-  }
-  _jsPdfLoadPromise = new Promise(function(resolve, reject){
-    const s1 = document.createElement('script');
-    s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s1.onload = function(){
-      const s2 = document.createElement('script');
-      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
-      s2.onload = function(){ resolve(); };
-      s2.onerror = function(){ reject(new Error('Failed to load jspdf-autotable')); };
-      document.head.appendChild(s2);
-    };
-    s1.onerror = function(){ reject(new Error('Failed to load jsPDF')); };
-    document.head.appendChild(s1);
-  });
-  return _jsPdfLoadPromise;
-}
-
-// ── Toggle the Save as PDF buttons' loading state ────────────────────────
-// Both action rows (top + bottom) share the same handler; both buttons
-// flip together so the user gets feedback wherever they clicked.
-function _setExportButtonLoading(isLoading){
-  const buttons = document.querySelectorAll('button[onclick="exportReportPdf()"]');
-  buttons.forEach(function(b){
-    if(isLoading){
-      b.dataset._origLabel = b.innerHTML;
-      b.innerHTML = '⤓ Generating…';
-      b.disabled = true;
-      b.style.opacity = '0.6';
-    } else {
-      if(b.dataset._origLabel) b.innerHTML = b.dataset._origLabel;
-      b.disabled = false;
-      b.style.opacity = '';
-    }
-  });
-}
-
-// ── Markdown → jsPDF renderer ────────────────────────────────────────────
-// Tokenizes a markdown string line-by-line and emits jsPDF drawing
-// instructions. Manages Y cursor + page breaks. Returns updated cursor Y.
-//
-// Supported:
-//   ## Heading       → H2 (serif, navy, 11pt)
-//   ### Heading      → H3 (serif, navy, 10pt)
-//   - item           → bulleted list (• prefix)
-//   * item           → bulleted list (• prefix)
-//   1. item          → numbered list
-//   | a | b |        → pipe table (uses autoTable)
-//   **bold**         → inline bold (works inside paragraphs AND table cells)
-//   [text](url)      → link as plain text "text (url)" if external
-//   (paragraph)      → body text 9.5pt
-//
-// Unsupported (fail loud — render visible placeholder):
-//   ```code blocks```, nested lists, images, merged cells
-//
-function _mdToPdf(pdf, md, ctx){
-  if(!md) return ctx.y;
-  const lines = String(md).split(/\r?\n/);
-  const PAGE_W = 210, PAGE_H = 297;
-  const MARGIN_L = 18, MARGIN_R = 18, MARGIN_T = 22, MARGIN_B = 22;
-  const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R;
-
-  // Cursor + page-break helpers
-  function ensureSpace(needed){
-    if(ctx.y + needed > PAGE_H - MARGIN_B){
-      pdf.addPage();
-      ctx.y = MARGIN_T;
-      ctx.pageCount++;
-    }
-  }
-
-  // Render a paragraph of mixed bold/plain text.
-  // Tokenizes **bold** segments; renders each segment with appropriate font weight.
-  // Wraps to width using jsPDF's getTextWidth + manual word splitting.
-  function renderInline(text, fontSize, baseFont, baseColor){
-    pdf.setFontSize(fontSize);
-    pdf.setTextColor.apply(pdf, baseColor);
-    // Tokenize **bold** segments
-    const segments = [];
-    let rest = text;
-    while(rest.length){
-      const m = rest.match(/^\*\*([^*]+)\*\*/);
-      if(m){ segments.push({text: m[1], bold: true}); rest = rest.slice(m[0].length); continue; }
-      const next = rest.indexOf('**');
-      if(next === -1){ segments.push({text: rest, bold: false}); break; }
-      segments.push({text: rest.slice(0, next), bold: false});
-      rest = rest.slice(next);
-    }
-    // Render segments inline with word wrapping. Track x cursor across segments.
-    let xCursor = MARGIN_L;
-    const lineHeight = fontSize * 0.45;
-    segments.forEach(function(seg){
-      pdf.setFont(baseFont, seg.bold ? 'bold' : 'normal');
-      // Split on whitespace, render word by word so we can wrap mid-segment
-      const words = seg.text.split(/(\s+)/);
-      words.forEach(function(w){
-        if(!w) return;
-        const wWidth = pdf.getTextWidth(w);
-        if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
-          ctx.y += lineHeight;
-          ensureSpace(lineHeight);
-          xCursor = MARGIN_L;
-        }
-        pdf.text(w, xCursor, ctx.y);
-        xCursor += wWidth;
-      });
-    });
-    ctx.y += lineHeight + 1.2; // line gap after paragraph
-  }
-
-  // Pipe-table parser. Collect consecutive lines starting with | then render
-  // via jspdf-autotable (handles row-level page breaks + header repeat).
-  function tryParseTable(startIdx){
-    const tableLines = [];
-    let i = startIdx;
-    while(i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])){
-      tableLines.push(lines[i]);
-      i++;
-    }
-    if(tableLines.length < 2) return null; // Need at least header + separator
-    // Standard markdown table: line 0 = header, line 1 = separator (---|---|---), rest = body
-    const splitRow = function(line){
-      return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(function(c){ return c.trim(); });
-    };
-    const sep = tableLines[1];
-    if(!/^[\s\|:\-]+$/.test(sep)) return null; // Not a real table separator
-    const header = splitRow(tableLines[0]);
-    const body = tableLines.slice(2).map(splitRow);
-    return { header: header, body: body, consumed: tableLines.length };
-  }
-
-  function renderTable(table){
-    // Each cell may contain **bold** spans. autoTable doesn't handle inline
-    // markdown; we strip the ** markers but keep the text. Bold formatting
-    // inside table cells degrades to plain text in V1 — this is an honest
-    // tradeoff (alternative: render every cell as a custom block, ~5x more
-    // code and slower rendering). Flagged in delivery notes.
-    const stripMd = function(s){ return String(s||'').replace(/\*\*/g, ''); };
-    const headerRow = table.header.map(stripMd);
-    const bodyRows = table.body.map(function(row){ return row.map(stripMd); });
-    // autoTable handles row-level page breaks + header repeat by default
-    pdf.autoTable({
-      head: [headerRow],
-      body: bodyRows,
-      startY: ctx.y + 2,
-      margin: { left: MARGIN_L, right: MARGIN_R, top: MARGIN_T, bottom: MARGIN_B },
-      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.5, lineColor: [212, 205, 194], lineWidth: 0.1 },
-      headStyles: { fillColor: [27, 45, 79], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [249, 248, 246] },
-      didDrawPage: function(data){
-        // autoTable may add pages internally; sync our page counter
-        ctx.pageCount = pdf.internal.getNumberOfPages();
-      }
-    });
-    ctx.y = pdf.lastAutoTable.finalY + 4;
-    ctx.pageCount = pdf.internal.getNumberOfPages();
-  }
-
-  // Main loop
-  let i = 0;
-  while(i < lines.length){
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    // Blank line: small vertical gap
-    if(!trimmed){ ctx.y += 2; i++; continue; }
-
-    // Code block (unsupported — fail loud)
-    if(/^```/.test(trimmed)){
-      ensureSpace(8);
-      pdf.setFont('courier', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(146, 64, 14); // amber-ish to flag
-      pdf.text('[unsupported markdown: code block — see source]', MARGIN_L, ctx.y);
-      ctx.y += 5;
-      // Skip until closing ```
-      i++;
-      while(i < lines.length && !/^```/.test(lines[i].trim())) i++;
-      i++;
-      continue;
-    }
-
-    // Heading H2 (## Foo)
-    if(/^##\s+/.test(trimmed) && !/^###/.test(trimmed)){
-      ensureSpace(10);
-      ctx.y += 3;
-      pdf.setFont('times', 'bold');
-      pdf.setFontSize(11);
-      pdf.setTextColor(27, 45, 79);
-      pdf.text(trimmed.replace(/^##\s+/, ''), MARGIN_L, ctx.y);
-      ctx.y += 6;
-      i++;
-      continue;
-    }
-
-    // Heading H3 (### Foo)
-    if(/^###\s+/.test(trimmed)){
-      ensureSpace(8);
-      ctx.y += 2;
-      pdf.setFont('times', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(27, 45, 79);
-      pdf.text(trimmed.replace(/^###\s+/, ''), MARGIN_L, ctx.y);
-      ctx.y += 5;
-      i++;
-      continue;
-    }
-
-    // H1 (#) — render as section-style large heading
-    if(/^#\s+/.test(trimmed) && !/^##/.test(trimmed)){
-      ensureSpace(12);
-      ctx.y += 4;
-      pdf.setFont('times', 'bold');
-      pdf.setFontSize(13);
-      pdf.setTextColor(27, 45, 79);
-      pdf.text(trimmed.replace(/^#\s+/, ''), MARGIN_L, ctx.y);
-      ctx.y += 7;
-      i++;
-      continue;
-    }
-
-    // Pipe table: try to consume contiguous lines
-    if(/^\s*\|.+\|\s*$/.test(line)){
-      const table = tryParseTable(i);
-      if(table){
-        ensureSpace(15); // rough min for header + 2 rows
-        renderTable(table);
-        i += table.consumed;
-        continue;
-      }
-      // Falls through to paragraph handling if not a real table
-    }
-
-    // Bulleted list item (- foo or * foo)
-    if(/^[-*]\s+/.test(trimmed)){
-      ensureSpace(6);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(40, 40, 40);
-      pdf.text('•', MARGIN_L + 2, ctx.y);
-      // Render the rest as inline (supports **bold**) with indent
-      const item = trimmed.replace(/^[-*]\s+/, '');
-      const savedY = ctx.y;
-      // Slightly indented paragraph render
-      const _origMargin = MARGIN_L;
-      // Render as paragraph at indented x — re-implement minimal inline render
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(40, 40, 40);
-      const segments = [];
-      let rest = item;
-      while(rest.length){
-        const m = rest.match(/^\*\*([^*]+)\*\*/);
-        if(m){ segments.push({text: m[1], bold: true}); rest = rest.slice(m[0].length); continue; }
-        const next = rest.indexOf('**');
-        if(next === -1){ segments.push({text: rest, bold: false}); break; }
-        segments.push({text: rest.slice(0, next), bold: false});
-        rest = rest.slice(next);
-      }
-      let xCursor = MARGIN_L + 6;
-      const indentX = MARGIN_L + 6;
-      const lineHeight = 9.5 * 0.45;
-      segments.forEach(function(seg){
-        pdf.setFont('helvetica', seg.bold ? 'bold' : 'normal');
-        const words = seg.text.split(/(\s+)/);
-        words.forEach(function(w){
-          if(!w) return;
-          const wWidth = pdf.getTextWidth(w);
-          if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
-            ctx.y += lineHeight;
-            ensureSpace(lineHeight);
-            xCursor = indentX;
-          }
-          pdf.text(w, xCursor, ctx.y);
-          xCursor += wWidth;
-        });
-      });
-      ctx.y += lineHeight + 1.2;
-      i++;
-      continue;
-    }
-
-    // Numbered list item (1. foo)
-    if(/^\d+\.\s+/.test(trimmed)){
-      ensureSpace(6);
-      const m = trimmed.match(/^(\d+)\.\s+(.*)$/);
-      const num = m[1] + '.';
-      const item = m[2];
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(40, 40, 40);
-      pdf.text(num, MARGIN_L + 2, ctx.y);
-      const segments = [];
-      let rest = item;
-      while(rest.length){
-        const mm = rest.match(/^\*\*([^*]+)\*\*/);
-        if(mm){ segments.push({text: mm[1], bold: true}); rest = rest.slice(mm[0].length); continue; }
-        const next = rest.indexOf('**');
-        if(next === -1){ segments.push({text: rest, bold: false}); break; }
-        segments.push({text: rest.slice(0, next), bold: false});
-        rest = rest.slice(next);
-      }
-      const indentX = MARGIN_L + 9;
-      let xCursor = indentX;
-      const lineHeight = 9.5 * 0.45;
-      segments.forEach(function(seg){
-        pdf.setFont('helvetica', seg.bold ? 'bold' : 'normal');
-        const words = seg.text.split(/(\s+)/);
-        words.forEach(function(w){
-          if(!w) return;
-          const wWidth = pdf.getTextWidth(w);
-          if(xCursor + wWidth > MARGIN_L + CONTENT_W && w.trim().length > 0){
-            ctx.y += lineHeight;
-            ensureSpace(lineHeight);
-            xCursor = indentX;
-          }
-          pdf.text(w, xCursor, ctx.y);
-          xCursor += wWidth;
-        });
-      });
-      ctx.y += lineHeight + 1.2;
-      i++;
-      continue;
-    }
-
-    // Regular paragraph
-    ensureSpace(6);
-    // Convert [text](url) to "text (url)" for external links; strip markdown link syntax
-    const cleaned = trimmed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, txt, url){
-      if(/^https?:/.test(url)) return txt + ' (' + url + ')';
-      return txt;
-    });
-    renderInline(cleaned, 9.5, 'helvetica', [40, 40, 40]);
-    i++;
-  }
-
-  return ctx.y;
-}
-
-// ── Programmatic PDF export entry point ──────────────────────────────────
-function exportReportPdf(){
-  const r = reportState && reportState.result;
-  if(!r){ alert('No report to export.'); return; }
-
-  // Mobile graceful fallback. Programmatic jsPDF works on mobile in principle,
-  // but the on-screen flow + memory constraints make desktop the better path.
-  if(window.innerWidth < 768){
-    alert('Open this report on a laptop or desktop browser to export as PDF.');
-    return;
-  }
-
-  _setExportButtonLoading(true);
-
-  _loadJsPdf().then(function(){
-    try {
-      _renderPdf(r);
-    } catch(err){
-      console.error('PDF generation failed:', err);
-      alert('PDF generation failed — please try again. If the problem persists, contact support.');
-    } finally {
-      _setExportButtonLoading(false);
-    }
-  }).catch(function(err){
-    console.error('Failed to load jsPDF:', err);
-    alert('Could not load PDF library. Check your internet connection and try again.');
-    _setExportButtonLoading(false);
-  });
-}
-
-// ── Main render pipeline ─────────────────────────────────────────────────
-function _renderPdf(r){
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const PAGE_W = 210, PAGE_H = 297;
-  const MARGIN_L = 18, MARGIN_R = 18, MARGIN_T = 22, MARGIN_B = 22;
-  const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R;
-
-  // Render context shared with markdown renderer
-  const ctx = { y: MARGIN_T, pageCount: 1 };
-
-  // ── Cover header (page 1 only, navy block) ─────────────────────────
-  pdf.setFillColor(27, 45, 79); // brand navy
-  pdf.rect(0, 0, PAGE_W, 50, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('courier', 'normal');
-  pdf.setFontSize(8);
-  pdf.text('MARKET ENTRY INTELLIGENCE REPORT · VEYAFLOW', MARGIN_L, 14);
-  pdf.setFontSize(7);
-  pdf.setTextColor(180, 180, 200);
-  pdf.text('GENERATED FOR', MARGIN_L, 22);
-  pdf.setFont('times', 'bold');
-  pdf.setFontSize(20);
-  pdf.setTextColor(255, 255, 255);
-  pdf.text(String(r.brandName || 'Brand'), MARGIN_L, 33);
-  pdf.setFont('courier', 'normal');
-  pdf.setFontSize(9);
-  pdf.setTextColor(212, 205, 194);
-  const homeMarket = r.currentMarket || 'Sweden';
-  const targetMarket = r.targetMarket || '';
-  pdf.text(homeMarket + ' → ' + targetMarket, MARGIN_L, 42);
-  ctx.y = 60;
-
-  // ── Sections ───────────────────────────────────────────────────────
-  const sections = (r.sections || []).filter(function(s){ return s && s.title; });
-  sections.forEach(function(sec, idx){
-    // Section break (except for first section, which flows under the cover header)
-    if(idx > 0){
-      pdf.addPage();
-      ctx.y = MARGIN_T;
-      ctx.pageCount = pdf.internal.getNumberOfPages();
-    }
-    // Section number + title (serif navy, 14pt)
-    pdf.setFont('times', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(27, 45, 79);
-    const sectionLabel = '0' + (idx + 1) + '  ' + (sec.title || '').replace(/^0\d\s+/, '');
-    pdf.text(sectionLabel, MARGIN_L, ctx.y);
-    ctx.y += 8;
-
-    // Confidence pill (if present)
-    if(sec.confidence){
-      pdf.setFont('courier', 'normal');
-      pdf.setFontSize(7);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text('Confidence: ' + String(sec.confidence).toUpperCase(), MARGIN_L, ctx.y);
-      ctx.y += 5;
-    }
-
-    // Section body (markdown)
-    _mdToPdf(pdf, sec.content || '', ctx);
-    ctx.pageCount = pdf.internal.getNumberOfPages();
-  });
-
-  // ── Pass 2: stamp header + footer on every page ────────────────────
-  // jsPDF pagination is forward-only; we need to know total page count
-  // to render "Page X of Y" — that's only available after the body
-  // renders. Iterate pages now and stamp programmatically.
-  const totalPages = pdf.internal.getNumberOfPages();
-  const generatedDate = new Date(r.date || Date.now()).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  });
-  for(let p = 1; p <= totalPages; p++){
-    pdf.setPage(p);
-    // Header (skip on page 1 where the navy cover block already serves as identification)
-    if(p > 1){
-      pdf.setFont('courier', 'normal');
-      pdf.setFontSize(7);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text('VEYAFLOW MARKET ENTRY REPORT', MARGIN_L, 12);
-      const rightText = String(r.brandName || '') + ' · ' + homeMarket + ' → ' + targetMarket;
-      const rightWidth = pdf.getTextWidth(rightText);
-      pdf.text(rightText, PAGE_W - MARGIN_R - rightWidth, 12);
-      // Thin rule under header
-      pdf.setDrawColor(212, 205, 194);
-      pdf.setLineWidth(0.1);
-      pdf.line(MARGIN_L, 14, PAGE_W - MARGIN_R, 14);
-    }
-    // Footer (every page including page 1)
-    pdf.setFont('courier', 'normal');
-    pdf.setFontSize(7);
-    pdf.setTextColor(120, 120, 120);
-    pdf.setDrawColor(212, 205, 194);
-    pdf.setLineWidth(0.1);
-    pdf.line(MARGIN_L, PAGE_H - 14, PAGE_W - MARGIN_R, PAGE_H - 14);
-    pdf.text('Generated ' + generatedDate + ' · veyaflow.com', MARGIN_L, PAGE_H - 9);
-    const pageText = 'Page ' + p + ' of ' + totalPages;
-    const pageWidth = pdf.getTextWidth(pageText);
-    pdf.text(pageText, PAGE_W - MARGIN_R - pageWidth, PAGE_H - 9);
-  }
-
-  // ── Save ───────────────────────────────────────────────────────────
-  const today = new Date().toISOString().slice(0, 10);
-  const brandSafe = _sanitizeForFilename(r.brandName) || 'Brand';
-  const marketSafe = _sanitizeForFilename(r.targetMarket) || 'Market';
-  const filename = 'VeyaFlow_MarketEntryReport_' + brandSafe + '_' + marketSafe + '_' + today + '.pdf';
-  pdf.save(filename);
 }
 
 function expandReport(id){
@@ -11609,7 +11099,7 @@ function renderReportResult(){
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
-      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
+      <button class="btn-outline" onclick="generateMarketEntryReportPDF()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
     </div>
 
     <!-- Section navigation -->
@@ -11683,7 +11173,7 @@ function renderReportResult(){
       <button class="btn-gold" onclick="showPage('pitch')">Generate retailer pitch →</button>
       <button class="btn-outline" onclick="showPage('find')">Find manufacturers →</button>
       <button class="btn-outline" onclick="showPage('compare')">Compare markets →</button>
-      <button class="btn-outline" onclick="exportReportPdf()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
+      <button class="btn-outline" onclick="generateMarketEntryReportPDF()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
     </div>
   `;
 }
@@ -24114,6 +23604,131 @@ function stripMd(text){
     .trim();
 }
 
+// ── Markdown-aware paragraph renderer (May 2026, Task D rewrite) ──
+// Drop-in alternative to pdfWrap that preserves **bold** inline within
+// a paragraph. Used by Market Entry Report PDF; future Brand Pack and
+// Business Case generators can opt in for richer rendering.
+//
+// Single source of truth: this lives in the shared PDF infrastructure
+// section alongside pdfWrap/pdfHeader/pdfFooter so all three artifact
+// generators can call it. Standing principle: enhance shared helpers,
+// don't fork them.
+//
+// Returns new Y position after the rendered paragraph (mirrors pdfWrap's
+// signature). Caller is responsible for setting font/color BEFORE calling;
+// this helper toggles font-style between 'normal' and 'bold' but inherits
+// the active font family + size + color.
+function pdfWrapMd(doc, text, x, y, maxW, lineH){
+  if(!text) return y;
+  // Tokenize into segments of {text, bold}
+  const segments = [];
+  let rest = String(text);
+  while(rest.length){
+    const m = rest.match(/^\*\*([^*]+)\*\*/);
+    if(m){ segments.push({text: m[1], bold: true}); rest = rest.slice(m[0].length); continue; }
+    const next = rest.indexOf('**');
+    if(next === -1){ segments.push({text: rest, bold: false}); break; }
+    if(next > 0) segments.push({text: rest.slice(0, next), bold: false});
+    rest = rest.slice(next);
+  }
+  // Capture current font family + size so we can toggle bold while preserving them
+  const baseFont = doc.getFont();
+  const familyName = baseFont.fontName || 'helvetica';
+  // Render word-by-word with manual word-wrap at maxW
+  let cx = x, cy = y;
+  segments.forEach(function(seg){
+    doc.setFont(familyName, seg.bold ? 'bold' : 'normal');
+    const words = seg.text.split(/(\s+)/);
+    words.forEach(function(w){
+      if(!w) return;
+      const wWidth = doc.getTextWidth(w);
+      if(cx + wWidth > x + maxW && w.trim().length > 0){
+        cy += lineH;
+        cx = x;
+      }
+      doc.text(w, cx, cy);
+      cx += wWidth;
+    });
+  });
+  // Restore the base style (so caller's next pdfSetFont call isn't surprised)
+  doc.setFont(familyName, baseFont.fontStyle || 'normal');
+  return cy + lineH;
+}
+
+// ── Pipe-table renderer (May 2026, Task D rewrite) ──
+// Renders a parsed pipe-table (header row + body rows) as a styled table
+// without depending on jspdf-autotable. Keeps the bundle lean (no extra
+// CDN load) and matches the visual language of the rest of the PDF.
+//
+// Auto-distributes column widths proportional to header text length plus
+// a minimum. Header row in light beige fill with bold; body rows in body
+// font with thin row separators. Cells with **bold** spans render bold
+// inline (uses pdfWrapMd internally).
+//
+// Returns new Y position after the table. Caller-controlled page-break
+// before/after; the table itself doesn't break across pages in V1
+// (matches the brief: "tables don't break across pages"). If a table
+// is too tall to fit on the remaining page, caller handles addPage()
+// before invocation.
+function pdfTable(doc, headerCells, bodyRows, x, y, maxW){
+  if(!headerCells || !headerCells.length) return y;
+  const N = headerCells.length;
+  // Distribute width: each column gets a base 1/N share, with longest
+  // header pulling extra width. V1 simple — works well for Retailer Map
+  // tables (Retailer | Score | Buyer | Email).
+  const colW = Math.floor(maxW / N);
+  const ROW_H = 6;
+  const HEADER_H = 7;
+  const PAD = 1.5;
+  // Header row: light beige fill + bold text
+  pdfColorFill(doc, '#F5F3EE');
+  doc.rect(x, y - HEADER_H + 1.5, maxW, HEADER_H, 'F');
+  pdfSetFont(doc, 'label');
+  pdfColor(doc, '#1E3A5F');
+  headerCells.forEach(function(cell, i){
+    // Strip any **bold** markers from header for layout simplicity
+    const cleaned = String(cell || '').replace(/\*\*/g, '');
+    doc.text(cleaned, x + i * colW + PAD, y - 1);
+  });
+  let cy = y + 2;
+  // Body rows
+  pdfSetFont(doc, 'body');
+  doc.setTextColor(40, 40, 40);
+  bodyRows.forEach(function(row, ri){
+    // Row separator (thin)
+    if(ri > 0){
+      pdfDrawLine(doc, x, cy - ROW_H + 1, x + maxW, cy - ROW_H + 1, '#E5E7EB', 0.15);
+    }
+    row.forEach(function(cell, i){
+      // Truncate cell text to fit column; render with **bold** awareness
+      const cellText = String(cell || '');
+      const cellX = x + i * colW + PAD;
+      const cellMaxW = colW - PAD * 2;
+      // Use pdfWrapMd for inline bold; constrain to single line by truncating
+      // first if needed (V1 simplicity — multi-line cells deferred).
+      // Estimate truncation: if text exceeds column width, cut and add ellipsis.
+      const stripped = cellText.replace(/\*\*/g, '');
+      pdfSetFont(doc, 'body');
+      const fullWidth = doc.getTextWidth(stripped);
+      if(fullWidth <= cellMaxW){
+        // Fits — render with bold awareness
+        pdfWrapMd(doc, cellText, cellX, cy, cellMaxW, ROW_H);
+      } else {
+        // Truncate with ellipsis (drop the bold markers for truncated content)
+        let truncated = stripped;
+        while(truncated.length > 4 && doc.getTextWidth(truncated + '…') > cellMaxW){
+          truncated = truncated.slice(0, -1);
+        }
+        doc.text(truncated + '…', cellX, cy);
+      }
+    });
+    cy += ROW_H;
+  });
+  // Bottom border
+  pdfDrawLine(doc, x, cy - ROW_H + 1, x + maxW, cy - ROW_H + 1, '#E5E7EB', 0.3);
+  return cy + 1;
+}
+
 // ── Brand Pack PDF ────────────────────────────────
 
 async function generateBrandPackPDF(){
@@ -24391,6 +24006,226 @@ async function generateBizCasePDF(){
     document.body.appendChild(pdfE2); setTimeout(()=>pdfE2.remove(),8000);
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='↓ Download PDF'; }
+  }
+}
+
+
+// ── Market Entry Report PDF (May 2026, Task D rewrite) ────────────────
+// Modeled on generateBizCasePDF — uses the shared PDF infrastructure
+// (loadJsPDF, pdfHeader, pdfFooter, pdfSetFont, pdfWrapMd, pdfTable, stripMd).
+// Replaces the parallel implementation that was shipped earlier this session.
+//
+// Pattern: cover page (navy block with brand + home → target framing),
+// then one page per AI section (5 sections in Market Entry Report). Each
+// section uses pdfHeader at top + pdfFooter at bottom, plus the new
+// markdown-aware body renderer that handles **bold** inline and pipe
+// tables (e.g. retailer maps in Section 03).
+async function generateMarketEntryReportPDF(){
+  const r = reportState && reportState.result;
+  if(!r){ alert('No report to export.'); return; }
+  // Mobile fallback: programmatic jsPDF works on mobile but on-screen
+  // memory + flow make desktop the better path.
+  if(window.innerWidth < 768){
+    alert('Open this report on a laptop or desktop browser to export as PDF.');
+    return;
+  }
+  const btn = event?.target;
+  if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
+  try{
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
+    const accent = '#C4A882'; // gold accent stripe (matches Brand Pack / Biz Case)
+
+    const homeMarket = r.currentMarket || 'Sweden';
+    const targetMarket = r.targetMarket || 'Market';
+    const generatedDate = new Date(r.date || Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+    // Parse AI content into sections by splitting on ## headings.
+    // Same pattern as generateBizCasePDF / generateBrandPackPDF.
+    const aiContent = (r.sections||[])
+      .map(function(s){ return s && s.title ? '## ' + s.title + '\n' + (s.content||'') : ''; })
+      .filter(function(s){ return s.length > 10; })
+      .join('\n\n');
+
+    const sections = aiContent.split(/^## /m).filter(function(s){return s.trim().length>10;}).map(function(s){
+      const lines = s.split('\n');
+      return {
+        title: lines[0].replace(/^0\d\s+/, '').trim(),
+        body: lines.slice(1).join('\n').trim()
+      };
+    });
+
+    // ── PAGE 1: Cover ──
+    pdfColorFill(doc, '#1E3A5F');
+    doc.rect(0, 0, pageW, pageH, 'F');
+    // Gold stripe
+    pdfColorFill(doc, accent);
+    doc.rect(0, pageH*0.6, pageW, 3, 'F');
+    // Label
+    pdfSetFont(doc, 'mono');
+    doc.setFontSize(7);
+    doc.setTextColor(150,160,170);
+    doc.text('MARKET ENTRY INTELLIGENCE REPORT', margin, 30);
+    // Brand name
+    pdfSetFont(doc, 'heading');
+    doc.setFontSize(26);
+    pdfColor(doc, '#FFFFFF');
+    doc.text(r.brandName||'Brand', margin, 48);
+    // Market arrow
+    pdfSetFont(doc, 'subheading');
+    doc.setFontSize(14);
+    doc.setTextColor(180,190,200);
+    doc.text(homeMarket + ' → ' + targetMarket, margin, 59);
+    // Details
+    doc.setFontSize(9);
+    doc.setTextColor(150,165,180);
+    doc.text((r.category||'Skincare & Beauty') + ' · ' + generatedDate, margin, 68);
+    // Sections summary box
+    pdfColorFill(doc, '#162D4A');
+    doc.roundedRect(margin, 90, contentW, 40, 2, 2, 'F');
+    pdfSetFont(doc,'label'); doc.setFontSize(6.5); doc.setTextColor(150,165,180);
+    doc.text('REPORT CONTENTS', margin+6, 98);
+    pdfSetFont(doc, 'body'); doc.setFontSize(9); doc.setTextColor(200,210,220);
+    let listY = 106;
+    sections.forEach(function(s, i){
+      if(listY > 126) return;
+      doc.text(String(i+1).padStart(2,'0') + '  ' + s.title.slice(0, 60), margin+6, listY);
+      listY += 5;
+    });
+    // VeyaFlow mark
+    pdfColor(doc, accent);
+    doc.setFontSize(8);
+    doc.text('◈ VeyaFlow', pageW/2, pageH-15, {align:'center'});
+    doc.setTextColor(150,165,180);
+    doc.setFontSize(7);
+    doc.text('veyaflow.com', pageW/2, pageH-9, {align:'center'});
+
+    // ── AI CONTENT PAGES ──
+    sections.forEach(function(section, idx){
+      doc.addPage();
+      pdfHeader(doc, section.title, (r.brandName||'Brand') + ' · ' + homeMarket + ' → ' + targetMarket, accent, pageW);
+      let sy = 40;
+      // Section number badge
+      pdfColorFill(doc, '#F5F3EE');
+      doc.rect(margin, sy-4, 8, 8, 'F');
+      pdfSetFont(doc,'label'); doc.setFontSize(8); pdfColor(doc, '#1E3A5F');
+      doc.text(String(idx+1).padStart(2,'0'), margin+4, sy+1, {align:'center'});
+      sy += 8;
+
+      // Render body line-by-line. Detect pipe tables and bullet/numbered
+      // lists; everything else flows through pdfWrapMd for inline-bold paragraphs.
+      const bodyLines = section.body.split(/\r?\n/);
+      let i = 0;
+      while(i < bodyLines.length){
+        const line = bodyLines[i];
+        const trimmed = line.trim();
+        // Page-break check
+        if(sy > pageH - 25){
+          pdfFooter(doc, doc.internal.getNumberOfPages(), 0, pageW, pageH); // pageNum stamped in pass 2
+          doc.addPage();
+          pdfHeader(doc, section.title, 'continued', accent, pageW);
+          sy = 40;
+        }
+        // Blank line: small gap
+        if(!trimmed){ sy += 2; i++; continue; }
+        // Code block fail-loud (per standing principle: surface gaps)
+        if(/^```/.test(trimmed)){
+          pdfSetFont(doc,'mono'); doc.setFontSize(7); doc.setTextColor(146,64,14);
+          doc.text('[unsupported markdown: code block — see source]', margin, sy);
+          sy += 5;
+          i++;
+          while(i < bodyLines.length && !/^```/.test(bodyLines[i].trim())) i++;
+          i++;
+          continue;
+        }
+        // Sub-heading (### or ##) within a section
+        if(/^#{2,3}\s+/.test(trimmed)){
+          sy += 2;
+          pdfSetFont(doc, 'subheading'); doc.setFontSize(11); pdfColor(doc, '#1E3A5F');
+          doc.text(trimmed.replace(/^#{2,3}\s+/, ''), margin, sy);
+          sy += 6;
+          pdfSetFont(doc, 'body'); doc.setTextColor(40,40,40);
+          i++;
+          continue;
+        }
+        // Pipe table: collect contiguous |...| lines
+        if(/^\s*\|.+\|\s*$/.test(line)){
+          const tableLines = [];
+          let j = i;
+          while(j < bodyLines.length && /^\s*\|.+\|\s*$/.test(bodyLines[j])){
+            tableLines.push(bodyLines[j]);
+            j++;
+          }
+          // Need header + separator + at least one body row
+          if(tableLines.length >= 2 && /^[\s\|:\-]+$/.test(tableLines[1])){
+            const splitRow = function(ln){
+              return ln.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(function(c){return c.trim();});
+            };
+            const header = splitRow(tableLines[0]);
+            const body = tableLines.slice(2).map(splitRow);
+            sy = pdfTable(doc, header, body, margin, sy + 2, contentW);
+            sy += 3;
+            i = j;
+            continue;
+          }
+          // Falls through to paragraph if not a real table
+        }
+        // Bullet list item
+        if(/^[-*]\s+/.test(trimmed)){
+          pdfSetFont(doc,'body'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+          doc.text('•', margin, sy);
+          sy = pdfWrapMd(doc, trimmed.replace(/^[-*]\s+/, ''), margin+5, sy, contentW-5, 5);
+          i++;
+          continue;
+        }
+        // Numbered list item
+        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+        if(numMatch){
+          pdfSetFont(doc,'body'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+          doc.text(numMatch[1] + '.', margin, sy);
+          sy = pdfWrapMd(doc, numMatch[2], margin+8, sy, contentW-8, 5);
+          i++;
+          continue;
+        }
+        // Paragraph (default)
+        pdfSetFont(doc,'body'); doc.setFontSize(9); doc.setTextColor(40,40,40);
+        // Convert [text](url) external links to "text (url)" inline
+        const cleaned = trimmed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, txt, url){
+          if(/^https?:/.test(url)) return txt + ' (' + url + ')';
+          return txt;
+        });
+        sy = pdfWrapMd(doc, cleaned, margin, sy, contentW, 5);
+        sy += 1;
+        i++;
+      }
+    });
+
+    // Pass 2: stamp page numbers on every page (header/footer total
+    // count was unknown during forward render). pdfFooter handles the
+    // visual layout; we just iterate and call it with the now-known total.
+    const totalPages = doc.internal.getNumberOfPages();
+    for(let p = 1; p <= totalPages; p++){
+      doc.setPage(p);
+      // Skip footer on cover (page 1) — the cover has its own VeyaFlow mark
+      if(p === 1) continue;
+      pdfFooter(doc, p, totalPages, pageW, pageH);
+    }
+
+    const safeName = function(s){ return String(s||'').replace(/[^A-Za-z0-9]+/g,'').slice(0,50) || 'item'; };
+    const filename = 'VeyaFlow_MarketEntryReport_' + safeName(r.brandName) + '_' + safeName(r.targetMarket) + '_' + new Date().toISOString().slice(0,10) + '.pdf';
+    doc.save(filename);
+  } catch(err){
+    console.error('Market Entry Report PDF generation failed:', err);
+    const cl3 = (typeof classifyApiError === 'function') ? classifyApiError(err) : {sub:'Try again, or use browser Print → Save as PDF as a fallback.'};
+    const pdfE2 = document.createElement('div');
+    pdfE2.style.cssText='position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;max-width:320px';
+    pdfE2.innerHTML = errCard('PDF could not be generated', cl3.sub + ' As a fallback, use your browser Print → Save as PDF.', 'Close', 'this.closest(\'[style*=fixed]\').remove()');
+    document.body.appendChild(pdfE2);
+    setTimeout(function(){ pdfE2.remove(); }, 8000);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='⤓ Save as PDF'; }
   }
 }
 
