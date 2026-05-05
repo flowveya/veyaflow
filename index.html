@@ -10337,7 +10337,9 @@ const RETAILER_INTEL = Object.fromEntries(
 
 // ── Storage keys ──────────────────────────────────
 const ATM_STORAGE_KEY_TEMPLATES = 'ns_atm_templates';
-const ATM_STORAGE_KEY_OUTCOMES  = 'ns_atm_outcomes';
+// ATM_STORAGE_KEY_OUTCOMES removed May 2026 (M2c) — outcome capture now
+// converged into retailSubmissions per Path 1 migration. See getOutcomesFor*
+// functions which read from retailSubmissions and project to outcome shape.
 const ATM_STORAGE_KEY_AUDIT     = 'ns_atm_audit';
 
 // ── Staleness thresholds (days) ───────────────────
@@ -10349,12 +10351,10 @@ const ATM_STALENESS_GREEN_DAYS = 90;
 const ATM_STALENESS_AMBER_DAYS = 365;
 
 // ── Module state (loaded lazily on first read) ────
-// Three arrays, kept in memory after first load to avoid repeated
-// JSON.parse on every read. All writes go through saveTemplate /
-// recordSubmissionOutcome / recordGenerationAudit which write-through
-// to localStorage immediately. No optimistic local mutation.
+// Two arrays now (down from three after M2c convergence): templates + audit.
+// Outcomes live in retailSubmissions; getOutcomesFor* functions project that
+// store into outcome record shape for backward-compatible consumers.
 let _atmTemplates = null; // null = not yet loaded; array once loaded
-let _atmOutcomes  = null;
 let _atmAudit     = null;
 
 // ── Init ──────────────────────────────────────────
@@ -10367,10 +10367,6 @@ function _atmInitStorage(){
   try {
     if(localStorage.getItem(ATM_STORAGE_KEY_TEMPLATES) === null){
       localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, '[]');
-      didInit = true;
-    }
-    if(localStorage.getItem(ATM_STORAGE_KEY_OUTCOMES) === null){
-      localStorage.setItem(ATM_STORAGE_KEY_OUTCOMES, '[]');
       didInit = true;
     }
     if(localStorage.getItem(ATM_STORAGE_KEY_AUDIT) === null){
@@ -10403,19 +10399,6 @@ function _atmLoadTemplates(){
   }
   return _atmTemplates;
 }
-function _atmLoadOutcomes(){
-  if(_atmOutcomes !== null) return _atmOutcomes;
-  _atmInitStorage();
-  try {
-    const raw = localStorage.getItem(ATM_STORAGE_KEY_OUTCOMES) || '[]';
-    _atmOutcomes = JSON.parse(raw);
-    if(!Array.isArray(_atmOutcomes)) _atmOutcomes = [];
-  } catch(e){
-    console.warn('ATM outcomes load failed:', e);
-    _atmOutcomes = [];
-  }
-  return _atmOutcomes;
-}
 function _atmLoadAudit(){
   if(_atmAudit !== null) return _atmAudit;
   _atmInitStorage();
@@ -10434,10 +10417,6 @@ function _atmLoadAudit(){
 function _atmSaveTemplates(){
   try { localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, JSON.stringify(_atmTemplates||[])); }
   catch(e){ console.warn('ATM templates save failed:', e); throw e; }
-}
-function _atmSaveOutcomes(){
-  try { localStorage.setItem(ATM_STORAGE_KEY_OUTCOMES, JSON.stringify(_atmOutcomes||[])); }
-  catch(e){ console.warn('ATM outcomes save failed:', e); throw e; }
 }
 function _atmSaveAudit(){
   try { localStorage.setItem(ATM_STORAGE_KEY_AUDIT, JSON.stringify(_atmAudit||[])); }
@@ -10599,14 +10578,63 @@ function getCurrentTemplate(retailerId){
   return getTemplateForRetailer(retailerId);
 }
 
-function getAllOutcomes(){ return _atmLoadOutcomes().slice(); }
+function getAllOutcomes(){
+  // Outcome capture converged into retailSubmissions (May 2026 M2b). This
+  // function now reads from retailSubmissions and projects each one into the
+  // outcome-record shape so Task C Layer 2 staleness logic and any other
+  // outcome consumer keeps working unchanged. Single read surface (rule 8).
+  try { loadRetailSubmissions(); } catch(e){}
+  return (retailSubmissions || []).map(_atmSubmissionToOutcomeView);
+}
+
+// Project a retailSubmissions record into the outcome-record shape.
+// Used by getAllOutcomes / getOutcomesForRetailer / getOutcomesForBrand
+// so consumers see the same shape Task A originally defined, regardless
+// of where the data physically lives.
+function _atmSubmissionToOutcomeView(s){
+  // Map submission status → outcomeType. Submissions in non-terminal states
+  // (draft / submitted / under_review / meeting_booked / terms) project as
+  // outcomeType='pending' which Layer 2 staleness logic ignores (it filters
+  // to outcomeType==='rejected' specifically). Terminal states project to
+  // their natural outcome equivalents.
+  let outcomeType = 'pending';
+  if(s.status === 'rejected') outcomeType = 'rejected';
+  else if(s.status === 'listed' || s.status === 'live') outcomeType = 'listed';
+  return {
+    id:                          s.id,
+    brandId:                     (typeof brand !== 'undefined' && brand && (brand.id || brand.name)) || 'unknown',
+    retailerId:                  s.retailerId,
+    marketId:                    s.market || '',
+    skuIds:                      Array.isArray(s.skuIds) ? s.skuIds.slice() : [],
+    submissionTimestamp:         s.submittedDate ? new Date(s.submittedDate).toISOString() : (s.createdAt || ''),
+    outcomeType:                 outcomeType,
+    outcomeTimestamp:            s.statusChangedAt || s.createdAt || '',
+    outcomeReason:               s.rejectionReason || '',
+    outcomeReasonStructured:     s.outcomeReasonStructured || null,
+    templateVersionUsed:         s.templateVersionUsed || '',
+    readinessScoreAtSubmission:  s.readinessScoreAtSubmission != null ? Number(s.readinessScoreAtSubmission) : null,
+    contextSnapshot:             s.contextSnapshot || null,
+    createdAt:                   s.createdAt || '',
+  };
+}
+
 function getOutcomesForRetailer(retailerId){
   if(!retailerId) return [];
-  return _atmLoadOutcomes().filter(function(o){ return o.retailerId === retailerId; });
+  try { loadRetailSubmissions(); } catch(e){}
+  return (retailSubmissions || [])
+    .filter(function(s){ return s.retailerId === retailerId; })
+    .map(_atmSubmissionToOutcomeView);
 }
 function getOutcomesForBrand(brandId){
   if(!brandId) return [];
-  return _atmLoadOutcomes().filter(function(o){ return o.brandId === brandId; });
+  try { loadRetailSubmissions(); } catch(e){}
+  // Single-tenant model: all submissions belong to the current brand.
+  // brandId filtering is currently a no-op match against the active brand;
+  // when multi-tenant lands (Stage 3 migration trigger), this filters by
+  // submission.brandId once that field is added.
+  const currentBrandId = (typeof brand !== 'undefined' && brand && (brand.id || brand.name)) || 'unknown';
+  if(brandId !== currentBrandId) return [];
+  return (retailSubmissions || []).map(_atmSubmissionToOutcomeView);
 }
 
 function getAllAuditRecords(){ return _atmLoadAudit().slice(); }
@@ -10632,13 +10660,73 @@ function saveTemplate(record){
 }
 
 function recordSubmissionOutcome(outcomeData){
-  const rec = (outcomeData && outcomeData.id && outcomeData.brandId && outcomeData.outcomeType)
-    ? outcomeData                              // already shaped
-    : createOutcomeRecord(outcomeData || {});  // build from partial input
-  const list = _atmLoadOutcomes();
-  list.push(rec);
-  _atmSaveOutcomes();
-  return rec;
+  // Outcome capture converged into retailSubmissions (May 2026 M2a). Three
+  // call patterns supported:
+  //   1. Caller passes {submissionId, outcomeType, outcomeReasonStructured,
+  //      readinessScoreAtSubmission, contextSnapshot} → enriches existing
+  //      submission record (this is the common path).
+  //   2. Caller passes {brandId, retailerId, outcomeType, ...} with no
+  //      submissionId → creates a new submission record. Used when outcome
+  //      arrives without a tracked submission (e.g. retroactive logging).
+  //   3. Legacy callers may pass a fully-shaped outcome record; we write
+  //      it as a new submission. Backward-compat shim.
+  const data = outcomeData || {};
+  if(!data.brandId || !data.retailerId || !data.outcomeType){
+    throw new Error('recordSubmissionOutcome requires brandId, retailerId, outcomeType');
+  }
+  try { loadRetailSubmissions(); } catch(e){ retailSubmissions = retailSubmissions || []; }
+  // Map outcomeType → submission status
+  const statusFromOutcome = (function(t){
+    if(t === 'rejected') return 'rejected';
+    if(t === 'listed' || t === 'live' || t === 'accepted') return 'listed';
+    if(t === 'declined') return 'rejected';
+    if(t === 'listed_then_delisted') return 'rejected';
+    return 'submitted';
+  })(data.outcomeType);
+  const now = new Date().toISOString();
+  // Path 1: enrich existing submission by id
+  if(data.submissionId){
+    const existing = (retailSubmissions || []).find(function(s){ return s.id === data.submissionId; });
+    if(existing){
+      existing.status                     = statusFromOutcome;
+      existing.statusChangedAt            = data.outcomeTimestamp || now;
+      if(data.outcomeReason)              existing.rejectionReason = data.outcomeReason;
+      if(data.outcomeReasonStructured)    existing.outcomeReasonStructured = data.outcomeReasonStructured;
+      if(data.templateVersionUsed)        existing.templateVersionUsed = data.templateVersionUsed;
+      if(data.readinessScoreAtSubmission != null) existing.readinessScoreAtSubmission = Number(data.readinessScoreAtSubmission);
+      if(data.contextSnapshot)            existing.contextSnapshot = data.contextSnapshot;
+      saveRetailSubmissions();
+      return _atmSubmissionToOutcomeView(existing);
+    }
+    // submissionId provided but not found — fall through to create new
+  }
+  // Path 2/3: create new submission record
+  const newSub = {
+    id:                          (typeof retailUuid === 'function') ? retailUuid() : ('sub_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+    retailerId:                  String(data.retailerId),
+    retailerName:                (typeof retailerNameFromId === 'function') ? (retailerNameFromId(data.retailerId) || data.retailerId) : data.retailerId,
+    market:                      data.marketId || '',
+    submittedDate:               (data.submissionTimestamp || now).slice(0, 10),
+    status:                      statusFromOutcome,
+    statusChangedAt:             data.outcomeTimestamp || now,
+    skuIds:                      Array.isArray(data.skuIds) ? data.skuIds.slice() : [],
+    contactName:                 '',
+    contactEmail:                '',
+    nextAction:                  '',
+    nextActionDate:              '',
+    notes:                       'Recorded via recordSubmissionOutcome',
+    meetingDate:                 '',
+    listingDate:                 statusFromOutcome === 'listed' ? (data.outcomeTimestamp || now).slice(0, 10) : '',
+    rejectionReason:             data.outcomeReason || '',
+    outcomeReasonStructured:     data.outcomeReasonStructured || '',
+    templateVersionUsed:         data.templateVersionUsed || '',
+    readinessScoreAtSubmission:  data.readinessScoreAtSubmission != null ? Number(data.readinessScoreAtSubmission) : null,
+    contextSnapshot:             data.contextSnapshot || null,
+    createdAt:                   now,
+  };
+  retailSubmissions.push(newSub);
+  saveRetailSubmissions();
+  return _atmSubmissionToOutcomeView(newSub);
 }
 
 function recordGenerationAudit(auditData){
@@ -10825,6 +10913,115 @@ async function _atmHashContent(content){
 // ── Boot: ensure storage exists on app load ───────
 // Runs once at script-evaluation time. Idempotent — safe to call again.
 _atmInitStorage();
+
+// ── Legacy ARTICLE_TEMPLATES migration (May 2026) ──
+// One-time migration to seed the versioned schema model with the two
+// retailers (Apotek Hjärtat + Matas) that were previously hardcoded as
+// the ARTICLE_TEMPLATES constant. Idempotent: each retailer gets seeded
+// once; subsequent app loads no-op if a template record already exists
+// for that retailer.
+//
+// Architectural rationale: the prior ARTICLE_TEMPLATES constant was partial
+// v0 of ATM that had been operating without versioning, staleness signals,
+// or outcome capture. This migration upgrades it to the full ATM model.
+// The legacy data is inlined here (rather than reading from an external
+// const) so the migration is self-contained and works on first deploy.
+//
+// Seeded retailers get:
+//   - templateVersion: '2026.01' (placeholder — operationally equivalent to v1)
+//   - verifiedAt: today (so they show green status, preserving the implicit
+//     "currently trustworthy" signal that confidence: 'veyaflow_verified' carried)
+//   - verifiedBy: 'migrated_from_v0'
+//   - sourceProvenance: descriptor noting the migration origin
+//   - sourceHash: '' (no source file existed; templates were author-defined)
+//   - schema.sheets[0].columns[]: populated from the legacy fields[] array
+const _ATM_LEGACY_SEED_TEMPLATES = {
+  apotek_hjartat_se: {
+    format: 'xlsx',
+    portalUrl: 'https://leverantor.apotekshjartat.se',
+    legacyConfidence: 'veyaflow_verified',
+    fields: [
+      { label:'Article number (EAN)',             source:'sku.ean' },
+      { label:'Product name (Swedish)',           source:'sku.nameSV||sku.name' },
+      { label:'Brand name',                       source:'brand.name' },
+      { label:'Product description (max 500)',    source:'sku.descSV||sku.descEN' },
+      { label:'Category (Apotek category code)',  source:'manual' },
+      { label:'RSP inc. VAT (SEK)',               source:'sku.rspSEK' },
+      { label:'Net price (SEK)',                  source:'private' },
+      { label:'VAT rate (%)',                     source:'const:25' },
+      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
+      { label:'EU Responsible Person',            source:'brand.euResponsiblePerson' },
+      { label:'Country of manufacture',           source:'sku.countryOfMfr' },
+      { label:'Shelf life (months)',              source:'sku.shelfLifeMonths' },
+      { label:'Net weight/volume',                source:'sku.netContent' },
+      { label:'Recycled packaging %',             source:'manual' },
+    ],
+  },
+  matas_dk: {
+    format: 'xlsx',
+    portalUrl: 'https://supplier.matas.dk',
+    legacyConfidence: 'research_verified',
+    fields: [
+      { label:'EAN',                              source:'sku.ean' },
+      { label:'Product name (Danish)',            source:'sku.descDA||sku.name' },
+      { label:'Brand',                            source:'brand.name' },
+      { label:'Description (max 300, Danish)',    source:'sku.descDA||sku.descEN' },
+      { label:'RSP (DKK)',                        source:'sku.rspDKK' },
+      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
+      { label:'Ingredients (INCI)',               source:'sku.inci' },
+    ],
+  },
+};
+
+function _atmMigrateLegacyTemplates(){
+  const today = new Date().toISOString();
+  const sheetName = 'Article Template';
+  Object.keys(_ATM_LEGACY_SEED_TEMPLATES).forEach(function(retailerId){
+    const existing = getTemplateForRetailer(retailerId);
+    if(existing) return; // already seeded — no-op
+    const legacy = _ATM_LEGACY_SEED_TEMPLATES[retailerId];
+    if(!legacy || !legacy.fields) return;
+    // Convert legacy fields[] to schema.sheets[0].columns[] shape
+    const columns = legacy.fields.map(function(f, idx){
+      return {
+        id:        'col_' + String(idx + 1).padStart(3, '0'),
+        position:  idx,
+        header:    f.label,
+        dataType:  'string',
+        required:  false,
+        validation: {},
+        mapping:   { source: f.source }, // preserves the resolver string
+      };
+    });
+    const rec = createTemplateRecord({
+      retailerId:        retailerId,
+      templateVersion:   '2026.01',
+      verifiedAt:        today,
+      verifiedBy:        'migrated_from_v0',
+      sourceProvenance:  'Migrated from hardcoded ARTICLE_TEMPLATES May 2026 (legacy confidence: ' + legacy.legacyConfidence + ')',
+      sourceHash:        '',
+      schema: {
+        sheets: [{
+          name:    sheetName,
+          order:   0,
+          format:  legacy.format || 'xlsx',
+          columns: columns,
+        }],
+        conditionalRules: [],
+      },
+      productTypeRouting: {},
+      notes:             'Auto-migrated from ARTICLE_TEMPLATES. Portal: ' + (legacy.portalUrl || 'unknown') + '. Original confidence: ' + legacy.legacyConfidence + '.',
+    });
+    // Preserve the portalUrl on the record for the brand-facing flow.
+    // It's not a first-class schema field, but lives alongside as metadata.
+    rec.portalUrl = legacy.portalUrl || '';
+    saveTemplate(rec);
+  });
+}
+// Run synchronously — _ATM_LEGACY_SEED_TEMPLATES is defined immediately above
+// so no temporal dead zone concern (unlike the previous typeof ARTICLE_TEMPLATES
+// approach which deferred via setTimeout).
+_atmMigrateLegacyTemplates();
 
 
 // ═══════════════════════════════════════════════════
@@ -12802,7 +12999,7 @@ HARD RULES:
 - No brand story in the main sections. Credentials go to appendix.
 - Total: under 650 words in main sections.`;
 
-  const magicLinkUrl = brand?.magicLinkUrl || 'https://veyaflow.com/brand/' + (brand?.shareId||'');
+  const magicLinkUrl = brand?.magicLinkUrl || (window.location.origin + '/brand/' + (brand?.shareId||''));
   const buyerPrompt = `You are writing a concise Retail Business Case for a buyer at ${retailer}, ${market}. April 2026. First-contact justification — the buyer has never heard of this brand.
 
 BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
@@ -17905,7 +18102,7 @@ async function runClaimLocalizer(){
     return;
   }
 
-  claimsState = {input, result:null, loading:true, selectedMarkets};
+  claimsState = {...claimsState, input, result:null, loading:true, selectedMarkets};
   renderClaims(document.getElementById('page-claims'));
 
   // Client-side greenwashing pre-screen
@@ -18006,9 +18203,9 @@ Be specific, cite the exact regulation per issue. Every RED must have ALTERNATIV
 
   try{
     const text = await callAPI([{role:'user',content:prompt}],1400);
-    claimsState = {input, result:text, loading:false};
+    claimsState = {...claimsState, input, result:text, loading:false};
   }catch(err){
-    claimsState = {input, result:'ERROR:'+err.message, loading:false};
+    claimsState = {...claimsState, input, result:'ERROR:'+err.message, loading:false};
   }
   renderClaims(document.getElementById('page-claims'));
 }
@@ -20321,7 +20518,7 @@ HARD RULES FOR ALL THREE VARIANTS:
     showSuccess('Retailer pitch generated for '+retailer);
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
-    renderPitch(el);
+    renderPitch(document.getElementById('page-pitch'));
   }catch(err){
     if(btn){btn.disabled=false;btn.textContent=`Generate ${getCatLabel('pitch')||'Retailer Pitch'} →`;}
     const classified = classifyApiError(err);
@@ -20349,7 +20546,7 @@ function sendPitchViaEmail(variantIdx){
   var active = parsed[idx];
   if(!active || !active.body) return;
   // Substitute the magic link placeholder same as renderPitchResult does
-  var magicLink = (brand && brand.magicLinkUrl) || ('https://veyaflow.com/brand/' + ((brand && brand.shareId) || '')).replace(/\/+$/, '') || 'https://veyaflow.com';
+  var magicLink = (brand && brand.magicLinkUrl) || (window.location.origin + '/brand/' + ((brand && brand.shareId) || '')).replace(/\/+$/, '') || window.location.origin;
   var bodyWithLink = active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink);
   var subject = active.subject || '';
   // encodeURIComponent handles ä, ö, å, é, quotes, line breaks correctly
@@ -20442,7 +20639,7 @@ function renderPitchResult(){
   };
 
   // Magic link — use live URL from brand profile if available, else static fallback
-  const magicLink = brand?.magicLinkUrl || `https://veyaflow.com/brand/${brand?.shareId||''}`.replace(/\/+$/, '') || 'https://veyaflow.com';
+  const magicLink = brand?.magicLinkUrl || `${window.location.origin}/brand/${brand?.shareId||''}`.replace(/\/+$/, '') || window.location.origin;
   const wordCount = active.body.split(/\s+/).filter(Boolean).length;
 
   // Replace placeholder in body
@@ -20987,7 +21184,7 @@ async function shareBrandPack(regenerate){
 
   } catch(err) {
     // Graceful degradation — show static placeholder URL
-    const fallback = `https://veyaflow.com/brand/${brandId}`;
+    const fallback = `${window.location.origin}/brand/${brandId}`;
     if(brand){
       brand.magicLinkUrl = fallback;
       brand.shareId      = brandId;
@@ -28903,7 +29100,7 @@ function renderDPPView(el){
   const f = d.fields||{};
   const r = dppReadiness(sku);
   const dppId = d.dppId||getDPPId(dppActiveSkuId);
-  const dppUrl = 'https://veyaflow.com/dpp/'+dppId;
+  const dppUrl = window.location.origin + '/dpp/' + dppId;
   const versions = d.versions||[];
   const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
   const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
@@ -29086,7 +29283,7 @@ function buildDPPJson(skuId){
   return {
     "@context": "https://veyaflow.com/dpp/schema/v1",
     "dppId": dppId,
-    "dppUrl": "https://veyaflow.com/dpp/"+dppId,
+    "dppUrl": window.location.origin + "/dpp/"+dppId,
     "generatedBy": "VeyaFlow DPP Generator",
     "generatedAt": d.generatedAt||new Date().toISOString(),
     "version": (d.versions&&d.versions[0]?.version)||"v1.0",
@@ -29233,7 +29430,7 @@ async function generateDPPPdf(skuId){
 
     section('Digital Product Passport');
     row('DPP ID',dppId);
-    row('DPP URL','veyaflow.com/dpp/'+dppId);
+    row('DPP URL', window.location.origin.replace(/^https?:\/\//,'') + '/dpp/'+dppId);
     row('Generated',new Date(d.generatedAt||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}));
     row('Standard','EU ESPR Digital Product Passport (ESPR Reg. 2024/1781)');
     y+=8;
@@ -30312,45 +30509,12 @@ const RETAIL_SUB_STATUSES = [
 ];
 const RETAIL_PIPELINE_STAGES = ['draft','submitted','under_review','meeting_booked','terms','listed','live'];
 
-const ARTICLE_TEMPLATES = {
-  apotek_hjartat_se: {
-    name: 'Apotek Hjärtat Article Template',
-    format: 'xlsx',
-    portalUrl: 'https://leverantor.apotekshjartat.se',
-    fields: [
-      { label:'Article number (EAN)',             source:'sku.ean' },
-      { label:'Product name (Swedish)',           source:'sku.nameSV||sku.name' },
-      { label:'Brand name',                       source:'brand.name' },
-      { label:'Product description (max 500)',    source:'sku.descSV||sku.descEN' },
-      { label:'Category (Apotek category code)',  source:'manual' },
-      { label:'RSP inc. VAT (SEK)',               source:'sku.rspSEK' },
-      { label:'Net price (SEK)',                  source:'private' },
-      { label:'VAT rate (%)',                     source:'const:25' },
-      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
-      { label:'EU Responsible Person',            source:'brand.euResponsiblePerson' },
-      { label:'Country of manufacture',           source:'sku.countryOfMfr' },
-      { label:'Shelf life (months)',              source:'sku.shelfLifeMonths' },
-      { label:'Net weight/volume',                source:'sku.netContent' },
-      { label:'Recycled packaging %',             source:'manual' },
-    ],
-    confidence: 'veyaflow_verified',
-  },
-  matas_dk: {
-    name: 'Matas Masterdata Template',
-    format: 'xlsx',
-    portalUrl: 'https://supplier.matas.dk',
-    fields: [
-      { label:'EAN',                              source:'sku.ean' },
-      { label:'Product name (Danish)',            source:'sku.descDA||sku.name' },
-      { label:'Brand',                            source:'brand.name' },
-      { label:'Description (max 300, Danish)',    source:'sku.descDA||sku.descEN' },
-      { label:'RSP (DKK)',                        source:'sku.rspDKK' },
-      { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
-      { label:'Ingredients (INCI)',               source:'sku.inci' },
-    ],
-    confidence: 'research_verified',
-  },
-};
+// ARTICLE_TEMPLATES constant removed May 2026 — migrated to ATM versioned
+// schema model via _atmMigrateLegacyTemplates(). The legacy data is now
+// inlined in _ATM_LEGACY_SEED_TEMPLATES inside the migration helper, which
+// runs on every app load and seeds template records the first time.
+// renderRetailTemplates and downloadRetailTemplate now read from the
+// versioned store via getCurrentTemplate(retailerId).
 
 // Per-product-type compliance rows. Surfaced IN ADDITION to retailer-specific
 // rows in the Listing Checklist. The retailer rows handle commercial readiness
@@ -30988,6 +31152,17 @@ function createRetailSubmission(){
     meetingDate: '',
     listingDate: '',
     rejectionReason: '',
+    // ATM outcome capture (May 2026 M2a) — convergence with retailSubmissions.
+    // These fields enrich the submission record with calibration data the prior
+    // shape didn't carry. Set when the submission is recorded; updated when
+    // status moves to 'rejected' or 'listed' via recordSubmissionOutcome.
+    outcomeReasonStructured: '',
+    templateVersionUsed: (function(){
+      try { var t = getCurrentTemplate(f.retailerId); return t ? t.templateVersion : ''; }
+      catch(e){ return ''; }
+    })(),
+    readinessScoreAtSubmission: null,
+    contextSnapshot: null,
     createdAt: now,
   };
   loadRetailSubmissions();
@@ -31109,11 +31284,41 @@ function retailTemplateResolveSource(source, sku, brandObj){
 
 function renderRetailTemplates(el){
   if(!el) return;
-  var retailerKeys = Object.keys(ARTICLE_TEMPLATES);
-  if(!retailTemplatesSelRetailer || !ARTICLE_TEMPLATES[retailTemplatesSelRetailer]){
-    retailTemplatesSelRetailer = retailerKeys[0];
+  // ── Read from versioned schema model (post-migration) ──
+  // Legacy ARTICLE_TEMPLATES has been migrated to the ATM template store.
+  // We pull the list of available retailers from getAllTemplates() and
+  // resolve each via getCurrentTemplate() so we always render the most
+  // recently verified version. Staleness signal replaces the legacy
+  // confidence badge as the unified trust signal (decision M3).
+  var allTemplates = getAllTemplates();
+  // Group by retailerId, keep only the current (most recent) version of each
+  var seenRetailerIds = {};
+  var availableRetailers = [];
+  allTemplates.forEach(function(t){
+    if(seenRetailerIds[t.retailerId]) return;
+    seenRetailerIds[t.retailerId] = true;
+    availableRetailers.push({id: t.retailerId, name: retailerNameFromId(t.retailerId) || t.retailerId});
+  });
+  if(!availableRetailers.length){
+    // Empty state — no migrated templates yet (rare; first-load before migration runs)
+    el.innerHTML = '<div class="page-wrap"><div class="topbar"><div><div class="page-title">Article Templates</div><div class="page-sub">No retailer templates configured yet</div></div></div><div class="content"><div class="card" style="padding:1.5rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">Templates are being initialized. Reload the page in a moment.</div></div></div>';
+    return;
   }
-  var tpl = ARTICLE_TEMPLATES[retailTemplatesSelRetailer];
+  if(!retailTemplatesSelRetailer || !seenRetailerIds[retailTemplatesSelRetailer]){
+    retailTemplatesSelRetailer = availableRetailers[0].id;
+  }
+  var tplRecord = getCurrentTemplate(retailTemplatesSelRetailer);
+  // Map versioned schema back to legacy {label, source} field shape so
+  // retailTemplateResolveSource (which operates on the source string)
+  // works unchanged. Preserves Task E's mapping engine.
+  var sheet = tplRecord.schema && tplRecord.schema.sheets && tplRecord.schema.sheets[0];
+  var legacyFields = sheet ? sheet.columns.map(function(c){
+    return { label: c.header, source: (c.mapping && c.mapping.source) || '' };
+  }) : [];
+  var portalUrl = tplRecord.portalUrl || '';
+  var displayName = retailerNameFromId(retailTemplatesSelRetailer) || retailTemplatesSelRetailer;
+  var staleness = getTemplateStaleness(retailTemplatesSelRetailer);
+
   var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
   if(!retailTemplatesSelSku && skusList.length) retailTemplatesSelSku = String(skusList[0].id);
   var sku = skusList.find(function(x){ return String(x.id)===String(retailTemplatesSelSku); });
@@ -31129,8 +31334,8 @@ function renderRetailTemplates(el){
   html += '<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem">';
   html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Retailer</div>';
   html += '<select onchange="retailTemplatesSelRetailer=this.value;retailTemplatesManualFields={};renderPage(\'retail-templates\')" style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff">';
-  retailerKeys.forEach(function(k){
-    html += '<option value="'+retailEsc(k)+'"'+(retailTemplatesSelRetailer===k?' selected':'')+'>'+retailEsc(ARTICLE_TEMPLATES[k].name)+'</option>';
+  availableRetailers.forEach(function(r){
+    html += '<option value="'+retailEsc(r.id)+'"'+(retailTemplatesSelRetailer===r.id?' selected':'')+'>'+retailEsc(r.name)+'</option>';
   });
   html += '</select></div>';
   html += '<div style="flex:1;min-width:220px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Product</div>';
@@ -31146,12 +31351,36 @@ function renderRetailTemplates(el){
   html += '</div>';
   html += '</div>';
 
-  // Portal URL + confidence badge
-  var confBadge = tpl.confidence==='veyaflow_verified' ? '<span style="font-family:var(--mono);font-size:.55rem;color:#1B2D4F">★★★ VeyaFlow-verified</span>' : '<span style="font-family:var(--mono);font-size:.55rem;color:#4A6FA5">★★ Research-verified</span>';
+  // ── Trust signal: staleness pill (replaces legacy confidence badge) ──
+  // Decision M3: staleness IS the unified trust signal post-migration.
+  // Color + label come from the four-status enum: green/amber/red/unverified.
+  var pillStyles = {
+    green:      { bg: '#D1FAE5', fg: '#065F46', border: '#6EE7B7', label: 'Current' },
+    amber:      { bg: '#FEF3C7', fg: '#92400E', border: '#FCD34D', label: 'Approaching staleness' },
+    red:        { bg: '#FEE2E2', fg: '#991B1B', border: '#FCA5A5', label: 'Stale — needs re-verification' },
+    unverified: { bg: '#F3F4F6', fg: '#6B7280', border: '#D1D5DB', label: 'Unverified' },
+  };
+  var pill = pillStyles[staleness.status] || pillStyles.unverified;
+  var verifiedDateDisplay = staleness.verifiedAt
+    ? new Date(staleness.verifiedAt).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})
+    : '—';
+  var ageDisplay = staleness.daysSinceVerification == null ? '' : ' · ' + staleness.daysSinceVerification + 'd ago';
   html += '<div style="background:#F7F5F0;border:1px solid var(--border);padding:.65rem .85rem;margin-bottom:1rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;align-items:center">';
-  html += '<div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Portal: <a href="'+retailEsc(tpl.portalUrl)+'" target="_blank" rel="noopener" style="color:var(--navy)">'+retailEsc(tpl.portalUrl.replace(/^https?:\/\//,''))+' ↗</a></div>';
-  html += '<div>'+confBadge+'</div>';
+  if(portalUrl){
+    html += '<div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Portal: <a href="'+retailEsc(portalUrl)+'" target="_blank" rel="noopener" style="color:var(--navy)">'+retailEsc(portalUrl.replace(/^https?:\/\//,''))+' ↗</a></div>';
+  } else {
+    html += '<div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Template version '+retailEsc(staleness.templateVersion || '—')+'</div>';
+  }
+  html += '<div style="display:flex;align-items:center;gap:.5rem">';
+  html += '<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Verified '+verifiedDateDisplay+ageDisplay+'</span>';
+  html += '<span style="display:inline-block;padding:.15rem .55rem;border:1px solid '+pill.border+';background:'+pill.bg+';color:'+pill.fg+';font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">'+pill.label+'</span>';
   html += '</div>';
+  html += '</div>';
+
+  // Layer 2 staleness reason (if flagged)
+  if(staleness.layer2Flag && staleness.layer2Reason){
+    html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.5rem .75rem;margin-bottom:1rem;font-family:var(--mono);font-size:.6rem;color:#92400E;letter-spacing:.04em">⚠ '+retailEsc(staleness.layer2Reason)+'</div>';
+  }
 
   // Disclaimer
   html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.65rem .85rem;margin-bottom:1rem;font-family:var(--sans);font-size:.72rem;color:#78350F;line-height:1.5">';
@@ -31164,7 +31393,7 @@ function renderRetailTemplates(el){
   } else {
     var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0;
     var rowsHtml = '';
-    tpl.fields.forEach(function(f, idx){
+    legacyFields.forEach(function(f, idx){
       var resolved = retailTemplateResolveSource(f.source, sku, brand);
       var userVal = retailTemplatesManualFields[f.label] || '';
       var effectiveType = resolved.type;
@@ -31219,7 +31448,9 @@ function renderRetailTemplates(el){
 
     html += '<div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap">';
     html += '<button class="btn-primary" style="font-size:.72rem" onclick="downloadRetailTemplate()">Download CSV ↓</button>';
-    html += '<a href="'+retailEsc(tpl.portalUrl)+'" target="_blank" rel="noopener" class="btn-outline" style="font-size:.72rem;text-decoration:none;display:inline-flex;align-items:center">Open '+retailEsc(tpl.portalUrl.replace(/^https?:\/\//,''))+' ↗</a>';
+    if(portalUrl){
+      html += '<a href="'+retailEsc(portalUrl)+'" target="_blank" rel="noopener" class="btn-outline" style="font-size:.72rem;text-decoration:none;display:inline-flex;align-items:center">Open '+retailEsc(portalUrl.replace(/^https?:\/\//,''))+' ↗</a>';
+    }
     html += '</div>';
   }
 
@@ -31228,13 +31459,23 @@ function renderRetailTemplates(el){
 }
 
 function downloadRetailTemplate(){
-  var tpl = ARTICLE_TEMPLATES[retailTemplatesSelRetailer];
-  if(!tpl){ alert('Pick a retailer first.'); return; }
+  // Read template from versioned schema model (post-migration)
+  var tplRecord = getCurrentTemplate(retailTemplatesSelRetailer);
+  if(!tplRecord){ alert('Pick a retailer first.'); return; }
+  var sheet = tplRecord.schema && tplRecord.schema.sheets && tplRecord.schema.sheets[0];
+  if(!sheet || !sheet.columns || !sheet.columns.length){
+    alert('Template has no field schema yet. Schema population pending Task D ingestion process.');
+    return;
+  }
+  // Map columns to legacy {label, source} shape for the resolver
+  var legacyFields = sheet.columns.map(function(c){
+    return { label: c.header, source: (c.mapping && c.mapping.source) || '' };
+  });
   var skusList = (typeof skus !== 'undefined' ? skus : []) || [];
   var sku = skusList.find(function(x){ return String(x.id)===String(retailTemplatesSelSku); });
   if(!sku){ alert('Pick a product first.'); return; }
   var rows = [['Field','Value','Source']];
-  tpl.fields.forEach(function(f){
+  legacyFields.forEach(function(f){
     var resolved = retailTemplateResolveSource(f.source, sku, brand);
     var userVal = retailTemplatesManualFields[f.label] || '';
     var value = '';
@@ -31245,8 +31486,19 @@ function downloadRetailTemplate(){
     else { value = ''; sourceLabel=''; }
     rows.push([f.label, value, sourceLabel]);
   });
-  var filename = tpl.name.replace(/[^a-z0-9]+/gi,'_')+'_'+(sku.name||'sku').replace(/[^a-z0-9]+/gi,'_')+'.csv';
+  var retailerName = retailerNameFromId(retailTemplatesSelRetailer) || retailTemplatesSelRetailer;
+  var filename = retailerName.replace(/[^a-z0-9]+/gi,'_')+'_'+(sku.name||'sku').replace(/[^a-z0-9]+/gi,'_')+'.csv';
   retailDownloadCsv(filename, rows);
+  // Capture audit trail (Task H foundation) — every CSV download is logged
+  try {
+    recordGenerationAudit({
+      brandId:             (brand && brand.id) || (brand && brand.name) || 'unknown',
+      retailerId:          retailTemplatesSelRetailer,
+      templateVersionUsed: tplRecord.templateVersion,
+      skuIds:              [String(sku.id)],
+      outputFileHash:      '', // CSV bytes are generated client-side and not retained; hash skipped in V1
+    });
+  } catch(e){ /* audit failure should not block download */ }
   if(typeof showSuccess === 'function') showSuccess('Template downloaded — review before submitting');
 }
 
