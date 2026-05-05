@@ -10974,6 +10974,8 @@ const _ATM_SEED_TEMPLATES = {
   ahlens_se: {
     format: 'xlsx',
     portalUrl: '',  // Åhléns has no supplier portal — masterdata submitted via email to Åhléns Product manager (eFlow handles only orders/invoices)
+    submissionContact: 'inkopsass_skonhet_g@ahlens.se',  // Shared Åhléns Beauty buying assistant inbox — confirmed by founder May 2026
+    submissionInstructions: 'Submit completed file to inkopsass_skonhet_g@ahlens.se. Measurements in cm, weights in grams. Dangerous goods category required for applicable products (auto-fills shipping name / class / packing group / hazard statements). Mandatory fields are strictly enforced — Åhléns auto-rejects incomplete files. Five distinct file types over product lifecycle: New products (this template), GWP, Display products, Soft Change (EAN/SKU updates to existing products), Discontinued products. Stage 1 supports New products only.',
     legacyConfidence: 'veyaflow_verified',  // Founder-supplied actual template file
     sourceProvenance: 'Åhléns Beauty Masterdata file 2026, supplied by founder May 2026',
     fields: [
@@ -11083,9 +11085,19 @@ function _atmMigrateLegacyTemplates(){
       productTypeRouting: {},
       notes:             'Auto-seeded from _ATM_SEED_TEMPLATES. Portal: ' + (legacy.portalUrl || 'none') + '. Confidence: ' + legacy.legacyConfidence + '.',
     });
-    // Preserve the portalUrl on the record for the brand-facing flow.
-    // It's not a first-class schema field, but lives alongside as metadata.
-    rec.portalUrl = legacy.portalUrl || '';
+    // Preserve submission metadata on the record for the brand-facing flow.
+    // Not first-class schema fields — they live alongside as record metadata.
+    // Three fields cover the retailer-submission surface:
+    //   - portalUrl: where to upload (when a portal exists)
+    //   - submissionContact: where to email (when no portal — e.g., Åhléns)
+    //   - submissionInstructions: operational rules per retailer (units,
+    //     mandatory-field handling, file-type variants) — surfaced at
+    //     generation time by Task G's brand-facing UI
+    // Future cleanup-sprint candidate: nest these under rec.submission = {...}
+    // once the field count grows. Flat for now to avoid mid-flight schema churn.
+    rec.portalUrl              = legacy.portalUrl              || '';
+    rec.submissionContact      = legacy.submissionContact      || '';
+    rec.submissionInstructions = legacy.submissionInstructions || '';
     saveTemplate(rec);
   });
 }
