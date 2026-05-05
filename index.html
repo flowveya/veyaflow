@@ -10935,7 +10935,7 @@ _atmInitStorage();
 //   - sourceProvenance: descriptor noting the migration origin
 //   - sourceHash: '' (no source file existed; templates were author-defined)
 //   - schema.sheets[0].columns[]: populated from the legacy fields[] array
-const _ATM_LEGACY_SEED_TEMPLATES = {
+const _ATM_SEED_TEMPLATES = {
   apotek_hjartat_se: {
     format: 'xlsx',
     portalUrl: 'https://leverantor.apotekshjartat.se',
@@ -10971,34 +10971,105 @@ const _ATM_LEGACY_SEED_TEMPLATES = {
       { label:'Ingredients (INCI)',               source:'sku.inci' },
     ],
   },
+  ahlens_se: {
+    format: 'xlsx',
+    portalUrl: '',  // Åhléns has no supplier portal — masterdata submitted via email to Åhléns Product manager (eFlow handles only orders/invoices)
+    legacyConfidence: 'veyaflow_verified',  // Founder-supplied actual template file
+    sourceProvenance: 'Åhléns Beauty Masterdata file 2026, supplied by founder May 2026',
+    fields: [
+      { label: "SKU VPN (SKU Vendor Product Number)", source: "manual", required: true, colLetter: "A" },
+      { label: "Barcode", source: "sku.ean", required: true, colLetter: "B" },
+      { label: "Gender", source: "manual", required: true, colLetter: "C", allowedValues: ["Female", "Male", "Unisex"] },
+      { label: "Brand", source: "brand.name", required: true, colLetter: "D" },
+      { label: "Category", source: "manual", required: true, colLetter: "E", allowedValues: ["Hair", "Male", "Children", "Face", "Body", "Make-up", "Fragrance"] },
+      { label: "Article name", source: "sku.name", required: true, colLetter: "F" },
+      { label: "Article VPN (Vendor series number / Series code) For articles within the same product series", source: "manual", required: false, colLetter: "G", conditional: true },
+      { label: "Series Description", source: "manual", required: false, colLetter: "H", conditional: true },
+      { label: "Article Function description", source: "manual", required: true, colLetter: "I" },
+      { label: "Color no", source: "manual", required: false, colLetter: "J" },
+      { label: "Color name", source: "manual", required: false, colLetter: "K", conditional: true },
+      { label: "Base color", source: "manual", required: true, colLetter: "L", allowedValues: ["BEIGE", "BLACK", "BLUE", "BROWN", "CYAN", "GOLD", "GREEN", "GREY", "MULTICOLOR", "ORANGE", "PINK", "PURPLE", "RED", "SILVER", "TRANSPARENT", "UNKNOWN", "WHITE", "YELLOW"] },
+      { label: "Size", source: "sku.netContent", required: true, colLetter: "M" },
+      { label: "List cost currency", source: "const:SEK", required: true, colLetter: "N" },
+      { label: "List cost price", source: "private", required: true, colLetter: "O" },
+      { label: "Discount % on list cost price", source: "private", required: true, colLetter: "P" },
+      { label: "Net cost price", source: "private", required: true, colLetter: "Q" },
+      { label: "Recommended Retail price SEK", source: "sku.rspSEK", required: true, colLetter: "R" },
+      { label: "Currency SEK", source: "const:SEK", required: true, colLetter: "S" },
+      { label: "HTS code for import (10 digits)", source: "manual", required: true, colLetter: "T" },
+      { label: "Country of Manufacturing", source: "sku.countryOfMfr", required: true, colLetter: "U" },
+      { label: "B-pack", source: "manual", required: true, colLetter: "V" },
+      { label: "Eaches width (CM)", source: "manual", required: true, colLetter: "W" },
+      { label: "Eaches depht (CM)", source: "manual", required: true, colLetter: "X" },
+      { label: "Eaches height (CM)", source: "manual", required: true, colLetter: "Y" },
+      { label: "VOLUME, item without packing, in ml (dangerous goods)", source: "manual", required: false, colLetter: "Z" },
+      { label: "NET WEIGHT, item without packaging in gram  (dangerous goods)", source: "manual", required: false, colLetter: "AA" },
+      { label: "GROSS WEIGHT, item with packaging in gram", source: "manual", required: true, colLetter: "AB" },
+      { label: "First possible delivery date", source: "manual", required: true, colLetter: "AC" },
+      { label: "Replenishment", source: "manual", required: true, colLetter: "AD", allowedValues: ["YES", "NO"] },
+      { label: "Selling Start date", source: "manual", required: true, colLetter: "AE" },
+      { label: "Season year", source: "manual", required: true, colLetter: "AF" },
+      { label: "Season code", source: "manual", required: true, colLetter: "AG", allowedValues: ["SS", "AW"] },
+      { label: "Season Type", source: "manual", required: true, colLetter: "AH", allowedValues: ["Continuity", "One-Shot"] },
+      { label: "GWP", source: "manual", required: true, colLetter: "AI", allowedValues: ["YES", "NO"] },
+      { label: "Vegan", source: "manual", required: false, colLetter: "AJ", allowedValues: ["Vegan"] },
+      { label: "Sustainability certificate", source: "manual", required: true, colLetter: "AK", allowedValues: ["Standard 100 (OEKO-TEX)", "Svanen/Nordic Ecolabel", "Bra Miljöval", "Cosmetic BDIH", "Cosmetic CosmeBio", "Cosmetic EcoCert", "Cosmetic NASAA", "Cosmetic NATRUE", "Cosmetic The Soil Association", "Cosmetic USDA Organic", "EU-Blomman/EU Ecolabel", "FSC (100, recycle, mix)", "Fairtrade", "Food Austria Bio Garantie", "Food EU Organic Farming", "Food KRAV", "Food Organic Food Chain", "Leather LWG", "Lyocell (Tencel\u2122 Lenzing)", "Made in Green (OEKO-TEX)", "Market Place Online", "Modal (Tencel\u2122 Lenzing)", "Organic GOTS", "Organic Leather", "Organic OCS", "Recycled GRS", "Recycled Other", "Recycled RCS", "Refibra\u2122 Lenzing", "Responsble Mohair Standard (RMS)", "Responsible Down Standard (RDS)", "Responsible Wool Standard (RWS)", "Viscose (EcoVero\u2122 Lenzing)", "Waterbased PU", "Better Cotton BCI"] },
+      { label: "Licence number", source: "manual", required: true, colLetter: "AL" },
+      { label: "Choose Dangerous Goods Category", source: "manual", required: false, colLetter: "AM", allowedValues: ["NAILPOLISH", "PERFUMES", "AEROSOLS", "HAIR COLOR, HYDROGEN PEROXIDE, AQUEOUS SOLUTION", "HAIR COLOR, PERSULFATES, INORGANIC, N.O.S.", "HAIR COLOR, PERSULFATE", "ETHANOL SOLUTION (ETHYL ALCOHOL SOLUTION)", "ETHYL ACETATE", "FLAMMABLE FLUID (ACETON, ETYLACETAT)"] },
+      { label: "UN NUMBER numeric 4 digits", source: "manual", required: false, colLetter: "AN" },
+      { label: "PROPER SHIPPING NAME in Swedish N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "manual", required: false, colLetter: "AO" },
+      { label: "PROPER SHIPPING NAME in English N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "manual", required: false, colLetter: "AP" },
+      { label: "CLASS numeric", source: "manual", required: false, colLetter: "AQ" },
+      { label: "PACKING GROUP I,II,III", source: "manual", required: false, colLetter: "AR" },
+      { label: "FLASH POINT oC ( c.c.) with > <", source: "manual", required: false, colLetter: "AS" },
+      { label: "Hazard Statement 1", source: "manual", required: false, colLetter: "AT" },
+      { label: "Hazard Statement 2", source: "manual", required: false, colLetter: "AU" },
+      { label: "Hazard Statement 3", source: "manual", required: false, colLetter: "AV" },
+      { label: "Hazard Statement 4", source: "manual", required: false, colLetter: "AW" },
+      { label: "Hazard Statement 5", source: "manual", required: false, colLetter: "AX" },
+      { label: "Hazard Statement 6", source: "manual", required: false, colLetter: "AY" },
+      { label: "Hazard Statement 7", source: "manual", required: false, colLetter: "AZ" },
+    ],
+  },
 };
 
 function _atmMigrateLegacyTemplates(){
   const today = new Date().toISOString();
   const sheetName = 'Article Template';
-  Object.keys(_ATM_LEGACY_SEED_TEMPLATES).forEach(function(retailerId){
+  Object.keys(_ATM_SEED_TEMPLATES).forEach(function(retailerId){
     const existing = getTemplateForRetailer(retailerId);
     if(existing) return; // already seeded — no-op
-    const legacy = _ATM_LEGACY_SEED_TEMPLATES[retailerId];
+    const legacy = _ATM_SEED_TEMPLATES[retailerId];
     if(!legacy || !legacy.fields) return;
-    // Convert legacy fields[] to schema.sheets[0].columns[] shape
+    // Convert seed fields[] to schema.sheets[0].columns[] shape.
+    // Reads optional metadata (required flag, colLetter, conditional flag,
+    // allowedValues dropdown list) when present on the seed entry. Legacy
+    // entries (Apotek/Matas) lack these fields and fall through to defaults.
     const columns = legacy.fields.map(function(f, idx){
+      const validation = {};
+      if(f.allowedValues) validation.allowedValues = f.allowedValues;
+      if(f.conditional)   validation.conditional = true;
+      if(f.colLetter)     validation.colLetter = f.colLetter; // canonical Excel col letter
       return {
         id:        'col_' + String(idx + 1).padStart(3, '0'),
         position:  idx,
         header:    f.label,
         dataType:  'string',
-        required:  false,
-        validation: {},
+        required:  !!f.required, // defaults false for legacy entries without flag
+        validation: validation,
         mapping:   { source: f.source }, // preserves the resolver string
       };
     });
+    // Use seed-provided sourceProvenance if present (richer retailer-specific
+    // origin description); fall back to generic legacy migration string.
+    const provenance = legacy.sourceProvenance
+      || ('Migrated from hardcoded ARTICLE_TEMPLATES May 2026 (legacy confidence: ' + legacy.legacyConfidence + ')');
     const rec = createTemplateRecord({
       retailerId:        retailerId,
       templateVersion:   '2026.01',
       verifiedAt:        today,
       verifiedBy:        'migrated_from_v0',
-      sourceProvenance:  'Migrated from hardcoded ARTICLE_TEMPLATES May 2026 (legacy confidence: ' + legacy.legacyConfidence + ')',
+      sourceProvenance:  provenance,
       sourceHash:        '',
       schema: {
         sheets: [{
@@ -11010,7 +11081,7 @@ function _atmMigrateLegacyTemplates(){
         conditionalRules: [],
       },
       productTypeRouting: {},
-      notes:             'Auto-migrated from ARTICLE_TEMPLATES. Portal: ' + (legacy.portalUrl || 'unknown') + '. Original confidence: ' + legacy.legacyConfidence + '.',
+      notes:             'Auto-seeded from _ATM_SEED_TEMPLATES. Portal: ' + (legacy.portalUrl || 'none') + '. Confidence: ' + legacy.legacyConfidence + '.',
     });
     // Preserve the portalUrl on the record for the brand-facing flow.
     // It's not a first-class schema field, but lives alongside as metadata.
@@ -11018,7 +11089,7 @@ function _atmMigrateLegacyTemplates(){
     saveTemplate(rec);
   });
 }
-// Run synchronously — _ATM_LEGACY_SEED_TEMPLATES is defined immediately above
+// Run synchronously — _ATM_SEED_TEMPLATES is defined immediately above
 // so no temporal dead zone concern (unlike the previous typeof ARTICLE_TEMPLATES
 // approach which deferred via setTimeout).
 _atmMigrateLegacyTemplates();
@@ -30511,7 +30582,7 @@ const RETAIL_PIPELINE_STAGES = ['draft','submitted','under_review','meeting_book
 
 // ARTICLE_TEMPLATES constant removed May 2026 — migrated to ATM versioned
 // schema model via _atmMigrateLegacyTemplates(). The legacy data is now
-// inlined in _ATM_LEGACY_SEED_TEMPLATES inside the migration helper, which
+// inlined in _ATM_SEED_TEMPLATES inside the migration helper, which
 // runs on every app load and seeds template records the first time.
 // renderRetailTemplates and downloadRetailTemplate now read from the
 // versioned store via getCurrentTemplate(retailerId).
