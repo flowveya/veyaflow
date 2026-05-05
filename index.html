@@ -13232,7 +13232,7 @@ function renderBrandPack(el){
             </select>
           </div>
           <div class="field"><label class="lbl">Target retailer</label>
-            <select onchange="brandPackState.retailer=this.value">
+            <select onchange="brandPackState.retailer=this.value;renderBrandPack(document.getElementById('page-brandpack'))">
               <option value="">Select retailer…</option>
               ${retailers.map(r=>`<option${brandPackState.retailer===r?' selected':''}>${r}</option>`).join('')}
             </select>
