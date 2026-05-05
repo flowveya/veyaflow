@@ -779,6 +779,7 @@
     <div class="page" id="page-retail-checklist"></div>
     <div class="page" id="page-retail-performance"></div>
     <div class="page" id="page-retail-comms"></div>
+    <div class="page" id="page-atm-admin"></div>
   </div>
 
   <!-- MOBILE BOTTOM NAV -->
@@ -2139,7 +2140,7 @@ const NAV=[
 function getVisibleNav(){
   const stage = brand?.stage || 'trading';
   const cat = brand?.category || null;
-  return NAV.filter(function(n){
+  const visible = NAV.filter(function(n){
     if(!n.stages.includes(stage)) return false;
     if(n.cats && cat && !n.cats.includes(cat)) return false;
     return true;
@@ -2148,6 +2149,23 @@ function getVisibleNav(){
     var label = getCatLabel(n.id)||n.label;
     return Object.assign({}, n, {label:label});
   });
+  // ATM admin nav entry — surfaced ONLY when localStorage flag is set
+  // (Charlotte sets `localStorage.setItem('ns_atm_show_admin','true')` once
+  // via DevTools). Hidden from all brands by default. Stage 1 simplification
+  // with explicit migration trigger: real auth needed when team grows.
+  try {
+    if(localStorage.getItem('ns_atm_show_admin') === 'true'){
+      visible.push({
+        id:    'atm-admin',
+        sec:   'retail',
+        icon:  '⚙',
+        label: 'ATM Admin',
+        stages: [stage], // always pass stage filter
+        cats:   null,
+      });
+    }
+  } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
+  return visible;
 }
 
 const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
@@ -2772,6 +2790,7 @@ function renderPage(id){
   else if(id==='retail-checklist'){ loadRetailChecklist(); renderRetailChecklist(el); }
   else if(id==='retail-performance'){ loadRetailPerformance(); renderRetailPerformance(el); }
   else if(id==='retail-comms'){ loadRetailComms(); renderRetailComms(el); }
+  else if(id==='atm-admin'){ renderAtmAdmin(el); }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -10478,6 +10497,14 @@ function createTemplateRecord(data){
     productTypeRouting:  data.productTypeRouting || {},  // empty stub for single-sheet
     notes:               data.notes || '',
     supersedes:          data.supersedes || null,         // id of prior version
+    // Layer 2 staleness — manual or admin-triggered flag (May 2026 Task C).
+    // Set true when a brand reports a format-related rejection or admin marks
+    // template stale via Task B admin UI. Cleared when a newer template
+    // version is verified that supersedes this one. Read by getTemplateStaleness
+    // alongside outcome history — single read surface, multiple write paths.
+    flaggedStale:        data.flaggedStale === true,
+    flaggedStaleReason:  data.flaggedStaleReason || '',
+    flaggedStaleAt:      data.flaggedStaleAt || null,
     createdAt:           new Date().toISOString(),
   };
 }
@@ -10624,27 +10651,43 @@ function recordGenerationAudit(auditData){
   return rec;
 }
 
-// ── Staleness primitive (Task C skeleton) ─────────
-/**
- * Compute time-based staleness signal for a retailer's current template.
- * Layer 1 of three (per brief Task C). Layers 2 (outcome-based) and 3
- * (source-based detection) wire in during Task C's full implementation.
- *
- * Returns: {
- *   templateId:               string | null,
- *   templateVersion:          string | null,
- *   verifiedAt:               ISO string | null,
- *   daysSinceVerification:    integer | null,
- *   status:                   'green' | 'amber' | 'red' | 'unverified',
- *   hasTemplate:              boolean,
- * }
- *
- * `unverified` = no template record exists for the retailer (most retailers
- * in Stage 1 will be in this state until Tasks D-H ingest specific schemas).
- * Standing principle: surface gaps, don't hide them. UI surfaces (Task B,
- * Task G) MUST distinguish unverified-vs-stale rather than collapsing both
- * to a single "no data" state.
- */
+// ── Staleness primitive — Layer 1 + Layer 2 (Task C) ─────
+//
+// Layer 1: time-based — green ≤90d, amber 90-365d, red >365d, unverified=no record
+// Layer 2: outcome-based + manual flag
+//   - reads outcome history via getOutcomesForRetailer; if any outcome AFTER
+//     the template's verifiedAt has outcomeType='rejected' AND outcomeReasonStructured
+//     matches a format-related enum (format_mismatch / schema_mismatch / column_invalid /
+//     validation_failed), Layer 2 = flagged
+//   - reads flaggedStale boolean directly on template record (admin manual flag)
+//   - both paths converge on the same read — single read surface, multiple
+//     write paths (standing rule 8)
+//
+// Returns enriched shape:
+//   {
+//     templateId, templateVersion, verifiedAt, daysSinceVerification, hasTemplate,
+//     status:        'green' | 'amber' | 'red' | 'unverified'  // headline (worst of L1/L2)
+//     layer1Status:  'green' | 'amber' | 'red' | 'unverified'  // pure time-based
+//     layer2Flag:    boolean                                   // any L2 trigger active
+//     layer2Reason:  string                                    // human-readable cause
+//   }
+//
+// Layer 3 (automated source-based scrape diff) is out of scope per brief.
+// The data model supports it — when implemented it adds a third layer to
+// the headline calculation, no schema migration needed.
+
+// Format-related rejection enum: outcome reasons that mean "the template was
+// wrong shape." Other rejection reasons (incomplete brand profile, missing
+// claim approval, regulatory gap) do NOT trigger Layer 2 — those are about
+// the brand state, not the template.
+const ATM_FORMAT_REJECTION_REASONS = [
+  'format_mismatch',
+  'schema_mismatch',
+  'column_invalid',
+  'validation_failed',
+  'template_outdated',
+];
+
 function getTemplateStaleness(retailerId){
   const t = getTemplateForRetailer(retailerId);
   if(!t){
@@ -10653,29 +10696,89 @@ function getTemplateStaleness(retailerId){
       templateVersion:       null,
       verifiedAt:            null,
       daysSinceVerification: null,
-      status:                'unverified',
       hasTemplate:           false,
+      status:                'unverified',
+      layer1Status:          'unverified',
+      layer2Flag:            false,
+      layer2Reason:          '',
     };
   }
+  // ── Layer 1: time-based ─────────────────────────
   const verifiedAt = t.verifiedAt || t.createdAt;
   let days = null;
-  let status = 'unverified';
+  let layer1 = 'unverified';
   if(verifiedAt){
     const ms = Date.now() - new Date(verifiedAt).getTime();
     days = Math.floor(ms / (1000 * 60 * 60 * 24));
-    if(days < 0) days = 0; // future-dated verifications snap to 0
-    if(days <= ATM_STALENESS_GREEN_DAYS) status = 'green';
-    else if(days <= ATM_STALENESS_AMBER_DAYS) status = 'amber';
-    else status = 'red';
+    if(days < 0) days = 0;
+    if(days <= ATM_STALENESS_GREEN_DAYS) layer1 = 'green';
+    else if(days <= ATM_STALENESS_AMBER_DAYS) layer1 = 'amber';
+    else layer1 = 'red';
   }
+  // ── Layer 2: outcome-based + manual flag ────────
+  let layer2 = false;
+  let layer2Reason = '';
+  // Path A: manual flag on the template record
+  if(t.flaggedStale === true){
+    layer2 = true;
+    layer2Reason = t.flaggedStaleReason || 'Marked stale (no reason given)';
+  }
+  // Path B: outcome history. Any rejection AFTER template was verified, with
+  // a format-related reason, flags this template version as stale.
+  const verifiedAtMs = new Date(verifiedAt).getTime();
+  const outcomes = getOutcomesForRetailer(retailerId);
+  for(let i = 0; i < outcomes.length; i++){
+    const o = outcomes[i];
+    if(o.outcomeType !== 'rejected') continue;
+    if(!o.outcomeReasonStructured) continue;
+    if(ATM_FORMAT_REJECTION_REASONS.indexOf(o.outcomeReasonStructured) < 0) continue;
+    const outcomeMs = new Date(o.outcomeTimestamp || o.createdAt).getTime();
+    if(outcomeMs <= verifiedAtMs) continue; // pre-dates current template, ignore
+    layer2 = true;
+    if(!layer2Reason){
+      layer2Reason = 'Brand reported ' + o.outcomeReasonStructured.replace(/_/g, ' ') +
+        ' (' + new Date(o.outcomeTimestamp || o.createdAt).toLocaleDateString('en-GB') + ')';
+    }
+    break;
+  }
+  // ── Headline status: worst of (L1, L2) ──────────
+  // L2 forces minimum 'amber' regardless of L1, because a flagged template
+  // is at minimum suspect. If L1 is already red, stays red. If L1 is green
+  // or amber and L2 is set, becomes amber (suspect but recently verified).
+  let status = layer1;
+  if(layer2 && status === 'green') status = 'amber';
   return {
     templateId:            t.id,
     templateVersion:       t.templateVersion,
     verifiedAt:            verifiedAt,
     daysSinceVerification: days,
-    status:                status,
     hasTemplate:           true,
+    status:                status,
+    layer1Status:          layer1,
+    layer2Flag:            layer2,
+    layer2Reason:          layer2Reason,
   };
+}
+
+// ── Layer 2 manual flag write paths (admin UI consumes these) ──
+function flagTemplateStale(templateId, reason){
+  const t = getTemplateById(templateId);
+  if(!t) throw new Error('flagTemplateStale: no template with id ' + templateId);
+  t.flaggedStale = true;
+  t.flaggedStaleReason = reason || 'Marked stale by admin';
+  t.flaggedStaleAt = new Date().toISOString();
+  saveTemplate(t);
+  return t;
+}
+
+function clearTemplateStaleFlag(templateId){
+  const t = getTemplateById(templateId);
+  if(!t) throw new Error('clearTemplateStaleFlag: no template with id ' + templateId);
+  t.flaggedStale = false;
+  t.flaggedStaleReason = '';
+  t.flaggedStaleAt = null;
+  saveTemplate(t);
+  return t;
 }
 
 // ── SHA-256 content hash (async via SubtleCrypto) ──
@@ -10722,6 +10825,293 @@ async function _atmHashContent(content){
 // ── Boot: ensure storage exists on app load ───────
 // Runs once at script-evaluation time. Idempotent — safe to call again.
 _atmInitStorage();
+
+
+// ═══════════════════════════════════════════════════
+// ATM Admin UI (Task B) — internal verification surface
+// ═══════════════════════════════════════════════════
+//
+// Hidden URL hash route: #atm-admin
+// Sidebar entry surfaced ONLY when localStorage.ns_atm_show_admin === 'true'
+// (Charlotte sets this once via DevTools; default ATM admin invisible to brands)
+//
+// Operational pattern: list ALL retailers from RETAILER_REGISTRY (not just
+// retailers with templates) — surfaces the unverified-vs-stale distinction
+// from Task A. Charlotte triages monthly: oldest verified at top, unverified
+// retailers below.
+//
+// Action handlers prefixed _atmAdmin* for greppability.
+
+// Module-level state for the admin UI
+let _atmAdminFilter = 'all'; // 'all' | 'attention' | 'stale' | 'unverified'
+
+function renderAtmAdmin(el){
+  // Build per-retailer rows: {retailer, staleness, sortKey}
+  // Sort: rows with templates by oldest verifiedAt first (most-stale at top);
+  // unverified retailers (no template record) come last alphabetically.
+  const rows = (RETAILER_REGISTRY || []).map(function(r){
+    const stale = getTemplateStaleness(r.id);
+    return { retailer: r, staleness: stale };
+  });
+  // Apply filter
+  const filtered = rows.filter(function(row){
+    if(_atmAdminFilter === 'all') return true;
+    if(_atmAdminFilter === 'attention') return row.staleness.status === 'amber' || row.staleness.status === 'red' || row.staleness.layer2Flag;
+    if(_atmAdminFilter === 'stale') return row.staleness.status === 'red';
+    if(_atmAdminFilter === 'unverified') return row.staleness.status === 'unverified';
+    return true;
+  });
+  filtered.sort(function(a, b){
+    // Verified first, sorted oldest verifiedAt first
+    if(a.staleness.hasTemplate && !b.staleness.hasTemplate) return -1;
+    if(!a.staleness.hasTemplate && b.staleness.hasTemplate) return 1;
+    if(a.staleness.hasTemplate && b.staleness.hasTemplate){
+      return (a.staleness.verifiedAt || '').localeCompare(b.staleness.verifiedAt || '');
+    }
+    // Both unverified: alphabetical by name
+    return (a.retailer.name || '').localeCompare(b.retailer.name || '');
+  });
+
+  // Counts for filter chips
+  const countAll = rows.length;
+  const countAttention = rows.filter(function(r){ return r.staleness.status === 'amber' || r.staleness.status === 'red' || r.staleness.layer2Flag; }).length;
+  const countStale = rows.filter(function(r){ return r.staleness.status === 'red'; }).length;
+  const countUnverified = rows.filter(function(r){ return r.staleness.status === 'unverified'; }).length;
+
+  const chip = function(key, label, count){
+    const active = _atmAdminFilter === key;
+    return `<button onclick="_atmAdminSetFilter('${key}')"
+      style="padding:.4rem .75rem;border:1px solid ${active?'var(--navy)':'var(--border)'};background:${active?'#EFF6FF':'#fff'};cursor:pointer;font-family:var(--mono);font-size:.65rem;letter-spacing:.04em;text-transform:uppercase;color:${active?'var(--navy)':'#555'};margin-right:.4rem">
+      ${label} <span style="opacity:.6">(${count})</span>
+    </button>`;
+  };
+
+  const statusPill = function(staleness){
+    const status = staleness.status;
+    const colors = {
+      green:      { bg: '#D1FAE5', fg: '#065F46', border: '#6EE7B7' },
+      amber:      { bg: '#FEF3C7', fg: '#92400E', border: '#FCD34D' },
+      red:        { bg: '#FEE2E2', fg: '#991B1B', border: '#FCA5A5' },
+      unverified: { bg: '#F3F4F6', fg: '#6B7280', border: '#D1D5DB' },
+    };
+    const c = colors[status] || colors.unverified;
+    const label = status === 'unverified' ? 'Unverified' :
+                  status === 'green' ? 'Current' :
+                  status === 'amber' ? 'Approaching staleness' :
+                  'Stale';
+    return `<span style="display:inline-block;padding:.15rem .55rem;border:1px solid ${c.border};background:${c.bg};color:${c.fg};font-family:var(--mono);font-size:.6rem;letter-spacing:.04em;text-transform:uppercase">${label}</span>`;
+  };
+
+  const layer2Indicator = function(staleness){
+    if(!staleness.layer2Flag) return '';
+    return `<div style="margin-top:.25rem;font-family:var(--mono);font-size:.55rem;color:#92400E;letter-spacing:.04em">⚠ ${escapeHtml(staleness.layer2Reason || 'Flagged stale')}</div>`;
+  };
+
+  const rowHtml = function(row){
+    const r = row.retailer;
+    const s = row.staleness;
+    const versionDisplay = s.templateVersion || '—';
+    const verifiedDisplay = s.verifiedAt
+      ? new Date(s.verifiedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})
+      : '—';
+    const daysDisplay = s.daysSinceVerification == null ? '—' : (s.daysSinceVerification + 'd ago');
+    const flagBtn = s.hasTemplate
+      ? (s.layer2Flag
+          ? `<button class="btn-outline" style="font-size:.6rem;padding:.2rem .5rem" onclick="_atmAdminClearFlag('${s.templateId}')">Clear flag</button>`
+          : `<button class="btn-outline" style="font-size:.6rem;padding:.2rem .5rem" onclick="_atmAdminToggleStaleFlag('${s.templateId}','${escapeHtml(r.id)}')">Flag stale</button>`)
+      : '';
+    const verifyBtn = s.hasTemplate
+      ? `<button class="btn-outline" style="font-size:.6rem;padding:.2rem .5rem" onclick="_atmAdminMarkVerified('${escapeHtml(r.id)}','${escapeHtml(r.name)}')">Re-verify</button>`
+      : `<button class="btn-primary" style="font-size:.6rem;padding:.2rem .5rem" onclick="_atmAdminUploadTemplate('${escapeHtml(r.id)}','${escapeHtml(r.name)}')">Add template</button>`;
+    const updateBtn = s.hasTemplate
+      ? `<button class="btn-outline" style="font-size:.6rem;padding:.2rem .5rem" onclick="_atmAdminUploadTemplate('${escapeHtml(r.id)}','${escapeHtml(r.name)}')">Update</button>`
+      : '';
+    return `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:.65rem .85rem;vertical-align:top">
+          <div style="font-family:var(--sans);font-size:.85rem;color:#1F2937;font-weight:500">${escapeHtml(r.name)}</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.04em;margin-top:.15rem">${escapeHtml(r.id)} · ${escapeHtml((r.markets||[]).join(' / ') || r.market || '')}</div>
+        </td>
+        <td style="padding:.65rem .85rem;vertical-align:top;font-family:var(--mono);font-size:.7rem;color:#374151">${escapeHtml(versionDisplay)}</td>
+        <td style="padding:.65rem .85rem;vertical-align:top;font-family:var(--mono);font-size:.7rem;color:#374151">${verifiedDisplay}</td>
+        <td style="padding:.65rem .85rem;vertical-align:top;font-family:var(--mono);font-size:.7rem;color:#6B7280">${daysDisplay}</td>
+        <td style="padding:.65rem .85rem;vertical-align:top">${statusPill(s)}${layer2Indicator(s)}</td>
+        <td style="padding:.65rem .85rem;vertical-align:top;text-align:right;white-space:nowrap">
+          ${verifyBtn} ${updateBtn} ${flagBtn}
+        </td>
+      </tr>
+    `;
+  };
+
+  el.innerHTML = `
+    <div class="topbar">
+      <div>
+        <div class="page-title">ATM template administration</div>
+        <div class="page-sub">Internal verification surface · ${countAll} retailers · ${countAttention} need attention</div>
+      </div>
+    </div>
+    <div style="padding:0 1rem 2rem">
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;padding:.6rem .85rem;margin-bottom:1.25rem;font-family:var(--mono);font-size:.65rem;color:#92400E;letter-spacing:.04em">
+        ◆ INTERNAL ADMIN — not user-facing. Hash route: #atm-admin. Toggle visibility via localStorage.ns_atm_show_admin.
+      </div>
+      <div style="margin-bottom:1.25rem">
+        ${chip('all', 'All', countAll)}
+        ${chip('attention', 'Needs attention', countAttention)}
+        ${chip('stale', 'Stale (>365d)', countStale)}
+        ${chip('unverified', 'Unverified', countUnverified)}
+      </div>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border)">
+        <thead>
+          <tr style="background:#F9FAFB;border-bottom:2px solid var(--border)">
+            <th style="padding:.65rem .85rem;text-align:left;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Retailer</th>
+            <th style="padding:.65rem .85rem;text-align:left;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Version</th>
+            <th style="padding:.65rem .85rem;text-align:left;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Verified</th>
+            <th style="padding:.65rem .85rem;text-align:left;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Age</th>
+            <th style="padding:.65rem .85rem;text-align:left;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Status</th>
+            <th style="padding:.65rem .85rem;text-align:right;font-family:var(--mono);font-size:.6rem;color:#6B7280;letter-spacing:.06em;text-transform:uppercase;font-weight:500">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.length ? filtered.map(rowHtml).join('') : `
+            <tr><td colspan="6" style="padding:2rem;text-align:center;font-family:var(--mono);font-size:.7rem;color:var(--muted)">No retailers match this filter.</td></tr>
+          `}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function _atmAdminSetFilter(filterKey){
+  _atmAdminFilter = filterKey;
+  renderPage('atm-admin');
+}
+
+// ── Action: mark template re-verified ─────────────
+// Creates a NEW template record that supersedes the current one. Preserves
+// schema and other fields from the previous version (the schema didn't
+// change — we just re-confirmed the existing version is still current).
+// To capture an actual schema change, use _atmAdminUploadTemplate instead.
+function _atmAdminMarkVerified(retailerId, retailerName){
+  const lastVerifier = (function(){ try { return localStorage.getItem('ns_atm_last_verifier') || ''; } catch(e){ return ''; } })();
+  const verifierName = window.prompt(
+    'Mark template as re-verified for ' + retailerName + '.\n\n' +
+    'Verifier name (defaults to last-used):',
+    lastVerifier || 'Charlotte'
+  );
+  if(!verifierName) return; // cancelled
+  try { localStorage.setItem('ns_atm_last_verifier', verifierName); } catch(e){}
+
+  const prev = getCurrentTemplate(retailerId);
+  if(!prev){
+    alert('No existing template to re-verify. Use "Add template" first.');
+    return;
+  }
+  const newRec = createTemplateRecord({
+    retailerId:         retailerId,
+    templateVersion:    prev.templateVersion, // unchanged — re-verification, not new version
+    verifiedAt:         new Date().toISOString(),
+    verifiedBy:         verifierName,
+    sourceProvenance:   prev.sourceProvenance,
+    sourceHash:         prev.sourceHash,
+    schema:             prev.schema,
+    productTypeRouting: prev.productTypeRouting,
+    notes:              'Re-verified ' + new Date().toLocaleDateString('en-GB') + ' by ' + verifierName + (prev.notes ? '\n\nPrevious notes: ' + prev.notes : ''),
+    supersedes:         prev.id,
+  });
+  saveTemplate(newRec);
+  alert('Template re-verified for ' + retailerName + '.');
+  renderPage('atm-admin');
+}
+
+// ── Action: upload new template ───────────────────
+// Captures version + provenance + hash + filename. Schema field stays empty
+// (per Stage 1 spec: schema population is Task D's separate process). File
+// bytes are NOT stored in localStorage — hash for integrity, provenance text
+// for traceability, that's it. Re-upload required if re-processing needed.
+function _atmAdminUploadTemplate(retailerId, retailerName){
+  // Build a transient file-input + form prompt
+  // (no auth/multi-user system, so verifier name is also captured here)
+  const lastVerifier = (function(){ try { return localStorage.getItem('ns_atm_last_verifier') || ''; } catch(e){ return ''; } })();
+  const newVersion = window.prompt(
+    'Add/update template for ' + retailerName + '.\n\n' +
+    'Template version (e.g. 2026.01):',
+    new Date().getFullYear() + '.01'
+  );
+  if(!newVersion) return;
+  const provenance = window.prompt(
+    'Source provenance (vendor portal URL, buyer email reference, etc.):',
+    ''
+  );
+  if(provenance === null) return; // cancelled (empty string OK)
+  const verifierName = window.prompt('Verifier name:', lastVerifier || 'Charlotte');
+  if(!verifierName) return;
+  try { localStorage.setItem('ns_atm_last_verifier', verifierName); } catch(e){}
+
+  // File picker: hash the selected file via async _atmHashContent.
+  // Note: this is single-purpose — it only captures metadata. Schema
+  // population happens via Task D's separate process.
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls,.csv';
+  input.onchange = async function(){
+    const file = input.files && input.files[0];
+    if(!file){ return; }
+    try {
+      const buf = await file.arrayBuffer();
+      const hash = await _atmHashContent(new Uint8Array(buf));
+      const rec = createTemplateRecord({
+        retailerId:       retailerId,
+        templateVersion:  newVersion,
+        verifiedAt:       new Date().toISOString(),
+        verifiedBy:       verifierName,
+        sourceProvenance: (provenance || '') + (provenance ? '\n' : '') + 'Filename: ' + file.name,
+        sourceHash:       hash,
+        // schema intentionally left empty — populated separately via Task D process
+        schema:           { sheets: [], conditionalRules: [] },
+        productTypeRouting: {},
+        notes:            'Uploaded ' + new Date().toLocaleDateString('en-GB') + ' by ' + verifierName + '. Schema not yet ingested — pending Task D mapping process.',
+      });
+      const prev = getCurrentTemplate(retailerId);
+      if(prev){ rec.supersedes = prev.id; }
+      saveTemplate(rec);
+      alert('Template metadata recorded for ' + retailerName + '.\n\n' +
+            'Version: ' + newVersion + '\n' +
+            'Hash: ' + hash.slice(0, 16) + '…\n\n' +
+            'Schema mapping is a separate process — file bytes were not stored.');
+      renderPage('atm-admin');
+    } catch(err){
+      console.error('Template upload failed:', err);
+      alert('Template upload failed: ' + (err.message || 'unknown error'));
+    }
+  };
+  input.click();
+}
+
+// ── Action: toggle Layer 2 manual stale flag ──────
+function _atmAdminToggleStaleFlag(templateId, retailerId){
+  const reason = window.prompt(
+    'Reason for marking template stale (e.g. "Brand reported format rejection on 2026-04-10"):',
+    ''
+  );
+  if(reason === null) return;
+  try {
+    flagTemplateStale(templateId, reason || 'Marked stale by admin');
+    renderPage('atm-admin');
+  } catch(err){
+    alert('Failed to flag template: ' + err.message);
+  }
+}
+
+function _atmAdminClearFlag(templateId){
+  if(!window.confirm('Clear the stale flag on this template?')) return;
+  try {
+    clearTemplateStaleFlag(templateId);
+    renderPage('atm-admin');
+  } catch(err){
+    alert('Failed to clear flag: ' + err.message);
+  }
+}
+
 
 /* ═══════════════════════════════════════════════════
    PRICING VERIFICATION FLOW
@@ -27771,7 +28161,7 @@ function handleDeepLink(){
   const page = parts[0];
   const param = parts[1];
 
-  const validPages = ['home','find','report','compare','pitch','brandpack','bizcase','suppliers','circular','skus','claims','cfo','crm'];
+  const validPages = ['home','find','report','compare','pitch','brandpack','bizcase','suppliers','circular','skus','claims','cfo','crm','atm-admin'];
   if(!validPages.includes(page)) return;
 
   // Handle param-specific deep links
