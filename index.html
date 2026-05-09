@@ -13082,7 +13082,14 @@ HARD RULES:
 - No brand story in the main sections. Credentials go to appendix.
 - Total: under 650 words in main sections.`;
 
-  const magicLinkUrl = brand?.magicLinkUrl || (window.location.origin + '/brand/' + (brand?.shareId||''));
+  // γ architecture: append ?retailer=slug when Magic Link exists.
+  // When no Magic Link generated, do NOT pass null/broken URL into prompt —
+  // instruct LLM to use the placeholder text instead so generated business
+  // case surfaces the gap rather than embedding a broken URL into output.
+  const magicLinkUrl = getBrandMagicLink(brandPackRetailerSlug(retailer));
+  const verificationLine = magicLinkUrl
+    ? `End: "Full brand verification pack: ${magicLinkUrl}"`
+    : `End: "Full brand verification pack: [Brand Pack link to be added — generate at /#brandpack]"`;
   const buyerPrompt = `You are writing a concise Retail Business Case for a buyer at ${retailer}, ${market}. April 2026. First-contact justification — the buyer has never heard of this brand.
 
 BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
@@ -13110,7 +13117,7 @@ Fits the ${rangeReview} range reset. Minimum viable launch: SKUs, bays, stores �
 
 ## NEXT STEPS
 Three bullets only: sample/data pack commitment, decision timeline (${rangeReview}), trial period commitment.
-End: "Full brand verification pack: ${magicLinkUrl}"`;
+${verificationLine}`;
 
   const prompt = mode==='catman' ? catmanPrompt : buyerPrompt;
 
@@ -13305,6 +13312,8 @@ function renderBrandPack(el){
           <div class="page-sub">Buyer-first document — answers all 4 buyer questions in 3 minutes</div>
         </div>
       </div>
+
+      ${renderMagicLinkCard()}
 
       <div class="card" style="margin-bottom:1rem">
         <div class="section-tag">Target</div>
@@ -13555,6 +13564,7 @@ function renderBrandPackResult(el){
       </div>
 
       <!-- Cover page -->
+      ${renderMagicLinkCard()}
       <div style="background:${cover.accent};padding:2rem 1.75rem;margin-bottom:1rem">
         <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.4);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.35rem">Prepared for</div>
         <div style="font-family:var(--serif);font-size:1.5rem;color:#fff;font-weight:400;margin-bottom:.2rem">${brandPackState.retailer}</div>
@@ -20628,9 +20638,14 @@ function sendPitchViaEmail(variantIdx){
   var idx = (typeof variantIdx === 'number' && variantIdx >= 0 && variantIdx < parsed.length) ? variantIdx : 0;
   var active = parsed[idx];
   if(!active || !active.body) return;
-  // Substitute the magic link placeholder same as renderPitchResult does
-  var magicLink = (brand && brand.magicLinkUrl) || (window.location.origin + '/brand/' + ((brand && brand.shareId) || '')).replace(/\/+$/, '') || window.location.origin;
-  var bodyWithLink = active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink);
+  // γ architecture: append ?retailer=slug when Magic Link exists,
+  // leave [VeyaFlow Brand Pack link] placeholder visible when none generated yet.
+  // Mailto with placeholder visible is preferable to mailto with broken URL —
+  // brand sees the gap and can return to set up the link before sending.
+  var magicLink = getBrandMagicLink(brandPackRetailerSlug(pitchResult.retailer));
+  var bodyWithLink = magicLink
+    ? active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink)
+    : active.body;
   var subject = active.subject || '';
   // encodeURIComponent handles ä, ö, å, é, quotes, line breaks correctly
   // (it produces percent-encoded UTF-8 — what mail clients expect)
@@ -20721,12 +20736,18 @@ function renderPitchResult(){
     'Trend-Anchored':'Opens with a specific 2026 trend. Best for trend-driven retailers (Lyko, Kicks).',
   };
 
-  // Magic link — use live URL from brand profile if available, else static fallback
-  const magicLink = brand?.magicLinkUrl || `${window.location.origin}/brand/${brand?.shareId||''}`.replace(/\/+$/, '') || window.location.origin;
+  // Magic link — γ architecture: append ?retailer=slug when Magic Link exists,
+  // leave [VeyaFlow Brand Pack link] placeholder visible when none generated yet
+  // (per Q2 Option 1 — surfaces gap, teaches workflow).
+  const magicLink = getBrandMagicLink(brandPackRetailerSlug(pitchResult.retailer));
   const wordCount = active.body.split(/\s+/).filter(Boolean).length;
 
-  // Replace placeholder in body
-  const bodyWithLink = active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink);
+  // Replace placeholder in body — only when a real Magic Link exists.
+  // When absent, placeholder text remains visible in pitch body and a
+  // separate CTA card prompts the brand to set up the link on Brand Pack page.
+  const bodyWithLink = magicLink
+    ? active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink)
+    : active.body;
 
   return `
     <!-- Header -->
@@ -20813,29 +20834,32 @@ function renderPitchResult(){
       </div>
     `:''}
 
-    <!-- Magic link / Share Brand Pack -->
+    <!-- γ architecture (Bug B B3): Magic Link card on Pitch is reference-only.
+         Generation/refresh lives on Brand Pack page (B1). Pitch reads brand.magicLinkUrl.
+         When no link exists, show CTA to Brand Pack page rather than Generate button —
+         keeps write surface canonical (rule 8) and surfaces the gap (rule 5, Q2 Option 1). -->
     <div id="magic-link-card" style="background:#FFFBEB;border:1px solid #FCD34D;padding:.75rem 1rem;margin-bottom:1rem">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
           <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem">
-            <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:#92400E">Brand Pack link — include in every email</div>
+            <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:#92400E">Brand Pack link — included in email body</div>
             ${getVerificationBadgeHTML(calcVerificationTier(),'small')}
           </div>
           ${brand?.magicLinkUrl ? `
-            <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;word-break:break-all;margin-bottom:.2rem">${brand.magicLinkUrl}</div>
-            <div style="font-family:var(--sans);font-size:.65rem;color:#92400E">Buyer clicks → sees your full verified brand profile. Updates live.</div>
+            <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;word-break:break-all;margin-bottom:.2rem">${brand.magicLinkUrl}?retailer=${brandPackRetailerSlug(pitchResult.retailer)}</div>
+            <div style="font-family:var(--sans);font-size:.65rem;color:#92400E">Buyer clicks → sees your verified brand profile, framed for ${pitchResult.retailer}. Updates live as you change data.</div>
           ` : `
-            <div style="font-family:var(--sans);font-size:.7rem;color:#92400E;line-height:1.5">Generate a shareable link. Buyer clicks → sees your full verified brand profile, SKU data, and market readiness score.</div>
+            <div style="font-family:var(--sans);font-size:.7rem;color:#92400E;line-height:1.5"><strong>Your Brand Pack link isn't set up yet.</strong> Pitch body shows <code style="background:rgba(146,64,14,.08);padding:.05rem .25rem">[VeyaFlow Brand Pack link]</code> placeholder until you generate it. Buyers click your link to see your verified profile.</div>
           `}
         </div>
         <div style="display:flex;flex-direction:column;gap:.35rem;flex-shrink:0">
           ${brand?.magicLinkUrl ? `
             <button class="btn-outline" style="font-size:.62rem;border-color:#FCD34D;color:#92400E"
-              onclick="copyToClipboard('${brand.magicLinkUrl}');this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy link',1500)">Copy link</button>
-            <button onclick="shareBrandPack(true)" style="font-size:.58rem;padding:.25rem .6rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer;font-family:var(--mono)">↻ Regenerate</button>
+              onclick="copyToClipboard('${brand.magicLinkUrl}?retailer=${brandPackRetailerSlug(pitchResult.retailer)}');this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy link',1500)">Copy link</button>
+            <button onclick="showPage('brandpack')" style="font-size:.58rem;padding:.25rem .6rem;background:none;border:1px solid #FCD34D;color:#92400E;cursor:pointer;font-family:var(--mono)">Manage →</button>
           ` : `
-            <button onclick="shareBrandPack(false)" id="share-pack-btn" class="btn-primary" style="font-size:.62rem;background:#92400E;border-color:#92400E">
-              Generate share link →
+            <button onclick="showPage('brandpack')" class="btn-primary" style="font-size:.62rem;background:#92400E;border-color:#92400E;white-space:nowrap">
+              Set up on Brand Pack →
             </button>
           `}
         </div>
@@ -21188,6 +21212,110 @@ function renderMirrorCard(r, retailerName, pitchText){
   `;
 }
 
+// ── γ architecture (Bug B Q5): Magic Link URL construction ───────
+// Single read surface for Magic Link URL (rule 8). Returns the full URL
+// with optional ?retailer=[slug] parameter when a Magic Link exists for
+// the brand, returns null when no Magic Link has been generated yet.
+//
+// Callers MUST handle the null case explicitly. Earlier code defaulted
+// to a broken fallback URL (window.location.origin + '/brand/' + ''),
+// which produced "Invalid link" errors for buyers — that pattern is
+// removed here. No silent fallbacks under γ.
+function getBrandMagicLink(retailerSlug){
+  if(!brand || !brand.magicLinkUrl) return null;
+  // brand.magicLinkUrl already contains the canonical UUID URL.
+  // Append ?retailer= parameter if a slug was provided. Param is read
+  // by brand-viewer.html for retailer-specific cover framing.
+  if(retailerSlug){
+    var sep = brand.magicLinkUrl.indexOf('?') === -1 ? '?' : '&';
+    return brand.magicLinkUrl + sep + 'retailer=' + encodeURIComponent(retailerSlug);
+  }
+  return brand.magicLinkUrl;
+}
+
+// Slug helper: retailer name → URL-safe slug. Mirrors the slug logic
+// brand-viewer.html uses to map back from slug → display name.
+// Normalizes diacritics first (Å → A, é → e) so Åhléns becomes "ahlens"
+// not "hl_ns" (which would be unintelligible to humans reading URLs).
+function brandPackRetailerSlug(retailerName){
+  if(!retailerName) return '';
+  return String(retailerName)
+    .normalize('NFD')                 // decompose å → a + combining mark
+    .replace(/[\u0300-\u036f]/g, '')  // strip combining marks
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+// ── Bug B B1: Magic Link management card on Brand Pack page ──────
+// Renders the canonical Magic Link state surface. Always visible on
+// Brand Pack page (form view + result view). Two states:
+//   - No link yet: explain what Magic Link is + Generate CTA
+//   - Link exists: URL display + generation date + Copy/Refresh/Preview actions
+//
+// Visual grammar inherits from ATM staleness card pattern (rule 7 reuse) —
+// neutral background, monospace metadata, status pill on right. Below the
+// metadata strip, action button row follows existing magic-link-card pattern.
+//
+// Rule 8 single-write-path: Generate/Refresh both invoke shareBrandPack().
+function renderMagicLinkCard(){
+  if(!brand) return '';
+  const url = brand.magicLinkUrl;
+  if(!url){
+    // State 1: No link generated yet
+    return `
+      <div style="background:#F7F5F0;border:1px solid var(--border);padding:.95rem 1.1rem;margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem;flex-wrap:wrap;gap:.5rem">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--navy);letter-spacing:.08em;text-transform:uppercase;font-weight:700">Brand Pack link</div>
+          <span style="display:inline-block;padding:.15rem .55rem;border:1px solid #D1D5DB;background:#F3F4F6;color:#6B7280;font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">Not set up</span>
+        </div>
+        <div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);line-height:1.5;margin-bottom:.75rem">
+          Buyers click your Brand Pack link to see your verified profile, SKU data, and market readiness — updated live as you change data. One canonical link per brand. Pitches and business cases automatically reference it.
+        </div>
+        <button class="btn-primary" onclick="shareBrandPack(false)" id="share-pack-btn"
+                style="font-family:var(--mono);font-size:.65rem;padding:.55rem 1.1rem;letter-spacing:.06em">
+          Generate Brand Pack link →
+        </button>
+      </div>
+    `;
+  }
+  // State 2: Link exists
+  // Compute generation age from timestamp on brand (best-effort)
+  var ageDisplay = '';
+  if(brand.magicLinkGeneratedAt){
+    var ms = Date.now() - new Date(brand.magicLinkGeneratedAt).getTime();
+    var days = Math.floor(ms / (1000*60*60*24));
+    var dateStr = new Date(brand.magicLinkGeneratedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    ageDisplay = 'Generated ' + dateStr + (days > 0 ? ' · ' + days + 'd ago' : ' · today');
+  } else {
+    ageDisplay = 'Generation date not recorded';
+  }
+  // Escape URL for safe insertion in HTML attribute
+  var urlAttr = url.replace(/"/g, '&quot;');
+  return `
+    <div style="background:#F7F5F0;border:1px solid var(--border);padding:.95rem 1.1rem;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem">
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--navy);letter-spacing:.08em;text-transform:uppercase;font-weight:700">Brand Pack link</div>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${ageDisplay}</span>
+          <span style="display:inline-block;padding:.15rem .55rem;border:1px solid #6EE7B7;background:#D1FAE5;color:#065F46;font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">Live</span>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--navy);word-break:break-all;background:#fff;border:1px solid var(--border);padding:.45rem .6rem;margin-bottom:.6rem">${url}</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button class="btn-outline"
+                onclick="copyToClipboard('${urlAttr}');this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy link',1500)"
+                style="font-family:var(--mono);font-size:.62rem;padding:.4rem .85rem">Copy link</button>
+        <button class="btn-outline"
+                onclick="if(confirm('Refresh data updates the brand pack content for buyers re-clicking your link. The URL stays the same. Continue?')){shareBrandPack(true)}"
+                style="font-family:var(--mono);font-size:.62rem;padding:.4rem .85rem">↻ Refresh data</button>
+        <a href="${urlAttr}" target="_blank" rel="noopener"
+           style="font-family:var(--mono);font-size:.62rem;padding:.4rem .85rem;background:none;border:1px solid var(--border);color:var(--navy);text-decoration:none;display:inline-flex;align-items:center">Preview ↗</a>
+      </div>
+    </div>
+  `;
+}
+
 async function shareBrandPack(regenerate){
   const btn = document.getElementById('share-pack-btn');
   if(btn){ btn.textContent = '⟳ Generating link…'; btn.disabled = true; }
@@ -21210,6 +21338,10 @@ async function shareBrandPack(regenerate){
       })
     : [];
 
+  // ── γ architecture (Bug B Q5 locked decision) ──
+  // Magic Link is a brand-only canonical record. Retailer/market framing
+  // surfaces from URL parameter (?retailer=slug) read by brand-viewer.html.
+  // The Supabase row carries no retailer/market/coverAccent fields.
   const brandPackData = {
     brand: {
       name:          brand?.name||'',
@@ -21226,9 +21358,6 @@ async function shareBrandPack(regenerate){
       certifications:(s.certifications||[]).slice(0,6),
       inci: s.inci ? s.inci.slice(0,300) : '',
     })),
-    retailer:       brandPackState.retailer||'',
-    market:         brandPackState.market||'',
-    coverAccent:    (BRAND_PACK_COVERS[brandPackState.retailer]||{}).accent||'#1B2D4F',
     readinessScore: rsScore,
     sections:       sections.slice(0,6),
     generatedAt:    new Date().toISOString(),
@@ -21252,36 +21381,51 @@ async function shareBrandPack(regenerate){
 
     const {shareId, shareUrl} = await res.json();
 
-    // Store on brand profile
+    // Store on brand profile (γ architecture: URL is canonical, no retailer binding)
     if(brand){
-      brand.magicLinkUrl = shareUrl;
-      brand.shareId      = shareId;
+      brand.magicLinkUrl         = shareUrl;
+      brand.shareId              = shareId;
+      brand.magicLinkGeneratedAt = new Date().toISOString();
       saveBrandState();
     }
 
-    // Re-render pitch to show copy UI
-    renderPitch(document.getElementById('page-pitch'));
+    // Re-render the current page to reflect new Magic Link state.
+    // Pattern D (state-update-without-render) — both Brand Pack and Retailer
+    // Pitch can invoke shareBrandPack now (Bug B B1); re-render whichever
+    // page is currently active.
+    if(currentPage === 'brandpack'){
+      renderBrandPack(document.getElementById('page-brandpack'));
+    } else if(currentPage === 'pitch'){
+      renderPitch(document.getElementById('page-pitch'));
+    }
 
     // Auto-copy to clipboard
     navigator.clipboard?.writeText(shareUrl).catch(()=>{});
 
   } catch(err) {
-    // Graceful degradation — show static placeholder URL
-    const fallback = `${window.location.origin}/brand/${brandId}`;
-    if(brand){
-      brand.magicLinkUrl = fallback;
-      brand.shareId      = brandId;
-      saveBrandState();
+    // γ architecture (Bug B): no silent fallback to broken URL.
+    // If the function call fails, do NOT write a non-UUID shareId to the
+    // brand profile — that would propagate broken URLs into pitch substitutions
+    // and produce "Invalid link" for buyers. Surface the failure visibly.
+    //
+    // Rule 5 — surface gaps don't hide them. Rule 10c — for users without a
+    // Magic Link, broken-URL substitution silently shipped pitches with bad
+    // links. Removing that path closes the latent Bug C symptom for new users.
+    if(btn){
+      btn.disabled    = false;
+      btn.textContent = 'Generate Brand Pack link →';
     }
-    renderPitch(document.getElementById('page-pitch'));
-
-    // Show note that Supabase isn't configured yet
-    const card = document.getElementById('magic-link-card');
-    if(card){
-      const note = document.createElement('div');
-      note.style.cssText = 'font-family:var(--mono);font-size:.52rem;color:#92400E;margin-top:.3rem;padding-top:.3rem;border-top:1px solid #FCD34D';
-      note.textContent = 'Note: Deploy Netlify functions + configure SUPABASE_URL/KEY to activate live links.';
-      card.appendChild(note);
+    // Surface error to user with actionable framing
+    var errMsg = 'Could not generate Brand Pack link. Check your connection and try again. ' +
+                 '(If this persists, the share-brand-pack Netlify function may need redeployment.)';
+    alert(errMsg);
+    // Do NOT mutate brand.magicLinkUrl on failure — leaving it undefined
+    // is the correct state. UI will continue showing the "Not set up" state
+    // with the Generate button.
+    if(currentPage === 'brandpack'){
+      renderBrandPack(document.getElementById('page-brandpack'));
+    } else if(currentPage === 'pitch'){
+      renderPitch(document.getElementById('page-pitch'));
     }
   }
 }
