@@ -2761,6 +2761,26 @@ function renderRegStrip(){
 }
 
 /* ═══════════════════════════════════════════════════
+   NUMERIC PROOF NORMALIZER
+═══════════════════════════════════════════════════ */
+// B1.1 + B1.2 fix: strips leading '+' and trailing '%' from stored proof
+// values so render sites can apply canonical formatting without doubling.
+// Historical context: input placeholders taught users to type formatted
+// strings (e.g. "+38%", "42%"); render sites assumed bare numbers and
+// prepended '+' / appended '%'. Result was "++38% YoY" and "50%% repeat".
+// This defensive normalizer handles both already-stored legacy values and
+// any future cases where users still include the formatting characters.
+// Applied at output, NOT at input — preserves user-typed display intent
+// for any read path that wants raw rendering (none today, but defensive).
+function normalizeNumericProof(s){
+  if(s === null || s === undefined) return '';
+  // Trim FIRST so the ^ and $ anchors below align with the actual symbol
+  // positions. Without leading trim, '  +38%' keeps the '+' (anchor doesn't
+  // match after whitespace). Without trailing trim, '38% ' keeps the '%'.
+  return String(s).trim().replace(/^\+/, '').replace(/%$/, '');
+}
+
+/* ═══════════════════════════════════════════════════
    PAGE ROUTER
 ═══════════════════════════════════════════════════ */
 function renderPage(id){
@@ -2892,11 +2912,11 @@ function renderOnboardStep(){
         <div class="field"><label class="lbl">Annual revenue (SEK/EUR)</label>
           <input type="text" placeholder="e.g. 1,200,000 SEK" value="${onboardForm.annualRevenue||''}" oninput="onboardForm.annualRevenue=this.value"></div>
         <div class="field"><label class="lbl">Year-on-year growth</label>
-          <input type="text" placeholder="e.g. +38%" value="${onboardForm.revenueGrowth||''}" oninput="onboardForm.revenueGrowth=this.value"></div>
+          <input type="text" placeholder="e.g. 38" value="${onboardForm.revenueGrowth||''}" oninput="onboardForm.revenueGrowth=this.value"></div>
         <div class="field"><label class="lbl">Units sold (last 12 months)</label>
           <input type="text" placeholder="e.g. 4,200" value="${onboardForm.unitsSold||''}" oninput="onboardForm.unitsSold=this.value"></div>
         <div class="field"><label class="lbl">Repeat purchase rate</label>
-          <input type="text" placeholder="e.g. 42%" value="${onboardForm.repeatRate||''}" oninput="onboardForm.repeatRate=this.value"></div>
+          <input type="text" placeholder="e.g. 42" value="${onboardForm.repeatRate||''}" oninput="onboardForm.repeatRate=this.value"></div>
       </div>
 
       <div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:.75rem 0 .5rem">Social & press</div>
@@ -3027,9 +3047,9 @@ function showProofEdit(){
       </div>
       ${currentType==='revenue'?`
         <div class="field"><label class="lbl">Annual revenue</label><input type="text" id="pf-revenue" placeholder="e.g. 1,200,000 SEK" value="${brand.annualRevenue||''}"></div>
-        <div class="field"><label class="lbl">YoY growth</label><input type="text" id="pf-growth" placeholder="e.g. +38%" value="${brand.revenueGrowth||''}"></div>
+        <div class="field"><label class="lbl">YoY growth</label><input type="text" id="pf-growth" placeholder="e.g. 38" value="${brand.revenueGrowth||''}"></div>
         <div class="field"><label class="lbl">Units sold (12 months)</label><input type="text" id="pf-units" placeholder="e.g. 4,200" value="${brand.unitsSold||''}"></div>
-        <div class="field"><label class="lbl">Repeat purchase rate</label><input type="text" id="pf-repeat" placeholder="e.g. 42%" value="${brand.repeatRate||''}"></div>
+        <div class="field"><label class="lbl">Repeat purchase rate</label><input type="text" id="pf-repeat" placeholder="e.g. 42" value="${brand.repeatRate||''}"></div>
         <div class="field"><label class="lbl">DTC revenue in target market</label><input type="text" id="pf-dtc" placeholder="e.g. 180,000 SEK in Germany" value="${brand.dtcRevenue||''}"></div>
       `:''}
       ${currentType==='social'?`
@@ -4042,7 +4062,7 @@ function computePatternStatus(pattern, brand, sku, retailerEntry, marketCode) {
       const hasProof = b.annualRevenue||b.unitsSold||b.revenueGrowth;
       if(b.annualRevenue) return {pass:true, label:'Revenue data on file', detail:b.annualRevenue};
       if(b.unitsSold) return {pass:true, label:'Units sold data on file', detail:b.unitsSold};
-      if(b.revenueGrowth) return {pass:true, label:`+${b.revenueGrowth}% YoY on file`, detail:''};
+      if(b.revenueGrowth) return {pass:true, label:`+${normalizeNumericProof(b.revenueGrowth)}% YoY on file`, detail:''};
       return {pass:false, label:'No Nordic track record', detail:'add DTC sales data in Brand Home'};
     }
     case 'socialLow': {
@@ -13096,7 +13116,7 @@ BRAND: ${brand.name} | CATEGORY: ${brand.category} | USP: ${brand.usp||''}${prod
 
 ${plTable}
 
-PROOF POINTS: ${[brand.revenueGrowth?'+'+brand.revenueGrowth+'% YoY':null,brand.unitsSold?brand.unitsSold+' units sold':null,brand.repeatRate?brand.repeatRate+'% repeat':null,brand.reviewScore?brand.reviewScore+' avg review':null,brand.clinicalClaims?brand.clinicalClaims:null].filter(Boolean).join(' | ')||'Add proof points in Brand Profile for accurate numbers'}
+PROOF POINTS: ${[brand.revenueGrowth?'+'+normalizeNumericProof(brand.revenueGrowth)+'% YoY':null,brand.unitsSold?brand.unitsSold+' units sold':null,brand.repeatRate?normalizeNumericProof(brand.repeatRate)+'% repeat':null,brand.reviewScore?brand.reviewScore+' avg review':null,brand.clinicalClaims?brand.clinicalClaims:null].filter(Boolean).join(' | ')||'Add proof points in Brand Profile for accurate numbers'}
 
 RETAILER CONTEXT: ${retailerEntry.strategy2026?.slice(0,150)||'Standard category review'}
 Range review: ${rangeReview}
@@ -13353,9 +13373,9 @@ function renderBrandPack(el){
           <div style="border:1px solid var(--border);padding:.6rem .75rem">
             <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">The numbers</div>
             ${[
-              brand.revenueGrowth ? ['Revenue growth', '+'+brand.revenueGrowth+'% YoY', '#065F46'] : ['Revenue growth','[not set]','var(--muted)'],
+              brand.revenueGrowth ? ['Revenue growth', '+'+normalizeNumericProof(brand.revenueGrowth)+'% YoY', '#065F46'] : ['Revenue growth','[not set]','var(--muted)'],
               brand.unitsSold     ? ['Units sold', brand.unitsSold+' units', '#065F46'] : ['Units sold','[not set]','var(--muted)'],
-              brand.repeatRate    ? ['Repeat rate', brand.repeatRate+'%', '#065F46'] : ['Repeat rate','[not set]','var(--muted)'],
+              brand.repeatRate    ? ['Repeat rate', normalizeNumericProof(brand.repeatRate)+'%', '#065F46'] : ['Repeat rate','[not set]','var(--muted)'],
               brand.reviewScore   ? ['Review score', brand.reviewScore+' / 5', '#065F46'] : ['Review score','[not set]','var(--muted)'],
             ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)">
               <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">${l}</div>
@@ -13410,9 +13430,9 @@ async function generateBrandPack(){
 
   // Proof points — brand-verified, not AI
   const proofPoints = [
-    brand.revenueGrowth ? `+${brand.revenueGrowth}% YoY revenue growth` : null,
+    brand.revenueGrowth ? `+${normalizeNumericProof(brand.revenueGrowth)}% YoY revenue growth` : null,
     brand.unitsSold     ? `${brand.unitsSold} units sold in home market` : null,
-    brand.repeatRate    ? `${brand.repeatRate}% repeat purchase rate` : null,
+    brand.repeatRate    ? `${normalizeNumericProof(brand.repeatRate)}% repeat purchase rate` : null,
     brand.reviewScore   ? `${brand.reviewScore} avg rating` : null,
     brand.socialFollowers?`${brand.socialFollowers} followers` : null,
     brand.annualRevenue ? `${brand.annualRevenue} annual revenue` : null,
@@ -13584,9 +13604,9 @@ function renderBrandPackResult(el){
           <div>
             <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">The numbers</div>
             ${[
-              ['Revenue growth', brand.revenueGrowth?'+'+brand.revenueGrowth+'% YoY':'[not set]', !!brand.revenueGrowth],
+              ['Revenue growth', brand.revenueGrowth?'+'+normalizeNumericProof(brand.revenueGrowth)+'% YoY':'[not set]', !!brand.revenueGrowth],
               ['Units sold',     brand.unitsSold||'[not set]', !!brand.unitsSold],
-              ['Repeat rate',    brand.repeatRate?brand.repeatRate+'%':'[not set]', !!brand.repeatRate],
+              ['Repeat rate',    brand.repeatRate?normalizeNumericProof(brand.repeatRate)+'%':'[not set]', !!brand.repeatRate],
               ['Review score',   brand.reviewScore?brand.reviewScore+' / 5':'[not set]', !!brand.reviewScore],
               ['Hero SKU RSP',   heroSku?.rspSEK?heroSku.rspSEK+' SEK':'[set in SKU data]', !!heroSku?.rspSEK],
             ].map(([l,v,ok])=>`
@@ -20023,9 +20043,9 @@ function renderPitch(el){
         <div style="background:#F9F8F6;padding:.75rem;font-family:var(--mono);font-size:.62rem;color:var(--muted);line-height:1.8;margin-bottom:.5rem">
           ${[
             brand.annualRevenue ? `Revenue: ${brand.annualRevenue}` : null,
-            brand.revenueGrowth ? `Growth: ${brand.revenueGrowth}% YoY` : null,
+            brand.revenueGrowth ? `Growth: ${normalizeNumericProof(brand.revenueGrowth)}% YoY` : null,
             brand.unitsSold     ? `Units sold: ${brand.unitsSold}` : null,
-            brand.repeatRate    ? `Repeat purchase: ${brand.repeatRate}%` : null,
+            brand.repeatRate    ? `Repeat purchase: ${normalizeNumericProof(brand.repeatRate)}%` : null,
             brand.socialFollowers?`Social: ${brand.socialFollowers} followers` : null,
             brand.reviewScore   ? `Reviews: ${brand.reviewScore} avg` : null,
             brand.clinicalClaims? `Clinical: ${brand.clinicalClaims}` : null,
@@ -20470,9 +20490,9 @@ const PITCH_INTEL = {
 // Build commercial proof points from brand profile — never AI-estimated
 function buildCommercialNumbers(){
   const pts = [];
-  if(brand?.revenueGrowth)   pts.push(`${brand.revenueGrowth}% YoY revenue growth`);
+  if(brand?.revenueGrowth)   pts.push(`${normalizeNumericProof(brand.revenueGrowth)}% YoY revenue growth`);
   if(brand?.unitsSold)       pts.push(`${brand.unitsSold} units sold in home market`);
-  if(brand?.repeatRate)      pts.push(`${brand.repeatRate}% repeat purchase rate`);
+  if(brand?.repeatRate)      pts.push(`${normalizeNumericProof(brand.repeatRate)}% repeat purchase rate`);
   if(brand?.socialFollowers) pts.push(`${brand.socialFollowers} followers`);
   if(brand?.reviewScore)     pts.push(`${brand.reviewScore} avg customer review`);
   if(brand?.annualRevenue)   pts.push(`${brand.annualRevenue} annual revenue`);
