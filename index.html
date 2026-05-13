@@ -31699,6 +31699,31 @@ function renderRetailTemplates(el){
   } else {
     var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0;
     var rowsHtml = '';
+
+    // ── Bug fix: Pattern D state-update-without-render for lookup triggers ──
+    // Task E added lookup: source pattern. When a brand types in a manual
+    // field that's referenced as a lookup TRIGGER by another column's source,
+    // those downstream lookup columns must re-resolve and re-render. Without
+    // this trigger detection, AN-AS columns stay frozen on initial render
+    // even after the user fills AM.
+    //
+    // Strategy: scan all column sources for lookup:X.Y:TRIGGER_LABEL pattern,
+    // collect the TRIGGER_LABEL values into a set. When rendering an input
+    // for a field whose label is in the set, attach onchange (in addition to
+    // oninput) that triggers full page re-render. Non-trigger fields keep
+    // cheap oninput-only behavior to preserve typing UX.
+    var lookupTriggerLabels = {};
+    legacyFields.forEach(function(f){
+      if(f.source && f.source.indexOf('lookup:') === 0){
+        var body = f.source.slice('lookup:'.length);
+        var firstColon = body.indexOf(':');
+        if(firstColon !== -1){
+          var triggerLabel = body.slice(firstColon + 1);
+          if(triggerLabel) lookupTriggerLabels[triggerLabel] = true;
+        }
+      }
+    });
+
     legacyFields.forEach(function(f, idx){
       var resolved = retailTemplateResolveSource(f.source, sku, brand, retailTemplatesManualFields);
       var userVal = retailTemplatesManualFields[f.label] || '';
@@ -31721,12 +31746,14 @@ function renderRetailTemplates(el){
         bg = effectiveType==='auto_manual' ? '#EFF6FF' : '#FFFBEB';
         col = effectiveType==='auto_manual' ? '#1E40AF' : '#92400E';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:'+col+';padding:.15rem .4rem;background:#fff;border:1px solid '+(effectiveType==='auto_manual'?'#BFDBFE':'#FDE68A')+'">Manual</span>';
-        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value" placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        var manualTriggerAttr = lookupTriggerLabels[f.label] ? ' onchange="renderPage(\'retail-templates\')"' : '';
+        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+manualTriggerAttr+' placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
         manualCount++;
       } else if(effectiveType === 'private' || effectiveType === 'private_filled'){
         bg = '#F3F4F6'; col = '#6B7280';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#6B7280;padding:.15rem .4rem;background:#fff;border:1px solid #E5E7EB">Private · local only</span>';
-        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value" placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        var privateTriggerAttr = lookupTriggerLabels[f.label] ? ' onchange="renderPage(\'retail-templates\')"' : '';
+        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+privateTriggerAttr+' placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
         privateCount++;
       } else {
         bg = '#F9FAFB';
