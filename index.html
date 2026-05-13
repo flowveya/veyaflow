@@ -11018,12 +11018,12 @@ const _ATM_SEED_TEMPLATES = {
       { label: "Sustainability certificate", source: "manual", required: true, colLetter: "AK", allowedValues: ["Standard 100 (OEKO-TEX)", "Svanen/Nordic Ecolabel", "Bra Miljöval", "Cosmetic BDIH", "Cosmetic CosmeBio", "Cosmetic EcoCert", "Cosmetic NASAA", "Cosmetic NATRUE", "Cosmetic The Soil Association", "Cosmetic USDA Organic", "EU-Blomman/EU Ecolabel", "FSC (100, recycle, mix)", "Fairtrade", "Food Austria Bio Garantie", "Food EU Organic Farming", "Food KRAV", "Food Organic Food Chain", "Leather LWG", "Lyocell (Tencel\u2122 Lenzing)", "Made in Green (OEKO-TEX)", "Market Place Online", "Modal (Tencel\u2122 Lenzing)", "Organic GOTS", "Organic Leather", "Organic OCS", "Recycled GRS", "Recycled Other", "Recycled RCS", "Refibra\u2122 Lenzing", "Responsble Mohair Standard (RMS)", "Responsible Down Standard (RDS)", "Responsible Wool Standard (RWS)", "Viscose (EcoVero\u2122 Lenzing)", "Waterbased PU", "Better Cotton BCI"] },
       { label: "Licence number", source: "manual", required: true, colLetter: "AL" },
       { label: "Choose Dangerous Goods Category", source: "manual", required: false, colLetter: "AM", allowedValues: ["NAILPOLISH", "PERFUMES", "AEROSOLS", "HAIR COLOR, HYDROGEN PEROXIDE, AQUEOUS SOLUTION", "HAIR COLOR, PERSULFATES, INORGANIC, N.O.S.", "HAIR COLOR, PERSULFATE", "ETHANOL SOLUTION (ETHYL ALCOHOL SOLUTION)", "ETHYL ACETATE", "FLAMMABLE FLUID (ACETON, ETYLACETAT)"] },
-      { label: "UN NUMBER numeric 4 digits", source: "manual", required: false, colLetter: "AN" },
-      { label: "PROPER SHIPPING NAME in Swedish N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "manual", required: false, colLetter: "AO" },
-      { label: "PROPER SHIPPING NAME in English N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "manual", required: false, colLetter: "AP" },
-      { label: "CLASS numeric", source: "manual", required: false, colLetter: "AQ" },
-      { label: "PACKING GROUP I,II,III", source: "manual", required: false, colLetter: "AR" },
-      { label: "FLASH POINT oC ( c.c.) with > <", source: "manual", required: false, colLetter: "AS" },
+      { label: "UN NUMBER numeric 4 digits", source: "lookup:dangerousGoods.AN:Choose Dangerous Goods Category", required: false, colLetter: "AN" },
+      { label: "PROPER SHIPPING NAME in Swedish N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "lookup:dangerousGoods.AO:Choose Dangerous Goods Category", required: false, colLetter: "AO" },
+      { label: "PROPER SHIPPING NAME in English N.O.S (description in parenthesis), description of (marine pollutant in parenthesis)", source: "lookup:dangerousGoods.AP:Choose Dangerous Goods Category", required: false, colLetter: "AP" },
+      { label: "CLASS numeric", source: "lookup:dangerousGoods.AQ:Choose Dangerous Goods Category", required: false, colLetter: "AQ" },
+      { label: "PACKING GROUP I,II,III", source: "lookup:dangerousGoods.AR:Choose Dangerous Goods Category", required: false, colLetter: "AR" },
+      { label: "FLASH POINT oC ( c.c.) with > <", source: "lookup:dangerousGoods.AS:Choose Dangerous Goods Category", required: false, colLetter: "AS" },
       { label: "Hazard Statement 1", source: "manual", required: false, colLetter: "AT" },
       { label: "Hazard Statement 2", source: "manual", required: false, colLetter: "AU" },
       { label: "Hazard Statement 3", source: "manual", required: false, colLetter: "AV" },
@@ -31473,11 +31473,90 @@ function deleteRetailSubmission(id){
    MODULE 2 — ARTICLE TEMPLATES
 ═══════════════════════════════════════════════════ */
 
-function retailTemplateResolveSource(source, sku, brandObj){
+// ── Task E: Cross-field lookup tables for ATM mapping engine ─────
+// retailLookupTables holds cross-reference data used by the lookup: source
+// pattern in retailTemplateResolveSource. Retailers like Åhléns auto-fill
+// downstream columns (UN number, shipping name, class, packing group, flash
+// point, hazard statements) when a brand picks a Dangerous Goods Category.
+//
+// The dangerousGoods table mirrors Åhléns's own DataTable!L2:R10 sheet —
+// the same data their VLOOKUP formulas reference. This keeps VeyaFlow's
+// in-app renderer in lockstep with Åhléns's template behavior even before
+// the brand downloads the file.
+//
+// Lookup key normalization: trim + uppercase to handle source-data quirks
+// (Åhléns row 7 has trailing non-breaking space; allowedValues in seed are
+// stored without trailing whitespace). Single read surface, robust matching.
+//
+// Field references use Excel column letters (AN/AO/AP/AQ/AR/AS) matching
+// the Åhléns Beauty Work Sheet columns these values populate.
+const retailLookupTables = {
+  dangerousGoods: {
+    // Key: Åhléns Dangerous Goods Category dropdown value (column AM)
+    // Value: lookup row with AN/AO/AP/AQ/AR/AS fields
+    // Empty/blank values preserved as empty strings for consistent CSV output
+    'NAILPOLISH':                                       { AN:'1263', AO:'FÄRG',                          AP:'PAINT',                                       AQ:'3',   AR:'II',  AS:'5' },
+    'PERFUMES':                                         { AN:'1266', AO:'PARFYMPRODUKTER',               AP:'PERFUMERY PRODUCTS',                          AQ:'3',   AR:'II',  AS:'5' },
+    'AEROSOLS':                                         { AN:'1950', AO:'AEROSOLER',                     AP:'AEROSOLS',                                    AQ:'2',   AR:'',    AS:''  },
+    'HAIR COLOR, HYDROGEN PEROXIDE, AQUEOUS SOLUTION':  { AN:'2984', AO:'VÄTEPEROXID, VATTENLÖSNING',    AP:'HYDROGEN PEROXIDE, AQUEOUS SOLUTION',         AQ:'5.1', AR:'III', AS:''  },
+    'HAIR COLOR, PERSULFATES, INORGANIC, N.O.S.':       { AN:'3215', AO:'PERSULFATER, OORGANISKA, N.O.S.', AP:'PERSULFATES, INORGANIC, N.O.S.',            AQ:'5.1', AR:'III', AS:''  },
+    'HAIR COLOR, PERSULFATE':                           { AN:'1492', AO:'KALIUMPERSULFAT',               AP:'POTASSIUM PERSULPHATE',                       AQ:'5.1', AR:'III', AS:''  },
+    'ETHANOL SOLUTION (ETHYL ALCOHOL SOLUTION)':        { AN:'1170', AO:'ETANOLLÖSNING',                 AP:'ETHANOL SOLUTION (ETHYL ALCOHOL SOLUTION)',   AQ:'3',   AR:'III', AS:''  },
+    'ETHYL ACETATE':                                    { AN:'1173', AO:'ETYLACETAT',                    AP:'ETHYL ACETATE',                               AQ:'3',   AR:'II',  AS:''  },
+    'FLAMMABLE FLUID (ACETON, ETYLACETAT)':             { AN:'1993', AO:'BRANDFARLIG VÄTSKA, N.O.S',     AP:'FLAMMABLE FLUID (ACETON, ETYLACETAT)',        AQ:'3',   AR:'II',  AS:''  },
+  },
+};
+
+// Resolver helper: given a lookup source string and the brand's current
+// manual-field input map, return the resolved value or 'missing' status.
+//
+// Source format: 'lookup:<tableName>.<fieldRef>:<triggerLabel>'
+// - tableName:   key into retailLookupTables (e.g. 'dangerousGoods')
+// - fieldRef:    field on the matched row (e.g. 'AN' for UN number)
+// - triggerLabel: label of the column whose user-entered value is the lookup
+//                 key (e.g. the Dangerous Goods Category column header)
+//
+// Returns {type, value} matching the existing resolver shape:
+// - {type:'auto', value:'1266'}  when lookup succeeds
+// - {type:'missing', value:''}   when trigger field is empty or no row match
+function retailTemplateLookup(source, manualFields){
+  // Parse 'lookup:<table>.<field>:<triggerLabel>'
+  const body = source.slice('lookup:'.length);
+  const firstColon = body.indexOf(':');
+  if(firstColon === -1) return {type:'missing', value:''};
+  const tableField = body.slice(0, firstColon);
+  const triggerLabel = body.slice(firstColon + 1);
+  const dot = tableField.indexOf('.');
+  if(dot === -1) return {type:'missing', value:''};
+  const tableName = tableField.slice(0, dot);
+  const fieldRef  = tableField.slice(dot + 1);
+
+  const table = retailLookupTables[tableName];
+  if(!table) return {type:'missing', value:''};
+
+  // Read the user's input for the trigger column. Manual fields are keyed
+  // by column label (matches existing renderer pattern at L31627-ish).
+  const triggerValue = (manualFields && manualFields[triggerLabel]) || '';
+  if(!triggerValue) return {type:'missing', value:''};
+
+  // Normalize for lookup: trim handles trailing whitespace in source data;
+  // exact case match preserves Åhléns's UPPERCASE convention.
+  const key = String(triggerValue).trim();
+  const row = table[key];
+  if(!row) return {type:'missing', value:''};
+
+  const val = row[fieldRef];
+  if(val === undefined || val === null || val === '') return {type:'auto', value:''};
+  return {type:'auto', value: String(val)};
+}
+
+function retailTemplateResolveSource(source, sku, brandObj, manualFields){
   if(!source) return {type:'empty', value:''};
   if(source === 'private') return {type:'private', value:''};
   if(source === 'manual')  return {type:'manual',  value:''};
   if(source.indexOf('const:') === 0) return {type:'auto', value: source.slice(6)};
+  // Task E: lookup:<table>.<field>:<triggerLabel> for cross-field auto-fill
+  if(source.indexOf('lookup:') === 0) return retailTemplateLookup(source, manualFields || {});
   if(source === 'brand.name'){
     return {type: brandObj && brandObj.name ? 'auto' : 'missing', value: (brandObj && brandObj.name) || ''};
   }
@@ -31621,7 +31700,7 @@ function renderRetailTemplates(el){
     var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0;
     var rowsHtml = '';
     legacyFields.forEach(function(f, idx){
-      var resolved = retailTemplateResolveSource(f.source, sku, brand);
+      var resolved = retailTemplateResolveSource(f.source, sku, brand, retailTemplatesManualFields);
       var userVal = retailTemplatesManualFields[f.label] || '';
       var effectiveType = resolved.type;
       if(effectiveType==='manual' && userVal) effectiveType='auto_manual';
@@ -31703,7 +31782,7 @@ function downloadRetailTemplate(){
   if(!sku){ alert('Pick a product first.'); return; }
   var rows = [['Field','Value','Source']];
   legacyFields.forEach(function(f){
-    var resolved = retailTemplateResolveSource(f.source, sku, brand);
+    var resolved = retailTemplateResolveSource(f.source, sku, brand, retailTemplatesManualFields);
     var userVal = retailTemplatesManualFields[f.label] || '';
     var value = '';
     var sourceLabel = '';
