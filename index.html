@@ -31539,9 +31539,14 @@ function retailTemplateLookup(source, manualFields){
   const triggerValue = (manualFields && manualFields[triggerLabel]) || '';
   if(!triggerValue) return {type:'missing', value:''};
 
-  // Normalize for lookup: trim handles trailing whitespace in source data;
-  // exact case match preserves Åhléns's UPPERCASE convention.
-  const key = String(triggerValue).trim();
+  // Normalize for lookup: trim handles trailing whitespace in source data
+  // (Åhléns row 7 has a trailing non-breaking space); uppercase aligns with
+  // table keys which mirror Åhléns's UPPERCASE convention. Matches the
+  // module docstring at L31488. Defense-in-depth post-G2: dropdown values
+  // already match table keys exactly, so this normalization is effectively
+  // a no-op in the dropdown path but protects the API contract if a future
+  // caller (e.g. CSV import) feeds in a mixed-case trigger value.
+  const key = String(triggerValue).trim().toUpperCase();
   const row = table[key];
   if(!row) return {type:'missing', value:''};
 
@@ -31619,7 +31624,11 @@ function renderRetailTemplates(el){
   // works unchanged. Preserves Task E's mapping engine.
   var sheet = tplRecord.schema && tplRecord.schema.sheets && tplRecord.schema.sheets[0];
   var legacyFields = sheet ? sheet.columns.map(function(c){
-    return { label: c.header, source: (c.mapping && c.mapping.source) || '' };
+    // G2: preserve validation so the renderer can switch to <select> for
+    // columns with allowedValues, and so G3 (required asterisk) lands
+    // without re-touching this site. Legacy retailers without validation
+    // metadata (Apotek/Matas) get {} and fall through unchanged.
+    return { label: c.header, source: (c.mapping && c.mapping.source) || '', validation: c.validation || {} };
   }) : [];
   var portalUrl = tplRecord.portalUrl || '';
   var displayName = retailerNameFromId(retailTemplatesSelRetailer) || retailTemplatesSelRetailer;
@@ -31747,13 +31756,41 @@ function renderRetailTemplates(el){
         col = effectiveType==='auto_manual' ? '#1E40AF' : '#92400E';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:'+col+';padding:.15rem .4rem;background:#fff;border:1px solid '+(effectiveType==='auto_manual'?'#BFDBFE':'#FDE68A')+'">Manual</span>';
         var manualTriggerAttr = lookupTriggerLabels[f.label] ? ' onchange="renderPage(\'retail-templates\')"' : '';
-        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+manualTriggerAttr+' placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        // ── G2: dropdown render when seed entry declares validation.allowedValues ──
+        // Five Åhléns columns ship with allowedValues today (AH/AI/AJ/AK/AM).
+        // Trigger-field selects (AM Choose Dangerous Goods Category) embed the
+        // Pattern D re-render in the SAME onchange that writes state, so
+        // AN-AS auto-fill on a single user action. Non-trigger selects skip
+        // re-render — matches existing text-input UX where badge transitions
+        // happen on next render trigger (parity, not regression).
+        if(f.validation && f.validation.allowedValues && f.validation.allowedValues.length){
+          var manualTriggerSuffix = lookupTriggerLabels[f.label] ? ";renderPage(\'retail-templates\')" : '';
+          var manualOptions = '<option value="">— Select —</option>';
+          f.validation.allowedValues.forEach(function(v){
+            manualOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
+          });
+          valCell = '<select data-mf="'+retailEsc(f.label)+'" onchange="retailTemplatesManualFields[this.dataset.mf]=this.value'+manualTriggerSuffix+'" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">'+manualOptions+'</select>';
+        } else {
+          valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+manualTriggerAttr+' placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        }
         manualCount++;
       } else if(effectiveType === 'private' || effectiveType === 'private_filled'){
         bg = '#F3F4F6'; col = '#6B7280';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#6B7280;padding:.15rem .4rem;background:#fff;border:1px solid #E5E7EB">Private · local only</span>';
         var privateTriggerAttr = lookupTriggerLabels[f.label] ? ' onchange="renderPage(\'retail-templates\')"' : '';
-        valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+privateTriggerAttr+' placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        // G2 defensive symmetry: no Åhléns column currently has both private
+        // source AND allowedValues, but the conditional preserves the option
+        // for future seed entries without re-touching this site.
+        if(f.validation && f.validation.allowedValues && f.validation.allowedValues.length){
+          var privateTriggerSuffix = lookupTriggerLabels[f.label] ? ";renderPage(\'retail-templates\')" : '';
+          var privateOptions = '<option value="">— Select —</option>';
+          f.validation.allowedValues.forEach(function(v){
+            privateOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
+          });
+          valCell = '<select data-mf="'+retailEsc(f.label)+'" onchange="retailTemplatesManualFields[this.dataset.mf]=this.value'+privateTriggerSuffix+'" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">'+privateOptions+'</select>';
+        } else {
+          valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+privateTriggerAttr+' placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
+        }
         privateCount++;
       } else {
         bg = '#F9FAFB';
