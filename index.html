@@ -3000,9 +3000,9 @@ function toggleGoal(g){
 function renderProofSummary(){
   if(!brand) return '<div style="font-family:var(--sans);font-size:.75rem;color:var(--muted);padding:.5rem 0">No proof points added yet. <span onclick="showProofEdit()" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add now →</span></div>';
   const items=[];
-  if(brand.annualRevenue) items.push({icon:'📈',label:'Revenue',val:brand.annualRevenue+(brand.revenueGrowth?' · '+brand.revenueGrowth:'')});
+  if(brand.annualRevenue) items.push({icon:'📈',label:'Revenue',val:brand.annualRevenue+(brand.revenueGrowth?' · +'+normalizeNumericProof(brand.revenueGrowth)+'%':'')});
   if(brand.unitsSold) items.push({icon:'📦',label:'Units sold',val:brand.unitsSold});
-  if(brand.repeatRate) items.push({icon:'🔄',label:'Repeat rate',val:brand.repeatRate});
+  if(brand.repeatRate) items.push({icon:'🔄',label:'Repeat rate',val:normalizeNumericProof(brand.repeatRate)+'%'});
   if(brand.dtcRevenue) items.push({icon:'🌍',label:'DTC in target market',val:brand.dtcRevenue});
   if(brand.socialFollowers) items.push({icon:'📱',label:'Social reach',val:brand.socialFollowers});
   if(brand.pressCount) items.push({icon:'📰',label:'Press',val:brand.pressCount});
@@ -25069,7 +25069,7 @@ async function generateBrandPackPDF(){
     const snapRows2=[
       ['Annual revenue', brand?.annualRevenue||'Not disclosed'],
       ['Units sold', brand?.unitsSold||'—'],
-      ['Repeat rate', brand?.repeatRate||'—'],
+      ['Repeat rate', brand?.repeatRate ? normalizeNumericProof(brand.repeatRate)+'%' : '—'],
       ['Social following', brand?.socialFollowers||'—'],
       ['Press mentions', brand?.pressCount||'—'],
     ];
