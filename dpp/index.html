@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Product Passport — VeyaFlow</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    :root {
+      --navy:  #1B2D4F;
+      --gold:  #C4A882;
+      --sans:  'Inter', system-ui, -apple-system, sans-serif;
+      --mono:  'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+      --serif: 'Playfair Display', Georgia, serif;
+      --border:#E8E4DE;
+      --muted: #888;
+      --ink:   #1A1A1A;
+      --green: #065F46;
+      --green-bg: #ECFDF5;
+      --amber: #92400E;
+      --amber-bg: #FFFBEB;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); background: #FAFAF8; color: var(--ink); }
+
+    /* ── Header ── */
+    .vf-header {
+      background: var(--navy);
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .vf-logo { font-family: var(--serif); font-size: 1rem; color: #fff; letter-spacing: .02em; }
+    .vf-logo span { color: var(--gold); }
+    .vf-header-badge { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.4); letter-spacing: .08em; text-transform: uppercase; }
+
+    /* ── Content ── */
+    .vf-wrap { max-width: 780px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+    /* ── Cover ── */
+    .vf-cover { padding: 2rem 1.75rem; margin-bottom: 1.5rem; background: var(--navy); }
+    .vf-cover-label { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.4); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .35rem; }
+    .vf-cover-name { font-family: var(--serif); font-size: 1.6rem; color: #fff; margin-bottom: .2rem; line-height: 1.2; }
+    .vf-cover-sub { font-family: var(--mono); font-size: .65rem; color: rgba(255,255,255,.55); }
+    .vf-cover-meta { display: flex; gap: 1.25rem; margin-top: 1rem; flex-wrap: wrap; }
+    .vf-cover-meta-item { font-family: var(--mono); font-size: .6rem; color: rgba(255,255,255,.6); }
+    .vf-cover-meta-item strong { color: var(--gold); display: block; font-size: .72rem; margin-bottom: .1rem; }
+
+    /* ── Sections ── */
+    .vf-section { background: #fff; border: 1px solid var(--border); border-left: 3px solid var(--gold); padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+    .vf-section-title { font-family: var(--mono); font-size: .6rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--navy); margin-bottom: .75rem; }
+
+    /* ── Field rows ── */
+    .vf-field { display: flex; align-items: baseline; padding: .45rem 0; border-bottom: 1px solid #F5F2EC; gap: .75rem; }
+    .vf-field:last-child { border-bottom: none; }
+    .vf-field-label { font-family: var(--mono); font-size: .58rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; min-width: 140px; flex-shrink: 0; }
+    .vf-field-value { font-family: var(--sans); font-size: .8rem; color: var(--ink); line-height: 1.5; flex: 1; word-break: break-word; }
+    .vf-field-value.mono { font-family: var(--mono); font-size: .72rem; }
+
+    /* ── Composition INCI (long text) ── */
+    .vf-inci { font-family: var(--mono); font-size: .68rem; line-height: 1.6; color: #333; padding: .65rem .85rem; background: #FAFAF8; border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+
+    /* ── Certification chips ── */
+    .vf-cert { display: inline-block; font-family: var(--mono); font-size: .56rem; background: var(--green-bg); color: var(--green); padding: .15rem .45rem; border: 1px solid #A7F3D0; margin: .1rem .15rem 0 0; letter-spacing: .04em; }
+
+    /* ── Environmental data ── */
+    .vf-env-row { display: flex; align-items: baseline; gap: .75rem; padding: .5rem 0; border-bottom: 1px solid #F5F2EC; }
+    .vf-env-row:last-child { border-bottom: none; }
+    .vf-env-label { font-family: var(--mono); font-size: .58rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; flex: 1; }
+    .vf-env-value { font-family: var(--serif); font-size: 1.1rem; font-weight: 600; color: var(--navy); }
+    .vf-env-unit { font-family: var(--mono); font-size: .6rem; color: var(--muted); margin-left: .25rem; }
+    .vf-env-est { font-family: var(--mono); font-size: .5rem; color: var(--amber); background: var(--amber-bg); padding: .1rem .35rem; border: 1px solid #FDE68A; margin-left: .35rem; letter-spacing: .04em; text-transform: uppercase; }
+
+    /* ── Regulatory badges ── */
+    .vf-reg { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--mono); font-size: .65rem; background: var(--green-bg); color: var(--green); padding: .25rem .55rem; border: 1px solid #A7F3D0; margin: .15rem .3rem 0 0; }
+    .vf-reg-label { font-weight: 700; }
+    .vf-reg-value { color: #333; }
+
+    /* ── Footer ── */
+    .vf-footer { border-top: 1px solid var(--border); padding: 1.25rem 1.5rem; text-align: center; margin-top: 2rem; }
+    .vf-footer-logo { font-family: var(--serif); font-size: .85rem; color: var(--navy); margin-bottom: .2rem; }
+    .vf-footer-sub { font-family: var(--mono); font-size: .52rem; color: var(--muted); }
+    .vf-footer-meta { font-family: var(--mono); font-size: .55rem; color: var(--muted); margin-top: .65rem; }
+    .vf-footer-cta { display: inline-block; margin-top: .65rem; font-family: var(--mono); font-size: .6rem; color: var(--navy); border: 1px solid var(--navy); padding: .35rem .85rem; text-decoration: none; }
+
+    /* ── States ── */
+    .vf-loading { text-align: center; padding: 4rem 1rem; }
+    .vf-loading-spinner { width: 28px; height: 28px; border: 3px solid #E8E4DE; border-top-color: var(--navy); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .vf-error { text-align: center; padding: 4rem 1rem; max-width: 480px; margin: 0 auto; }
+    .vf-error-icon { font-size: 2rem; margin-bottom: .75rem; color: var(--navy); }
+    .vf-error-title { font-family: var(--serif); font-size: 1.3rem; color: var(--navy); margin-bottom: .5rem; }
+    .vf-error-sub { font-family: var(--sans); font-size: .82rem; color: var(--muted); line-height: 1.6; margin-bottom: 1.25rem; }
+    .vf-error-id { font-family: var(--mono); font-size: .55rem; color: var(--muted); background: #F5F2EC; padding: .25rem .5rem; display: inline-block; border: 1px solid var(--border); margin-bottom: 1.25rem; word-break: break-all; }
+
+    @media (max-width: 560px) {
+      .vf-cover { padding: 1.25rem 1rem; }
+      .vf-section { padding: 1rem; }
+      .vf-field { flex-direction: column; gap: .1rem; align-items: flex-start; }
+      .vf-field-label { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="vf-header">
+  <div class="vf-logo">Veya<span>Flow</span></div>
+  <div class="vf-header-badge">Digital Product Passport</div>
+</header>
+
+<main class="vf-wrap" id="content">
+  <div class="vf-loading">
+    <div class="vf-loading-spinner"></div>
+    <div style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Loading product passport…</div>
+  </div>
+</main>
+
+<footer class="vf-footer">
+  <div class="vf-footer-logo">VeyaFlow</div>
+  <div class="vf-footer-sub">Digital Product Passport · Powered by VeyaFlow</div>
+  <a href="https://veyaflow.com" class="vf-footer-cta">Learn more →</a>
+</footer>
+
+<script>
+(async function(){
+  const dppId = location.pathname.split('/dpp/')[1]?.replace(/\/$/, '');
+  const wrap = document.getElementById('content');
+
+  function showError(title, sub, showId){
+    wrap.innerHTML = `
+      <div class="vf-error">
+        <div class="vf-error-icon">◌</div>
+        <div class="vf-error-title">${title}</div>
+        <div class="vf-error-sub">${sub}</div>
+        ${showId && dppId ? `<div class="vf-error-id">${esc(dppId)}</div>` : ''}
+        <a href="https://veyaflow.com" style="font-family:var(--mono);font-size:.65rem;color:var(--navy);text-decoration:underline">veyaflow.com →</a>
+      </div>
+    `;
+  }
+
+  // ── ID format guard ────────────────────────────────────────────────────
+  if(!dppId || !/^vf-[a-z0-9-]+$/.test(dppId)){
+    return showError(
+      'Invalid passport link',
+      'This Digital Product Passport URL is malformed. If you scanned a QR code, please try scanning again or contact the brand.',
+      false
+    );
+  }
+
+  // ── Fetch from Netlify function ────────────────────────────────────────
+  let data;
+  try {
+    const res = await fetch(`/.netlify/functions/get-dpp?id=${encodeURIComponent(dppId)}`);
+    if(res.status === 404){
+      return showError(
+        'Product passport not found',
+        'This Digital Product Passport does not exist or has been removed by the brand.',
+        true
+      );
+    }
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch(e) {
+    return showError(
+      'Could not load passport',
+      'A temporary issue prevented this passport from loading. Please try again in a moment.',
+      true
+    );
+  }
+
+  const payload    = data.payload || {};
+  const identity   = payload.identity || {};
+  const composition= payload.composition || {};
+  const origin     = payload.origin || {};
+  const regulatory = payload.regulatory || {};
+  const certs      = (payload.certifications && payload.certifications.certifications) || [];
+  const env        = payload.environmental || {};
+  const published  = data.publishedAt ? new Date(data.publishedAt).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const updated    = data.updatedAt   ? new Date(data.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const version    = data.version || 1;
+
+  // Update page title
+  document.title = `${identity.name || 'Product Passport'} — VeyaFlow`;
+
+  // ── Cover ──
+  const coverHTML = `
+    <div class="vf-cover">
+      <div class="vf-cover-label">Digital Product Passport</div>
+      <div class="vf-cover-name">${esc(identity.name || 'Product')}</div>
+      <div class="vf-cover-sub">${identity.ean ? 'EAN ' + esc(identity.ean) : 'Identity'}</div>
+      <div class="vf-cover-meta">
+        ${identity.productType ? `<div class="vf-cover-meta-item"><strong>${esc(prettifyProductType(identity.productType))}</strong>Product type</div>` : ''}
+        ${origin.countryOfMfr ? `<div class="vf-cover-meta-item"><strong>${esc(origin.countryOfMfr)}</strong>Country of manufacture</div>` : ''}
+        ${published ? `<div class="vf-cover-meta-item"><strong>${esc(published)}</strong>Published</div>` : ''}
+        ${version > 1 ? `<div class="vf-cover-meta-item"><strong>v${esc(String(version))}</strong>Revision</div>` : ''}
+      </div>
+    </div>
+  `;
+
+  // ── Section: Product identity ──
+  const identityRows = [];
+  if(identity.name)        identityRows.push(['Product name', esc(identity.name)]);
+  if(identity.ean)         identityRows.push(['EAN / barcode', esc(identity.ean), 'mono']);
+  if(identity.productType) identityRows.push(['Product type', esc(prettifyProductType(identity.productType))]);
+  if(identity.netContent || identity.netUnit) {
+    identityRows.push(['Net content', esc((identity.netContent || '') + ' ' + (identity.netUnit || '')).trim(), 'mono']);
+  }
+  if(origin.countryOfMfr)  identityRows.push(['Country of manufacture', esc(origin.countryOfMfr)]);
+
+  const identityHTML = identityRows.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Product Identity</div>
+      ${identityRows.map(r => `
+        <div class="vf-field">
+          <div class="vf-field-label">${r[0]}</div>
+          <div class="vf-field-value${r[2]==='mono'?' mono':''}">${r[1]}</div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  // ── Section: Regulatory ──
+  const regulatoryBadges = [];
+  if(regulatory.cpnp) {
+    regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">CPNP</span><span class="vf-reg-value">${esc(regulatory.cpnp)}</span></div>`);
+  }
+  if(regulatory.ceMarking) {
+    regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">CE</span><span class="vf-reg-value">${esc(regulatory.ceMarking)}</span></div>`);
+  }
+  if(regulatory.novelFoodStatus) {
+    regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">Novel Food</span><span class="vf-reg-value">${esc(regulatory.novelFoodStatus)}</span></div>`);
+  }
+  const regulatoryHTML = regulatoryBadges.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Regulatory Compliance</div>
+      <div>${regulatoryBadges.join('')}</div>
+    </div>
+  ` : '';
+
+  // ── Section: Composition ──
+  const compositionParts = [];
+  if(composition.inci) {
+    compositionParts.push(`
+      <div class="vf-field"><div class="vf-field-label">INCI list</div></div>
+      <div class="vf-inci">${esc(composition.inci)}</div>
+    `);
+  }
+  if(composition.materialComposition && !composition.inci) {
+    compositionParts.push(`
+      <div class="vf-field"><div class="vf-field-label">Materials</div></div>
+      <div class="vf-inci">${esc(composition.materialComposition)}</div>
+    `);
+  }
+  if(composition.ingredientList && !composition.inci && !composition.materialComposition) {
+    compositionParts.push(`
+      <div class="vf-field"><div class="vf-field-label">Ingredients</div></div>
+      <div class="vf-inci">${esc(composition.ingredientList)}</div>
+    `);
+  }
+  const compositionHTML = compositionParts.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Composition</div>
+      ${compositionParts.join('')}
+    </div>
+  ` : '';
+
+  // ── Section: Certifications ──
+  const certificationsHTML = certs.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Certifications (${certs.length})</div>
+      <div style="margin-top:.25rem">
+        ${certs.map(c => `<span class="vf-cert">${esc(typeof c === 'string' ? c : (c.name || ''))}</span>`).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  // ── Section: Environmental ──
+  const envRows = [];
+  if(env.carbonKg !== undefined && env.carbonKg !== '') {
+    envRows.push(`
+      <div class="vf-env-row">
+        <div class="vf-env-label">Carbon footprint</div>
+        <div>
+          <span class="vf-env-value">${esc(String(env.carbonKg))}</span><span class="vf-env-unit">kg CO₂e</span>
+          ${env.carbonEstimated ? '<span class="vf-env-est">Estimated</span>' : ''}
+        </div>
+      </div>
+    `);
+  }
+  if(env.recycledProduct !== undefined && env.recycledProduct !== '') {
+    envRows.push(`
+      <div class="vf-env-row">
+        <div class="vf-env-label">Recycled content</div>
+        <div><span class="vf-env-value">${esc(String(env.recycledProduct))}</span><span class="vf-env-unit">%</span></div>
+      </div>
+    `);
+  }
+  if(env.recyclability) {
+    envRows.push(`
+      <div class="vf-env-row">
+        <div class="vf-env-label">Recyclability</div>
+        <div style="font-family:var(--sans);font-size:.85rem;color:var(--ink)">${esc(env.recyclability)}</div>
+      </div>
+    `);
+  }
+  if(env.takeback !== undefined && env.takeback !== '' && env.takeback !== null) {
+    envRows.push(`
+      <div class="vf-env-row">
+        <div class="vf-env-label">Take-back scheme</div>
+        <div style="font-family:var(--sans);font-size:.85rem;color:var(--ink)">${esc(String(env.takeback))}</div>
+      </div>
+    `);
+  }
+  const environmentalHTML = envRows.length ? `
+    <div class="vf-section">
+      <div class="vf-section-title">Environmental Impact</div>
+      ${envRows.join('')}
+    </div>
+  ` : '';
+
+  // ── Footer meta ──
+  const footerMetaHTML = `
+    <div class="vf-footer-meta">
+      Passport ID: ${esc(dppId)} · v${esc(String(version))} ${updated && updated !== published ? '· Updated ' + esc(updated) : ''}
+    </div>
+  `;
+
+  wrap.innerHTML = coverHTML + identityHTML + compositionHTML + regulatoryHTML + certificationsHTML + environmentalHTML + footerMetaHTML;
+})();
+
+function esc(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function prettifyProductType(t){
+  const map = {
+    cosmetic:         'Cosmetics / Skincare',
+    device:           'Beauty Device',
+    beauty_accessory: 'Beauty Accessory',
+    supplement:       'Supplement',
+    food:             'Food',
+    textile:          'Textile',
+    garment:          'Garment',
+  };
+  return map[t] || t;
+}
+</script>
+</body>
+</html>
