@@ -4215,7 +4215,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
     else if(amberClaims.length>0){ blockers.push({id:'amberClaim',level:'amber',label:amberClaims.length+' claim'+(amberClaims.length>1?'s':'')+' need review for '+market.name,impact:'Amber claims need substantiation or market-specific rephrasing.'}); comp+=5; }
 
   } else {
-    blockers.push({id:'noSku',level:'red',label:'No product added yet',impact:'Your compliance score activates once you add a product. <span onclick="showPage(\"skus\")" style="text-decoration:underline;cursor:pointer;color:#991B1B">Add your first product →</span>'});
+    blockers.push({id:'noSku',level:'red',label:'No products yet',impact:'Your compliance score activates once you add a product. <span onclick="showPage(\"skus\")" style="text-decoration:underline;cursor:pointer;color:#991B1B">Add your first product →</span>'});
   }
   dims.compliance = {score:Math.min(comp,35), max:35};
 
@@ -5578,7 +5578,7 @@ function renderDashboard(el){
             <span>Products (${skus.length})</span>
             <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">${skus.length>0?'View all →':'Add SKU →'}</span>
           </div>
-          ${skus.length===0?`<div style="padding:.6rem;background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.15);font-size:.75rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first SKU →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)"><div style="flex:1;font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div><div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div></div>`;}).join('')}
+          ${skus.length===0?`<div style="padding:.6rem;background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.15);font-size:.75rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)"><div style="flex:1;font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div><div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div></div>`;}).join('')}
           ${renderSetupTracker()}
         </div>
       </div>
@@ -5851,7 +5851,7 @@ function renderPresetForm(){
               <span style="color:var(--navy)">${s.name||'Unnamed'}</span>
               <span style="color:var(--muted)">${s.rspSEK?s.rspSEK+' SEK':'no price set'}</span>
             </div>
-          `).join(''):`<div style="font-family:var(--sans);font-size:.7rem;color:var(--muted)">No products added yet — <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer">add in My Products →</span></div>`}
+          `).join(''):`<div style="font-family:var(--sans);font-size:.7rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first product →</span></div>`}
           <div style="font-family:var(--sans);font-size:.65rem;color:var(--muted);margin-top:.4rem;line-height:1.4">Prices are set per product in My Products. The report uses your SKU prices for margin and revenue calculations.</div>
         </div>
       </div>
@@ -14704,8 +14704,8 @@ function renderSkus(el){
       ${skus.length===0?`
         <div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">
           <div style="font-size:2rem;margin-bottom:.75rem">▦</div>
-          <div class="empty-title">No products added yet</div>
-          <div class="empty-sub" style="margin-bottom:1.25rem">Add your first SKU — VeyaFlow stores all product data in one place and exports it in any retailer's format.</div>
+          <div class="empty-title">No products yet</div>
+          <div class="empty-sub" style="margin-bottom:1.25rem">VeyaFlow stores all product data in one place and exports it in any retailer's format.</div>
           <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
             <button class="btn-primary" onclick="startNewSku()">Add your first product →</button>
             <button class="btn-outline" onclick="startBulkImport()">↥ Or bulk import</button>
@@ -14975,7 +14975,7 @@ function renderCPNPModal(skuId, view){
                 ${f.hint?`<div style="font-family:var(--sans);font-size:.5rem;color:var(--muted);line-height:1.4;margin-top:.1rem">${f.hint}</div>`:''}
               </div>
               <div style="font-family:${f.value?'var(--mono)':'var(--sans)'};font-size:.62rem;color:${f.value?'var(--ink)':'#FCA5A5'};word-break:break-word;line-height:1.5">
-                ${f.value || `<span style="color:#FCA5A5;font-style:italic">⚠ Not on file — add in My Products</span>`}
+                ${f.value || `<span style="color:#FCA5A5;font-style:italic">⚠ Missing — add in My Products</span>`}
               </div>
             </div>
           `).join('')}
@@ -28569,9 +28569,9 @@ function smartEmpty(moduleId){
     },
     skus: {
       icon: '▦',
-      title: 'No products added yet',
+      title: 'No products yet',
       sub: `Add your hero SKU — name, EAN, RSP, INCI list. VeyaFlow stores all product data in one place and exports it in any retailer's required format.`,
-      cta: 'Add first product →',
+      cta: 'Add your first product →',
       action: `startNewSku()`,
     },
     cfo: {
@@ -29067,7 +29067,7 @@ function renderDPP(el){
           <div class="card empty-state">
             <div class="empty-title">No products yet</div>
             <div class="empty-sub" style="margin-bottom:1rem">Add your hero SKU in My Products — VeyaFlow already captures 60% of DPP required fields.</div>
-            <button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage('skus')">Add products →</button>
+            <button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage('skus')">Add your first product →</button>
           </div>
         `:`
           <div class="card" style="margin-bottom:1rem">
@@ -31349,7 +31349,7 @@ function renderRetailAddSubmissionForm(){
     });
     html += '</div>';
   } else {
-    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-bottom:.8rem">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-bottom:.8rem">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add your first product →</span></div>';
   }
 
   html += '<div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.8rem">';
@@ -31703,7 +31703,7 @@ function renderRetailTemplates(el){
     });
     html += '</select>';
   } else {
-    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add your first product →</span></div>';
   }
   html += '</div>';
   html += '</div>';
@@ -31809,7 +31809,7 @@ function renderRetailTemplates(el){
       } else if(effectiveType === 'missing'){
         bg = '#FFFBEB'; col = '#92400E';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#92400E;padding:.15rem .4rem;background:#fff;border:1px solid #FDE68A">Missing — fix in SKU</span>';
-        valCell = '<div style="font-family:var(--sans);font-size:.75rem;color:#92400E;font-style:italic">Not set — <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">add in My Products →</span></div>';
+        valCell = '<div style="font-family:var(--sans);font-size:.75rem;color:#92400E;font-style:italic">Missing — <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">add in My Products →</span></div>';
         missingCount++;
       } else if(effectiveType === 'manual' || effectiveType === 'auto_manual'){
         bg = effectiveType==='auto_manual' ? '#EFF6FF' : '#FFFBEB';
@@ -31991,7 +31991,7 @@ function renderRetailChecklist(el){
     });
     html += '</select>';
   } else {
-    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add products →</span></div>';
+    html += '<div style="padding:.55rem .75rem;background:#F9FAFB;border:1px solid var(--border);font-family:var(--sans);font-size:.72rem;color:var(--muted)">No products yet. <span onclick="showPage(\'skus\')" style="text-decoration:underline;cursor:pointer">Add your first product →</span></div>';
   }
   html += '</div>';
   html += '</div>';
@@ -32055,7 +32055,7 @@ function renderRetailChecklist(el){
     if(autoDone){
       html += '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.1rem">Auto-verified from your data</div>';
     } else if(r.autoCheck && !autoDone){
-      html += '<div style="font-family:var(--mono);font-size:.52rem;color:#991B1B;margin-top:.1rem">Missing in your data — <span onclick="showPage(\''+retailEsc(r.fixPage||'skus')+'\')" style="text-decoration:underline;cursor:pointer">fix →</span></div>';
+      html += '<div style="font-family:var(--mono);font-size:.52rem;color:#991B1B;margin-top:.1rem">Missing — <span onclick="showPage(\''+retailEsc(r.fixPage||'skus')+'\')" style="text-decoration:underline;cursor:pointer">fix →</span></div>';
     }
     html += '</div>';
     if(!autoDone && !manualDone && r.fixPage){
