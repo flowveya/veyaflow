@@ -745,7 +745,6 @@
     <div id="sidebar-trial-badge"></div>
     <div class="s-footer">
       <div class="s-footer-text" id="footer-text">No brand set up yet</div>
-      <div onclick="openPricingModal('full_platform')" style="font-family:var(--mono);font-size:.5rem;color:rgba(255,255,255,.25);cursor:pointer;margin-top:.2rem;text-decoration:underline">View plans</div>
     </div>
   </div>
 
@@ -2640,23 +2639,23 @@ function openUpgradeContact(tierId){
   window.open(`mailto:hello@veyaflow.com?subject=${subject}&body=${body}`);
 }
 
-// Sidebar trial/plan badge — renders inside sidebar footer area
+// Sidebar trial/plan badge — Bundle 1A (A1-medium): stubbed pre-Beta.
+// Trial system is dormant until V1.5+ Pricing Tier UI ships. Function shape
+// preserved so callers (renderTrialBadge injection at L2741) don't need to
+// change. When V1.5+ ships, restore the body and uncomment initTrialIfNeeded
+// in init() (~L30828).
 function renderTrialBadge(){
-  const trial = getTrialState();
-  if(!trial) return '';
-  if(trial.plan) return `<div style="font-family:var(--mono);font-size:.52rem;color:var(--gold);padding:.3rem 1rem">${PRICING_TIERS.find(t=>t.id===trial.plan)?.name||'Active plan'}</div>`;
-  const days = getTrialDaysLeft();
-  if(days===null) return '';
-  const urgent = days <= 3;
-  return `
-    <div onclick="openPricingModal('full_platform')" style="margin:.4rem .85rem;padding:.4rem .65rem;border:1px solid ${urgent?'#FCA5A5':'rgba(196,168,130,.3)'};background:${urgent?'rgba(239,68,68,.08)':'rgba(196,168,130,.06)'};cursor:pointer">
-      <div style="font-family:var(--mono);font-size:.52rem;color:${urgent?'#EF4444':'var(--gold)'}">
-        ${urgent?'⏰':'◎'} Trial: ${days}d left
-      </div>
-      <div style="font-family:var(--mono);font-size:.48rem;color:rgba(255,255,255,.35);margin-top:.1rem">Click to view plans →</div>
-    </div>
-  `;
+  return '';
 }
+
+// Legacy implementation preserved here for V1.5+ reintroduction:
+//   const trial = getTrialState();
+//   if(!trial) return '';
+//   if(trial.plan) return `<div style="...">${PRICING_TIERS.find(t=>t.id===trial.plan)?.name||'Active plan'}</div>`;
+//   const days = getTrialDaysLeft();
+//   if(days===null) return '';
+//   const urgent = days <= 3;
+//   return `<div onclick="openPricingModal('full_platform')" ...>...Trial: ${days}d left...</div>`;
 
 // Trial expiry screen — shown if trial expired and no plan selected
 function renderTrialExpiredScreen(targetMarket, category){
@@ -23990,11 +23989,18 @@ function renderFind(el){
   html += '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.55rem">' + filtered.length + ' of ' + MANUFACTURERS.length + ' manufacturers</div>';
 
   // ── EMPTY STATE ────────────────────────────────────
+  // Bundle 1A (A3-empty-state-recovery): inline Clear all button. Same
+  // affordance exists at top of filter bar (L23886) but only visible
+  // conditional on hasAnyFilter, and requires user to look up. One-click
+  // recovery from any over-restrictive filter combination — reuses existing
+  // clearFindFilters() function.
   if(filtered.length === 0){
     html += '<div class="card empty-state">' +
             '<div class="empty-title">No manufacturers match these filters</div>' +
             '<div class="empty-sub">Try widening MOQ, removing a certification filter, or changing the region. ' +
-            'If you need a manufacturer type not listed, <a href="mailto:support@veyaflow.com?subject=Manufacturer%20request" style="color:var(--gold)">request coverage</a>.</div></div>';
+            'If you need a manufacturer type not listed, <a href="mailto:support@veyaflow.com?subject=Manufacturer%20request" style="color:var(--gold)">request coverage</a>.</div>' +
+            '<button class="btn-outline" onclick="clearFindFilters()" style="margin-top:.85rem;font-size:.7rem;padding:.4rem .85rem">↺ Clear all filters and try again</button>' +
+            '</div>';
   }
 
   // ── RESULT CARDS ───────────────────────────────────
@@ -25991,6 +25997,14 @@ function renderAllBrandHomeAlerts() {
     const weeeMkts = getWEEEMarkets().filter(m=>m!=='Norway');
     const sku0 = skus.find(s=>isWEEEDevice(s));
     if(weeeMkts.length>0 && sku0 && !sku0.weeeRegistered){
+      // Bundle 1A (A2-rigorous): conditional copy by detection certainty.
+      // Certain path (productType ∈ device-types OR ceMarking set) → "require"
+      // matches the platform's compliance certainty. Keyword-only fallback in
+      // isWEEEDevice (name match on 'tool'/'massager'/etc.) keeps the "may
+      // require" hedge — protects against false positives from name keywords
+      // applied to non-electrical products.
+      const certainDevice = ['device','beauty_device','garment_accessories'].includes(sku0.productType) || !!sku0.ceMarking;
+      const weeeVerb = certainDevice ? 'require' : 'may require';
       action.push(`
         <div style="background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #F59E0B;padding:.85rem 1.25rem;margin-bottom:.85rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
           <div style="flex:1;min-width:240px">
@@ -25999,7 +26013,7 @@ function renderAllBrandHomeAlerts() {
               <span style="font-family:var(--mono);font-size:.58rem;color:#92400E;font-weight:700">WEEE PRODUCER REGISTRATION — ELECTRICAL DEVICES</span>
             </div>
             <div style="font-family:var(--sans);font-size:.75rem;color:#78350F;line-height:1.55;margin-bottom:.25rem">
-              Your electrical devices may require WEEE producer registration before sale in <strong>${weeeMkts.join(', ')}</strong>. Register per market — annual reporting required.
+              Your electrical devices ${weeeVerb} WEEE producer registration before sale in <strong>${weeeMkts.join(', ')}</strong>. Register per market — annual reporting required.
             </div>
             <div style="font-family:var(--mono);font-size:.52rem;color:#92400E;opacity:.75">
               DE: stiftung ear · SE: El-Kretsen · DK: DPA-System · NO: Elretur · FR: Eco-systèmes · NL: Wecycle
@@ -30825,7 +30839,7 @@ function init(){
   loadManualSuppliers();
   loadSourcingCRM();
   loadRegulatoryMonitor();
-  initTrialIfNeeded();
+  // initTrialIfNeeded();  // Bundle 1A (A1-medium): trial system dormant pre-Beta. Restore when V1.5+ Pricing Tier UI ships.
   buildNav();
   updateSidebarBrand();
   renderRegStrip();
