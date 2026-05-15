@@ -13363,7 +13363,7 @@ function renderBrandPack(el){
       <div class="card" style="margin-bottom:1rem;border-left:4px solid ${cover.accent}">
         <div class="section-tag">Page 1 preview — verified data only, no AI</div>
         <div style="font-family:var(--sans);font-size:.85rem;font-weight:700;color:var(--navy);margin-bottom:.15rem">
-          ${brand.name} — Entering ${brandPackState.market||'[select market]'}
+          ${brand.name} — ${brandPackState.market ? 'Entering '+brandPackState.market : 'Pick a market above ↑'}
         </div>
         <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.75rem">
           Proposed retailer: ${brandPackState.retailer||'[select retailer]'} | ${brand.category||''} | RSP: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':'[set in My Products]'}
@@ -31741,6 +31741,11 @@ function renderRetailTemplates(el){
     // for a field whose label is in the set, attach onchange (in addition to
     // oninput) that triggers full page re-render. Non-trigger fields keep
     // cheap oninput-only behavior to preserve typing UX.
+    // Ship 4 (2c): value type aggregates the COUNT of fields each trigger
+    // drives, not just a boolean. Used in the dropdown branch below to render
+    // a "⤵ Auto-fills N shipping fields below" affordance under trigger-field
+    // selects. Existing truthy checks (Pattern D onchange wiring on manual /
+    // private inputs) remain compatible — a count of 6 is truthy.
     var lookupTriggerLabels = {};
     legacyFields.forEach(function(f){
       if(f.source && f.source.indexOf('lookup:') === 0){
@@ -31748,7 +31753,7 @@ function renderRetailTemplates(el){
         var firstColon = body.indexOf(':');
         if(firstColon !== -1){
           var triggerLabel = body.slice(firstColon + 1);
-          if(triggerLabel) lookupTriggerLabels[triggerLabel] = true;
+          if(triggerLabel) lookupTriggerLabels[triggerLabel] = (lookupTriggerLabels[triggerLabel] || 0) + 1;
         }
       }
     });
@@ -31790,6 +31795,13 @@ function renderRetailTemplates(el){
             manualOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
           });
           valCell = '<select data-mf="'+retailEsc(f.label)+'" onchange="retailTemplatesManualFields[this.dataset.mf]=this.value'+manualTriggerSuffix+'" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">'+manualOptions+'</select>';
+          // Ship 4 (2c): drives-N-fields affordance for lookup-trigger dropdowns.
+          // Count comes from lookupTriggerLabels aggregation above. "shipping
+          // fields" copy is AM-specific (the dangerous-goods columns are
+          // shipping-related). Re-evaluate label when a second trigger arrives.
+          if(lookupTriggerLabels[f.label]){
+            valCell += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem;letter-spacing:.05em">⤵ Auto-fills '+lookupTriggerLabels[f.label]+' shipping fields below</div>';
+          }
         } else {
           valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+manualTriggerAttr+' placeholder="Enter value" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
         }
@@ -31808,6 +31820,10 @@ function renderRetailTemplates(el){
             privateOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
           });
           valCell = '<select data-mf="'+retailEsc(f.label)+'" onchange="retailTemplatesManualFields[this.dataset.mf]=this.value'+privateTriggerSuffix+'" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">'+privateOptions+'</select>';
+          // Ship 4 (2c) defensive symmetry: same affordance on private dropdowns.
+          if(lookupTriggerLabels[f.label]){
+            valCell += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem;letter-spacing:.05em">⤵ Auto-fills '+lookupTriggerLabels[f.label]+' shipping fields below</div>';
+          }
         } else {
           valCell = '<input type="text" data-mf="'+retailEsc(f.label)+'" value="'+retailEsc(userVal)+'" oninput="retailTemplatesManualFields[this.dataset.mf]=this.value"'+privateTriggerAttr+' placeholder="Fill locally — not stored by VeyaFlow" style="width:100%;padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff">';
         }
