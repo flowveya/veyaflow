@@ -31914,15 +31914,17 @@ function renderRetailTemplates(el){
         col = effectiveType==='auto_manual' ? '#1E40AF' : '#92400E';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:'+col+';padding:.15rem .4rem;background:#fff;border:1px solid '+(effectiveType==='auto_manual'?'#BFDBFE':'#FDE68A')+'">Manual</span>';
         var manualTriggerAttr = lookupTriggerLabels[f.label] ? ' onchange="renderPage(\'retail-templates\')"' : '';
-        // ── G2: dropdown render when seed entry declares validation.allowedValues ──
-        // Five Åhléns columns ship with allowedValues today (AH/AI/AJ/AK/AM).
-        // Trigger-field selects (AM Choose Dangerous Goods Category) embed the
-        // Pattern D re-render in the SAME onchange that writes state, so
-        // AN-AS auto-fill on a single user action. Non-trigger selects skip
-        // re-render — matches existing text-input UX where badge transitions
-        // happen on next render trigger (parity, not regression).
+        // ── G2 + Ship 7: dropdown render when seed entry declares validation.allowedValues ──
+        // Ten Åhléns columns ship with allowedValues today (C/E/L/AD/AG/AH/AI/AJ/AK/AM).
+        // All selects re-render on change (Ship 7 — Phase 3 2d): trigger fields (AM)
+        // cascade auto-fill to AN-AS, non-trigger fields surface the amber→blue
+        // filled-state affordance immediately (L31885: effectiveType flips to
+        // 'auto_manual' when userVal present). Pattern D wired uniformly so row
+        // background and badge color stay in sync with user input. Text inputs
+        // retain conditional Pattern D wiring (no current text-input triggers) —
+        // logged for Cleanup Sprint when Stage 2 surfaces text-input triggers.
         if(f.validation && f.validation.allowedValues && f.validation.allowedValues.length){
-          var manualTriggerSuffix = lookupTriggerLabels[f.label] ? ";renderPage(\'retail-templates\')" : '';
+          var manualTriggerSuffix = ";renderPage(\'retail-templates\')";
           var manualOptions = '<option value="">— Select —</option>';
           f.validation.allowedValues.forEach(function(v){
             manualOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
@@ -31947,7 +31949,7 @@ function renderRetailTemplates(el){
         // source AND allowedValues, but the conditional preserves the option
         // for future seed entries without re-touching this site.
         if(f.validation && f.validation.allowedValues && f.validation.allowedValues.length){
-          var privateTriggerSuffix = lookupTriggerLabels[f.label] ? ";renderPage(\'retail-templates\')" : '';
+          var privateTriggerSuffix = ";renderPage(\'retail-templates\')";
           var privateOptions = '<option value="">— Select —</option>';
           f.validation.allowedValues.forEach(function(v){
             privateOptions += '<option value="'+retailEsc(v)+'"'+(userVal===v?' selected':'')+'>'+retailEsc(v)+'</option>';
