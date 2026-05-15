@@ -6,6 +6,13 @@
   # Use Node.js 20 for all functions
   node_bundler = "esbuild"
 
+# Redirect /dpp/:dppId to the static DPP viewer HTML
+# The viewer JS then calls /.netlify/functions/get-dpp?id=:dppId
+[[redirects]]
+  from   = "/dpp/*"
+  to     = "/dpp/index.html"
+  status = 200
+
 # Redirect /brand/:shareId to the static viewer HTML
 # The viewer JS then calls the Netlify function with the shareId
 [[redirects]]
@@ -22,5 +29,5 @@
 [context.production.environment]
   # These are read by Netlify functions — set actual values in Netlify dashboard
   # SUPABASE_URL       = "https://your-project.supabase.co"
-  # SUPABASE_SERVICE_KEY = "eyJ..."   (service role — functions/share-brand-pack.js)
-  # SUPABASE_ANON_KEY    = "eyJ..."   (anon — functions/get-brand-pack.js)
+  # SUPABASE_SERVICE_KEY = "eyJ..."   (service role — functions/share-brand-pack.js, share-dpp.js)
+  # SUPABASE_ANON_KEY    = "eyJ..."   (anon — functions/get-brand-pack.js, get-dpp.js)
