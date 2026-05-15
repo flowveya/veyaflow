@@ -29472,7 +29472,7 @@ function renderDPPView(el){
             <div id="dpp-qr-container" style="width:140px;height:140px;margin:.5rem auto;background:#F9F8F6;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)">
               <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center">Loading QR…</div>
             </div>
-            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-bottom:.65rem;word-break:break-all">${dppUrl}</div>
+            <a href="${dppUrl}" target="_blank" rel="noopener noreferrer" style="font-family:var(--mono);font-size:.55rem;color:var(--gold);text-align:center;margin-bottom:.65rem;word-break:break-all;display:block;text-decoration:underline;cursor:pointer">${dppUrl}</a>
             <div style="display:flex;gap:.4rem;flex-wrap:wrap">
               <button class="btn-primary" style="flex:1;font-size:.62rem;padding:.5rem" onclick="downloadDPPQR('${dppId}')">↓ Download QR (PNG)</button>
             </div>
