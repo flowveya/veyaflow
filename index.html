@@ -28723,6 +28723,95 @@ function saveDPP(){
   try{ localStorage.setItem('ns_dpp',JSON.stringify(dppData)); }catch(e){}
 }
 
+// ── Publish DPP to Supabase (Option C — Regulator MVP) ──
+// Server-side filter in share-dpp.js applies the DPP_PUBLIC_FIELDS allowlist
+// + DPP_CONDITIONAL_GATING before write. Client sends a merged payload of
+// candidate-public SKU + DPP fields; server strips anything not allowlisted.
+// Two-layer guardrail: even if this client sends a non-public field, it
+// never lands in Supabase. Belt-and-suspenders.
+//
+// dppId is stable per SKU and PRIMARY KEY in dpp_records. UPSERT semantics:
+// re-publish overwrites + bumps version, URL never changes. Critical for
+// physical packaging — QR codes printed in bulk stay resolvable.
+async function publishDPP(skuId){
+  const sku = skus.find(s=>s.id===skuId);
+  if(!sku){ alert('SKU not found — cannot publish.'); return; }
+
+  const d = dppData[skuId]||{fields:{}};
+  const f = d.fields||{};
+
+  // Resolve + persist dppId before publish (URL must be stable across sessions)
+  const dppId = d.dppId||getDPPId(skuId);
+  if(!dppData[skuId]) dppData[skuId] = {fields:{}};
+  if(!dppData[skuId].dppId){ dppData[skuId].dppId = dppId; saveDPP(); }
+
+  // Merged payload of all candidate-public fields (server filters via allowlist)
+  const dppPayload = {
+    name:                sku.name,
+    ean:                 sku.ean,
+    productType:         sku.productType,
+    netContent:          sku.netContent,
+    netUnit:             sku.netUnit,
+    inci:                sku.inci,
+    materialComposition: sku.materialComposition,
+    ingredientList:      sku.ingredientList,
+    countryOfMfr:        sku.countryOfMfr,
+    cpnp:                sku.cpnp,
+    cpnpStatus:          sku.cpnpStatus,
+    ceMarking:           sku.ceMarking,
+    novelFoodStatus:     sku.novelFoodStatus,
+    certifications:      sku.certifications,
+    carbonKg:            f.carbonKg,
+    carbonEstimated:     f.carbonEstimated,
+    recycledProduct:     f.recycledProduct,
+    recyclability:       f.recyclability,
+    takeback:            f.takeback,
+  };
+
+  // brandId pattern mirrors Magic Link γ
+  const brandId = brand?.name
+    ? brand.name.toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+(getSessionId()||'sess')
+    : (getSessionId()||'anonymous');
+
+  const isUpdate = !!d.publishedVersion;
+  const publicUrl = window.location.origin+'/dpp/'+dppId;
+  const confirmMsg = isUpdate
+    ? 'Re-publish DPP for "'+sku.name+'"?\n\nUpdates the public passport at:\n'+publicUrl+'\n\nThe URL stays the same — useful when packaging is already printed.'
+    : 'Publish DPP for "'+sku.name+'" to public passport?\n\nA regulator-accessible passport will be created at:\n'+publicUrl+'\n\nThe URL is stable across re-publishes.';
+  if(!confirm(confirmMsg)) return;
+
+  const btn = document.getElementById('dpp-publish-btn-'+skuId);
+  if(btn){ btn.disabled = true; btn.textContent = 'Publishing…'; }
+
+  try {
+    const res = await fetch('/.netlify/functions/share-dpp', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({dppId, brandId, skuId, dppPayload}),
+    });
+    if(!res.ok){
+      const errBody = await res.json().catch(()=>({}));
+      throw new Error(errBody.error||('HTTP '+res.status));
+    }
+    const result = await res.json();
+
+    dppData[skuId].dppId            = result.shareId;
+    dppData[skuId].publishedVersion = result.version;
+    dppData[skuId].publishedAt      = result.published;
+    dppData[skuId].publishedUrl     = result.shareUrl;
+    saveDPP();
+
+    alert((isUpdate?'Re-published as v':'Published as v')+result.version+'\n\n'+result.shareUrl);
+    renderDPP(document.getElementById('page-dpp'));
+  } catch(e) {
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = isUpdate ? '↗ Re-publish (update)' : '↗ Publish to public passport';
+    }
+    alert('Publish failed: '+(e.message||'Unknown error')+'\n\nThe DPP is still saved locally. If the share-dpp function is not yet deployed, this will start working once it is.');
+  }
+}
+
 // ── DPP Readiness per SKU ─────────────────────────
 
 function dppReadiness(sku){
@@ -29388,6 +29477,15 @@ function renderDPPView(el){
               <button class="btn-primary" style="flex:1;font-size:.62rem;padding:.5rem" onclick="downloadDPPQR('${dppId}')">↓ Download QR (PNG)</button>
             </div>
             <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.4rem">Min print size: 10×10mm · Error correction: Level Q</div>
+
+            <!-- Publish to public passport (Option C — Regulator MVP) -->
+            <div style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid var(--border)">
+              ${d.publishedVersion
+                ? `<div style="font-family:var(--mono);font-size:.55rem;color:#065F46;margin-bottom:.4rem">✓ Published v${d.publishedVersion} · ${d.publishedAt?new Date(d.publishedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):''}</div>
+                   <button id="dpp-publish-btn-${sku.id}" class="btn-outline" style="width:100%;font-size:.62rem;padding:.5rem" onclick="publishDPP('${sku.id}')">↗ Re-publish (update)</button>`
+                : `<div style="font-family:var(--mono);font-size:.55rem;color:#92400E;margin-bottom:.4rem">⚠ Not yet published — public QR will 404</div>
+                   <button id="dpp-publish-btn-${sku.id}" class="btn-primary" style="width:100%;font-size:.62rem;padding:.5rem" onclick="publishDPP('${sku.id}')">↗ Publish to public passport</button>`}
+            </div>
           </div>
 
           <!-- Data summary -->
