@@ -30944,6 +30944,20 @@ function retailerNameFromId(id){
   return id;
 }
 
+// Ship 5 / B1.4 — click handler for pending_lookup rows. Scrolls the trigger
+// field into view (center-aligned for visibility) and focuses it after the
+// smooth-scroll settles (400ms is generous; scrolls typically complete in
+// ~300ms). The data-mf attribute on the target input matches the label
+// stored in retailTemplatesManualFields, so this lookup is one-to-one.
+function retailScrollToManualField(label){
+  if(!label) return;
+  var el = document.querySelector('[data-mf="'+label.replace(/"/g,'\\"')+'"]');
+  if(el){
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    setTimeout(function(){ try{ el.focus(); }catch(e){} }, 400);
+  }
+}
+
 function retailerMarketFromId(id){
   if(typeof crmCards !== 'undefined' && crmCards && crmCards.length){
     var c = crmCards.find(function(x){ return x.id===id; });
@@ -31536,9 +31550,17 @@ const retailLookupTables = {
 // - triggerLabel: label of the column whose user-entered value is the lookup
 //                 key (e.g. the Dangerous Goods Category column header)
 //
-// Returns {type, value} matching the existing resolver shape:
-// - {type:'auto', value:'1266'}  when lookup succeeds
-// - {type:'missing', value:''}   when trigger field is empty or no row match
+// Returns {type, value} matching the existing resolver shape, PLUS optional
+// triggerLabel field for pending_lookup type (Ship 5 / B1.4):
+// - {type:'auto', value:'1266'}                                  when lookup succeeds
+// - {type:'pending_lookup', value:'', triggerLabel:'...'}         when trigger empty or value not in table
+// - {type:'missing', value:''}                                    when source is malformed / table unknown (config error)
+//
+// pending_lookup is USER-FACING: brand needs to make a selection upstream.
+// missing here means CONFIG ERROR: source string is malformed or references
+// a table that doesn't exist. Renderer treats these distinctly — pending_lookup
+// gets "Awaiting selection" badge + scroll-to-trigger CTA; config-error missing
+// keeps the legacy "fix in SKU" treatment (developer-visible bug surface).
 function retailTemplateLookup(source, manualFields){
   // Parse 'lookup:<table>.<field>:<triggerLabel>'
   const body = source.slice('lookup:'.length);
@@ -31557,7 +31579,7 @@ function retailTemplateLookup(source, manualFields){
   // Read the user's input for the trigger column. Manual fields are keyed
   // by column label (matches existing renderer pattern at L31627-ish).
   const triggerValue = (manualFields && manualFields[triggerLabel]) || '';
-  if(!triggerValue) return {type:'missing', value:''};
+  if(!triggerValue) return {type:'pending_lookup', value:'', triggerLabel: triggerLabel};
 
   // Normalize for lookup: trim handles trailing whitespace in source data
   // (Åhléns row 7 has a trailing non-breaking space); uppercase aligns with
@@ -31568,7 +31590,7 @@ function retailTemplateLookup(source, manualFields){
   // caller (e.g. CSV import) feeds in a mixed-case trigger value.
   const key = String(triggerValue).trim().toUpperCase();
   const row = table[key];
-  if(!row) return {type:'missing', value:''};
+  if(!row) return {type:'pending_lookup', value:'', triggerLabel: triggerLabel};
 
   const val = row[fieldRef];
   if(val === undefined || val === null || val === '') return {type:'auto', value:''};
@@ -31726,7 +31748,7 @@ function renderRetailTemplates(el){
   if(!sku){
     html += '<div class="card" style="padding:1.5rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">Select a product above to see the pre-filled template.</div>';
   } else {
-    var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0;
+    var autoCount = 0, missingCount = 0, manualCount = 0, privateCount = 0, pendingLookupCount = 0;
     var rowsHtml = '';
 
     // ── Bug fix: Pattern D state-update-without-render for lookup triggers ──
@@ -31771,6 +31793,19 @@ function renderRetailTemplates(el){
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#065F46;padding:.15rem .4rem;background:#fff;border:1px solid #A7F3D0">Auto</span>';
         valCell = '<div style="font-family:var(--sans);font-size:.78rem;color:'+col+';word-break:break-word">'+retailEsc(resolved.value)+'</div>';
         autoCount++;
+      } else if(effectiveType === 'pending_lookup'){
+        // Ship 5 / B1.4: lookup-pending state, distinct from SKU-missing.
+        // Same warm cream/amber as `missing` (Q5.1 — same severity, not red
+        // alarm). Differentiated by copy and CTA destination — pending_lookup
+        // points the user to a manual field above (the trigger), not to the
+        // SKU page. Click anywhere on the value cell scrolls + focuses the
+        // trigger field (Q5.3). triggerLabel comes from the resolver, so this
+        // branch is generic across any future lookup trigger type (Q1.4c).
+        bg = '#FFFBEB'; col = '#92400E';
+        badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#92400E;padding:.15rem .4rem;background:#fff;border:1px solid #FDE68A">Awaiting selection</span>';
+        var trigLabel = resolved.triggerLabel || '';
+        valCell = '<div data-scroll-to="'+retailEsc(trigLabel)+'" onclick="retailScrollToManualField(this.dataset.scrollTo)" style="font-family:var(--sans);font-size:.75rem;color:#92400E;font-style:italic;cursor:pointer">Will auto-fill from <strong style="text-decoration:underline">'+retailEsc(trigLabel)+'</strong> ↑</div>';
+        pendingLookupCount++;
       } else if(effectiveType === 'missing'){
         bg = '#FFFBEB'; col = '#92400E';
         badge = '<span style="font-family:var(--mono);font-size:.5rem;color:#92400E;padding:.15rem .4rem;background:#fff;border:1px solid #FDE68A">Missing — fix in SKU</span>';
@@ -31842,6 +31877,7 @@ function renderRetailTemplates(el){
     html += '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem;font-family:var(--mono);font-size:.6rem;color:var(--muted)">';
     html += '<span style="color:#065F46">✓ '+autoCount+' auto-filled</span>';
     if(manualCount>0) html += '<span style="color:#92400E">⚑ '+manualCount+' need manual input</span>';
+    if(pendingLookupCount>0) html += '<span style="color:#92400E">⏸ '+pendingLookupCount+' awaiting selection</span>';
     if(missingCount>0) html += '<span style="color:#991B1B">✗ '+missingCount+' missing from SKU data</span>';
     if(privateCount>0) html += '<span style="color:#6B7280">🔒 '+privateCount+' private (local only)</span>';
     html += '</div>';
@@ -31888,6 +31924,7 @@ function downloadRetailTemplate(){
     var sourceLabel = '';
     if(resolved.type === 'auto'){ value = resolved.value; sourceLabel='auto'; }
     else if(resolved.type === 'manual' || resolved.type === 'private'){ value = userVal; sourceLabel = resolved.type==='private' ? 'private' : 'manual'; }
+    else if(resolved.type === 'pending_lookup'){ value = ''; sourceLabel='pending_lookup'; }
     else if(resolved.type === 'missing'){ value = ''; sourceLabel='missing'; }
     else { value = ''; sourceLabel=''; }
     rows.push([f.label, value, sourceLabel]);
