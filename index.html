@@ -28997,15 +28997,19 @@ function renderCSRD(el){
       </div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
         <button onclick="showModuleExplainer('csrd')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:pointer;font-size:.62rem;padding:.25rem .55rem;font-family:var(--mono)">? How it works</button>
-        <button onclick="exportCSRDPDF()" class="btn-outline" style="font-size:.65rem;padding:.35rem .8rem">↓ Export PDF</button>
+        <button onclick="csrdRequestExport()" class="btn-outline" style="font-size:.65rem;padding:.35rem .8rem${pct<60?';opacity:.45;cursor:not-allowed':''}"${pct<60?` disabled title="CSRD Pack must be at least 60% complete to export. Currently ${pct}% complete."`:''}>↓ Export PDF</button>
       </div>
     </div>
     <div class="content">
 
-      <!-- Explainer banner -->
+      <!-- Explainer banner — Bundle 1B (B2): state-aware copy per completeness gate -->
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid #3B82F6;padding:.75rem 1rem;margin-bottom:1.25rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.6">
         <strong>Your large retail partners are legally required to collect this data from their suppliers.</strong>
-        VeyaFlow generates your response automatically from data you have already entered. Fill in any gaps below, then export as a PDF to send to any retailer requesting ESG/sustainability data.
+        ${pct<60
+          ? `Complete the disclosure below — VeyaFlow auto-fills what it knows and surfaces what needs your input. Export becomes available when your disclosure reaches <strong>60% complete</strong>.`
+          : pct<80
+          ? `Your disclosure is <strong>${pct}% complete</strong> — you can export a draft for internal review, but completing remaining fields is recommended before submitting to retailers.`
+          : `Your disclosure is <strong>${pct}% complete</strong> and ready for retailer submission. Update annually or when sustainability data changes.`}
       </div>
 
       <!-- Progress -->
@@ -29015,10 +29019,10 @@ function renderCSRD(el){
             <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.1rem">Disclosure completeness</div>
             <div style="font-family:var(--sans);font-size:.85rem;color:var(--navy);font-weight:500">${brand.name} — CSRD Supply Chain Disclosure ${year}</div>
           </div>
-          <div style="font-family:var(--mono);font-size:1.2rem;color:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'};font-weight:700">${pct}%</div>
+          <div style="font-family:var(--mono);font-size:1.2rem;color:${pct>=80?'var(--green)':pct>=60?'var(--amber)':'var(--red)'};font-weight:700">${pct}%</div>
         </div>
         <div style="background:var(--border);height:6px;border-radius:3px">
-          <div style="background:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'};height:6px;border-radius:3px;width:${pct}%;transition:width .4s"></div>
+          <div style="background:${pct>=80?'var(--green)':pct>=60?'var(--amber)':'var(--red)'};height:6px;border-radius:3px;width:${pct}%;transition:width .4s"></div>
         </div>
         <div style="display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap">
           <span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ ${autoFilled} auto-filled</span>
@@ -29060,7 +29064,7 @@ function renderCSRD(el){
 
       <!-- Footer actions -->
       <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;padding-top:1rem;border-top:1px solid var(--border)">
-        <button onclick="exportCSRDPDF()" class="btn-primary" style="padding:.5rem 1.1rem;font-size:.72rem">↓ Export PDF — ${brand.name} CSRD Pack ${year}</button>
+        <button onclick="csrdRequestExport()" class="btn-primary" style="padding:.5rem 1.1rem;font-size:.72rem${pct<60?';opacity:.45;cursor:not-allowed':''}"${pct<60?` disabled title="CSRD Pack must be at least 60% complete to export. Currently ${pct}% complete."`:''}>↓ Export PDF — ${brand.name} CSRD Pack ${year}</button>
         <button onclick="csrdAutoFill();renderPage('csrd')" class="btn-outline" style="font-size:.65rem;padding:.4rem .85rem">↻ Re-sync from VeyaFlow data</button>
         <button onclick="if(confirm('Clear all saved answers?')){localStorage.removeItem('ns_csrd_answers');renderPage('csrd')}" class="btn-outline" style="font-size:.65rem;padding:.4rem .85rem;color:var(--red);border-color:var(--red)">✕ Clear all</button>
       </div>
@@ -29069,12 +29073,71 @@ function renderCSRD(el){
   `;
 }
 
+// Bundle 1B (B1) — Gate logic for CSRD Export PDF.
+// Recomputes completeness so it's authoritative (button render is gated too,
+// but this is the defensive single source of truth for export decisions).
+// Below 60%: blocked (defensive — button is also disabled in DOM).
+// 60-79%:    custom warning modal → "Export as Draft" calls exportCSRDPDF().
+// ≥80%:      directly calls exportCSRDPDF() — no friction.
+function csrdRequestExport(){
+  const answers = csrdGetAnswers();
+  const autoFilled = CSRD_QUESTIONS.filter(q=>answers[q.id]&&answers[q.id]!=='').length;
+  const total = CSRD_QUESTIONS.length;
+  const pct = Math.round((autoFilled/total)*100);
+
+  if(pct < 60){
+    // Defensive: button is disabled in DOM, but block click anyway
+    alert('CSRD Pack must be at least 60% complete to export.\n\nCurrently '+pct+'% complete. Continue building the disclosure below.');
+    return;
+  }
+  if(pct < 80){
+    csrdShowDraftWarningModal(pct);
+    return;
+  }
+  exportCSRDPDF();
+}
+
+// Bundle 1B (B1) — Custom warning modal for 60-79% completeness range.
+// Brief copy: "Incomplete CSRD disclosure" / "Your CSRD Pack is X% complete.
+// Exporting now will produce a partial disclosure marked DRAFT that may not
+// satisfy retailer requirements. Continue?" / [Cancel] [Export as Draft]
+function csrdShowDraftWarningModal(pct){
+  const existing = document.getElementById('csrd-draft-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'csrd-draft-modal';
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)document.getElementById('csrd-draft-modal').remove()">
+      <div style="background:#fff;max-width:480px;width:100%;padding:1.5rem 1.75rem;border-left:4px solid #F59E0B;font-family:var(--sans)">
+        <div style="font-family:var(--serif);font-size:1.15rem;color:var(--navy);margin-bottom:.75rem">Incomplete CSRD disclosure</div>
+        <div style="font-size:.82rem;color:#333;line-height:1.6;margin-bottom:1.25rem">
+          Your CSRD Pack is <strong>${pct}% complete</strong>. Exporting now will produce a partial disclosure marked <strong>DRAFT</strong> that may not satisfy retailer requirements. Continue?
+        </div>
+        <div style="display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap">
+          <button onclick="document.getElementById('csrd-draft-modal').remove()" class="btn-outline" style="font-size:.7rem;padding:.45rem .9rem">Cancel</button>
+          <button onclick="document.getElementById('csrd-draft-modal').remove();exportCSRDPDF()" style="font-size:.7rem;padding:.45rem .9rem;background:#F59E0B;color:#fff;border:1px solid #F59E0B;cursor:pointer;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em">Export as Draft</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
 async function exportCSRDPDF(){
   const answers = csrdGetAnswers();
   const year = new Date().getFullYear();
   const brandName = brand?.name||'Brand';
   const categories = [...new Set(CSRD_QUESTIONS.map(q=>q.category))];
   const dateStr = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+  // Bundle 1B (B3) — Completeness state drives watermark, draft banner, signatory.
+  // exportCSRDPDF is invoked either via csrdRequestExport gate (preferred) or
+  // directly from the draft warning modal's "Export as Draft" button. Either
+  // path: recompute pct authoritatively here so PDF state is self-consistent.
+  const autoFilled = CSRD_QUESTIONS.filter(q=>answers[q.id]&&answers[q.id]!=='').length;
+  const total = CSRD_QUESTIONS.length;
+  const pct = Math.round((autoFilled/total)*100);
+  const isDraft = pct < 80;
 
   // Build printable HTML document
   const catColors = CSRD_CATEGORY_COLORS;
@@ -29092,21 +29155,41 @@ async function exportCSRDPDF(){
     </div>`;
   }).join('');
 
+  // B3 — Watermark CSS (only when isDraft). Diagonal across-page via fixed-position
+  // pseudo-element on body. Renders on every print page automatically.
+  const watermarkCSS = isDraft ? `
+      body::before{content:"DRAFT — ${pct}% COMPLETE — NOT FOR RETAILER SUBMISSION";position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-28deg);font-size:30pt;font-weight:700;color:rgba(245,158,11,0.18);z-index:9999;pointer-events:none;white-space:nowrap;letter-spacing:.05em;font-family:Arial,sans-serif}
+      .draft-banner{background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #F59E0B;padding:.65rem .85rem;margin-bottom:1.25rem;font-size:.72rem;color:#92400E;line-height:1.5}
+    ` : '';
+
+  // B3 — Draft banner at top of document (in addition to diagonal watermark)
+  const draftBanner = isDraft
+    ? `<div class="draft-banner"><strong>⚠ DRAFT DISCLOSURE — ${pct}% complete.</strong> This disclosure may not satisfy retailer requirements. Complete remaining fields before final submission to retailers.</div>`
+    : '';
+
+  // B3 — Conditional signatory block. Draft (<80%): no name attestation, makes
+  // clear final disclosure requires completion. Ready (≥80%): standard
+  // signatory + completeness % in footer for transparency.
+  const signatoryBlock = isDraft
+    ? `<div class="disclaimer"><strong>DRAFT — Signatory block pending completion</strong><br>
+       Final disclosure requires ${pct}% → 80%+ completion. Generated by VeyaFlow · ${dateStr}.</div>`
+    : `<div class="disclaimer">Signatory: ${brand?.userName||'[Name]'} · ${brandName} · ${dateStr}<br>
+       Data is self-reported and accurate to the best of the company's knowledge. Disclosure ${pct}% complete · Annual update recommended.</div>`;
+
   const printHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>${brandName} CSRD Pack ${year}</title>
+    <title>${brandName} CSRD Pack ${year}${isDraft?' (DRAFT)':''}</title>
     <style>
       body{font-family:Arial,sans-serif;font-size:11px;color:#222;margin:2cm;line-height:1.5}
       h1{font-size:16px;color:#1E3A5F;margin-bottom:.2rem}
       .meta{font-size:.65rem;color:#888;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid #ddd}
       .disclaimer{font-size:.6rem;color:#888;margin-top:2rem;padding-top:.5rem;border-top:1px solid #ddd}
-      @media print{body{margin:1.5cm}}
+      @media print{body{margin:1.5cm}}${watermarkCSS}
     </style>
   </head><body>
-    <h1>${brandName} — CSRD Supply Chain Disclosure ${year}</h1>
+    <h1>${brandName} — CSRD Supply Chain Disclosure ${year}${isDraft?' (DRAFT)':''}</h1>
     <div class="meta">Generated by VeyaFlow · ${dateStr} · This document is provided in response to CSRD Directive (EU) 2022/2464 data requests from retail partners.</div>
-    ${sectionsHTML}
-    <div class="disclaimer">Signatory: ${brand?.userName||'[Name]'} · ${brandName} · ${dateStr}<br>
-    Data is self-reported and accurate to the best of the company's knowledge. Annual update recommended.</div>
+    ${draftBanner}${sectionsHTML}
+    ${signatoryBlock}
   </body></html>`;
 
   // Open print dialog
