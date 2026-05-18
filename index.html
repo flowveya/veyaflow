@@ -29054,6 +29054,7 @@ function renderCSRD(el){
                   <input type="text" value="${(val||'').replace(/"/g,'&quot;')}"
                     placeholder="${q.unit==='yes/no'?'yes / no':q.unit==='yes/no/partial'?'yes / no / partial':q.unit==='yes/no + cert'?'yes — [certificate name]':q.unit==='yes/no/unknown'?'yes / no / unknown':'Enter value…'}"
                     oninput="csrdSaveAnswer('${q.id}',this.value);this.closest('div[style]').style.borderColor=this.value.trim()?'#A7F3D0':'#FCD34D';this.closest('div[style]').style.borderLeftColor=this.value.trim()?'var(--green)':'var(--amber)'"
+                    onchange="renderPage('csrd')"
                     style="width:100%;font-family:var(--sans);font-size:.75rem;padding:.35rem .55rem;border:1px solid var(--border);background:#FAFAFA;box-sizing:border-box">
                 </div>
               `;
