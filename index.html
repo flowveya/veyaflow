@@ -31233,11 +31233,18 @@ function _atmGenerateXLSX(tplRecord, sku, brandRef, manualFields){
   }
 
   // Build wide-format AOA: [headers], [values]
+  // Task F V1 ships wide format + filename + replace-CSV-entirely. F.5
+  // (validation-embedding via XLSX dropdowns) deferred to Stage 2 after
+  // verification confirmed SheetJS 0.18.5 Community does not serialize
+  // !dataValidations into XLSX output (inline-list AND cross-sheet-lookup
+  // approaches both failed silently). Stage 2 entry point: library
+  // evaluation (ExcelJS / SheetJS Pro / manual OOXML injection) before
+  // re-attempting validation-embedding. Schema-level allowedValues data
+  // is preserved — only the XLSX rendering layer is deferred.
   var headers = [];
   var values  = [];
-  var validations = [];  // {colIdx, header, list} for !dataValidations via lookup sheet
 
-  sheet.columns.forEach(function(col, idx){
+  sheet.columns.forEach(function(col){
     headers.push(col.header || '');
     var source = (col.mapping && col.mapping.source) || '';
     var resolved = retailTemplateResolveSource(source, sku, brandRef, manualFields || {});
@@ -31247,14 +31254,6 @@ function _atmGenerateXLSX(tplRecord, sku, brandRef, manualFields){
     else if(resolved.type === 'manual' || resolved.type === 'private'){ value = userVal; }
     // pending_lookup / missing → empty cell
     values.push(value);
-
-    // Collect dropdown validations from the column's allowedValues (Åhléns
-    // dangerous goods, gender, category, etc.). Schema may store as
-    // col.allowedValues or col.mapping.allowedValues — check both shapes.
-    var allowed = col.allowedValues || (col.mapping && col.mapping.allowedValues);
-    if(Array.isArray(allowed) && allowed.length > 0){
-      validations.push({ colIdx: idx, header: col.header || ('col'+idx), list: allowed });
-    }
   });
 
   var aoa = [headers, values];
@@ -31266,67 +31265,10 @@ function _atmGenerateXLSX(tplRecord, sku, brandRef, manualFields){
   // Reasonable default column widths via !cols (standard OOXML, no issues).
   ws['!cols'] = headers.map(function(h){ return { wch: Math.max(12, Math.min(32, (h||'').length + 4)) }; });
 
-  // Bundle 1B Stage 2 — hidden-lookup-sheet approach for data validation.
-  // SheetJS Community write-mode does NOT support inline-list !dataValidations
-  // cleanly (triggers Excel "unsupported content" warning AND dropdowns don't
-  // render). The OOXML-correct cross-Excel-compatible approach is a secondary
-  // hidden worksheet holding the allowed-values lists, with primary sheet
-  // !dataValidations referencing ranges on the hidden sheet.
-  var lookupSheet = null;
-  var LOOKUP_NAME = '_atm_lookups';
-  if(validations.length > 0){
-    // Build lookup AOA: row 1 = field-label headers, rows 2+ = allowed values
-    // per column. Each validated field gets its own column. Max list length
-    // across all validations determines AOA depth.
-    var maxLen = 0;
-    validations.forEach(function(v){ if(v.list.length > maxLen) maxLen = v.list.length; });
-    var lookupAoa = [];
-    // Header row: field labels
-    lookupAoa.push(validations.map(function(v){ return v.header; }));
-    // Value rows: pad shorter lists with empty strings to keep AOA rectangular
-    for(var r=0; r<maxLen; r++){
-      var row = validations.map(function(v){ return v.list[r] || ''; });
-      lookupAoa.push(row);
-    }
-    lookupSheet = XLSX.utils.aoa_to_sheet(lookupAoa);
-    // Sensible column widths on lookup sheet (won't be seen by user but
-    // graceful if they unhide for debugging)
-    lookupSheet['!cols'] = validations.map(function(){ return { wch: 20 }; });
-
-    // Wire !dataValidations on the main sheet to reference the lookup sheet.
-    // Each validation: SKU cell (row 2 on main) reads from lookup column at
-    // rows 2 through (list.length+1). Standard OOXML cross-sheet ref syntax.
-    ws['!dataValidations'] = validations.map(function(v, lookupColIdx){
-      var mainLetter   = _atmColIndexToLetter(v.colIdx);
-      var lookupLetter = _atmColIndexToLetter(lookupColIdx);
-      var mainCellRef  = mainLetter + '2:' + mainLetter + '2';
-      // Lookup range: column on lookup sheet, rows 2..(list.length+1)
-      var lookupRange = LOOKUP_NAME + '!$' + lookupLetter + '$2:$' + lookupLetter + '$' + (v.list.length + 1);
-      return {
-        sqref: mainCellRef,
-        type: 'list',
-        formula1: lookupRange
-      };
-    });
-  }
-
   var wb = XLSX.utils.book_new();
   // Sheet name: short, retailer-derived. Excel max sheet name = 31 chars.
   var sheetName = (sheet.name || 'Template').substring(0, 31);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-  // Append hidden lookup sheet if validations exist. SheetJS Community
-  // hidden-sheet API: wb.Workbook.Sheets[idx].Hidden = 1.
-  //   0 = visible, 1 = hidden (user can unhide via Excel right-click),
-  //   2 = very hidden (only unhideable via VBA — overkill for our case).
-  if(lookupSheet){
-    XLSX.utils.book_append_sheet(wb, lookupSheet, LOOKUP_NAME);
-    wb.Workbook = wb.Workbook || {};
-    wb.Workbook.Sheets = wb.Workbook.Sheets || [];
-    // Main sheet is index 0, lookup sheet is index 1 (just appended)
-    wb.Workbook.Sheets[0] = wb.Workbook.Sheets[0] || { Hidden: 0 };
-    wb.Workbook.Sheets[1] = { Hidden: 1 };
-  }
 
   // Generate binary array. type:'array' returns ArrayBuffer-compatible
   // output; SheetJS produces Uint8Array internally.
