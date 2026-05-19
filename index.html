@@ -31233,14 +31233,22 @@ function _atmGenerateXLSX(tplRecord, sku, brandRef, manualFields){
   }
 
   // Build wide-format AOA: [headers], [values]
-  // Task F.5 DIAGNOSTIC RESTORATION — testing whether dropdowns render in
-  // Numbers/Sheets despite Excel false-positive. If verified, F.5 is honored.
-  // If not, revert to retreat per Stage 2 lock.
+  // Task F V1 ships wide format + filename + replace-CSV-entirely. F.5
+  // (validation-embedding via XLSX dropdowns) deferred to Stage 2 after
+  // diagnostic confirmed (19 May 2026) SheetJS 0.18.5 Community does not
+  // serialize !dataValidations into XLSX output. Verified across:
+  //   - inline-list approach (Excel: warning + no dropdown)
+  //   - cross-sheet-lookup approach (Excel: clean open but no dropdown)
+  //   - Numbers verification: still no dropdown (file genuinely lacks the
+  //     validation XML, not an Excel-version false-positive)
+  // Stage 2 entry point: library evaluation (ExcelJS / SheetJS Pro /
+  // manual OOXML injection) before re-attempting validation-embedding.
+  // Schema-level allowedValues data is preserved on column records —
+  // only the XLSX rendering layer is deferred.
   var headers = [];
   var values  = [];
-  var validations = [];
 
-  sheet.columns.forEach(function(col, idx){
+  sheet.columns.forEach(function(col){
     headers.push(col.header || '');
     var source = (col.mapping && col.mapping.source) || '';
     var resolved = retailTemplateResolveSource(source, sku, brandRef, manualFields || {});
@@ -31248,59 +31256,26 @@ function _atmGenerateXLSX(tplRecord, sku, brandRef, manualFields){
     var value = '';
     if(resolved.type === 'auto'){ value = resolved.value; }
     else if(resolved.type === 'manual' || resolved.type === 'private'){ value = userVal; }
+    // pending_lookup / missing → empty cell
     values.push(value);
-
-    var allowed = col.allowedValues || (col.mapping && col.mapping.allowedValues);
-    if(Array.isArray(allowed) && allowed.length > 0){
-      validations.push({ colIdx: idx, header: col.header || ('col'+idx), list: allowed });
-    }
   });
 
   var aoa = [headers, values];
   var ws  = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Header row formatting: kept minimal for max Excel compatibility.
+  // Task F V1: omitted frozen-pane hint (!freeze and !views both trigger
+  // Excel's "unsupported content" compatibility warning depending on version).
+  // Reasonable default column widths via !cols (standard OOXML, no issues).
   ws['!cols'] = headers.map(function(h){ return { wch: Math.max(12, Math.min(32, (h||'').length + 4)) }; });
 
-  // Hidden lookup sheet for data validation. Cross-sheet range references
-  // from main sheet's !dataValidations to the hidden lookup ranges.
-  var lookupSheet = null;
-  var LOOKUP_NAME = '_atm_lookups';
-  if(validations.length > 0){
-    var maxLen = 0;
-    validations.forEach(function(v){ if(v.list.length > maxLen) maxLen = v.list.length; });
-    var lookupAoa = [];
-    lookupAoa.push(validations.map(function(v){ return v.header; }));
-    for(var r=0; r<maxLen; r++){
-      var row = validations.map(function(v){ return v.list[r] || ''; });
-      lookupAoa.push(row);
-    }
-    lookupSheet = XLSX.utils.aoa_to_sheet(lookupAoa);
-    lookupSheet['!cols'] = validations.map(function(){ return { wch: 20 }; });
-
-    ws['!dataValidations'] = validations.map(function(v, lookupColIdx){
-      var mainLetter   = _atmColIndexToLetter(v.colIdx);
-      var lookupLetter = _atmColIndexToLetter(lookupColIdx);
-      var mainCellRef  = mainLetter + '2:' + mainLetter + '2';
-      var lookupRange = LOOKUP_NAME + '!$' + lookupLetter + '$2:$' + lookupLetter + '$' + (v.list.length + 1);
-      return {
-        sqref: mainCellRef,
-        type: 'list',
-        formula1: lookupRange
-      };
-    });
-  }
-
   var wb = XLSX.utils.book_new();
+  // Sheet name: short, retailer-derived. Excel max sheet name = 31 chars.
   var sheetName = (sheet.name || 'Template').substring(0, 31);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-  if(lookupSheet){
-    XLSX.utils.book_append_sheet(wb, lookupSheet, LOOKUP_NAME);
-    wb.Workbook = wb.Workbook || {};
-    wb.Workbook.Sheets = wb.Workbook.Sheets || [];
-    wb.Workbook.Sheets[0] = wb.Workbook.Sheets[0] || { Hidden: 0 };
-    wb.Workbook.Sheets[1] = { Hidden: 1 };
-  }
-
+  // Generate binary array. type:'array' returns ArrayBuffer-compatible
+  // output; SheetJS produces Uint8Array internally.
   var bin = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   return new Uint8Array(bin);
 }
