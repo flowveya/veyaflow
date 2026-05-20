@@ -4008,6 +4008,96 @@ const REJECTION_PATTERNS = {
   },
 };
 
+// ── OUTCOME REASON TAXONOMY ────────────────────────
+//
+// Source enum for the outcome capture modal dropdown (Task H1).
+// Stays separate from REJECTION_PATTERNS per single-read-surface principle:
+//   - OUTCOME_REASON_TAXONOMY: what brands SELECT when recording outcomes
+//   - REJECTION_PATTERNS:      what aggregation surfaces COMPUTE from many outcomes
+// Mapping between them lives in a dedicated function (M3 scope, not H1).
+//
+// Each entry: {label, category, severity}
+//   - label    → text shown in the dropdown (sentence-case for tone)
+//   - category → compliance / commercial / range / process / other (M3 aggregation key)
+//   - severity → hard_block / soft_block / preference / process / unknown
+//                (M3 confidence weighting — hard blocks count more in pattern surfacing)
+//
+// Code keys are stable identifiers; never rename without migration. Add new codes
+// freely — existing records reference codes by key, never by position.
+const OUTCOME_REASON_TAXONOMY = {
+  // Compliance — regulatory/safety blockers
+  cpnp_missing:           { label: 'CPNP documentation missing or incomplete',        category: 'compliance', severity: 'hard_block' },
+  claims_unsubstantiated: { label: 'Claims not substantiated in PIF',                 category: 'compliance', severity: 'hard_block' },
+  local_labelling:        { label: 'Local-language labelling missing',                category: 'compliance', severity: 'soft_block' },
+  certifications_missing: { label: 'Required certifications not provided',            category: 'compliance', severity: 'soft_block' },
+  // Commercial — margin / pricing / proof
+  margin_too_low:         { label: 'Margin or RSP outside retailer range',            category: 'commercial', severity: 'soft_block' },
+  no_track_record:        { label: 'Insufficient market or sales track record',       category: 'commercial', severity: 'soft_block' },
+  social_proof_low:       { label: 'Social proof or brand awareness below threshold', category: 'commercial', severity: 'soft_block' },
+  // Range — fit with retailer assortment
+  range_overlap:          { label: 'Already have similar SKU in range',               category: 'range',      severity: 'preference' },
+  category_mismatch:      { label: 'Category not aligned with retailer focus',        category: 'range',      severity: 'preference' },
+  aesthetic_mismatch:     { label: 'Packaging or positioning not aligned',            category: 'range',      severity: 'preference' },
+  // Process — timing / logistics
+  range_review_timing:    { label: 'Submitted outside range review window',           category: 'process',    severity: 'process' },
+  no_local_distributor:   { label: 'No local distributor or 3PL identified',          category: 'process',    severity: 'soft_block' },
+  // Other — escape hatch with required notes
+  other:                  { label: 'Other — see notes',                               category: 'other',      severity: 'unknown' },
+};
+
+// ── Taxonomy ↔ Pattern Bridge (M3.0 — May 2026) ──────────────────────
+//
+// Maps OUTCOME_REASON_TAXONOMY codes (write surface — what brands SELECT
+// when recording outcomes) to REJECTION_PATTERNS blocker codes (read
+// surface — what aggregation/prediction surfaces COMPUTE from many
+// outcomes). Honors Standing Rule #8 — single read surface, multiple
+// write paths.
+//
+// Returns a rich object packaging blocker + severity + category + label.
+// M3.1+ aggregation consumers receive everything they need in one call:
+//   - blocker  → REJECTION_PATTERNS blocker key (or null when the
+//                taxonomy reason has no compute-from-state pattern, e.g.
+//                range_overlap, aesthetic_mismatch — these require
+//                retailer-specific or contextual knowledge not derivable
+//                from brand/sku state alone).
+//   - severity → from canonical taxonomy entry. Used for M3 confidence
+//                weighting per Standing Rule #10 calibration discipline:
+//                  hard_block  — strongest signal (regulatory blockers)
+//                  soft_block  — strong signal (commercial / format)
+//                  preference  — medium signal (retailer fit / aesthetic)
+//                  process     — medium signal (timing / logistics)
+//                  unknown     — lowest signal (other / specify)
+//   - category → from canonical taxonomy entry. Used for grouping in
+//                aggregation surfaces (M3.2 patterns view, M3.3 dashboard).
+//   - label    → from canonical taxonomy entry. Display string for UI.
+//
+// Returns null for invalid/unknown codes (caller responsible for handling).
+function mapTaxonomyToPattern(taxonomyCode){
+  const entry = OUTCOME_REASON_TAXONOMY[taxonomyCode];
+  if(!entry) return null;
+  // Taxonomy code → REJECTION_PATTERNS blocker. null if no direct mapping
+  // (taxonomy codes without a corresponding state-derivable blocker keep
+  // their severity/category/label data — aggregation surfaces still use
+  // the outcome, just without auto-computed status).
+  const blockerMap = {
+    cpnp_missing:           'cpnpMissing',
+    claims_unsubstantiated: 'inciMissing',
+    local_labelling:        'labelMissing',
+    margin_too_low:         'marginTooLow',
+    no_track_record:        'noProof',
+    social_proof_low:       'socialLow',
+    // No blocker mapping for: certifications_missing, range_overlap,
+    // category_mismatch, aesthetic_mismatch, range_review_timing,
+    // no_local_distributor, other — these surface severity-only signals.
+  };
+  return {
+    blocker:  blockerMap[taxonomyCode] || null,
+    severity: entry.severity,
+    category: entry.category,
+    label:    entry.label,
+  };
+}
+
 function getRejectionPatterns(retailerId, retailerName) {
   // Direct id match first
   for(const [key, data] of Object.entries(REJECTION_PATTERNS)) {
@@ -28614,35 +28704,48 @@ function smartEmpty(moduleId){
 function handleDeepLink(){
   try{
   const hash = window.location.hash; // e.g. #crm/matas_dk or #report or #skus
-  if(!hash||hash==='#') return;
+  if(!hash||hash==='#') return false;
   const parts = hash.slice(1).split('/');
   const page = parts[0];
   const param = parts[1];
 
-  const validPages = ['home','find','report','compare','pitch','brandpack','bizcase','suppliers','circular','skus','claims','cfo','crm','atm-admin'];
-  if(!validPages.includes(page)) return;
+  // Valid page IDs — must match NAV array at L2110 (canonical source of truth).
+  // Hash-aware init route at init() calls handleDeepLink() before showPage('home'),
+  // so this list determines what bookmarks/hard-reload-to-hash actually work.
+  const validPages = [
+    // Brand section
+    'home','skus','report','compare','claims','pitch','brandpack','bizcase','cfo',
+    // Source section
+    'find','suppliers','sourcing','circular','dpp','csrd','reg_monitor',
+    // Retailer Relations section
+    'crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms',
+    // Admin (gated behind localStorage flag, but valid as deep-link target if user has flag set)
+    'atm-admin'
+  ];
+  if(!validPages.includes(page)) return false;
 
   // Handle param-specific deep links
   if(page==='crm'&&param){
     // Open CRM with specific card expanded: #crm/matas_dk
     showPage('crm');
     setTimeout(()=>{ crmEditId=param; renderPage('crm'); }, 100);
-    return;
+    return true;
   }
   if(page==='pitch'&&param){
     // Pre-fill retailer: #pitch/Matas
     pitchForm.retailer = decodeURIComponent(param);
     showPage('pitch');
-    return;
+    return true;
   }
   if(page==='report'&&param){
     // Pre-fill target market: #report/Denmark
     reportForm.targetMarket = decodeURIComponent(param);
     showPage('report');
-    return;
+    return true;
   }
   showPage(page);
-  }catch(e){ /* sandboxed */ }
+  return true;
+  }catch(e){ /* sandboxed */ return false; }
 }
 
 function setDeepLink(page, param){
@@ -29033,8 +29136,8 @@ function renderCSRD(el){
           <div style="background:${pct>=80?'var(--green)':pct>=60?'var(--amber)':'var(--red)'};height:6px;border-radius:3px;width:${pct}%;transition:width .4s"></div>
         </div>
         <div style="display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap">
-          <span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ ${autoFilled} auto-filled</span>
-          <span style="font-family:var(--mono);font-size:.55rem;color:var(--amber)">◐ ${total-autoFilled} need input</span>
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓ ${autoFilled} complete</span>
+          <span style="font-family:var(--mono);font-size:.55rem;color:var(--amber)">◐ ${total-autoFilled} pending</span>
           <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Date: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</span>
         </div>
       </div>
@@ -30935,7 +31038,13 @@ function init(){
   buildNav();
   updateSidebarBrand();
   renderRegStrip();
-  showPage('home');
+  // Hash-aware route: if URL has valid page hash (e.g. #csrd, #retail-templates),
+  // handleDeepLink navigates there and returns true. Otherwise fall through to
+  // home. Must run BEFORE showPage('home') because showPage→setDeepLink would
+  // otherwise overwrite the hash before we can read it.
+  if(!handleDeepLink()){
+    showPage('home');
+  }
   // Background weekly check — silent, fires after page renders
   setTimeout(()=>{ if(brand) runRegulatoryCheck(false); }, 2000);
 }
@@ -31769,6 +31878,188 @@ function updateRetailSubmissionStatus(id, status){
   }
   saveRetailSubmissions();
   renderPage('retail-tracker');
+}
+
+// ── OUTCOME CAPTURE MODAL (Task H1) ────────────────
+//
+// Single-screen structured form modal for capturing rejection outcomes.
+// Triggered by the loop-prev wrapper at bottom of file when a submission
+// transitions into 'rejected' status. Replaces the previous window.prompt
+// flow with structured capture: taxonomy code + free-text notes + auto-
+// captured context snapshot + template version.
+//
+// State machine:
+//   outcomeCaptureState = null  →  modal closed
+//   outcomeCaptureState = {...} →  modal open, fields populated from state
+//
+// Submit path: recordSubmissionOutcome (structured persistence) →
+//              logRejectionLoopEvent (preserve Brand Home alert) →
+//              close modal → re-render tracker page
+//
+// Cancel path: close modal. Status change already happened upstream
+// (wrapper called _loopPrevUpdateSubStatus before opening modal). User
+// can still go back and use the inline rejectionReason field on the
+// submission card if they want to add notes after cancelling.
+let outcomeCaptureState = null;
+
+function openOutcomeCaptureModal(submissionId, newStatus){
+  // Build context snapshot at the moment of outcome capture.
+  // Honest scope: snapshots what's in app state RIGHT NOW, not what was
+  // true at submission time. readinessScoreAtSubmission stays null when
+  // we don't have a stored value from submission time — surfacing the
+  // gap per Standing Rule 5 rather than fabricating a backfilled score.
+  loadRetailSubmissions();
+  const sub = retailSubmissions.find(function(x){ return x.id === submissionId; });
+  if(!sub) return;
+  const sku0 = (typeof skus !== 'undefined' && skus.length) ? skus[0] : null;
+  const tpl = (typeof getCurrentTemplate === 'function') ? getCurrentTemplate(sub.retailerId) : null;
+  const contextSnapshot = {
+    brandStage:          brand?.stage || '',
+    brandCategory:       brand?.category || '',
+    brandRevenue:        brand?.annualRevenue || '',
+    brandSocialFollowers: brand?.socialFollowers || '',
+    skuCpnpStatus:       (sku0?.cpnpNumber || sku0?.cpnp) ? 'on_file' : 'missing',
+    skuLocalLabels:      sku0?.localLabels ? 'on_file' : 'missing',
+    capturedAt:          new Date().toISOString(),
+  };
+  outcomeCaptureState = {
+    submissionId:        submissionId,
+    retailerName:        sub.retailerName || '',
+    retailerId:          sub.retailerId   || '',
+    market:              sub.market       || '',
+    submittedDate:       sub.submittedDate || '',
+    skuNames:            (sub.skuIds||[]).map(function(sid){
+                           var sk = (typeof skus !== 'undefined' ? skus : []).find(function(x){ return String(x.id)===String(sid); });
+                           return sk ? (sk.name||sk.ean||'SKU') : 'SKU';
+                         }).filter(Boolean),
+    newStatus:           newStatus,
+    templateVersionUsed: tpl ? (tpl.templateVersion || '') : '',
+    contextSnapshot:     contextSnapshot,
+    // Form fields (live as user types)
+    selectedCode:        '',
+    notes:               '',
+  };
+  // Remove any stale modal element + render fresh
+  const existing = document.getElementById('vf-outcome-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'vf-outcome-modal';
+  document.body.appendChild(modal);
+  renderOutcomeCaptureModal();
+}
+
+function renderOutcomeCaptureModal(){
+  const st = outcomeCaptureState;
+  const modal = document.getElementById('vf-outcome-modal');
+  if(!st || !modal) return;
+  const taxonomyOptions = Object.entries(OUTCOME_REASON_TAXONOMY).map(function(entry){
+    const code = entry[0], data = entry[1];
+    const selected = (st.selectedCode === code) ? 'selected' : '';
+    return '<option value="'+code+'" '+selected+'>'+data.label+'</option>';
+  }).join('');
+  const skuLine = st.skuNames.length ? st.skuNames.join(', ') : '—';
+  const submittedDisplay = st.submittedDate ? new Date(st.submittedDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  modal.innerHTML =
+    '<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem;overflow-y:auto" onclick="if(event.target===this)closeOutcomeCaptureModal()">'
+    +   '<div style="background:#fff;max-width:560px;width:100%;margin-top:2rem;padding:1.5rem;border:1px solid var(--border);box-shadow:0 16px 40px rgba(0,0,0,.18)">'
+    +     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:.5rem">'
+    +       '<div>'
+    +         '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.25rem">Rejection captured</div>'
+    +         '<div style="font-family:var(--serif);font-size:1.25rem;color:var(--navy);font-weight:500">Record outcome for '+retailEsc(st.retailerName)+'</div>'
+    +       '</div>'
+    +       '<button onclick="closeOutcomeCaptureModal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.25rem;line-height:1;padding:.25rem .5rem">×</button>'
+    +     '</div>'
+    +     // Context preview — what's being recorded
+    +     '<div style="background:#F9F8F6;border-left:3px solid var(--navy);padding:.7rem .85rem;margin-bottom:1.25rem">'
+    +       '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem">For this submission</div>'
+    +       '<div style="font-family:var(--sans);font-size:.78rem;color:#374151;line-height:1.5">'
+    +         '<strong>'+retailEsc(st.retailerName)+'</strong>'+(st.market?' · '+retailEsc(st.market):'')+'<br>'
+    +         'SKUs: '+retailEsc(skuLine)+'<br>'
+    +         'Submitted: '+submittedDisplay
+    +       '</div>'
+    +     '</div>'
+    +     // Reason dropdown — required for structured capture
+    +     '<div style="margin-bottom:1rem">'
+    +       '<label style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:.35rem">Reason for rejection</label>'
+    +       '<select id="outcome-reason-select" onchange="outcomeCaptureState.selectedCode=this.value;renderOutcomeCaptureModal()" '
+    +         'style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.85rem;border:1px solid var(--border);background:#fff">'
+    +         '<option value="">— Select a reason —</option>'
+    +         taxonomyOptions
+    +       '</select>'
+    +     '</div>'
+    +     // Free-text notes
+    +     '<div style="margin-bottom:1rem">'
+    +       '<label style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:.35rem">Notes (optional)</label>'
+    +       '<textarea id="outcome-notes" oninput="outcomeCaptureState.notes=this.value" rows="3" '
+    +         'placeholder="e.g. Buyer cited specific concern, range review timing, etc."'
+    +         'style="width:100%;padding:.55rem .7rem;font-family:var(--sans);font-size:.8rem;border:1px solid var(--border);background:#fff;resize:vertical;min-height:60px">'+retailEsc(st.notes)+'</textarea>'
+    +     '</div>'
+    +     // Transparency: what's being auto-captured (collapsed by default)
+    +     '<details style="margin-bottom:1.25rem">'
+    +       '<summary style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);cursor:pointer;padding:.25rem 0">What else is recorded with this outcome</summary>'
+    +       '<div style="background:#F9F8F6;padding:.65rem .85rem;margin-top:.4rem;font-family:var(--mono);font-size:.62rem;color:#555;line-height:1.55">'
+    +         'Template version: '+(st.templateVersionUsed||'—')+'<br>'
+    +         'Brand stage: '+(st.contextSnapshot.brandStage||'—')+'<br>'
+    +         'Category: '+(st.contextSnapshot.brandCategory||'—')+'<br>'
+    +         'CPNP: '+st.contextSnapshot.skuCpnpStatus+' · Local labels: '+st.contextSnapshot.skuLocalLabels+'<br>'
+    +         '<div style="margin-top:.4rem;color:var(--muted);font-style:italic">Recorded locally · helps surface patterns across your submissions over time</div>'
+    +       '</div>'
+    +     '</details>'
+    +     // Actions
+    +     '<div style="display:flex;gap:.6rem;justify-content:flex-end">'
+    +       '<button class="btn-outline" onclick="closeOutcomeCaptureModal()" style="font-size:.78rem;padding:.55rem 1rem">Skip</button>'
+    +       '<button class="btn-primary" onclick="submitOutcomeCapture()" style="font-size:.78rem;padding:.55rem 1.2rem"'
+    +         +(st.selectedCode?'':' disabled')+'>Save outcome</button>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>';
+}
+
+function closeOutcomeCaptureModal(){
+  outcomeCaptureState = null;
+  const modal = document.getElementById('vf-outcome-modal');
+  if(modal) modal.remove();
+}
+
+function submitOutcomeCapture(){
+  const st = outcomeCaptureState;
+  if(!st || !st.selectedCode) return;
+  const taxonomyEntry = OUTCOME_REASON_TAXONOMY[st.selectedCode] || {label:st.selectedCode};
+  // Persist via recordSubmissionOutcome (single read surface, multiple write paths)
+  try {
+    recordSubmissionOutcome({
+      submissionId:               st.submissionId,
+      brandId:                    (brand && brand.id) ? String(brand.id) : 'local',
+      retailerId:                 st.retailerId,
+      outcomeType:                'rejected',
+      outcomeReason:              taxonomyEntry.label + (st.notes ? ' — ' + st.notes : ''),
+      outcomeReasonStructured:    st.selectedCode,
+      templateVersionUsed:        st.templateVersionUsed,
+      readinessScoreAtSubmission: null,  // honest null — no stored score from submission time
+      contextSnapshot:            st.contextSnapshot,
+      outcomeTimestamp:           new Date().toISOString(),
+    });
+  } catch(e){
+    // Don't block UI on failure — log and continue. Outcome status change
+    // already persisted upstream; the structured capture is the supplemental layer.
+    console.warn('recordSubmissionOutcome failed:', e && e.message);
+  }
+  // Preserve Brand Home alert path — pass combined reason string per existing API
+  try {
+    if(typeof logRejectionLoopEvent === 'function'){
+      logRejectionLoopEvent({
+        submissionId: st.submissionId,
+        retailerId:   st.retailerId,
+        retailerName: st.retailerName,
+        market:       st.market,
+        reason:       taxonomyEntry.label + (st.notes ? ' — ' + st.notes : ''),
+        source:       'manual',
+      });
+    }
+  } catch(e){ /* downstream loop-event logging is best-effort */ }
+  closeOutcomeCaptureModal();
+  if(typeof showSuccess === 'function') showSuccess('Outcome recorded · helps surface patterns');
+  if(typeof renderPage === 'function') renderPage('retail-tracker');
 }
 
 function saveRetailSubmissionEdit(id){
@@ -34238,7 +34529,9 @@ function getLoopRejectionsForRetailer(retailerId, retailerName){
 }
 
 
-// prompt for an optional reason and log a Trigger 5 (rejection) loop event.
+// On rejection transition: open the structured outcome capture modal (Task H1).
+// Replaces the previous window.prompt flow. submitOutcomeCapture handles
+// recordSubmissionOutcome + logRejectionLoopEvent + re-render in one place.
 if(typeof updateRetailSubmissionStatus === 'function'){
   var _loopPrevUpdateSubStatus = updateRetailSubmissionStatus;
   updateRetailSubmissionStatus = function(id, status){
@@ -34250,43 +34543,17 @@ if(typeof updateRetailSubmissionStatus === 'function'){
     }catch(e){}
     var wasRejected = prior && prior.status === 'rejected';
     var nowRejected = status === 'rejected';
-    // Run the original
+    // Run the original — status change persists immediately. Modal captures
+    // supplemental structured data. If user cancels modal, status change stays
+    // (matches pre-H1 behavior where reason was always optional).
     _loopPrevUpdateSubStatus(id, status);
-    // Only fire on transition INTO rejected (not transitions within or out)
+    // Only fire modal on transition INTO rejected (not transitions within or out)
     if(nowRejected && !wasRejected){
       try{
-        var sub = null;
-        try{
-          var subs2 = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
-          sub = subs2.find(function(x){ return x.id === id; });
-        }catch(e2){}
-        if(!sub) return;
-        // Prompt — skippable by design (reason is optional)
-        var reason = window.prompt(
-          'Rejection logged for ' + (sub.retailerName||'this retailer') + '.\n\n' +
-          'Why was it rejected? (Optional — helps Pre-Pitch Brief learn from it.)\n' +
-          'Examples: "Buyer cited margin too low", "Range review timing", "Already have similar SKU".\n\n' +
-          'Leave blank to skip.',
-          ''
-        );
-        // window.prompt returns null if user clicked Cancel — treat that as skip-with-no-reason
-        // (still log the event, just without a reason). If they typed something, capture it.
-        var reasonText = (typeof reason === 'string') ? reason.trim() : '';
-        logRejectionLoopEvent({
-          submissionId: id,
-          retailerId:   sub.retailerId   || '',
-          retailerName: sub.retailerName || '',
-          market:       sub.market       || '',
-          reason:       reasonText,
-          source:       'manual',
-        });
-        // Re-render Brand Home (if there) so the new alert surfaces
-        setTimeout(function(){
-          if(typeof currentPage!=='undefined' && currentPage==='home' && typeof renderPage==='function'){
-            renderPage('home');
-          }
-        }, 200);
-      }catch(e3){ console.warn('Trigger 5 hook failed:', e3.message); }
+        if(typeof openOutcomeCaptureModal === 'function'){
+          openOutcomeCaptureModal(id, status);
+        }
+      }catch(e3){ console.warn('Outcome modal hook failed:', e3.message); }
     }
   };
 }
