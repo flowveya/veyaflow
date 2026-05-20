@@ -28925,10 +28925,17 @@ function csrdAutoFill(){
     ...(brand?.certifications||[]).map(c=>c.name||c.label||c),
   ])].filter(Boolean);
 
-  // Auto-fill from SKU data
+  // DPP data is loaded once at init via loadDPP() into module-scope dppData.
+  // Reference the global directly — no need to re-read localStorage (and the
+  // previous re-read used the wrong key 'ns_dpp_data' instead of 'ns_dpp').
+  const dppFields = sku0 && dppData[sku0.id] && dppData[sku0.id].fields;
+
+  // Auto-fill from SKU + DPP data
   if(sku0){
-    if(!answers.recycled_pkg && sku0.recycledContent)
-      answers.recycled_pkg = sku0.recycledContent;
+    // recycled_pkg = "% recycled content in packaging" — maps to DPP packaging
+    // field f.recycledPackaging (NOT f.recycledProduct which is the SKU body).
+    if(!answers.recycled_pkg && dppFields?.recycledPackaging)
+      answers.recycled_pkg = dppFields.recycledPackaging;
     if(!answers.recyclable_pkg && sku0.packagingType)
       answers.recyclable_pkg = sku0.packagingType.toLowerCase().includes('glass')||sku0.packagingType.toLowerCase().includes('metal')?'yes':sku0.packagingType.toLowerCase().includes('plastic')?'partial':'unknown';
     if(!answers.eudr_compliance)
@@ -28943,14 +28950,15 @@ function csrdAutoFill(){
     answers.social_audit = 'Yes — '+auditedSupplier.certifications.join(', ');
   }
 
-  // Auto-fill from DPP if carbon data exists
-  try{
-    const dppData = safeJsonParse(localStorage.getItem('ns_dpp_data'), {});
-    const dppSku = sku0 && dppData[sku0.id];
-    if(dppSku?.carbonFootprint && !answers.scope1){
-      answers.scope1 = dppSku.carbonFootprint;
-    }
-  }catch(e){}
+  // Auto-fill scope1 from DPP carbon. Path falls through three field names
+  // because DPP setters write to different keys depending on entry path:
+  //   carbonFootprint  set by ingredient traceability (L15667)
+  //   carbonKg         set by direct user entry (L29491)
+  //   carbonEstimated  set by AI estimate flow (L29473)
+  if(dppFields && !answers.scope1){
+    const carbon = dppFields.carbonFootprint || dppFields.carbonKg || dppFields.carbonEstimated;
+    if(carbon) answers.scope1 = carbon;
+  }
 
   localStorage.setItem('ns_csrd_answers', JSON.stringify(answers));
   return answers;
