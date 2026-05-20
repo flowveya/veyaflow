@@ -10752,6 +10752,84 @@ function getAuditRecordsForTemplate(templateVersion){
   return _atmLoadAudit().filter(function(a){ return a.templateVersionUsed === templateVersion; });
 }
 
+// H2 (May 2026) — Aggregation helper for ATM Admin audit trail sub-page.
+// Joins audit records (downloads) and retailSubmissions (outcomes) on the
+// shared templateVersionUsed field. Returns rich stats object.
+//
+// opts.dateRange:  optional '30d' | '90d' | '365d' to limit time window.
+//                  When set, BOTH audit records (by .timestamp) and
+//                  submissions (by .statusChangedAt fallback .submittedDate)
+//                  are filtered to the window.
+//
+// Returns:
+//   {
+//     templateVersion,
+//     usageCount,         // audit records (XLSX downloads)
+//     outcomesCaptured,   // submissions in terminal status (rejected/listed/live)
+//     rejectionCount,     // submissions with status === 'rejected'
+//     listingCount,       // submissions with status ∈ ['listed','live']
+//     rejectionRate,      // rounded % of outcomes that are rejected; null if zero outcomes
+//     lastUsed,           // ISO date of latest audit record; null if none
+//     verifiedAt,         // from template record (canonical via getTemplateForRetailer)
+//   }
+//
+// Pure function. No state mutation. Defensive against null/missing data.
+function _atmAuditStatsForTemplate(templateVersion, opts){
+  opts = opts || {};
+  // Date range bucket → epoch cutoff
+  let cutoff = null;
+  if(opts.dateRange === '30d')  cutoff = Date.now() - 30*24*60*60*1000;
+  if(opts.dateRange === '90d')  cutoff = Date.now() - 90*24*60*60*1000;
+  if(opts.dateRange === '365d') cutoff = Date.now() - 365*24*60*60*1000;
+
+  // Audit records for this template version, optionally date-filtered
+  const allRecords = getAuditRecordsForTemplate(templateVersion);
+  const records = cutoff
+    ? allRecords.filter(function(r){ return r.timestamp && new Date(r.timestamp).getTime() >= cutoff; })
+    : allRecords;
+  const usageCount = records.length;
+  let lastUsed = null;
+  records.forEach(function(r){
+    if(r.timestamp && (!lastUsed || r.timestamp > lastUsed)) lastUsed = r.timestamp;
+  });
+
+  // Submissions in terminal status with this templateVersion
+  const subs = (typeof retailSubmissions !== 'undefined' && Array.isArray(retailSubmissions))
+    ? retailSubmissions
+    : [];
+  const matchingSubs = subs.filter(function(s){
+    if(s.templateVersionUsed !== templateVersion) return false;
+    if(!cutoff) return true;
+    const dateStr = s.statusChangedAt || s.submittedDate || '';
+    return dateStr && new Date(dateStr).getTime() >= cutoff;
+  });
+  const terminalSubs = matchingSubs.filter(function(s){
+    return s.status === 'rejected' || s.status === 'listed' || s.status === 'live';
+  });
+  const rejectionCount = terminalSubs.filter(function(s){ return s.status === 'rejected'; }).length;
+  const listingCount   = terminalSubs.filter(function(s){ return s.status === 'listed' || s.status === 'live'; }).length;
+  const outcomesCaptured = terminalSubs.length;
+  const rejectionRate = outcomesCaptured > 0
+    ? Math.round((rejectionCount / outcomesCaptured) * 100)
+    : null;
+
+  // verifiedAt from the canonical template record (matches version string)
+  const allTpls = (typeof _atmLoadTemplates === 'function') ? _atmLoadTemplates() : [];
+  const tplRecord = allTpls.find(function(t){ return t.templateVersion === templateVersion; });
+  const verifiedAt = (tplRecord && tplRecord.verifiedAt) || null;
+
+  return {
+    templateVersion: templateVersion,
+    usageCount:      usageCount,
+    outcomesCaptured: outcomesCaptured,
+    rejectionCount:  rejectionCount,
+    listingCount:    listingCount,
+    rejectionRate:   rejectionRate,
+    lastUsed:        lastUsed,
+    verifiedAt:      verifiedAt,
+  };
+}
+
 // ── Write API ─────────────────────────────────────
 /**
  * Save a template record. New record (no existing id match): appended.
@@ -11234,7 +11312,270 @@ _atmMigrateLegacyTemplates();
 // Module-level state for the admin UI
 let _atmAdminFilter = 'all'; // 'all' | 'attention' | 'stale' | 'unverified'
 
+// H2 (May 2026) — Audit trail sub-page state. _atmAdminView toggles which
+// view renderAtmAdmin dispatches to. Hash route #atm-admin/audit sets
+// view='audit' via handleDeepLink. Sub-nav at top of either view lets
+// user switch back; setDeepLink keeps the hash in sync.
+let _atmAdminView = 'templates'; // 'templates' | 'audit'
+let _atmAuditFilterRetailer  = 'all';  // 'all' | retailerId
+let _atmAuditFilterDateRange = 'all';  // 'all' | '30d' | '90d' | '365d'
+let _atmAuditFilterOutcome   = 'all';  // 'all' | 'rejected' | 'listed' | 'captured' | 'no_outcomes'
+let _atmAuditExpandedVersion = null;   // null | templateVersion string (drill-down state)
+
+// H2 (May 2026) — Audit trail sub-page handlers and renderer.
+
+function _atmAdminSetView(view){
+  _atmAdminView = view;
+  // Reset drill-down state on view change
+  _atmAuditExpandedVersion = null;
+  if(typeof setDeepLink === 'function'){
+    setDeepLink('atm-admin', view === 'audit' ? 'audit' : null);
+  }
+  renderPage('atm-admin');
+}
+
+function _atmAuditSetFilterRetailer(val){
+  _atmAuditFilterRetailer = val;
+  _atmAuditExpandedVersion = null;  // collapse drill-down on filter change
+  renderPage('atm-admin');
+}
+
+function _atmAuditSetFilterDateRange(val){
+  _atmAuditFilterDateRange = val;
+  _atmAuditExpandedVersion = null;
+  renderPage('atm-admin');
+}
+
+function _atmAuditSetFilterOutcome(val){
+  _atmAuditFilterOutcome = val;
+  _atmAuditExpandedVersion = null;
+  renderPage('atm-admin');
+}
+
+function _atmAuditToggleExpand(templateVersion){
+  _atmAuditExpandedVersion = (_atmAuditExpandedVersion === templateVersion) ? null : templateVersion;
+  renderPage('atm-admin');
+}
+
+function renderAtmAuditView(el){
+  // Build version-level rows: one per unique templateVersion seen in either
+  // audit records OR submissions. Some templates may have submissions but
+  // no downloads (rare); some may have downloads but no outcomes captured
+  // yet (common — early Beta state). Both should surface.
+  const allRecords = getAllAuditRecords();
+  const subs = (typeof retailSubmissions !== 'undefined' && Array.isArray(retailSubmissions)) ? retailSubmissions : [];
+
+  // Unique template versions, with which retailer they belong to (via template lookup).
+  const versionSet = new Set();
+  allRecords.forEach(function(r){ if(r.templateVersionUsed) versionSet.add(r.templateVersionUsed); });
+  subs.forEach(function(s){ if(s.templateVersionUsed) versionSet.add(s.templateVersionUsed); });
+
+  // Build rows. For each version: find retailer (from template record), compute stats with date range filter.
+  const dateRangeOpt = (_atmAuditFilterDateRange === 'all') ? {} : { dateRange: _atmAuditFilterDateRange };
+  const allTpls = _atmLoadTemplates();
+  let rows = Array.from(versionSet).map(function(version){
+    const tpl = allTpls.find(function(t){ return t.templateVersion === version; });
+    const retailerId   = tpl ? tpl.retailerId : '';
+    const retailer     = (RETAILER_REGISTRY || []).find(function(r){ return r.id === retailerId; });
+    const retailerName = retailer ? retailer.name : (retailerId || '—');
+    const stats = _atmAuditStatsForTemplate(version, dateRangeOpt);
+    return { version: version, retailerId: retailerId, retailerName: retailerName, stats: stats };
+  });
+
+  // Apply retailer filter
+  if(_atmAuditFilterRetailer !== 'all'){
+    rows = rows.filter(function(row){ return row.retailerId === _atmAuditFilterRetailer; });
+  }
+  // Apply outcome filter
+  if(_atmAuditFilterOutcome !== 'all'){
+    rows = rows.filter(function(row){
+      const s = row.stats;
+      if(_atmAuditFilterOutcome === 'rejected')      return s.rejectionCount > 0;
+      if(_atmAuditFilterOutcome === 'listed')        return s.listingCount > 0;
+      if(_atmAuditFilterOutcome === 'captured')      return s.outcomesCaptured > 0;
+      if(_atmAuditFilterOutcome === 'no_outcomes')   return s.outcomesCaptured === 0 && s.usageCount > 0;
+      return true;
+    });
+  }
+  // Hide rows with zero usage AND zero outcomes when a date range is active
+  // (these are noise from the date filter, not meaningful records)
+  if(_atmAuditFilterDateRange !== 'all'){
+    rows = rows.filter(function(row){ return row.stats.usageCount > 0 || row.stats.outcomesCaptured > 0; });
+  }
+  // Sort: usage count desc, then verifiedAt desc, then version string desc
+  rows.sort(function(a, b){
+    if(a.stats.usageCount !== b.stats.usageCount) return b.stats.usageCount - a.stats.usageCount;
+    if(a.stats.verifiedAt !== b.stats.verifiedAt) return (b.stats.verifiedAt || '').localeCompare(a.stats.verifiedAt || '');
+    return (b.version || '').localeCompare(a.version || '');
+  });
+
+  // Retailer dropdown options: all retailers in registry that have at least one template
+  const retailersWithTemplates = new Set();
+  allTpls.forEach(function(t){ if(t.retailerId) retailersWithTemplates.add(t.retailerId); });
+  const retailerOptions = (RETAILER_REGISTRY || [])
+    .filter(function(r){ return retailersWithTemplates.has(r.id); })
+    .sort(function(a, b){ return (a.name || '').localeCompare(b.name || ''); });
+
+  // ── Render helpers ────────────────────────────────────
+  const formatDate = function(iso){
+    if(!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}); }
+    catch(e){ return '—'; }
+  };
+  const formatTimestamp = function(iso){
+    if(!iso) return '—';
+    try { return new Date(iso).toLocaleString('en-GB', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}); }
+    catch(e){ return '—'; }
+  };
+  const rejectionPill = function(rate, count, total){
+    if(rate === null) return '<span style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">—</span>';
+    const bg = rate >= 50 ? '#FEE2E2' : rate >= 25 ? '#FEF3C7' : '#D1FAE5';
+    const fg = rate >= 50 ? '#991B1B' : rate >= 25 ? '#92400E' : '#065F46';
+    return '<span style="display:inline-block;padding:.15rem .5rem;background:'+bg+';color:'+fg+';font-family:var(--mono);font-size:.65rem">'+rate+'%</span> '
+         + '<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-left:.25rem">'+count+'/'+total+'</span>';
+  };
+  const escapeAttr = function(s){ return String(s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); };
+
+  // ── Drill-down rendering (for expanded row) ───────────
+  const drilldownHtml = function(version){
+    const records = getAuditRecordsForTemplate(version)
+      .slice()
+      .sort(function(a, b){ return (b.timestamp || '').localeCompare(a.timestamp || ''); });
+    if(!records.length){
+      return '<tr><td colspan="6" style="padding:1rem 2rem;background:#F9F8F6;font-family:var(--sans);font-size:.75rem;color:var(--muted);font-style:italic">No download records yet for this template version.</td></tr>';
+    }
+    let inner = '<tr><td colspan="6" style="padding:0;background:#F9F8F6">'
+              + '<div style="padding:.5rem 1.25rem .75rem 2rem">'
+              + '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Download records · '+records.length+' total</div>'
+              + '<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border)">'
+              + '<thead><tr style="background:#F9F8F6">'
+              + '<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Timestamp</th>'
+              + '<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Brand</th>'
+              + '<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">SKU IDs</th>'
+              + '<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)">Output hash</th>'
+              + '</tr></thead><tbody>';
+    records.forEach(function(r){
+      inner += '<tr style="border-bottom:1px solid var(--border)">'
+            +  '<td style="padding:.4rem .65rem;font-family:var(--mono);font-size:.65rem;color:#374151;vertical-align:top">'+formatTimestamp(r.timestamp)+'</td>'
+            +  '<td style="padding:.4rem .65rem;font-family:var(--mono);font-size:.65rem;color:#374151;vertical-align:top">'+escapeHtml(r.brandId || '—')+'</td>'
+            +  '<td style="padding:.4rem .65rem;font-family:var(--mono);font-size:.65rem;color:#374151;vertical-align:top">'+escapeHtml((r.skuIds || []).join(', ') || '—')+'</td>'
+            +  '<td style="padding:.4rem .65rem;font-family:var(--mono);font-size:.6rem;color:var(--muted);vertical-align:top;word-break:break-all">'+(r.outputFileHash ? escapeHtml(r.outputFileHash) : '<em>not captured</em>')+'</td>'
+            +  '</tr>';
+    });
+    inner += '</tbody></table></div></td></tr>';
+    return inner;
+  };
+
+  // ── Main row rendering ────────────────────────────────
+  let rowsHtml = '';
+  if(rows.length === 0){
+    rowsHtml = '<tr><td colspan="6" style="padding:2rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">'
+             + 'No audit records match the current filters.'
+             + (_atmAuditFilterRetailer !== 'all' || _atmAuditFilterDateRange !== 'all' || _atmAuditFilterOutcome !== 'all'
+                 ? '<div style="font-family:var(--mono);font-size:.6rem;margin-top:.5rem;color:var(--muted)">Try clearing filters or expanding the date range.</div>'
+                 : '<div style="font-family:var(--mono);font-size:.6rem;margin-top:.5rem;color:var(--muted)">Audit records are captured on every ATM XLSX download. Try downloading a template to populate.</div>')
+             + '</td></tr>';
+  } else {
+    rows.forEach(function(row){
+      const expanded = _atmAuditExpandedVersion === row.version;
+      const versionAttr = escapeAttr(row.version);
+      rowsHtml += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="_atmAuditToggleExpand(\''+versionAttr+'\')">'
+               +  '<td style="padding:.6rem .85rem;font-family:var(--mono);font-size:.7rem;color:#374151;vertical-align:top">'
+               +    '<span style="display:inline-block;margin-right:.3rem;color:var(--muted);font-size:.65rem">'+(expanded ? '▼' : '▶')+'</span>'
+               +    escapeHtml(row.version)
+               +  '</td>'
+               +  '<td style="padding:.6rem .85rem;font-family:var(--sans);font-size:.8rem;color:#1F2937;vertical-align:top">'+escapeHtml(row.retailerName)+'</td>'
+               +  '<td style="padding:.6rem .85rem;font-family:var(--mono);font-size:.7rem;color:#374151;vertical-align:top;text-align:right">'+row.stats.usageCount+'</td>'
+               +  '<td style="padding:.6rem .85rem;font-family:var(--mono);font-size:.7rem;color:#374151;vertical-align:top;text-align:right">'+row.stats.outcomesCaptured+'</td>'
+               +  '<td style="padding:.6rem .85rem;vertical-align:top">'+rejectionPill(row.stats.rejectionRate, row.stats.rejectionCount, row.stats.outcomesCaptured)+'</td>'
+               +  '<td style="padding:.6rem .85rem;font-family:var(--mono);font-size:.65rem;color:#6B7280;vertical-align:top">'
+               +    'Last used '+formatDate(row.stats.lastUsed)+'<br>'
+               +    '<span style="color:var(--muted)">Verified '+formatDate(row.stats.verifiedAt)+'</span>'
+               +  '</td>'
+               +  '</tr>';
+      if(expanded){
+        rowsHtml += drilldownHtml(row.version);
+      }
+    });
+  }
+
+  // ── Filter dropdowns ──────────────────────────────────
+  const retailerSelect = '<select onchange="_atmAuditSetFilterRetailer(this.value)" '
+                       + 'style="padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff;cursor:pointer;min-width:160px">'
+                       + '<option value="all"'+(_atmAuditFilterRetailer==='all'?' selected':'')+'>All retailers</option>'
+                       + retailerOptions.map(function(r){
+                           return '<option value="'+escapeAttr(r.id)+'"'+(_atmAuditFilterRetailer===r.id?' selected':'')+'>'+escapeHtml(r.name)+'</option>';
+                         }).join('')
+                       + '</select>';
+
+  const dateRangeOptions = [
+    {v:'all',  l:'All time'},
+    {v:'30d',  l:'Last 30 days'},
+    {v:'90d',  l:'Last 90 days'},
+    {v:'365d', l:'Last 365 days'},
+  ];
+  const dateSelect = '<select onchange="_atmAuditSetFilterDateRange(this.value)" '
+                   + 'style="padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff;cursor:pointer">'
+                   + dateRangeOptions.map(function(o){
+                       return '<option value="'+o.v+'"'+(_atmAuditFilterDateRange===o.v?' selected':'')+'>'+o.l+'</option>';
+                     }).join('')
+                   + '</select>';
+
+  const outcomeOptions = [
+    {v:'all',          l:'All outcomes'},
+    {v:'rejected',     l:'Has rejections'},
+    {v:'listed',       l:'Has listings'},
+    {v:'captured',     l:'Outcomes captured'},
+    {v:'no_outcomes',  l:'Used but no outcomes yet'},
+  ];
+  const outcomeSelect = '<select onchange="_atmAuditSetFilterOutcome(this.value)" '
+                      + 'style="padding:.4rem .55rem;font-family:var(--sans);font-size:.75rem;border:1px solid var(--border);background:#fff;cursor:pointer">'
+                      + outcomeOptions.map(function(o){
+                          return '<option value="'+o.v+'"'+(_atmAuditFilterOutcome===o.v?' selected':'')+'>'+o.l+'</option>';
+                        }).join('')
+                      + '</select>';
+
+  // ── Page HTML ─────────────────────────────────────────
+  el.innerHTML = ''
+    + '<div class="topbar">'
+    +   '<div>'
+    +     '<div class="page-title">ATM audit trail</div>'
+    +     '<div class="page-sub">Template usage · captured outcomes · download records</div>'
+    +   '</div>'
+    +   '<button class="btn-outline" onclick="_atmAdminSetView(\'templates\')" style="font-size:.7rem;padding:.4rem .8rem">← Back to templates</button>'
+    + '</div>'
+    + '<div style="padding:0 1rem 2rem">'
+    +   '<div style="background:#FEF3C7;border:1px solid #FCD34D;padding:.6rem .85rem;margin-bottom:1.25rem;font-family:var(--mono);font-size:.65rem;color:#92400E;letter-spacing:.04em">'
+    +     '◆ INTERNAL ADMIN — not user-facing. Hash route: #atm-admin/audit. Records captured on every ATM XLSX download.'
+    +   '</div>'
+    +   '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.25rem;align-items:center">'
+    +     '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-right:.25rem">Filter</div>'
+    +     retailerSelect
+    +     dateSelect
+    +     outcomeSelect
+    +     '<div style="flex:1"></div>'
+    +     '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">'+rows.length+' template version'+(rows.length===1?'':'s')+' shown</div>'
+    +   '</div>'
+    +   '<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border)">'
+    +     '<thead><tr style="background:#F9F8F6;border-bottom:1px solid var(--border)">'
+    +       '<th style="padding:.55rem .85rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Template version</th>'
+    +       '<th style="padding:.55rem .85rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Retailer</th>'
+    +       '<th style="padding:.55rem .85rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Downloads</th>'
+    +       '<th style="padding:.55rem .85rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Outcomes</th>'
+    +       '<th style="padding:.55rem .85rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Rejection rate</th>'
+    +       '<th style="padding:.55rem .85rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Dates</th>'
+    +     '</tr></thead>'
+    +     '<tbody>'+rowsHtml+'</tbody>'
+    +   '</table>'
+    + '</div>';
+}
+
 function renderAtmAdmin(el){
+  // H2 (May 2026) — Sub-view dispatch. Hash route #atm-admin/audit sets
+  // _atmAdminView='audit' via handleDeepLink; templates view is the default.
+  if(_atmAdminView === 'audit') {
+    return renderAtmAuditView(el);
+  }
   // Build per-retailer rows: {retailer, staleness, sortKey}
   // Sort: rows with templates by oldest verifiedAt first (most-stale at top);
   // unverified retailers (no template record) come last alphabetically.
@@ -11338,6 +11679,7 @@ function renderAtmAdmin(el){
         <div class="page-title">ATM template administration</div>
         <div class="page-sub">Internal verification surface · ${countAll} retailers · ${countAttention} need attention</div>
       </div>
+      <button class="btn-outline" onclick="_atmAdminSetView('audit')" style="font-size:.7rem;padding:.4rem .8rem">View audit trail →</button>
     </div>
     <div style="padding:0 1rem 2rem">
       <div style="background:#FEF3C7;border:1px solid #FCD34D;padding:.6rem .85rem;margin-bottom:1.25rem;font-family:var(--mono);font-size:.65rem;color:#92400E;letter-spacing:.04em">
@@ -28741,6 +29083,13 @@ function handleDeepLink(){
     // Pre-fill target market: #report/Denmark
     reportForm.targetMarket = decodeURIComponent(param);
     showPage('report');
+    return true;
+  }
+  if(page==='atm-admin'){
+    // Sub-view routing: #atm-admin/audit → renderAtmAuditView via state flag.
+    // Default (#atm-admin or unknown param) resets to templates view.
+    _atmAdminView = (param === 'audit') ? 'audit' : 'templates';
+    showPage('atm-admin');
     return true;
   }
   showPage(page);
