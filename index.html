@@ -4098,6 +4098,146 @@ function mapTaxonomyToPattern(taxonomyCode){
   };
 }
 
+// ── M3.1 Sample-Size Transparency (May 2026) ──────────────────────────
+//
+// Static REJECTION_PATTERNS provides research-derived percentages (e.g.
+// "32% of rejections cite low social proof"). M3.1 augments this with
+// FIRST-HAND captured outcomes from retailSubmissions — surfacing how
+// many actual outcomes inform the pattern view for a given retailer.
+//
+// Honors Standing Rule #10 (calibration discipline): predictions must
+// disclose sample size so users can weight confidence appropriately.
+// A pattern shown with n=3 captured outcomes is weaker evidence than
+// the same pattern shown with n=50.
+//
+// Honors Standing Rule #8 (single read surface): renderSampleSizeDisclosure
+// is the single read surface; both Readiness Score and Mirror Test
+// render sites consume identical output.
+//
+// Forward-compat language: "outcomes captured" rather than "brands
+// submitted" works for both per-brand localStorage (current) and future
+// cross-brand backend aggregation.
+
+// Count terminal-status outcomes with structured taxonomy capture for a
+// retailer. Returns {sampleSize, earliest, latest, hasStructured}.
+// hasStructured=true means at least one outcome went through H1 modal
+// (structured outcomeReasonStructured set) — distinguishes captured
+// from legacy/portal-sync outcomes.
+function _atmPatternSampleSize(retailerId){
+  if(typeof retailSubmissions === 'undefined' || !Array.isArray(retailSubmissions)){
+    return { sampleSize: 0, earliest: null, latest: null, hasStructured: false };
+  }
+  const matching = retailSubmissions.filter(function(s){
+    if(s.retailerId !== retailerId) return false;
+    // Terminal status only — pending submissions don't count toward sample
+    return s.status === 'rejected' || s.status === 'listed' || s.status === 'live';
+  });
+  let earliest = null;
+  let latest   = null;
+  let hasStructured = false;
+  matching.forEach(function(s){
+    const dateStr = s.statusChangedAt || s.submittedDate || '';
+    if(dateStr){
+      if(!earliest || dateStr < earliest) earliest = dateStr;
+      if(!latest   || dateStr > latest)   latest   = dateStr;
+    }
+    if(s.outcomeReasonStructured) hasStructured = true;
+  });
+  return {
+    sampleSize:    matching.length,
+    earliest:      earliest,
+    latest:        latest,
+    hasStructured: hasStructured,
+  };
+}
+
+// Map sample size to confidence tier per M3.1 brief.
+// Returns {tier, label, bg, fg, border, messaging}.
+//   tier:      'insufficient' (<5) | 'low' (5-9) | 'medium' (10-14) | 'high' (15-49) | 'very_high' (50+)
+//   messaging: optional secondary message tier — 'insufficient' (n<5) or 'early' (5≤n<10) or null
+function _atmSampleSizeConfidence(n){
+  if(n < 5){
+    return {
+      tier: 'insufficient', label: 'Low confidence',
+      bg: '#FEF2F2', fg: '#991B1B', border: '#FCA5A5',
+      messaging: 'insufficient',
+    };
+  }
+  if(n < 10){
+    return {
+      tier: 'low', label: 'Low confidence',
+      bg: '#FFFBEB', fg: '#92400E', border: '#FCD34D',
+      messaging: 'early',
+    };
+  }
+  if(n < 15){
+    return {
+      tier: 'medium', label: 'Medium confidence',
+      bg: '#FFFBEB', fg: '#92400E', border: '#FCD34D',
+      messaging: null,
+    };
+  }
+  if(n < 50){
+    return {
+      tier: 'high', label: 'High confidence',
+      bg: '#ECFDF5', fg: '#065F46', border: '#A7F3D0',
+      messaging: null,
+    };
+  }
+  return {
+    tier: 'very_high', label: 'Very high confidence',
+    bg: '#D1FAE5', fg: '#065F46', border: '#6EE7B7',
+    messaging: null,
+  };
+}
+
+// Shared render function — returns HTML string for the sample-size
+// disclosure line. Consumed by Readiness Score and Mirror Test render
+// sites. Empty string when retailerId is falsy (defensive).
+function renderSampleSizeDisclosure(retailerId){
+  if(!retailerId) return '';
+  const stats = _atmPatternSampleSize(retailerId);
+  const n = stats.sampleSize;
+  // Date range formatter
+  const fmtDate = function(iso){
+    if(!iso) return '';
+    try { return new Date(iso).toLocaleDateString('en-GB', {month:'short', year:'numeric'}); }
+    catch(e){ return ''; }
+  };
+  // Case 1: zero outcomes — research-only mode
+  if(n === 0){
+    return '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.45rem;line-height:1.5">'
+         + 'Patterns from research-verified data · '
+         + '<span style="color:#92400E">no outcomes captured yet at this retailer</span>'
+         + '</div>';
+  }
+  const conf = _atmSampleSizeConfidence(n);
+  const dateRange = (stats.earliest && stats.latest && stats.earliest !== stats.latest)
+    ? fmtDate(stats.earliest) + ' to ' + fmtDate(stats.latest)
+    : (stats.latest ? fmtDate(stats.latest) : '');
+  // Confidence pill
+  const pill = '<span style="display:inline-block;padding:.1rem .45rem;background:'+conf.bg+';color:'+conf.fg
+             + ';font-family:var(--mono);font-size:.5rem;letter-spacing:.04em;border:1px solid '+conf.border
+             + ';margin-left:.4rem;text-transform:uppercase">'+conf.label+'</span>';
+  // Main disclosure line
+  let html = '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.45rem;line-height:1.5">'
+           + 'Based on '+n+' outcome'+(n===1?'':'s')+' captured'
+           + (dateRange ? ' · '+dateRange : '')
+           + pill
+           + '</div>';
+  // Secondary messaging tier
+  if(conf.messaging === 'insufficient'){
+    html += '<div style="font-family:var(--sans);font-size:.6rem;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;padding:.35rem .55rem;margin-bottom:.5rem;line-height:1.5">'
+         +  'Insufficient data — patterns will appear as more outcomes captured. Treat percentages as research-derived only.'
+         +  '</div>';
+  } else if(conf.messaging === 'early'){
+    html += '<div style="font-family:var(--sans);font-size:.6rem;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;padding:.35rem .55rem;margin-bottom:.5rem;line-height:1.5">'
+         +  'Early data — confidence builds as more outcomes captured.'
+         +  '</div>';
+  }
+  return html;
+}
+
 function getRejectionPatterns(retailerId, retailerName) {
   // Direct id match first
   for(const [key, data] of Object.entries(REJECTION_PATTERNS)) {
@@ -4546,6 +4686,7 @@ function renderReadinessScore(){
               ${confidenceBadge}
             </div>
             <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.45rem">Based on ${{veyaflow_verified:'VeyaFlow-verified intelligence',research_verified:'research-verified (public sources)',ai_estimated:'AI-estimated data'}[rp.confidence]||'platform intelligence'}</div>
+            ${renderSampleSizeDisclosure(readinessState.retailerId)}
             ${risks.map(r=>{
               const s = r.status;
               const statusIcon  = s.pass===true  ? '✓' : s.pass===false ? '⚠' : '○';
@@ -20522,6 +20663,7 @@ function renderPitch(el){
                   <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:${_anyFail?'#92400E':'#065F46'}">${_anyFail?'⚠':'✓'} Common rejection reasons at ${_sel}</div>
                   ${_rp?renderConfidence(_rp.confidence,{size:'small'}):''}
                 </div>
+                ${renderSampleSizeDisclosure(_retailerEntry?.id||'')}
                 ${_allRisks.map(r=>{
                   const st=r.status;
                   const sicon=st.pass===true?'✓':st.pass===false?'⚠':'○';
