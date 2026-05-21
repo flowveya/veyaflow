@@ -31736,23 +31736,28 @@ function _m3AggregatePatternsForBrand(brandId){
   if(_m3PatternCache && _m3PatternCache.brandId === brandId){
     return _m3PatternCache.result;
   }
-  // getOutcomesForBrand handles single-tenant filtering: returns [] when
-  // brandId !== current active brand. For active brand, returns all
-  // retailSubmissions as outcome views (with _atmSubmissionToOutcomeView
-  // shape: retailerId, retailerName, status, outcomeReasonStructured, ...)
+  // getOutcomesForBrand returns an outcome-view shape (via _atmSubmissionToOutcomeView):
+  //   - s.outcomeType    ('rejected' | 'listed' | 'pending') — NOT s.status
+  //   - s.outcomeTimestamp  (s.statusChangedAt || s.createdAt) — NOT s.statusChangedAt
+  //   - retailerName is NOT included — must look up from RETAILER_REGISTRY
   const subs = (typeof getOutcomesForBrand === 'function') ? getOutcomesForBrand(brandId) : [];
-  // Terminal-status filter — matches M3.1 precedent
+  // Terminal outcomes only. View maps 'live' status into 'listed' outcomeType.
   const terminal = subs.filter(function(s){
-    return s.status === 'rejected' || s.status === 'listed' || s.status === 'live';
+    return s.outcomeType === 'rejected' || s.outcomeType === 'listed';
   });
   const perRetailer = {};
   const allTimestamps = [];
+  // Build retailer name lookup once (avoids repeated registry scans)
+  const retailerNameById = {};
+  if(typeof RETAILER_REGISTRY !== 'undefined' && Array.isArray(RETAILER_REGISTRY)){
+    RETAILER_REGISTRY.forEach(function(r){ retailerNameById[r.id] = r.name; });
+  }
   terminal.forEach(function(s){
     const rid = s.retailerId || 'unknown';
     if(!perRetailer[rid]){
       perRetailer[rid] = {
         retailerId:            rid,
-        retailerName:          s.retailerName || rid,
+        retailerName:          retailerNameById[rid] || rid,
         totalTerminalOutcomes: 0,
         rejectionCount:        0,
         listingCount:          0,
@@ -31762,9 +31767,9 @@ function _m3AggregatePatternsForBrand(brandId){
     }
     const bucket = perRetailer[rid];
     bucket.totalTerminalOutcomes++;
-    if(s.status === 'rejected') bucket.rejectionCount++;
+    if(s.outcomeType === 'rejected') bucket.rejectionCount++;
     else bucket.listingCount++;
-    const ts = s.statusChangedAt || s.submittedDate;
+    const ts = s.outcomeTimestamp;
     if(ts){
       bucket._timestamps.push(ts);
       allTimestamps.push(ts);
@@ -32763,7 +32768,7 @@ function renderOutcomeCaptureModal(){
     +     '<div style="display:flex;gap:.6rem;justify-content:flex-end">'
     +       '<button class="btn-outline" onclick="closeOutcomeCaptureModal()" style="font-size:.78rem;padding:.55rem 1rem">Skip</button>'
     +       '<button class="btn-primary" onclick="submitOutcomeCapture()" style="font-size:.78rem;padding:.55rem 1.2rem"'
-    +         +(st.selectedCode?'':' disabled')+'>Save outcome</button>'
+    +         (st.selectedCode?'':' disabled')+'>Save outcome</button>'
     +     '</div>'
     +   '</div>'
     + '</div>';
