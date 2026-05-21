@@ -4194,9 +4194,24 @@ function _atmSampleSizeConfidence(n){
 // Shared render function — returns HTML string for the sample-size
 // disclosure line. Consumed by Readiness Score and Mirror Test render
 // sites. Empty string when retailerId is falsy (defensive).
-function renderSampleSizeDisclosure(retailerId){
-  if(!retailerId) return '';
-  const stats = _atmPatternSampleSize(retailerId);
+function renderSampleSizeDisclosure(retailerId, opts){
+  // M3.2 (May 2026) — soft refactor. Optional `opts` accepts pre-computed
+  // { sampleSize, earliest, latest, hasStructured } from M3.2 aggregation.
+  // When provided, skip internal _atmPatternSampleSize lookup.
+  // Existing callers (Readiness Score, Mirror Test) pass only retailerId
+  // and hit the legacy path unchanged.
+  if(!retailerId && !opts) return '';
+  let stats;
+  if(opts && typeof opts.sampleSize === 'number'){
+    stats = {
+      sampleSize:    opts.sampleSize,
+      earliest:      opts.earliest || null,
+      latest:        opts.latest   || null,
+      hasStructured: opts.hasStructured || false,
+    };
+  } else {
+    stats = _atmPatternSampleSize(retailerId);
+  }
   const n = stats.sampleSize;
   // Date range formatter
   const fmtDate = function(iso){
@@ -11054,6 +11069,11 @@ function recordSubmissionOutcome(outcomeData){
   };
   retailSubmissions.push(newSub);
   saveRetailSubmissions();
+  // M3.2 (May 2026) — invalidate pattern cache. recordSubmissionOutcome is
+  // the SOLE mutation path that adds an outcomeReasonStructured + terminal
+  // status to retailSubmissions. Other write paths (status edits without
+  // outcome capture, notes/contact edits) don't affect aggregation inputs.
+  if(typeof invalidateM3PatternCache === 'function') invalidateM3PatternCache();
   return _atmSubmissionToOutcomeView(newSub);
 }
 
@@ -31674,6 +31694,241 @@ let retailTrackerExpandedId = null;
 let retailTrackerAddOpen = false;
 let retailTrackerAddForm = {retailerId:'', skuIds:[], contactName:'', contactEmail:'', notes:''};
 
+// ── M3.2 Pattern Intelligence (May 2026) ──────────────────────────────
+//
+// Standalone view in Submission Tracker that surfaces aggregated rejection
+// patterns derived from captured outcomes (H1 modal feeds outcomeReasonStructured).
+// First reachable user-facing surface for VeyaFlow rejection pattern intelligence.
+//
+// Mount A (Submission Tracker, this ship): renders between pipeline summary
+// and active submissions list. Unconditional render (Rule 15 verified).
+// Mount B (pre-submission risk check in add form): deferred to next wave.
+//
+// Single-tenant model: getOutcomesForBrand returns [] if brandId mismatches
+// the active brand. Cross-brand aggregation deferred to M3.3 dashboard.
+//
+// Cache strategy: memoize by brandId. Invalidate on recordSubmissionOutcome
+// (only mutation path that affects pattern inputs — outcomeReasonStructured
+// + terminal status transition).
+
+let m3PatternsExpanded = false;        // 'Pattern Intelligence' section collapse state
+let _m3PatternCache = null;            // { brandId, computedAt, result } or null
+
+// Aggregation function. Pure read. Single source of truth consumed by both
+// renderM3PatternsSection (Mount A) and future renderM3PreSubmissionRiskCheck
+// (Mount B) — Standing Rule #8 single read surface, multiple write paths.
+//
+// Returns:
+//   {
+//     brandSummary: { totalOutcomes, retailerCount, lastUpdated },
+//     perRetailer: {
+//       [retailerId]: {
+//         retailerId, retailerName,
+//         totalTerminalOutcomes, rejectionCount, listingCount,
+//         patterns: [{ taxonomyCode, label, count, percentage,
+//                      severity, category, blocker }],
+//         sampleSize, earliest, latest, lastUpdated,
+//       }
+//     }
+//   }
+function _m3AggregatePatternsForBrand(brandId){
+  // Cache check
+  if(_m3PatternCache && _m3PatternCache.brandId === brandId){
+    return _m3PatternCache.result;
+  }
+  // getOutcomesForBrand handles single-tenant filtering: returns [] when
+  // brandId !== current active brand. For active brand, returns all
+  // retailSubmissions as outcome views (with _atmSubmissionToOutcomeView
+  // shape: retailerId, retailerName, status, outcomeReasonStructured, ...)
+  const subs = (typeof getOutcomesForBrand === 'function') ? getOutcomesForBrand(brandId) : [];
+  // Terminal-status filter — matches M3.1 precedent
+  const terminal = subs.filter(function(s){
+    return s.status === 'rejected' || s.status === 'listed' || s.status === 'live';
+  });
+  const perRetailer = {};
+  const allTimestamps = [];
+  terminal.forEach(function(s){
+    const rid = s.retailerId || 'unknown';
+    if(!perRetailer[rid]){
+      perRetailer[rid] = {
+        retailerId:            rid,
+        retailerName:          s.retailerName || rid,
+        totalTerminalOutcomes: 0,
+        rejectionCount:        0,
+        listingCount:          0,
+        _patternCounts:        {},
+        _timestamps:           [],
+      };
+    }
+    const bucket = perRetailer[rid];
+    bucket.totalTerminalOutcomes++;
+    if(s.status === 'rejected') bucket.rejectionCount++;
+    else bucket.listingCount++;
+    const ts = s.statusChangedAt || s.submittedDate;
+    if(ts){
+      bucket._timestamps.push(ts);
+      allTimestamps.push(ts);
+    }
+    if(s.outcomeReasonStructured){
+      bucket._patternCounts[s.outcomeReasonStructured] =
+        (bucket._patternCounts[s.outcomeReasonStructured] || 0) + 1;
+    }
+  });
+  // Finalize each retailer bucket — convert _patternCounts to patterns array,
+  // compute date range, derive sampleSize
+  Object.keys(perRetailer).forEach(function(rid){
+    const r = perRetailer[rid];
+    const totalPatternCount = Object.values(r._patternCounts).reduce(function(a,b){ return a+b; }, 0);
+    r.patterns = Object.keys(r._patternCounts)
+      .map(function(code){
+        const count = r._patternCounts[code];
+        const mapping = (typeof mapTaxonomyToPattern === 'function') ? mapTaxonomyToPattern(code) : null;
+        return {
+          taxonomyCode: code,
+          label:        (mapping && mapping.label) || code,
+          count:        count,
+          percentage:   totalPatternCount > 0 ? Math.round((count/totalPatternCount)*100) : 0,
+          severity:     (mapping && mapping.severity) || 'unknown',
+          category:     (mapping && mapping.category) || 'other',
+          blocker:      (mapping && mapping.blocker)  || null,
+        };
+      })
+      .sort(function(a,b){ return b.count - a.count; });
+    r.sampleSize = r.totalTerminalOutcomes;
+    r.earliest = r._timestamps.length ? r._timestamps.reduce(function(min,t){ return t<min?t:min; }) : null;
+    r.latest   = r._timestamps.length ? r._timestamps.reduce(function(max,t){ return t>max?t:max; }) : null;
+    r.lastUpdated = r.latest;
+    delete r._patternCounts;
+    delete r._timestamps;
+  });
+  const result = {
+    brandSummary: {
+      totalOutcomes: terminal.length,
+      retailerCount: Object.keys(perRetailer).length,
+      lastUpdated:   allTimestamps.length ? allTimestamps.reduce(function(max,t){ return t>max?t:max; }) : null,
+    },
+    perRetailer: perRetailer,
+  };
+  _m3PatternCache = { brandId: brandId, computedAt: Date.now(), result: result };
+  return result;
+}
+
+function invalidateM3PatternCache(){
+  _m3PatternCache = null;
+}
+
+function toggleM3Patterns(){
+  m3PatternsExpanded = !m3PatternsExpanded;
+  if(typeof renderPage === 'function') renderPage('retail-tracker');
+}
+
+// Standalone view (Mount A). Collapsible section between pipeline summary
+// and active submissions list. Renders unconditionally — empty state when
+// no outcomes captured yet.
+function renderM3PatternsSection(brandId){
+  const data = _m3AggregatePatternsForBrand(brandId);
+  const total = data.brandSummary.totalOutcomes;
+  const expanded = m3PatternsExpanded;
+  const chevron = expanded ? '▼' : '▶';
+
+  // Date formatter
+  const fmtDate = function(iso){
+    if(!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}); }
+    catch(e){ return '—'; }
+  };
+
+  // Severity → visual treatment
+  const severityStyle = function(sev){
+    if(sev === 'hard_block')  return { border:'#FCA5A5', bg:'#FEF2F2', fg:'#991B1B', label:'Hard block' };
+    if(sev === 'soft_block')  return { border:'#FCD34D', bg:'#FFFBEB', fg:'#92400E', label:'Soft block' };
+    if(sev === 'preference')  return { border:'#D1D5DB', bg:'#F9FAFB', fg:'#6B7280', label:'Preference' };
+    if(sev === 'process')     return { border:'#D1D5DB', bg:'#F9FAFB', fg:'#6B7280', label:'Process' };
+    return { border:'#D1D5DB', bg:'#F9FAFB', fg:'#6B7280', label:'—' };
+  };
+
+  // Header always shown (collapsed or expanded)
+  let html = '<div style="border:1px solid var(--border);background:#fff;margin:1.25rem 0 .6rem">';
+  html += '<div onclick="toggleM3Patterns()" style="cursor:pointer;padding:.85rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:'+(expanded?'1px solid var(--border)':'none')+'">';
+  html +=   '<div style="display:flex;align-items:center;gap:.55rem">';
+  html +=     '<span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">'+chevron+'</span>';
+  html +=     '<div>';
+  html +=       '<div style="font-family:var(--serif);font-size:.95rem;color:var(--navy)">Pattern intelligence</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.15rem;letter-spacing:.04em">';
+  if(total === 0){
+    html +=       'No outcomes captured yet · click to learn more';
+  } else {
+    html +=       total+' outcome'+(total===1?'':'s')+' across '+data.brandSummary.retailerCount+' retailer'+(data.brandSummary.retailerCount===1?'':'s')+' · last update '+fmtDate(data.brandSummary.lastUpdated);
+  }
+  html +=       '</div>';
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+
+  // Expanded body
+  if(expanded){
+    html += '<div style="padding:1rem 1.1rem">';
+    if(total === 0){
+      // Empty state — educational
+      html += '<div style="background:#F9F8F6;padding:1.1rem 1.25rem;border-left:3px solid var(--gold)">';
+      html +=   '<div style="font-family:var(--serif);font-size:.85rem;color:var(--navy);margin-bottom:.45rem">No outcome data yet</div>';
+      html +=   '<div style="font-family:var(--sans);font-size:.72rem;color:var(--muted);line-height:1.55">';
+      html +=     'Submission outcomes appear here as you capture them via the outcome modal. Each rejection or listing recorded builds your pattern intelligence — surfacing which compliance, commercial, or fit issues recur at which retailers.';
+      html +=   '</div>';
+      html +=   '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.7rem;letter-spacing:.04em">';
+      html +=     '◎ Capture happens automatically when you change a submission status to Listed or Rejected';
+      html +=   '</div>';
+      html += '</div>';
+    } else {
+      // Per-retailer cards — sorted by terminal outcomes desc, then alphabetically
+      const retailerArr = Object.values(data.perRetailer).sort(function(a, b){
+        if(a.totalTerminalOutcomes !== b.totalTerminalOutcomes) return b.totalTerminalOutcomes - a.totalTerminalOutcomes;
+        return (a.retailerName || '').localeCompare(b.retailerName || '');
+      });
+      retailerArr.forEach(function(r){
+        const topPatterns = r.patterns.slice(0, 3); // top 3 by count
+        html += '<div style="border:1px solid var(--border);padding:.85rem 1rem;margin-bottom:.65rem;background:#fff">';
+        // Retailer header
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem">';
+        html +=   '<div style="font-family:var(--sans);font-size:.85rem;font-weight:600;color:var(--navy)">'+escapeHtml(r.retailerName)+'</div>';
+        html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">';
+        html +=     r.totalTerminalOutcomes+' outcome'+(r.totalTerminalOutcomes===1?'':'s')+' · ';
+        html +=     '<span style="color:#991B1B">'+r.rejectionCount+' rejected</span> · ';
+        html +=     '<span style="color:#065F46">'+r.listingCount+' listed</span>';
+        html +=   '</div>';
+        html += '</div>';
+        // Sample-size disclosure — uses pre-computed opts via M3.2 soft refactor
+        html += renderSampleSizeDisclosure(r.retailerId, {
+          sampleSize: r.sampleSize,
+          earliest:   r.earliest,
+          latest:     r.latest,
+        });
+        // Top patterns
+        if(topPatterns.length === 0){
+          html += '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);padding:.45rem 0;font-style:italic">No structured outcome reasons captured — only status transitions recorded</div>';
+        } else {
+          topPatterns.forEach(function(p){
+            const sev = severityStyle(p.severity);
+            html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .55rem;border-left:3px solid '+sev.border+';background:'+sev.bg+';margin-bottom:.35rem">';
+            html +=   '<div style="flex:1;font-family:var(--sans);font-size:.72rem;color:#1F2937;line-height:1.45">'+escapeHtml(p.label)+'</div>';
+            html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:'+sev.fg+';font-weight:600">'+p.count+' · '+p.percentage+'%</div>';
+            html +=   '<div style="font-family:var(--mono);font-size:.5rem;color:'+sev.fg+';text-transform:uppercase;letter-spacing:.06em;padding:.1rem .35rem;border:1px solid '+sev.border+'">'+sev.label+'</div>';
+            html += '</div>';
+          });
+          if(r.patterns.length > 3){
+            html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:.25rem 0">'+(r.patterns.length-3)+' more pattern'+(r.patterns.length-3===1?'':'s') + ' not shown</div>';
+          }
+        }
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 let retailTemplatesSelRetailer = 'apotek_hjartat_se';
 let retailTemplatesSelSku = '';
 let retailTemplatesManualFields = {};
@@ -32002,6 +32257,14 @@ function renderRetailTracker(el){
 
   // Pipeline summary
   html += renderRetailPipelineSummary(subs);
+
+  // M3.2 (May 2026) — Pattern intelligence standalone view (Mount A).
+  // Renders unconditionally between pipeline summary and active submissions.
+  // Empty state when no outcomes captured yet — educational copy in expand.
+  if(typeof renderM3PatternsSection === 'function'){
+    const currentBrandId = (typeof brand !== 'undefined' && brand && (brand.id || brand.name)) || 'unknown';
+    html += renderM3PatternsSection(currentBrandId);
+  }
 
   // Add submission form (when open)
   if(retailTrackerAddOpen){
