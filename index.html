@@ -20,6 +20,8 @@
     --amber: #F59E0B;
     --red: #EF4444;
     --blue: #1E40AF;
+    --sage: #7A9B7E;        /* forward-aligned with Brand Identity Refresh */
+    --terracotta: #D97757;  /* forward-aligned with Brand Identity Refresh */
     --serif: 'Playfair Display', Georgia, serif;
     --sans: 'DM Sans', system-ui, sans-serif;
     --mono: 'DM Mono', monospace;
@@ -31822,9 +31824,430 @@ function invalidateM3PatternCache(){
   _m3PatternCache = null;
 }
 
+// ── M3.3 Brand Outcome Dashboard (May 2026) ───────────────────────────
+//
+// Dashboard surface in Submission Tracker (Mount: before Pattern Intelligence
+// per Q1 lock). Closes Task H + M3 / ATM Stage 1.
+//
+// Reuses _m3AggregatePatternsForBrand for base stats. Extends with:
+//   - Time-window filtering (30d/90d/365d/all)
+//   - Optional retailer filter
+//   - Listing rate, strongest-performance retailer, top rejection reason
+//   - Weekly buckets for trend chart
+//   - Recent outcomes list (5 most recent terminal, brand-wide per Q5)
+//
+// Single read surface (Rule 8): _m3DashboardData. Multiple write paths
+// (filter handlers, mount).
+
+let _m3DashWindow   = '90d';  // '30d' | '90d' | '365d' | 'all'
+let _m3DashRetailer = 'all';  // 'all' | retailerId
+
+function _m3DashSetWindow(val){
+  _m3DashWindow = val;
+  if(typeof renderPage === 'function') renderPage('retail-tracker');
+}
+
+function _m3DashSetRetailer(val){
+  _m3DashRetailer = val;
+  if(typeof renderPage === 'function') renderPage('retail-tracker');
+}
+
+// Time-window cutoff in ms epoch (null = all-time)
+function _m3DashWindowCutoff(window){
+  if(window === '30d')  return Date.now() - 30*24*60*60*1000;
+  if(window === '90d')  return Date.now() - 90*24*60*60*1000;
+  if(window === '365d') return Date.now() - 365*24*60*60*1000;
+  return null;
+}
+
+// Dashboard data helper. Pure read. Returns rich object consumed by
+// renderM3OutcomeDashboard + renderM3TrendChart.
+function _m3DashboardData(brandId, opts){
+  opts = opts || {};
+  const window   = opts.window   || _m3DashWindow;
+  const retailer = opts.retailer || _m3DashRetailer;
+  const cutoff   = _m3DashWindowCutoff(window);
+
+  // Outcome view shape (s.outcomeType, s.outcomeTimestamp). retailerName
+  // looked up from RETAILER_REGISTRY.
+  const subs = (typeof getOutcomesForBrand === 'function') ? getOutcomesForBrand(brandId) : [];
+  const retailerNameById = {};
+  if(typeof RETAILER_REGISTRY !== 'undefined' && Array.isArray(RETAILER_REGISTRY)){
+    RETAILER_REGISTRY.forEach(function(r){ retailerNameById[r.id] = r.name; });
+  }
+
+  // Window-filtered terminal outcomes
+  const terminalInWindow = subs.filter(function(s){
+    if(s.outcomeType !== 'rejected' && s.outcomeType !== 'listed') return false;
+    if(!cutoff) return true;
+    return s.outcomeTimestamp && new Date(s.outcomeTimestamp).getTime() >= cutoff;
+  });
+  // Retailer-filtered (applies to cards + chart, NOT recent list per Q5)
+  const filtered = (retailer === 'all')
+    ? terminalInWindow
+    : terminalInWindow.filter(function(s){ return s.retailerId === retailer; });
+
+  // Headline card 1: total submissions (all-time, brand-wide, ignores filters)
+  const totalSubmissions = subs.length;
+
+  // Headline card 2: listing rate within filter
+  const rejectionCount = filtered.filter(function(s){ return s.outcomeType === 'rejected'; }).length;
+  const listingCount   = filtered.filter(function(s){ return s.outcomeType === 'listed';   }).length;
+  const totalTerminal  = filtered.length;
+  const listingRate    = totalTerminal > 0 ? Math.round((listingCount / totalTerminal) * 100) : null;
+
+  // Headline card 3: strongest performance retailer (highest listing rate,
+  // sampleSize ≥ 3, ties by absolute listing count)
+  // NOTE: applies to time-window filtered data, but NOT retailer filter
+  // (retailer filter would defeat the purpose of finding "which retailer best").
+  // Build per-retailer stats over terminalInWindow.
+  const perRetailerStats = {};
+  terminalInWindow.forEach(function(s){
+    const rid = s.retailerId || 'unknown';
+    if(!perRetailerStats[rid]){
+      perRetailerStats[rid] = { id: rid, name: retailerNameById[rid] || rid, listing: 0, rejection: 0, total: 0 };
+    }
+    perRetailerStats[rid].total++;
+    if(s.outcomeType === 'listed')   perRetailerStats[rid].listing++;
+    if(s.outcomeType === 'rejected') perRetailerStats[rid].rejection++;
+  });
+  let strongest = null;
+  Object.values(perRetailerStats).forEach(function(r){
+    if(r.total < 3) return;
+    const rate = r.listing / r.total;
+    if(!strongest || rate > strongest._rate ||
+       (rate === strongest._rate && r.listing > strongest.listing)){
+      strongest = { id: r.id, name: r.name, sampleSize: r.total, listingRate: Math.round(rate * 100), listing: r.listing, _rate: rate };
+    }
+  });
+
+  // Headline card 4: top rejection reason (across all rejections in filter)
+  const rejectionsByCode = {};
+  filtered.filter(function(s){ return s.outcomeType === 'rejected' && s.outcomeReasonStructured; })
+    .forEach(function(s){
+      rejectionsByCode[s.outcomeReasonStructured] = (rejectionsByCode[s.outcomeReasonStructured] || 0) + 1;
+    });
+  let topRejection = null;
+  Object.keys(rejectionsByCode).forEach(function(code){
+    const count = rejectionsByCode[code];
+    if(!topRejection || count > topRejection.count){
+      const mapping = (typeof mapTaxonomyToPattern === 'function') ? mapTaxonomyToPattern(code) : null;
+      topRejection = {
+        code:       code,
+        label:      (mapping && mapping.label) || code,
+        count:      count,
+        rejectionCount: rejectionCount,
+        percentage: rejectionCount > 0 ? Math.round((count / rejectionCount) * 100) : 0,
+        severity:   (mapping && mapping.severity) || 'unknown',
+      };
+    }
+  });
+
+  // Weekly buckets for chart (filtered set)
+  // Determine bucket range from window
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  let bucketCount, rangeStart;
+  if(window === '30d'){ bucketCount = 5;  rangeStart = now - 5*weekMs;  }
+  if(window === '90d'){ bucketCount = 13; rangeStart = now - 13*weekMs; }
+  if(window === '365d'){ bucketCount = 52; rangeStart = now - 52*weekMs; }
+  if(window === 'all'){
+    // Determine earliest outcome to set range
+    const earliestTs = filtered.reduce(function(min, s){
+      const t = new Date(s.outcomeTimestamp || 0).getTime();
+      return t && (!min || t < min) ? t : min;
+    }, null);
+    if(earliestTs){
+      rangeStart = earliestTs;
+      bucketCount = Math.max(4, Math.ceil((now - earliestTs) / weekMs));
+      if(bucketCount > 52) bucketCount = 52;  // cap at 1 year of weekly buckets
+      rangeStart = now - bucketCount * weekMs;
+    } else {
+      bucketCount = 13; rangeStart = now - 13 * weekMs;
+    }
+  }
+  const buckets = [];
+  for(let i = 0; i < bucketCount; i++){
+    buckets.push({
+      start:     rangeStart + i * weekMs,
+      end:       rangeStart + (i+1) * weekMs,
+      listing:   0,
+      rejection: 0,
+    });
+  }
+  filtered.forEach(function(s){
+    const t = new Date(s.outcomeTimestamp || 0).getTime();
+    if(!t) return;
+    const idx = Math.floor((t - rangeStart) / weekMs);
+    if(idx < 0 || idx >= bucketCount) return;
+    if(s.outcomeType === 'listed')   buckets[idx].listing++;
+    if(s.outcomeType === 'rejected') buckets[idx].rejection++;
+  });
+
+  // Recent outcomes list — 5 most recent, BRAND-WIDE (not retailer-filtered
+  // per Q5 lock asymmetry: recent list always shows latest activity across
+  // all retailers regardless of dashboard retailer filter)
+  const recent = terminalInWindow
+    .slice()
+    .sort(function(a, b){
+      const ta = new Date(a.outcomeTimestamp || 0).getTime();
+      const tb = new Date(b.outcomeTimestamp || 0).getTime();
+      return tb - ta;
+    })
+    .slice(0, 5)
+    .map(function(s){
+      const mapping = s.outcomeReasonStructured && typeof mapTaxonomyToPattern === 'function'
+        ? mapTaxonomyToPattern(s.outcomeReasonStructured) : null;
+      return {
+        id:           s.id,
+        retailerId:   s.retailerId,
+        retailerName: retailerNameById[s.retailerId] || s.retailerId,
+        outcomeType:  s.outcomeType,
+        timestamp:    s.outcomeTimestamp,
+        reasonLabel:  (mapping && mapping.label) || (s.outcomeReasonStructured ? s.outcomeReasonStructured : null),
+      };
+    });
+
+  // Retailer dropdown options — retailers with at least 1 outcome in window
+  const retailerOptions = Object.values(perRetailerStats)
+    .map(function(r){ return { id: r.id, name: r.name }; })
+    .sort(function(a, b){ return (a.name || '').localeCompare(b.name || ''); });
+
+  return {
+    window:           window,
+    retailer:         retailer,
+    totalSubmissions: totalSubmissions,
+    totalTerminal:    totalTerminal,
+    listingRate:      listingRate,
+    listingCount:     listingCount,
+    rejectionCount:   rejectionCount,
+    strongest:        strongest,
+    topRejection:     topRejection,
+    buckets:          buckets,
+    rangeStart:       rangeStart,
+    rangeEnd:         now,
+    recent:           recent,
+    retailerOptions:  retailerOptions,
+  };
+}
+
 function toggleM3Patterns(){
   m3PatternsExpanded = !m3PatternsExpanded;
   if(typeof renderPage === 'function') renderPage('retail-tracker');
+}
+
+// M3.3 trend chart — inline SVG bar chart per Q4 lock.
+// Colors via design tokens: var(--sage) for listings, var(--terracotta) for
+// rejections. Tokens added to CSS variables block; forward-aligned with
+// Brand Identity Refresh which will repurpose them broadly.
+function renderM3TrendChart(data){
+  const buckets = data.buckets || [];
+  if(buckets.length === 0){
+    return '';
+  }
+  // Determine max for Y-axis scaling
+  let maxCount = 0;
+  buckets.forEach(function(b){
+    const total = b.listing + b.rejection;
+    if(total > maxCount) maxCount = total;
+  });
+  // Empty state — all buckets zero
+  if(maxCount === 0){
+    return '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);text-align:center;padding:1.5rem;background:#F9F8F6;border:1px solid var(--border);margin-bottom:0">'
+         +   'No outcomes in this window — chart will populate as outcomes captured'
+         + '</div>';
+  }
+  // SVG geometry
+  const svgWidth = 700;
+  const svgHeight = 140;
+  const padL = 30;     // y-axis label space
+  const padR = 12;
+  const padT = 10;
+  const padB = 22;     // x-axis label space
+  const chartW = svgWidth - padL - padR;
+  const chartH = svgHeight - padT - padB;
+  const barGap = 2;
+  const barW = (chartW / buckets.length) - barGap;
+  // Date formatter for x-axis
+  const fmtMonth = function(ms){
+    try { return new Date(ms).toLocaleDateString('en-GB', {month:'short', day:'numeric'}); }
+    catch(e){ return ''; }
+  };
+  // Build bars
+  let bars = '';
+  buckets.forEach(function(b, i){
+    const x = padL + i * (barW + barGap);
+    const listingH   = chartH * (b.listing / maxCount);
+    const rejectionH = chartH * (b.rejection / maxCount);
+    const listingY   = padT + chartH - listingH;
+    const rejectionY = padT + chartH - listingH - rejectionH;
+    if(b.listing > 0){
+      bars += '<rect x="'+x.toFixed(1)+'" y="'+listingY.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+listingH.toFixed(1)+'" fill="var(--sage)"></rect>';
+    }
+    if(b.rejection > 0){
+      bars += '<rect x="'+x.toFixed(1)+'" y="'+rejectionY.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+rejectionH.toFixed(1)+'" fill="var(--terracotta)"></rect>';
+    }
+  });
+  // Y-axis tick lines + labels (just max + 0)
+  const yMax     = '<line x1="'+padL+'" y1="'+padT+'" x2="'+(svgWidth-padR)+'" y2="'+padT+'" stroke="#EDE9E1" stroke-width="1"/>'
+                +  '<text x="'+(padL-4)+'" y="'+(padT+3)+'" text-anchor="end" font-family="monospace" font-size="8" fill="#9A9489">'+maxCount+'</text>';
+  const yZero    = '<line x1="'+padL+'" y1="'+(padT+chartH)+'" x2="'+(svgWidth-padR)+'" y2="'+(padT+chartH)+'" stroke="#EDE9E1" stroke-width="1"/>'
+                +  '<text x="'+(padL-4)+'" y="'+(padT+chartH+3)+'" text-anchor="end" font-family="monospace" font-size="8" fill="#9A9489">0</text>';
+  // X-axis labels: first + middle + last bucket
+  const xLabels  = '<text x="'+(padL)+'" y="'+(svgHeight-6)+'" text-anchor="start" font-family="monospace" font-size="8" fill="#9A9489">'+fmtMonth(buckets[0].start)+'</text>'
+                +  (buckets.length > 4
+                    ? '<text x="'+(padL + chartW/2)+'" y="'+(svgHeight-6)+'" text-anchor="middle" font-family="monospace" font-size="8" fill="#9A9489">'+fmtMonth(buckets[Math.floor(buckets.length/2)].start)+'</text>'
+                    : '')
+                +  '<text x="'+(svgWidth-padR)+'" y="'+(svgHeight-6)+'" text-anchor="end" font-family="monospace" font-size="8" fill="#9A9489">'+fmtMonth(buckets[buckets.length-1].end)+'</text>';
+  // Legend
+  const legend = '<div style="display:flex;justify-content:flex-end;gap:.8rem;font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.3rem">'
+               +   '<div style="display:flex;align-items:center;gap:.3rem"><span style="display:inline-block;width:10px;height:10px;background:var(--sage)"></span>listings</div>'
+               +   '<div style="display:flex;align-items:center;gap:.3rem"><span style="display:inline-block;width:10px;height:10px;background:var(--terracotta)"></span>rejections</div>'
+               + '</div>';
+  return '<div style="margin-top:.4rem">'
+       +   legend
+       +   '<svg viewBox="0 0 '+svgWidth+' '+svgHeight+'" style="width:100%;height:auto;display:block;background:#F9F8F6;border:1px solid var(--border)" preserveAspectRatio="none">'
+       +     yMax + yZero + bars + xLabels
+       +   '</svg>'
+       + '</div>';
+}
+
+// M3.3 Brand Outcome Dashboard render — Mount: Submission Tracker, before
+// Pattern Intelligence (Q1 lock). Unconditional render per Rule 15.
+function renderM3OutcomeDashboard(brandId){
+  const data = _m3DashboardData(brandId);
+
+  // Window dropdown options
+  const windowOptions = [
+    {v:'30d',  l:'Last 30 days'},
+    {v:'90d',  l:'Last 90 days'},
+    {v:'365d', l:'Last 365 days'},
+    {v:'all',  l:'All time'},
+  ];
+  const windowSelect = '<select onchange="_m3DashSetWindow(this.value)" '
+                     + 'style="padding:.35rem .5rem;font-family:var(--sans);font-size:.7rem;border:1px solid var(--border);background:#fff;cursor:pointer">'
+                     + windowOptions.map(function(o){
+                         return '<option value="'+o.v+'"'+(data.window===o.v?' selected':'')+'>'+o.l+'</option>';
+                       }).join('')
+                     + '</select>';
+  const retailerSelect = '<select onchange="_m3DashSetRetailer(this.value)" '
+                       + 'style="padding:.35rem .5rem;font-family:var(--sans);font-size:.7rem;border:1px solid var(--border);background:#fff;cursor:pointer;min-width:140px">'
+                       + '<option value="all"'+(data.retailer==='all'?' selected':'')+'>All retailers</option>'
+                       + data.retailerOptions.map(function(r){
+                           return '<option value="'+r.id+'"'+(data.retailer===r.id?' selected':'')+'>'+escapeHtml(r.name)+'</option>';
+                         }).join('')
+                       + '</select>';
+
+  // Relative date formatter
+  const relDate = function(iso){
+    if(!iso) return '—';
+    const t = new Date(iso).getTime();
+    if(!t) return '—';
+    const diff = Date.now() - t;
+    const day = 24*60*60*1000;
+    if(diff < day*2)    return Math.max(1, Math.round(diff/day)) + 'd ago';
+    if(diff < day*14)   return Math.round(diff/day) + 'd ago';
+    if(diff < day*60)   return Math.round(diff/(day*7)) + 'w ago';
+    return Math.round(diff/(day*30)) + 'mo ago';
+  };
+
+  // Status pill helper
+  const statusPill = function(outcomeType){
+    if(outcomeType === 'listed'){
+      return '<span style="display:inline-block;padding:.1rem .4rem;background:#D1FAE5;color:#065F46;font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">Listed</span>';
+    }
+    return '<span style="display:inline-block;padding:.1rem .4rem;background:#FEE2E2;color:#991B1B;font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">Rejected</span>';
+  };
+
+  // Headline card builder
+  const card = function(label, big, caption){
+    return '<div style="border:1px solid var(--border);background:#fff;padding:.85rem 1rem;flex:1;min-width:160px">'
+         +   '<div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem">'+label+'</div>'
+         +   '<div style="font-family:var(--serif);font-size:1.5rem;color:var(--navy);line-height:1.1;margin-bottom:.25rem">'+big+'</div>'
+         +   '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);line-height:1.4">'+caption+'</div>'
+         + '</div>';
+  };
+  const nullCard = function(label, message){
+    return '<div style="border:1px solid var(--border);background:#F9F8F6;padding:.85rem 1rem;flex:1;min-width:160px">'
+         +   '<div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem">'+label+'</div>'
+         +   '<div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);font-style:italic;padding:.5rem 0">'+message+'</div>'
+         + '</div>';
+  };
+
+  // 4 headline cards per Q2 lock
+  const card1 = card('Submissions', data.totalSubmissions, 'all-time');
+  const card2 = card(
+    'Listing rate',
+    data.listingRate !== null ? data.listingRate + '%' : '—',
+    data.totalTerminal > 0 ? 'N=' + data.totalTerminal + ' outcome' + (data.totalTerminal===1?'':'s') : 'No outcomes captured yet'
+  );
+  const card3 = data.strongest
+    ? card('Strongest performance', escapeHtml(data.strongest.name), data.strongest.listingRate + '% · N=' + data.strongest.sampleSize)
+    : nullCard('Strongest performance', 'Need 3+ outcomes per retailer');
+  const card4 = data.topRejection
+    ? card(
+        'Top rejection reason',
+        '<span style="font-family:var(--sans);font-size:.95rem;font-weight:600">'+escapeHtml(data.topRejection.label)+'</span>',
+        data.topRejection.count + ' of ' + data.topRejection.rejectionCount + ' (' + data.topRejection.percentage + '%)'
+      )
+    : nullCard('Top rejection reason', 'No rejections captured');
+
+  // Recent outcomes list — 5 rows, brand-wide per Q5 asymmetry, clickable
+  let recentHtml = '';
+  if(data.recent.length === 0){
+    recentHtml = '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);padding:.6rem .85rem;font-style:italic">No outcomes in this window</div>';
+  } else {
+    data.recent.forEach(function(r){
+      const reason = r.reasonLabel || '(no reason captured)';
+      recentHtml += '<div onclick="toggleRetailSubmissionExpand(\''+r.id+'\')" '
+                 +  'style="display:flex;align-items:center;gap:.6rem;padding:.5rem .85rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s" '
+                 +  'onmouseover="this.style.background=\'#F9F8F6\'" onmouseout="this.style.background=\'\'">'
+                 +    '<div style="font-family:var(--sans);font-size:.78rem;font-weight:500;color:var(--navy);min-width:140px">'+escapeHtml(r.retailerName)+'</div>'
+                 +    '<div style="flex-shrink:0">'+statusPill(r.outcomeType)+'</div>'
+                 +    '<div style="flex:1;font-family:var(--sans);font-size:.7rem;color:'+(r.reasonLabel?'#374151':'var(--muted)')+(r.reasonLabel?'':';font-style:italic')+';line-height:1.4">'+escapeHtml(reason)+'</div>'
+                 +    '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);min-width:60px;text-align:right">'+relDate(r.timestamp)+'</div>'
+                 +  '</div>';
+    });
+  }
+
+  // Assemble dashboard
+  let html = '<div style="border:1px solid var(--border);background:#fff;margin:1.25rem 0 .6rem">';
+  // Header + filter row
+  html +=   '<div style="padding:.85rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem">';
+  html +=     '<div>';
+  html +=       '<div style="font-family:var(--serif);font-size:.95rem;color:var(--navy)">Outcome dashboard</div>';
+  html +=       '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.15rem;letter-spacing:.04em">';
+  html +=         data.totalSubmissions === 0
+                    ? 'No submissions yet'
+                    : data.totalTerminal+' terminal outcome'+(data.totalTerminal===1?'':'s')+' in window · '+data.totalSubmissions+' total submission'+(data.totalSubmissions===1?'':'s');
+  html +=       '</div>';
+  html +=     '</div>';
+  html +=     '<div style="display:flex;gap:.4rem;align-items:center">';
+  html +=       windowSelect;
+  html +=       retailerSelect;
+  html +=     '</div>';
+  html +=   '</div>';
+  // Body
+  html +=   '<div style="padding:1rem">';
+  // 4 cards in flex row
+  html +=     '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">';
+  html +=       card1 + card2 + card3 + card4;
+  html +=     '</div>';
+  // Chart (Edit 3 will inject this)
+  if(typeof renderM3TrendChart === 'function'){
+    html +=   renderM3TrendChart(data);
+  }
+  // Recent outcomes
+  html +=     '<div style="margin-top:1.1rem">';
+  html +=       '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Recent outcomes</div>';
+  html +=       '<div style="border:1px solid var(--border);background:#fff">';
+  html +=         recentHtml;
+  html +=       '</div>';
+  html +=       (data.recent.length > 0 ? '<div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.4rem;text-align:right">click row → expand submission below</div>' : '');
+  html +=     '</div>';
+  html +=   '</div>';
+  html += '</div>';
+  return html;
 }
 
 // Standalone view (Mount A). Collapsible section between pipeline summary
@@ -32262,6 +32685,13 @@ function renderRetailTracker(el){
 
   // Pipeline summary
   html += renderRetailPipelineSummary(subs);
+
+  // M3.3 (May 2026) — Brand Outcome Dashboard (Q1 lock: before Patterns).
+  // Closes Task H + M3 / ATM Stage 1. Renders unconditionally.
+  if(typeof renderM3OutcomeDashboard === 'function'){
+    const currentBrandIdM33 = (typeof brand !== 'undefined' && brand && (brand.id || brand.name)) || 'unknown';
+    html += renderM3OutcomeDashboard(currentBrandIdM33);
+  }
 
   // M3.2 (May 2026) — Pattern intelligence standalone view (Mount A).
   // Renders unconditionally between pipeline summary and active submissions.
