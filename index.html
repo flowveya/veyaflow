@@ -32190,7 +32190,9 @@ function renderM3OutcomeDashboard(brandId){
         '<span style="font-family:var(--sans);font-size:.95rem;font-weight:600">'+escapeHtml(data.topRejection.label)+'</span>',
         data.topRejection.count + ' of ' + data.topRejection.rejectionCount + ' (' + data.topRejection.percentage + '%)'
       )
-    : nullCard('Top rejection reason', 'No rejections captured');
+    : data.rejectionCount > 0
+      ? nullCard('Top rejection reason', 'Rejections captured without reason codes — populate via outcome modal')
+      : nullCard('Top rejection reason', 'No rejections captured');
 
   // Recent outcomes list — 5 rows, brand-wide per Q5 asymmetry, clickable
   let recentHtml = '';
