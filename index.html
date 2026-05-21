@@ -1407,6 +1407,9 @@ function loadState(){
     const sk=localStorage.getItem('ns_skus');
     if(sk) skus=safeJsonParse(sk)||[];
     if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
+    // SKU Schema Rationalization Phase 2 — migrate phantom fields to canonical names.
+    // Idempotent: checks sku._schemaVersion before applying.
+    if(typeof migrateSkuSchemaV2 === 'function') migrateSkuSchemaV2();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -4442,7 +4445,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
     } else if(isTextile){
       if(sku.fibreComposition||sku.fibreLabel){ comp+=12; greens.push('Fibre composition label confirmed'); }
       else{ blockers.push({id:'fibreLabelMissing',level:'red',label:'Fibre composition labelling missing',impact:'EU Textile Labelling Regulation 1007/2011: fibre % in local language mandatory.'}); }
-      if(sku.eudrCompliant||brand&&brand.eudrCompliant){ comp+=12; greens.push('EUDR due diligence on file'); }
+      if(isEudrCompliant(sku.eudrStatus) || (brand && isEudrCompliant(brand.eudrStatus))){ comp+=12; greens.push('EUDR due diligence on file'); }
       else{ blockers.push({id:'eudrMissing',level:'red',label:'EUDR due diligence required — December 2026',impact:'EUDR in scope for cotton, leather, wood-based fibres from December 30 2026.'}); }
       if(sku.gots||sku.oekotex||sku.grs){ comp+=11; greens.push('Textile certification on file (GOTS/OEKO-TEX/GRS)'); }
       else{ blockers.push({id:'textileCertMissing',level:'amber',label:'No textile sustainability certification',impact:'dm, Zalando, and most EU fashion retailers require GOTS or OEKO-TEX.'}); comp+=3; }
@@ -5518,7 +5521,7 @@ const COMPLIANCE_RADAR_ITEMS = [
     },
   },
   // Cross-category
-  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>s?.eudrCompliant||b?.eudrCompliant?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
+  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>isEudrCompliant(s?.eudrStatus)||isEudrCompliant(b?.eudrStatus)?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
   {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
   {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
 ];
@@ -14321,6 +14324,94 @@ function assertNoPrivateData(str){
   if(leaked.length>0) console.warn('VeyaFlow privacy warning: private field in prompt:', leaked);
 }
 
+// ── EUDR compliance derived getter ────────────────────────────────────
+// Replaces phantom field `eudrCompliant` reads. The canonical SKU field is
+// `eudrStatus` (string enum), but two form sites use DIFFERENT vocabularies
+// for the same semantic field (Watchpoint M, backlog-logged for future
+// reconciliation):
+//
+//   Cosmetic Tab 2 (L16493): 'Compliant — documentation on file' / 'In progress' /
+//                            'Not applicable (synthetic only)' / 'Requires assessment'
+//   Device Tab 2   (L16581): 'Compliant' / 'Not in scope' / 'In progress'
+//
+// Both 'Compliant' and 'Compliant — documentation on file' map to compliant=true.
+// All other values (including 'In progress', 'Not in scope', 'Not applicable',
+// 'Requires assessment', null, '') map to compliant=false.
+//
+// When Watchpoint M reconciliation lands, this helper's match list converges
+// or normalizes. Read sites stay unchanged.
+function isEudrCompliant(status){
+  if(!status) return false;
+  const s = String(status).trim();
+  return s === 'Compliant' || s === 'Compliant — documentation on file';
+}
+
+// ── SKU Schema Rationalization — Phase 2 migration (May 2026) ─────────
+// Idempotent: marks SKU._schemaVersion=2 on completion, skips re-runs.
+//
+// Migrates existing SKU records from phantom field names to canonical
+// names per Phase 2a-2c locks:
+//   eudrCompliant (boolean) → eudrStatus (enum) via conservative mapping
+//   packagingType → packagingMaterial (same domain rename)
+//   packagingDescription + recyclable → DROPPED (never canonically populated)
+//   dppData[id].fields.carbonFootprint → carbonKg (same semantic, brand-provided)
+//
+// Conservative mappings preserve data when possible, prefer empty over
+// fabricated default. Migration runs once on first load post-deploy.
+function migrateSkuSchemaV2(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  let migratedCount = 0;
+  let dppDirty = false;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion === 2) return;  // idempotency
+
+    // eudrCompliant phantom → eudrStatus enum
+    if(sku.eudrCompliant !== undefined){
+      // Conservative: true → 'Compliant' (canonical short form, device-form
+      // vocabulary; cosmetic form long-form maps via isEudrCompliant). 
+      // false/null → leave eudrStatus untouched (don't fabricate 'Not in scope'
+      // which has specific semantic).
+      if(sku.eudrCompliant === true && !sku.eudrStatus){
+        sku.eudrStatus = 'Compliant';
+      }
+      delete sku.eudrCompliant;
+      migratedCount++;
+    }
+    // packagingType phantom → packagingMaterial
+    if(sku.packagingType !== undefined){
+      if(sku.packagingType && !sku.packagingMaterial){
+        sku.packagingMaterial = sku.packagingType;
+      }
+      delete sku.packagingType;
+      migratedCount++;
+    }
+    // Drop pure phantoms (never legitimately populated)
+    if(sku.packagingDescription !== undefined){ delete sku.packagingDescription; migratedCount++; }
+    if(sku.recyclable !== undefined){ delete sku.recyclable; migratedCount++; }
+
+    // DPP carbonFootprint → carbonKg (in dppData store; Phase 5 will further
+    // migrate from dppData → SKU directly)
+    if(typeof dppData !== 'undefined' && dppData[sku.id] && dppData[sku.id].fields){
+      const dpf = dppData[sku.id].fields;
+      if(dpf.carbonFootprint !== undefined){
+        if(dpf.carbonFootprint && !dpf.carbonKg){
+          dpf.carbonKg = dpf.carbonFootprint;
+        }
+        delete dpf.carbonFootprint;
+        dppDirty = true;
+        migratedCount++;
+      }
+    }
+
+    sku._schemaVersion = 2;
+  });
+  if(migratedCount > 0){
+    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 2 SKU migration save failed:', e); }
+    if(dppDirty && typeof saveDPP === 'function') saveDPP();
+    console.log('VeyaFlow SKU Schema Rationalization Phase 2: migrated '+migratedCount+' phantom field reference(s) across '+skus.length+' SKU(s).');
+  }
+}
+
 
 let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
 let skuUploadData = null; // parsed CSV rows
@@ -15454,7 +15545,7 @@ function renderCPNPModal(skuId, view){
     {section:'D. Physical properties',fields:[
       {portal:'pH value',                 value: sku.ph||'',                        filled:!!sku.ph,                        required:false, hint:'Required for products pH <3 or >10'},
       {portal:'SPF / UVA-PF',             value: sku.spf||'',                       filled:!!sku.spf,                       required:false, hint:'Required for sun protection products'},
-      {portal:'Packaging description',    value: sku.packagingType||sku.packagingDescription||'',filled:!!(sku.packagingType||sku.packagingDescription),required:true},
+      {portal:'Packaging description',    value: sku.packagingMaterial||'',filled:!!sku.packagingMaterial,required:true},
       {portal:'Net content',              value: sku.netContent?(sku.netContent+' '+( sku.netUnit||'ml')):'',filled:!!sku.netContent,required:true},
     ]},
     {section:'E. Safety & compliance',fields:[
@@ -16259,7 +16350,7 @@ function saveSkuForm(){
       loadDPP();
       if(!dppData[skuForm.id]) dppData[skuForm.id]={fields:{}};
       if(!dppData[skuForm.id].fields) dppData[skuForm.id].fields={};
-      dppData[skuForm.id].fields.carbonFootprint = totalCarbon.toFixed(2);
+      dppData[skuForm.id].fields.carbonKg = totalCarbon.toFixed(2);
       dppData[skuForm.id].traceabilitySource = true;
       saveDPP();
     }
@@ -27403,7 +27494,7 @@ function calcBrandESGScore(retailerId){
 
   // Packaging subscore
   const pkgTarget = esg.packagingSustainability?.targetRecyclable||75;
-  const hasPkgData = !!(sku?.packagingType||sku?.packagingMaterial||sku?.recyclable);
+  const hasPkgData = !!sku?.packagingMaterial;
   const pkgScore = hasPkgData ? 70 : 40; // partial credit if no data
   score += pkgScore * (w.packaging/100);
 
@@ -27435,7 +27526,7 @@ function checkMandatoryESG(retailerId){
   return esg.mandatoryRequirements.map(req=>{
     let met = false;
     if(req.id==='animal_testing') met = certs.some(c=>c.includes('leaping bunny')||c.includes('cruelty')||c.includes('vegan'))||!!(sku?.noAnimalTesting||brand?.crueltyFree);
-    else if(req.id==='packaging_recyclable') met = !!(sku?.recyclable||sku?.packagingMaterial);
+    else if(req.id==='packaging_recyclable') met = !!sku?.packagingMaterial;
     else if(req.id==='inci_transparency') met = !!(sku?.inci||sku?.ingredients);
     else if(req.id==='iso14001') met = certs.some(c=>c.includes('iso 14001')||c.includes('iso14001')||c.includes('ems'));
     else if(req.id==='gmp_cert') met = certs.some(c=>c.includes('iso 22716')||c.includes('gmp'));
@@ -29552,10 +29643,10 @@ function csrdAutoFill(){
     // field f.recycledPackaging (NOT f.recycledProduct which is the SKU body).
     if(!answers.recycled_pkg && dppFields?.recycledPackaging)
       answers.recycled_pkg = dppFields.recycledPackaging;
-    if(!answers.recyclable_pkg && sku0.packagingType)
-      answers.recyclable_pkg = sku0.packagingType.toLowerCase().includes('glass')||sku0.packagingType.toLowerCase().includes('metal')?'yes':sku0.packagingType.toLowerCase().includes('plastic')?'partial':'unknown';
+    if(!answers.recyclable_pkg && sku0.packagingMaterial)
+      answers.recyclable_pkg = sku0.packagingMaterial.toLowerCase().includes('glass')||sku0.packagingMaterial.toLowerCase().includes('metal')?'yes':sku0.packagingMaterial.toLowerCase().includes('plastic')?'partial':'unknown';
     if(!answers.eudr_compliance)
-      answers.eudr_compliance = (sku0.eudrCompliant||brand?.eudrCompliant) ? 'EUDR due diligence completed — no deforestation risk identified in supply chain.' : '';
+      answers.eudr_compliance = (isEudrCompliant(sku0.eudrStatus)||isEudrCompliant(brand?.eudrStatus)) ? 'EUDR due diligence completed — no deforestation risk identified in supply chain.' : '';
     if(!answers.certifications && allCerts.length)
       answers.certifications = allCerts.join(', ');
   }
@@ -29566,13 +29657,14 @@ function csrdAutoFill(){
     answers.social_audit = 'Yes — '+auditedSupplier.certifications.join(', ');
   }
 
-  // Auto-fill scope1 from DPP carbon. Path falls through three field names
-  // because DPP setters write to different keys depending on entry path:
-  //   carbonFootprint  set by ingredient traceability (L15667)
-  //   carbonKg         set by direct user entry (L29491)
-  //   carbonEstimated  set by AI estimate flow (L29473)
+  // Auto-fill scope1 from DPP carbon. Two canonical fields (3→2 post Phase 2c):
+  //   carbonKg         brand-provided exact value (direct entry OR ingredient
+  //                    traceability calculation — both BRAND_PROVIDED confidence)
+  //   carbonEstimated  AI category-average estimate (ESTIMATED_CATEGORY_AVERAGE
+  //                    confidence — kept SEPARATE to preserve regulatory provenance)
+  // Read order: prefer brand-provided exact over AI estimate.
   if(dppFields && !answers.scope1){
-    const carbon = dppFields.carbonFootprint || dppFields.carbonKg || dppFields.carbonEstimated;
+    const carbon = dppFields.carbonKg || dppFields.carbonEstimated;
     if(carbon) answers.scope1 = carbon;
   }
 
