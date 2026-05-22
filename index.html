@@ -1416,6 +1416,9 @@ function loadState(){
     // SKU Schema Rationalization Phase 4 — backfill packaging factory defaults
     // + Watchpoint R universal compliance fields on older SKUs.
     if(typeof migrateSkuSchemaV4 === 'function') migrateSkuSchemaV4();
+    // SKU Schema Rationalization Phase 4 hotfix V5 — normalize packagingLanguages
+    // from array (wrong type from Phase 4 ship) to comma-separated string.
+    if(typeof migrateSkuSchemaV5 === 'function') migrateSkuSchemaV5();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -14500,7 +14503,7 @@ const _PHASE4_BACKFILL_DEFAULTS = {
   packagingFSC:         '',
   packagingBarcode:     '',
   packagingQR:          '',
-  packagingLanguages:   [],
+  packagingLanguages:   '',
   packagingDimensions:  '',
   packagingNotes:       '',
   // Universal compliance (Watchpoint R — backfill for SKUs older than
@@ -14532,6 +14535,44 @@ function migrateSkuSchemaV4(){
   if(backfilledCount > 0){
     try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 4 SKU migration save failed:', e); }
     console.log('VeyaFlow SKU Schema Rationalization Phase 4: backfilled '+backfilledCount+' missing field default(s) across '+touchedSkus+' SKU(s).');
+  }
+}
+
+
+// ── SKU Schema Rationalization — Phase 4 hotfix V5 (May 22 2026) ──────
+// Corrective migration for Phase 4 ship that defined packagingLanguages
+// factory default as array []. Codebase actually treats this field as a
+// comma-separated string (L15326 .split, L15358 interpolation, L17270
+// text input, L17271 oninput writes input.value). The array default
+// introduced latent TypeError risk (Array.split() throws) and silent
+// type-flip on first form interaction.
+//
+// V5 normalizes any array-typed packagingLanguages to comma-separated
+// string. Conservative: empty array → '', populated → values.join(', ').
+// Idempotent via _schemaVersion >= 5 check.
+//
+// Process lesson logged for future briefs (Standing Rule #17 candidate):
+// Field type assumptions in briefs require read-site grep verification
+// before locking. Field-name semantics (plural → array intuition) are
+// not a substitute for codebase-contract evidence.
+function migrateSkuSchemaV5(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  let normalizedCount = 0;
+  let touched = false;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion >= 5) return;  // idempotency
+    if(Array.isArray(sku.packagingLanguages)){
+      sku.packagingLanguages = sku.packagingLanguages.join(', ');
+      normalizedCount++;
+    }
+    sku._schemaVersion = 5;
+    touched = true;
+  });
+  if(touched){
+    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 4 hotfix V5 save failed:', e); }
+    if(normalizedCount > 0){
+      console.log('VeyaFlow SKU Schema — Phase 4 hotfix V5: normalized '+normalizedCount+' packagingLanguages array→string conversion(s).');
+    }
   }
 }
 
@@ -14582,7 +14623,7 @@ function newSkuForm(){
     // match form write pattern: enum selects produce strings (not booleans),
     // number inputs produce input.value strings (not numbers).
     packagingMaterial:'', packagingRecycledPct:'', packagingFSC:'',
-    packagingBarcode:'', packagingQR:'', packagingLanguages:[],
+    packagingBarcode:'', packagingQR:'', packagingLanguages:'',
     packagingDimensions:'', packagingNotes:'',
     // Legacy product-type fields (textile/supplement/food/garment) pruned from
     // factory output May 2026 Phase 3. Form's oninput lazy-creates them when
