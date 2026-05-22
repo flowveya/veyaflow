@@ -1413,6 +1413,9 @@ function loadState(){
     // SKU Schema Rationalization Phase 3 — clean empty pruned legacy fields.
     // Runs after V2 so phantom renames complete first.
     if(typeof migrateSkuSchemaV3 === 'function') migrateSkuSchemaV3();
+    // SKU Schema Rationalization Phase 4 — backfill packaging factory defaults
+    // + Watchpoint R universal compliance fields on older SKUs.
+    if(typeof migrateSkuSchemaV4 === 'function') migrateSkuSchemaV4();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -14475,6 +14478,64 @@ function migrateSkuSchemaV3(){
 }
 
 
+// ── SKU Schema Rationalization — Phase 4 migration (May 2026) ─────────
+// Combined Phase 4 (packaging factory backfill) + Watchpoint R (universal
+// compliance fields missing on older SKUs created before Phase 3 factory
+// added materialComposition + reachCompliant as universal init).
+//
+// Single-pass migration: for each SKU at _schemaVersion < 4, backfill any
+// missing keys from defaults table. Never overwrites existing values
+// (Tab 5 form-typed data preserved). Arrays cloned to prevent shared-
+// reference bugs. Idempotent via _schemaVersion=4 marker.
+//
+// For Cloud & Glow's 5 SKUs:
+//   - LED face mask (#0): missing universal fields + 8 packaging → ~10 keys
+//   - Gua Sha SKUs (#1-4): have universal fields, may miss packaging
+//     depending on Tab 5 interaction history → 0-8 keys each
+//   Expected total: 10-50 fields backfilled across 5 SKUs
+const _PHASE4_BACKFILL_DEFAULTS = {
+  // Packaging (Phase 4 — moved from form-only to factory-initialized)
+  packagingMaterial:    '',
+  packagingRecycledPct: '',
+  packagingFSC:         '',
+  packagingBarcode:     '',
+  packagingQR:          '',
+  packagingLanguages:   [],
+  packagingDimensions:  '',
+  packagingNotes:       '',
+  // Universal compliance (Watchpoint R — backfill for SKUs older than
+  // Phase 3 reclassification of materialComposition + reachCompliant as
+  // universal factory fields)
+  materialComposition:  '',
+  reachCompliant:       '',
+};
+
+function migrateSkuSchemaV4(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  let backfilledCount = 0;
+  let touchedSkus = 0;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion === 4) return;  // idempotency
+    let touched = false;
+    Object.keys(_PHASE4_BACKFILL_DEFAULTS).forEach(function(key){
+      if(!(key in sku)){
+        const def = _PHASE4_BACKFILL_DEFAULTS[key];
+        // Clone arrays to prevent shared-reference bugs across SKUs
+        sku[key] = Array.isArray(def) ? [] : def;
+        backfilledCount++;
+        touched = true;
+      }
+    });
+    if(touched) touchedSkus++;
+    sku._schemaVersion = 4;
+  });
+  if(backfilledCount > 0){
+    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 4 SKU migration save failed:', e); }
+    console.log('VeyaFlow SKU Schema Rationalization Phase 4: backfilled '+backfilledCount+' missing field default(s) across '+touchedSkus+' SKU(s).');
+  }
+}
+
+
 let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
 let skuUploadData = null; // parsed CSV rows
 let skuColumnMap = {};    // {veyafield: csvcolumn}
@@ -14515,6 +14576,14 @@ function newSkuForm(){
     // UN code + Wh required for lithium-battery shipping classification;
     // hsCode required for cross-border customs declarations.
     unCode:'', battWh:'', hsCode:'',
+    // Tab 5 — Packaging (May 2026 Phase 4 — added to factory, previously
+    // form-only writes via Tab 5 oninput handlers, causing schema drift
+    // between factory and form per Watchpoint A). Default types empirically
+    // match form write pattern: enum selects produce strings (not booleans),
+    // number inputs produce input.value strings (not numbers).
+    packagingMaterial:'', packagingRecycledPct:'', packagingFSC:'',
+    packagingBarcode:'', packagingQR:'', packagingLanguages:[],
+    packagingDimensions:'', packagingNotes:'',
     // Legacy product-type fields (textile/supplement/food/garment) pruned from
     // factory output May 2026 Phase 3. Form's oninput lazy-creates them when
     // user selects a legacy product type. Read sites use defensive `||` patterns.
