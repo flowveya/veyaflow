@@ -1410,6 +1410,9 @@ function loadState(){
     // SKU Schema Rationalization Phase 2 — migrate phantom fields to canonical names.
     // Idempotent: checks sku._schemaVersion before applying.
     if(typeof migrateSkuSchemaV2 === 'function') migrateSkuSchemaV2();
+    // SKU Schema Rationalization Phase 3 — clean empty pruned legacy fields.
+    // Runs after V2 so phantom renames complete first.
+    if(typeof migrateSkuSchemaV3 === 'function') migrateSkuSchemaV3();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -14413,6 +14416,65 @@ function migrateSkuSchemaV2(){
 }
 
 
+// ── SKU Schema Rationalization — Phase 3 migration (May 2026) ─────────
+// Cleans empty pruned legacy fields from current-product-type SKUs.
+// Idempotent via SKU._schemaVersion=3 marker.
+//
+// Phase 3 prune scope (factory no longer emits these):
+//   Textile-specific:   careInstructions, gotsCertNo, oekotexCertNo
+//   Supplement/food:    ingredientList, servingSize, servingsPerPack,
+//                       novelFoodStatus, nutritionLabel, suitableFor
+//
+// Migration policy:
+//   - SKU.productType in current PRODUCT_TYPES (cosmetic/device/
+//     beauty_accessory) AND pruned field empty (''/null/undefined/[]) → delete
+//   - SKU.productType is legacy (textile/supplement/food/garment) → preserve all
+//   - SKU.productType is current BUT pruned field has populated value → preserve
+//     (data integrity priority — user may have meaningful data we shouldn't lose;
+//     a warning surface can be added later if needed)
+//
+// For Cloud & Glow (5 current-type SKUs, all 9 pruned fields empty):
+// migration deletes 5 × 9 = 45 empty keys.
+const _PHASE3_PRUNED_FIELDS = [
+  'careInstructions', 'gotsCertNo', 'oekotexCertNo',
+  'ingredientList', 'servingSize', 'servingsPerPack',
+  'novelFoodStatus', 'nutritionLabel', 'suitableFor',
+];
+const _CURRENT_PRODUCT_TYPES_LIST = ['cosmetic', 'device', 'beauty_accessory'];
+
+function migrateSkuSchemaV3(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  let deletedCount = 0;
+  let touchedSkus = 0;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion === 3) return;  // idempotency
+    if(!_CURRENT_PRODUCT_TYPES_LIST.includes(sku.productType)){
+      // Legacy product type — preserve all fields, just bump version
+      sku._schemaVersion = 3;
+      return;
+    }
+    let touched = false;
+    _PHASE3_PRUNED_FIELDS.forEach(function(f){
+      if(!(f in sku)) return;
+      const v = sku[f];
+      const isEmpty = v === '' || v === null || v === undefined ||
+                      (Array.isArray(v) && v.length === 0);
+      if(isEmpty){
+        delete sku[f];
+        deletedCount++;
+        touched = true;
+      }
+    });
+    if(touched) touchedSkus++;
+    sku._schemaVersion = 3;
+  });
+  if(deletedCount > 0){
+    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 3 SKU migration save failed:', e); }
+    console.log('VeyaFlow SKU Schema Rationalization Phase 3: cleaned '+deletedCount+' empty pruned-field key(s) across '+touchedSkus+' SKU(s).');
+  }
+}
+
+
 let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
 let skuUploadData = null; // parsed CSV rows
 let skuColumnMap = {};    // {veyafield: csvcolumn}
@@ -14429,9 +14491,14 @@ function newSkuForm(){
     // Tab 1 universal logistics + variant fields (May 2026 — Boozt template additions).
     // Color/weight/dimensions apply to all product types; surfaced on Tab 1.
     color:'', weightGrams:'', dimensionsCm:'',
-    // Tab 2 — Compliance
+    // Tab 2 — Cosmetic-specific compliance (rendered when productType==='cosmetic')
     inci:'', hasFrag:false, allergens:'', ph:'',
     cpnp:'', euResponsible:'', safetyRef:'',
+    // Tab 2 — Shared compliance (cross-product-type, May 2026 Phase 3 reclassification).
+    // materialComposition used by beauty_accessory + textile + garment Tab 2 branches.
+    // eudrStatus used by all product types via EUDR Dec 2026 enforcement.
+    // reachCompliant used by textile + Home & Living fallthrough.
+    materialComposition:'', eudrStatus:'', reachCompliant:'',
     claims:[], certifications:[],
     // Tab 3 — Commercial
     rspSEK:'', rspDKK:'', rspGBP:'', rspEUR:'',
@@ -14440,7 +14507,7 @@ function newSkuForm(){
     descSV:'', descEN:'', descDA:'',
     // Financials (PRIVATE)
     exWorksCost:'',
-    // Device fields
+    // Device fields (rendered when productType==='device')
     modelNo:'', voltageInput:'', frequencyHz:'', powerOutput:'', batteryType:'',
     ipRating:'', ceMarking:'', ukCaMarking:'', docOnFile:'', directives:[],
     userManualLangs:[],
@@ -14448,12 +14515,12 @@ function newSkuForm(){
     // UN code + Wh required for lithium-battery shipping classification;
     // hsCode required for cross-border customs declarations.
     unCode:'', battWh:'', hsCode:'',
-    // Textile/Garment fields
-    materialComposition:'', eudrStatus:'', reachCompliant:'', careInstructions:'',
-    gotsCertNo:'', oekotexCertNo:'',
-    // Supplement/Food fields
-    ingredientList:'', servingSize:'', servingsPerPack:'', novelFoodStatus:'',
-    nutritionLabel:'', suitableFor:[],
+    // Legacy product-type fields (textile/supplement/food/garment) pruned from
+    // factory output May 2026 Phase 3. Form's oninput lazy-creates them when
+    // user selects a legacy product type. Read sites use defensive `||` patterns.
+    // Pruned: careInstructions, gotsCertNo, oekotexCertNo (textile-only),
+    //          ingredientList, servingSize, servingsPerPack, novelFoodStatus,
+    //          nutritionLabel, suitableFor (supplement/food-only).
     // Meta
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
