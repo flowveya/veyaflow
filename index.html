@@ -1419,6 +1419,10 @@ function loadState(){
     // SKU Schema Rationalization Phase 4 hotfix V5 — normalize packagingLanguages
     // from array (wrong type from Phase 4 ship) to comma-separated string.
     if(typeof migrateSkuSchemaV5 === 'function') migrateSkuSchemaV5();
+    // SKU Schema Rationalization Phase 5 V6 — merge dppData[id].fields into
+    // canonical sku.X storage (8 keys, 5 renames + 3 preserves). DPP meta
+    // (.dppId, .versions, .generatedAt, etc.) stays on dppData.
+    if(typeof migrateSkuSchemaV6 === 'function') migrateSkuSchemaV6();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -14312,6 +14316,17 @@ const RETAILER_SAFE_FIELDS = [
   'rspSEK','rspDKK','rspGBP','rspEUR',
   'moq','caseQty','leadDays','warehouse',
   'descSV','descEN','descDA',
+  // Phase 5 (May 2026) — DPP sustainability fields migrated from
+  // dppData.fields onto canonical SKU storage. ESG-aware retailers
+  // (Matas/Apotek Hjärtat/Lyko etc.) are CSRD-obligated and require
+  // visibility on carbon + recycled + recyclability + take-back data.
+  // Empty fields sanitise to empty values — no leak if not populated.
+  // ppwrRecycledTargetCompliant EXCLUDED: PPWR Article 7 self-attestation,
+  // brand-internal until ESPR/PPWR enforcement triggers (V2 territory).
+  'carbonKg','carbonEstimated',
+  'recycledProductPct','recycledPackagingPct',
+  'recyclabilityRating','takebackScheme','takebackDesc',
+  'packagingComposition',
   'createdAt','updatedAt',
 ];
 
@@ -14577,6 +14592,87 @@ function migrateSkuSchemaV5(){
 }
 
 
+// ── SKU Schema Rationalization — Phase 5 V6 (May 2026) ─────────────────
+// DPP fields merge from dppData[skuId].fields into canonical sku.X storage
+// per Locked Architectural Decision #1 (single source of truth, eliminates
+// dual-store DPP architecture). Migrates 8 keys with 5 renames + 3 preserves:
+//
+//   dppData[id].fields.carbonKg           → sku.carbonKg              (preserve)
+//   dppData[id].fields.carbonEstimated    → sku.carbonEstimated       (preserve)
+//   dppData[id].fields.recycledProduct    → sku.recycledProductPct    (rename)
+//   dppData[id].fields.recycledPackaging  → sku.recycledPackagingPct  (rename)
+//   dppData[id].fields.recyclability      → sku.recyclabilityRating   (rename)
+//   dppData[id].fields.takeback           → sku.takebackScheme        (rename)
+//   dppData[id].fields.takebackDesc       → sku.takebackDesc          (preserve)
+//   dppData[id].fields.packagingMaterial  → sku.packagingComposition  (rename,
+//     collision-avoiding: existing sku.packagingMaterial is Tab 5 packaging
+//     enum and is NOT touched by this migration — both fields coexist post-V6)
+//
+// Strict-empty check (v4.1 Finding 5 lock): write only if target field is
+// '' (factory default) or null/undefined. NOT 'in' operator (silent regression,
+// same class as Watchpoint S V5 hotfix). NOT strict-falsy (would catch 0/false).
+// Preserves any explicit user state on the SKU; empty string from user delete
+// is semantically same as factory default per Phase 5 lock.
+//
+// Retention lock: delete migrated KEY entries from dppData[id].fields, but
+// keep .fields as empty object — defensive reads (const f=d.fields||{}) at
+// 7 sites depend on .fields property existence; future writes may re-populate.
+// Other dppData[id] properties (.dppId, .versions, .generatedAt, .updatedAt,
+// .publishedAt, .publishedUrl, .publishedVersion, .traceabilitySource) are
+// publication-artifact metadata and stay on dppData (not intrinsic product
+// data per v4 dppId retention decision).
+//
+// Idempotent via _schemaVersion >= 6 check.
+const _PHASE5_FIELD_MAP = {
+  carbonKg:           'carbonKg',
+  carbonEstimated:    'carbonEstimated',
+  recycledProduct:    'recycledProductPct',
+  recycledPackaging:  'recycledPackagingPct',
+  recyclability:      'recyclabilityRating',
+  takeback:           'takebackScheme',
+  takebackDesc:       'takebackDesc',
+  packagingMaterial:  'packagingComposition',
+};
+
+function migrateSkuSchemaV6(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  if(typeof dppData === 'undefined') return;
+  let migratedFields = 0;
+  let touchedSkus = 0;
+  let touchedDpp = false;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion >= 6) return;  // idempotency
+    const d = dppData[sku.id];
+    let touched = false;
+    if(d && d.fields && typeof d.fields === 'object'){
+      Object.keys(_PHASE5_FIELD_MAP).forEach(function(srcKey){
+        const mappedName = _PHASE5_FIELD_MAP[srcKey];
+        if(!(srcKey in d.fields)) return;
+        const sourceValue = d.fields[srcKey];
+        // Strict-empty check (v4.1 lock): respect any explicit user state
+        if(sku[mappedName] === '' || sku[mappedName] == null){
+          sku[mappedName] = sourceValue;
+          migratedFields++;
+          touched = true;
+        }
+        // Delete migrated key from dppData.fields (but preserve .fields object)
+        delete d.fields[srcKey];
+        touchedDpp = true;
+      });
+    }
+    if(touched) touchedSkus++;
+    sku._schemaVersion = 6;
+  });
+  try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 5 SKU migration save failed:', e); }
+  if(touchedDpp){
+    try{ localStorage.setItem('ns_dpp', JSON.stringify(dppData)); }catch(e){ console.warn('Phase 5 DPP migration save failed:', e); }
+  }
+  if(migratedFields > 0){
+    console.log('VeyaFlow SKU Schema Rationalization Phase 5: migrated '+migratedFields+' field(s) across '+touchedSkus+' SKU(s) from dppData.fields to canonical SKU storage.');
+  }
+}
+
+
 let skuUploadMode = null; // null | 'choice' | 'mapping' | 'preview'
 let skuUploadData = null; // parsed CSV rows
 let skuColumnMap = {};    // {veyafield: csvcolumn}
@@ -14631,6 +14727,22 @@ function newSkuForm(){
     // Pruned: careInstructions, gotsCertNo, oekotexCertNo (textile-only),
     //          ingredientList, servingSize, servingsPerPack, novelFoodStatus,
     //          nutritionLabel, suitableFor (supplement/food-only).
+    // Tab 7 — Sustainability & DPP (May 2026 Phase 5 — merged from dppData.fields
+    // into canonical SKU storage per Locked Architectural Decision #1; eliminates
+    // dual-store DPP architecture + 3-paths-for-carbon bug shape). All migrated
+    // fields locked to string types per Brief v4.1 type table — form contracts
+    // (input.value, radio.value, textarea.value) store as string; numeric coercion
+    // is downstream consumer concern, not storage concern (Watchpoint S lesson).
+    // packagingComposition is parallel-named to materialComposition (renamed from
+    // dppData.fields.packagingMaterial to avoid collision with sku.packagingMaterial
+    // Tab 5 enum — both fields coexist post-Phase-5, serving distinct semantics).
+    // ppwrRecycledTargetCompliant is bool (PPWR Article 7 self-attestation flag);
+    // default null distinguishes "not declared" from "declared false".
+    carbonKg:'', carbonEstimated:'',
+    recycledProductPct:'', recycledPackagingPct:'',
+    recyclabilityRating:'', takebackScheme:'', takebackDesc:'',
+    packagingComposition:'',
+    ppwrRecycledTargetCompliant:null,
     // Meta
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -16520,14 +16632,17 @@ function saveSkuForm(){
   }
   document.getElementById('sku-ean-err')?.remove();
   skuForm.updatedAt = new Date().toISOString();
-  // Auto-feed DPP carbon from ingredient traceability if data exists
+  // Auto-feed DPP carbon from ingredient traceability if data exists.
+  // Post-Phase-5: carbonKg lives on SKU canonical storage. Write to skuForm
+  // before the skus.unshift/splice below carries the change into persistence.
+  // .traceabilitySource flag stays on dppData (publication-artifact metadata,
+  // not intrinsic product property — same logic as .dppId retention).
   if(skuForm.ingredientTraceability?.length){
     const totalCarbon = skuForm.ingredientTraceability.reduce((sum,ing)=>sum+(parseFloat(ing.carbonEstimate)||0),0);
     if(totalCarbon>0){
+      skuForm.carbonKg = totalCarbon.toFixed(2);
       loadDPP();
-      if(!dppData[skuForm.id]) dppData[skuForm.id]={fields:{}};
-      if(!dppData[skuForm.id].fields) dppData[skuForm.id].fields={};
-      dppData[skuForm.id].fields.carbonKg = totalCarbon.toFixed(2);
+      if(!dppData[skuForm.id]) dppData[skuForm.id]={};
       dppData[skuForm.id].traceabilitySource = true;
       saveDPP();
     }
@@ -29659,11 +29774,11 @@ async function publishDPP(skuId){
     ceMarking:           sku.ceMarking,
     novelFoodStatus:     sku.novelFoodStatus,
     certifications:      sku.certifications,
-    carbonKg:            f.carbonKg,
-    carbonEstimated:     f.carbonEstimated,
-    recycledProduct:     f.recycledProduct,
-    recyclability:       f.recyclability,
-    takeback:            f.takeback,
+    carbonKg:            sku.carbonKg,
+    carbonEstimated:     sku.carbonEstimated,
+    recycledProduct:     sku.recycledProductPct,
+    recyclability:       sku.recyclabilityRating,
+    takeback:            sku.takebackScheme,
   };
 
   // brandId pattern mirrors Magic Link γ
@@ -29713,8 +29828,10 @@ async function publishDPP(skuId){
 // ── DPP Readiness per SKU ─────────────────────────
 
 function dppReadiness(sku){
-  const d = dppData[sku.id]||{fields:{}};
-  const f = d.fields||{};
+  // Post-Phase-5: all DPP-readiness fields now live on sku.X directly
+  // (was const d = dppData[sku.id]; const f = d.fields). dppData still holds
+  // publication-artifact metadata (.dppId, .versions, .generatedAt) but
+  // those are not used by this readiness scorer.
 
   const checks = [
     // From SKU data — already captured
@@ -29724,11 +29841,11 @@ function dppReadiness(sku){
     {id:'cpnp',      label:'CPNP/regulatory ref',done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
     {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
     {id:'circular',  label:'End-of-life routing',done:!!(sku.productType),           source:'SKU'},
-    // DPP-specific gaps
-    {id:'carbon',    label:'Carbon footprint',   done:!!(f.carbonKg||f.carbonEstimated), source:'DPP'},
-    {id:'recycled',  label:'Recycled content %', done:!!(f.recycledProduct!==undefined&&f.recycledProduct!==''), source:'DPP'},
-    {id:'recyclability',label:'Recyclability',   done:!!(f.recyclability),            source:'DPP'},
-    {id:'takeback',  label:'Take-back scheme',   done:!!(f.takeback),                 source:'DPP'},
+    // DPP-specific gaps (post-Phase-5: now read from SKU canonical storage)
+    {id:'carbon',    label:'Carbon footprint',   done:!!(sku.carbonKg||sku.carbonEstimated), source:'DPP'},
+    {id:'recycled',  label:'Recycled content %', done:!!(sku.recycledProductPct!==undefined&&sku.recycledProductPct!==''), source:'DPP'},
+    {id:'recyclability',label:'Recyclability',   done:!!(sku.recyclabilityRating),            source:'DPP'},
+    {id:'takeback',  label:'Take-back scheme',   done:!!(sku.takebackScheme),                 source:'DPP'},
   ];
 
   const done = checks.filter(c=>c.done).length;
@@ -29809,17 +29926,18 @@ function csrdAutoFill(){
     ...(brand?.certifications||[]).map(c=>c.name||c.label||c),
   ])].filter(Boolean);
 
-  // DPP data is loaded once at init via loadDPP() into module-scope dppData.
-  // Reference the global directly — no need to re-read localStorage (and the
-  // previous re-read used the wrong key 'ns_dpp_data' instead of 'ns_dpp').
-  const dppFields = sku0 && dppData[sku0.id] && dppData[sku0.id].fields;
+  // Post-Phase-5: DPP fields (carbonKg, carbonEstimated, recycledPackagingPct,
+  // etc.) live on sku.X canonical storage — dppData no longer holds them, so
+  // the previous dppFields binding is removed. Reads go directly off sku0.
 
   // Auto-fill from SKU + DPP data
   if(sku0){
-    // recycled_pkg = "% recycled content in packaging" — maps to DPP packaging
-    // field f.recycledPackaging (NOT f.recycledProduct which is the SKU body).
-    if(!answers.recycled_pkg && dppFields?.recycledPackaging)
-      answers.recycled_pkg = dppFields.recycledPackaging;
+    // recycled_pkg = "% recycled content in packaging" — maps to
+    // sku.recycledPackagingPct (NOT sku.recycledProductPct which is the SKU
+    // body content). Both are Phase-5-renamed from dppData.fields.recycledPackaging
+    // and .recycledProduct respectively.
+    if(!answers.recycled_pkg && sku0.recycledPackagingPct)
+      answers.recycled_pkg = sku0.recycledPackagingPct;
     if(!answers.recyclable_pkg && sku0.packagingMaterial)
       answers.recyclable_pkg = sku0.packagingMaterial.toLowerCase().includes('glass')||sku0.packagingMaterial.toLowerCase().includes('metal')?'yes':sku0.packagingMaterial.toLowerCase().includes('plastic')?'partial':'unknown';
     if(!answers.eudr_compliance)
@@ -29834,14 +29952,15 @@ function csrdAutoFill(){
     answers.social_audit = 'Yes — '+auditedSupplier.certifications.join(', ');
   }
 
-  // Auto-fill scope1 from DPP carbon. Two canonical fields (3→2 post Phase 2c):
-  //   carbonKg         brand-provided exact value (direct entry OR ingredient
-  //                    traceability calculation — both BRAND_PROVIDED confidence)
-  //   carbonEstimated  AI category-average estimate (ESTIMATED_CATEGORY_AVERAGE
-  //                    confidence — kept SEPARATE to preserve regulatory provenance)
+  // Auto-fill scope1 from SKU carbon. Two canonical fields (3→2 post Phase 2c,
+  // both moved to sku.X canonical storage post Phase 5):
+  //   sku.carbonKg         brand-provided exact value (direct entry OR ingredient
+  //                        traceability calc — both BRAND_PROVIDED confidence)
+  //   sku.carbonEstimated  AI category-average estimate (ESTIMATED_CATEGORY_AVERAGE
+  //                        confidence — kept SEPARATE to preserve regulatory provenance)
   // Read order: prefer brand-provided exact over AI estimate.
-  if(dppFields && !answers.scope1){
-    const carbon = dppFields.carbonKg || dppFields.carbonEstimated;
+  if(sku0 && !answers.scope1){
+    const carbon = sku0.carbonKg || sku0.carbonEstimated;
     if(carbon) answers.scope1 = carbon;
   }
 
@@ -30210,8 +30329,8 @@ function renderDPPFill(el){
   const sku = skus.find(s=>s.id===dppActiveSkuId);
   if(!sku){dppStep='list';renderDPP(el);return;}
 
-  const existing = dppData[dppActiveSkuId]||{fields:{}};
-  const f = existing.fields||{};
+  // Post-Phase-5: all Tab-7 field reads route through sku.X directly
+  // (was const existing = dppData[...]; const f = existing.fields).
   const r = dppReadiness(sku);
   const carbon = estimateCarbon(sku);
   const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
@@ -30263,7 +30382,7 @@ function renderDPPFill(el){
             <div class="field">
               <label class="lbl">Enter verified figure <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(kg CO₂e per unit — optional, replaces estimate)</span></label>
               <div style="display:flex;gap:.5rem;align-items:center">
-                <input type="number" id="dpp-carbon" placeholder="${carbon.estimate}" value="${f.carbonKg||''}" min="0" step="0.1" oninput="" style="flex:1;max-width:160px">
+                <input type="number" id="dpp-carbon" placeholder="${carbon.estimate}" value="${sku.carbonKg||''}" min="0" step="0.1" oninput="" style="flex:1;max-width:160px">
                 <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">kg CO₂e/unit</span>
               </div>
             </div>
@@ -30280,14 +30399,14 @@ function renderDPPFill(el){
               <div class="field">
                 <label class="lbl">Product content</label>
                 <div style="display:flex;gap:.4rem;align-items:center">
-                  <input type="number" id="dpp-recycled-product" placeholder="0" value="${f.recycledProduct||''}" min="0" max="100" style="flex:1">
+                  <input type="number" id="dpp-recycled-product" placeholder="0" value="${sku.recycledProductPct||''}" min="0" max="100" style="flex:1">
                   <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">%</span>
                 </div>
               </div>
               <div class="field">
                 <label class="lbl">Packaging</label>
                 <div style="display:flex;gap:.4rem;align-items:center">
-                  <input type="number" id="dpp-recycled-pack" placeholder="0" value="${f.recycledPackaging||''}" min="0" max="100" style="flex:1">
+                  <input type="number" id="dpp-recycled-pack" placeholder="0" value="${sku.recycledPackagingPct||''}" min="0" max="100" style="flex:1">
                   <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">%</span>
                 </div>
               </div>
@@ -30303,14 +30422,14 @@ function renderDPPFill(el){
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem">
               ${['Fully recyclable','Partially recyclable','Not recyclable'].map(opt=>`
                 <label style="display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border:1px solid var(--border);cursor:pointer;min-height:40px;font-family:var(--sans);font-size:.75rem">
-                  <input type="radio" name="dpp-recyclability" value="${opt}" ${f.recyclability===opt?'checked':''} style="width:auto;min-height:auto">
+                  <input type="radio" name="dpp-recyclability" value="${opt}" ${sku.recyclabilityRating===opt?'checked':''} style="width:auto;min-height:auto">
                   ${opt}
                 </label>
               `).join('')}
             </div>
             <div class="field">
               <label class="lbl">Packaging material <span style="font-weight:400;text-transform:none;letter-spacing:0">(e.g. Glass, PCR plastic, Aluminium)</span></label>
-              <input type="text" id="dpp-pack-material" placeholder="e.g. PCR HDPE bottle + FSC cardboard outer" value="${f.packagingMaterial||''}">
+              <input type="text" id="dpp-pack-material" placeholder="e.g. PCR HDPE bottle + FSC cardboard outer" value="${sku.packagingComposition||''}">
             </div>
           </div>
         `:''}
@@ -30323,14 +30442,14 @@ function renderDPPFill(el){
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem">
               ${['Yes','No','In development'].map(opt=>`
                 <label style="display:flex;align-items:center;gap:.4rem;padding:.5rem .75rem;border:1px solid var(--border);cursor:pointer;min-height:40px;font-family:var(--sans);font-size:.75rem">
-                  <input type="radio" name="dpp-takeback" value="${opt}" ${f.takeback===opt?'checked':''} style="width:auto;min-height:auto">
+                  <input type="radio" name="dpp-takeback" value="${opt}" ${sku.takebackScheme===opt?'checked':''} style="width:auto;min-height:auto">
                   ${opt}
                 </label>
               `).join('')}
             </div>
             <div class="field" id="dpp-takeback-desc-wrap">
               <label class="lbl">Describe scheme <span style="font-weight:400;text-transform:none;letter-spacing:0">(if yes)</span></label>
-              <input type="text" id="dpp-takeback-desc" placeholder="e.g. Return to any Apotek Hjärtat for recycling" value="${f.takebackDesc||''}">
+              <input type="text" id="dpp-takeback-desc" placeholder="e.g. Return to any Apotek Hjärtat for recycling" value="${sku.takebackDesc||''}">
             </div>
           </div>
         `:''}
@@ -30339,8 +30458,8 @@ function renderDPPFill(el){
         ${r.checks.filter(c=>c.id==='carbon'&&c.done).length?`
           <div class="card" style="margin-bottom:.5rem;background:#F9F8F6">
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy)">✓ Carbon footprint: <strong>${f.carbonKg||f.carbonEstimated} kg CO₂e</strong>${f.carbonEstimated&&!f.carbonKg?' (estimated)':''}</div>
-              <button class="btn-outline" style="font-size:.58rem;padding:.25rem .5rem" onclick="dppData['${sku.id}'].fields.carbonKg='';dppData['${sku.id}'].fields.carbonEstimated='';saveDPP();renderDPP(document.getElementById('page-dpp'))">Edit</button>
+              <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy)">✓ Carbon footprint: <strong>${sku.carbonKg||sku.carbonEstimated} kg CO₂e</strong>${sku.carbonEstimated&&!sku.carbonKg?' (estimated)':''}</div>
+              <button class="btn-outline" style="font-size:.58rem;padding:.25rem .5rem" onclick="(function(){var s=skus.find(function(x){return x.id==='${sku.id}';});if(s){s.carbonKg='';s.carbonEstimated='';saveSkus();renderDPP(document.getElementById('page-dpp'));}})()">Edit</button>
             </div>
           </div>
         `:''}
@@ -30362,9 +30481,12 @@ function useCarbonEstimate(){
   const sku = skus.find(s=>s.id===dppActiveSkuId);
   if(!sku) return;
   const est = estimateCarbon(sku);
-  if(!dppData[dppActiveSkuId]) dppData[dppActiveSkuId]={fields:{}};
-  dppData[dppActiveSkuId].fields.carbonEstimated = est.estimate;
-  saveDPP();
+  // Post-Phase-5: carbonEstimated lives on sku, string-typed per v4.1 type lock.
+  // est.estimate is number from Math.round in estimateCarbon — coerce to string
+  // for storage. dppData no longer holds .fields.carbonEstimated.
+  sku.carbonEstimated = String(est.estimate);
+  sku.updatedAt = new Date().toISOString();
+  saveSkus();
   renderDPP(document.getElementById('page-dpp'));
 }
 
@@ -30378,28 +30500,39 @@ function requestCarbonFromMfr(skuId, skuName){
 }
 
 function saveDPPFields(skuId){
+  // Post-Phase-5: Tab-7 field writes target sku.X canonical storage.
+  // dppData[skuId] retained for publication metadata (.dppId, .versions,
+  // .generatedAt, .updatedAt, .traceabilitySource, etc.) — meta writes
+  // continue below. .fields object preserved empty per v4.1 retention lock.
+  const sku = skus.find(s=>s.id===skuId);
+  if(!sku){ console.warn('saveDPPFields: SKU not found:', skuId); return; }
   if(!dppData[skuId]) dppData[skuId]={fields:{},versions:[]};
-  const f = dppData[skuId].fields;
 
+  // Finding 1 lock (Brief v4.1 type table): all migrated fields are strings.
+  // Drop parseFloat — numeric coercion is downstream consumer concern, not
+  // storage concern (Watchpoint S lesson). carbonInput.value is already string
+  // from input.value. Aligns with L16530 toFixed (string) + factory default ''.
   const carbonInput = document.getElementById('dpp-carbon');
-  if(carbonInput?.value) f.carbonKg = parseFloat(carbonInput.value);
+  if(carbonInput?.value) sku.carbonKg = carbonInput.value;
 
   const recycledProduct = document.getElementById('dpp-recycled-product');
-  if(recycledProduct) f.recycledProduct = recycledProduct.value||'0';
+  if(recycledProduct) sku.recycledProductPct = recycledProduct.value||'0';
   const recycledPack = document.getElementById('dpp-recycled-pack');
-  if(recycledPack) f.recycledPackaging = recycledPack.value||'0';
+  if(recycledPack) sku.recycledPackagingPct = recycledPack.value||'0';
 
   const recyclability = document.querySelector('[name="dpp-recyclability"]:checked');
-  if(recyclability) f.recyclability = recyclability.value;
+  if(recyclability) sku.recyclabilityRating = recyclability.value;
   const packMat = document.getElementById('dpp-pack-material');
-  if(packMat?.value) f.packagingMaterial = packMat.value;
+  if(packMat?.value) sku.packagingComposition = packMat.value;
 
   const takeback = document.querySelector('[name="dpp-takeback"]:checked');
-  if(takeback) f.takeback = takeback.value;
+  if(takeback) sku.takebackScheme = takeback.value;
   const takebackDesc = document.getElementById('dpp-takeback-desc');
-  if(takebackDesc?.value) f.takebackDesc = takebackDesc.value;
+  if(takebackDesc?.value) sku.takebackDesc = takebackDesc.value;
 
-  // Version history
+  sku.updatedAt = new Date().toISOString();
+
+  // Version history + DPP meta (still on dppData — publication artifact)
   const versionNote = 'Updated '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   if(!dppData[skuId].versions) dppData[skuId].versions=[];
   const vNum = 'v1.'+dppData[skuId].versions.length;
@@ -30412,6 +30545,7 @@ function saveDPPFields(skuId){
     dppData[skuId].updatedAt = new Date().toISOString();
   }
 
+  saveSkus();
   saveDPP();
   dppStep='view';
   renderDPP(document.getElementById('page-dpp'));
@@ -30424,7 +30558,8 @@ function renderDPPView(el){
   if(!sku){dppStep='list';renderDPP(el);return;}
 
   const d = dppData[dppActiveSkuId]||{fields:{}};
-  const f = d.fields||{};
+  // Post-Phase-5: f.X reads migrated to sku.X (was const f = d.fields||{}).
+  // d retained for DPP publication metadata (.dppId, .versions, .publishedVersion).
   const r = dppReadiness(sku);
   const dppId = d.dppId||getDPPId(dppActiveSkuId);
   const dppUrl = window.location.origin + '/dpp/' + dppId;
@@ -30488,10 +30623,10 @@ function renderDPPView(el){
                 ['EAN',sku.ean||'—'],
                 ['Category',sku.productType||'—'],
                 ['Made in',sku.countryOfMfr||'—'],
-                ['Carbon',(f.carbonKg||f.carbonEstimated)?(f.carbonKg||f.carbonEstimated)+' kg CO₂e'+(f.carbonEstimated&&!f.carbonKg?' (est.)':''):'—'],
-                ['Recycled content',f.recycledProduct!==undefined?f.recycledProduct+'% product / '+(f.recycledPackaging||'0')+'% pack':'—'],
-                ['Recyclability',f.recyclability||'—'],
-                ['Take-back',f.takeback||'—'],
+                ['Carbon',(sku.carbonKg||sku.carbonEstimated)?(sku.carbonKg||sku.carbonEstimated)+' kg CO₂e'+(sku.carbonEstimated&&!sku.carbonKg?' (est.)':''):'—'],
+                ['Recycled content',sku.recycledProductPct!==undefined?sku.recycledProductPct+'% product / '+(sku.recycledPackagingPct||'0')+'% pack':'—'],
+                ['Recyclability',sku.recyclabilityRating||'—'],
+                ['Take-back',sku.takebackScheme||'—'],
                 ['Certifications',(sku.certifications||[]).join(', ')||'—'],
                 ['CPNP',sku.cpnp||'—'],
               ].map(([k,v])=>`
@@ -30612,9 +30747,9 @@ function buildDPPJson(skuId){
   const sku = skus.find(s=>s.id===skuId);
   if(!sku) return null;
   const d = dppData[skuId]||{fields:{}};
-  const f = d.fields||{};
+  // Post-Phase-5: data reads route via sku.X; d retained for publication metadata.
   const dppId = d.dppId||getDPPId(skuId);
-  const carbon = f.carbonKg||f.carbonEstimated||null;
+  const carbon = sku.carbonKg||sku.carbonEstimated||null;
 
   return {
     "@context": "https://veyaflow.com/dpp/schema/v1",
@@ -30640,16 +30775,16 @@ function buildDPPJson(skuId){
       "inci": sku.inci||null,
       "materialComposition": sku.materialComposition||null,
       "ingredients": sku.ingredientList||null,
-      "recycledContentProduct": f.recycledProduct?parseFloat(f.recycledProduct):null,
-      "recycledContentPackaging": f.recycledPackaging?parseFloat(f.recycledPackaging):null,
-      "packagingMaterial": f.packagingMaterial||null,
+      "recycledContentProduct": sku.recycledProductPct?parseFloat(sku.recycledProductPct):null,
+      "recycledContentPackaging": sku.recycledPackagingPct?parseFloat(sku.recycledPackagingPct):null,
+      "packagingMaterial": sku.packagingComposition||null,
     },
     "sustainability": {
       "carbonFootprintKgCO2e": carbon?parseFloat(carbon):null,
-      "carbonConfidence": f.carbonKg?'BRAND_PROVIDED':(f.carbonEstimated?'ESTIMATED_CATEGORY_AVERAGE':null),
-      "recyclability": f.recyclability||null,
-      "takeBackScheme": f.takeback||null,
-      "takeBackDescription": f.takebackDesc||null,
+      "carbonConfidence": sku.carbonKg?'BRAND_PROVIDED':(sku.carbonEstimated?'ESTIMATED_CATEGORY_AVERAGE':null),
+      "recyclability": sku.recyclabilityRating||null,
+      "takeBackScheme": sku.takebackScheme||null,
+      "takeBackDescription": sku.takebackDesc||null,
       "certifications": sku.certifications||[],
     },
     "compliance": {
@@ -30680,7 +30815,7 @@ async function generateDPPPdf(skuId){
   const sku = skus.find(s=>s.id===skuId);
   if(!sku) return;
   const d = dppData[skuId]||{fields:{}};
-  const f = d.fields||{};
+  // Post-Phase-5: f.X reads migrated to sku.X. d retained for .dppId/.generatedAt.
   const dppId = d.dppId||getDPPId(skuId);
 
   if(typeof window.jspdf==='undefined'){
@@ -30744,17 +30879,17 @@ async function generateDPPPdf(skuId){
 
     section('Materials & Composition');
     row('INCI / ingredients',(sku.inci||sku.materialComposition||sku.ingredientList||'—').slice(0,200));
-    row('Recycled content — product',(f.recycledProduct||'0')+'%');
-    row('Recycled content — packaging',(f.recycledPackaging||'0')+'%');
-    row('Packaging material',f.packagingMaterial||'—');
+    row('Recycled content — product',(sku.recycledProductPct||'0')+'%');
+    row('Recycled content — packaging',(sku.recycledPackagingPct||'0')+'%');
+    row('Packaging material',sku.packagingComposition||'—');
     y+=4;
 
     section('Sustainability');
-    const carbon = f.carbonKg||f.carbonEstimated;
-    row('Carbon footprint',carbon?(carbon+' kg CO₂e per unit'+(f.carbonEstimated&&!f.carbonKg?' (category estimate)':'')):'—');
-    row('Recyclability',f.recyclability||'—');
-    row('Take-back scheme',f.takeback||'—');
-    if(f.takebackDesc) row('Take-back description',f.takebackDesc);
+    const carbon = sku.carbonKg||sku.carbonEstimated;
+    row('Carbon footprint',carbon?(carbon+' kg CO₂e per unit'+(sku.carbonEstimated&&!sku.carbonKg?' (category estimate)':'')):'—');
+    row('Recyclability',sku.recyclabilityRating||'—');
+    row('Take-back scheme',sku.takebackScheme||'—');
+    if(sku.takebackDesc) row('Take-back description',sku.takebackDesc);
     y+=4;
 
     section('Compliance & Certifications');
