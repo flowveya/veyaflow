@@ -1407,6 +1407,12 @@ function loadState(){
     const sk=localStorage.getItem('ns_skus');
     if(sk) skus=safeJsonParse(sk)||[];
     if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
+    // Hydrate dppData BEFORE migrations run. V2 + V6 read dppData; without
+    // this, dppData is {} at migration time, the d=dppData[sku.id] lookup is
+    // undefined, the inner migration block short-circuits, and _schemaVersion
+    // still increments — locking SKUs in a half-migrated state. Discovered
+    // 26 May 2026 during Phase 5 verification. See V7 repair migration below.
+    if(typeof loadDPP === 'function') loadDPP();
     // SKU Schema Rationalization Phase 2 — migrate phantom fields to canonical names.
     // Idempotent: checks sku._schemaVersion before applying.
     if(typeof migrateSkuSchemaV2 === 'function') migrateSkuSchemaV2();
@@ -1423,6 +1429,10 @@ function loadState(){
     // canonical sku.X storage (8 keys, 5 renames + 3 preserves). DPP meta
     // (.dppId, .versions, .generatedAt, etc.) stays on dppData.
     if(typeof migrateSkuSchemaV6 === 'function') migrateSkuSchemaV6();
+    // SKU Schema Rationalization Phase 5 hotfix V7 — repair SKUs stuck at
+    // _v:6 due to V6 load-order bug (ran before loadDPP). Idempotent on
+    // _v >= 7. See migrateSkuSchemaV7 definition for details.
+    if(typeof migrateSkuSchemaV7 === 'function') migrateSkuSchemaV7();
   }catch(e){ console.warn('State load error:',e); }
 }
 
@@ -14669,6 +14679,77 @@ function migrateSkuSchemaV6(){
   }
   if(migratedFields > 0){
     console.log('VeyaFlow SKU Schema Rationalization Phase 5: migrated '+migratedFields+' field(s) across '+touchedSkus+' SKU(s) from dppData.fields to canonical SKU storage.');
+  }
+}
+
+
+// ── SKU Schema Rationalization — Phase 5 hotfix V7 (26 May 2026) ───────
+// Repair migration for SKUs stuck at _schemaVersion: 6 due to V6 load-order
+// bug. V6 read dppData before it was hydrated from localStorage, so the
+// `if(d && d.fields && ...)` block silently skipped, but _schemaVersion still
+// got bumped to 6 at the end of the loop. Result: SKUs marked migrated while
+// dppData.fields retained all source data.
+//
+// V7 detects the stuck state by checking whether dppData[sku.id].fields
+// still contains any of the 8 migration keys for SKUs at _v: 6. If yes,
+// it re-runs the V6 migration logic on that SKU. Uses the same field map
+// (_PHASE5_FIELD_MAP), same strict-empty check pattern, same .fields
+// retention lock. Marks repaired SKUs at _v: 7.
+//
+// Defensive loadDPP() at top: belt-and-suspenders in case the init-block
+// load-order fix gets reverted later. loadDPP is idempotent (pure read).
+//
+// Idempotent via _schemaVersion >= 7 check. Once a SKU reaches v7 — whether
+// via repair OR by already having clean V6 state — V7 never touches it again.
+//
+// Cloud & Glow expected impact (26 May 2026, pre-deploy):
+//   LED face mask (1775931914850): 6 fields migrate from dppData.fields to
+//     sku.X (recycledProduct, recycledPackaging, recyclability,
+//     packagingMaterial, takeback, carbonKg → renamed per V6 field map),
+//     dppData.fields gets 6 keys deleted, _v: 6 → 7.
+//   4 Gua Sha SKUs: no dppData entries to migrate from; clean transition
+//     _v: 6 → 7 (already had clean V6 state, idempotency case).
+function migrateSkuSchemaV7(){
+  if(typeof skus === 'undefined' || !Array.isArray(skus)) return;
+  if(typeof dppData === 'undefined') return;
+  // Defensive hydration — in case init-block load-order fix is absent.
+  if(typeof loadDPP === 'function') loadDPP();
+  if(typeof _PHASE5_FIELD_MAP === 'undefined') return;  // V6 must be defined
+
+  let repairedFields = 0;
+  let repairedSkus = 0;
+  let touchedDpp = false;
+  skus.forEach(function(sku){
+    if(!sku || sku._schemaVersion >= 7) return;  // idempotency
+    // Re-run V6 logic for SKUs at _v: 6 (stuck) AND any straggler still at
+    // _v < 6 (defensive — though prior migrations should have advanced them).
+    const d = dppData[sku.id];
+    let touched = false;
+    if(d && d.fields && typeof d.fields === 'object'){
+      Object.keys(_PHASE5_FIELD_MAP).forEach(function(srcKey){
+        const mappedName = _PHASE5_FIELD_MAP[srcKey];
+        if(!(srcKey in d.fields)) return;
+        const sourceValue = d.fields[srcKey];
+        // Strict-empty check (v4.1 lock): respect any explicit user state
+        if(sku[mappedName] === '' || sku[mappedName] == null){
+          sku[mappedName] = sourceValue;
+          repairedFields++;
+          touched = true;
+        }
+        // Delete migrated key from dppData.fields (preserve .fields object)
+        delete d.fields[srcKey];
+        touchedDpp = true;
+      });
+    }
+    if(touched) repairedSkus++;
+    sku._schemaVersion = 7;
+  });
+  try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 5 hotfix V7 SKU save failed:', e); }
+  if(touchedDpp){
+    try{ localStorage.setItem('ns_dpp', JSON.stringify(dppData)); }catch(e){ console.warn('Phase 5 hotfix V7 DPP save failed:', e); }
+  }
+  if(repairedFields > 0){
+    console.log('VeyaFlow SKU Schema — Phase 5 hotfix V7: REPAIRED '+repairedFields+' field(s) across '+repairedSkus+' SKU(s) stuck at _v:6 (V6 load-order bug). dppData.fields cleaned. SKUs advanced to _v:7.');
   }
 }
 
