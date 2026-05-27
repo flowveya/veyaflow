@@ -17256,6 +17256,11 @@ function renderSkuEdit(el){
     {n:4, label:'Digital Assets',           visible:true},
     {n:5, label:'Packaging',                visible:true},
     {n:6, label:'Ingredient Traceability',  visible:_tab6Visible},
+    // Tab 7 — Sustainability & DPP (May 2026 Phase 6 surfacing). Visible all
+    // product types per Decision D1 lock: carbon, recycled %, recyclability,
+    // take-back are cross-category (ESPR + PPWR + Green Claims apply universally,
+    // unlike Tab 6 INCI traceability which is cosmetics-only by nature).
+    {n:7, label:'Sustainability & DPP',     visible:true},
   ];
   const visibleTabs = tabSpec.filter(t=>t.visible);
   // If user is on a tab that's been hidden by a product-type switch, redirect to
@@ -17522,6 +17527,110 @@ function renderSkuEdit(el){
       `:``}
 
       ${skuTab===6?renderIngredientTraceabilityTab(skuForm):''}
+
+      ${skuTab===7?`
+        <div class="card">
+          <div class="section-tag">Carbon footprint</div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="lbl">Brand-provided value (kg CO₂e / unit)</label>
+              <input type="number" value="${skuForm.carbonKg||''}" placeholder="e.g. 0.4" min="0" step="0.1"
+                oninput="skuForm.carbonKg=this.value">
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">
+                Verified via LCA or supplier-supplied. Highest confidence — preferred over AI estimate.
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl">AI category estimate</label>
+              <div style="display:flex;gap:.5rem;align-items:center;padding:.55rem .65rem;border:1px solid var(--border);background:#FAFAFA">
+                <div style="flex:1;font-family:var(--mono);font-size:.72rem;color:var(--navy)">
+                  ${skuForm.carbonEstimated ? skuForm.carbonEstimated+' kg CO₂e (saved)' : (function(){const e=estimateCarbon(skuForm);return e&&e.estimate?'~'+e.estimate+' kg CO₂e':'—';})()}
+                </div>
+                <button type="button" class="btn-outline" style="font-size:.58rem;padding:.3rem .6rem" onclick="(function(){const e=estimateCarbon(skuForm);if(e&&e.estimate){skuForm.carbonEstimated=String(e.estimate);renderSkuEdit(document.getElementById('page-skus'));}})()">Use estimate</button>
+              </div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">
+                Category-average fallback. ESTIMATED_CATEGORY_AVERAGE confidence in DPP exports.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-tag">Recycled content</div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="lbl">% recycled — product body</label>
+              <input type="number" value="${skuForm.recycledProductPct||''}" placeholder="0" min="0" max="100"
+                oninput="skuForm.recycledProductPct=this.value">
+            </div>
+            <div class="field">
+              <label class="lbl">% recycled — packaging</label>
+              <input type="number" value="${skuForm.recycledPackagingPct||''}" placeholder="0" min="0" max="100"
+                oninput="skuForm.recycledPackagingPct=this.value">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-tag">Recyclability</div>
+          <div class="field">
+            <label class="lbl">Recyclability rating</label>
+            <select onchange="skuForm.recyclabilityRating=this.value">
+              <option value=""${!skuForm.recyclabilityRating?' selected':''}>Not assessed</option>
+              <option value="Fully recyclable"${skuForm.recyclabilityRating==='Fully recyclable'?' selected':''}>Fully recyclable</option>
+              <option value="Partially recyclable"${skuForm.recyclabilityRating==='Partially recyclable'?' selected':''}>Partially recyclable</option>
+              <option value="Not recyclable"${skuForm.recyclabilityRating==='Not recyclable'?' selected':''}>Not recyclable</option>
+              <option value="Unknown"${skuForm.recyclabilityRating==='Unknown'?' selected':''}>Unknown — pending review</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl">Packaging composition (free-text detail)</label>
+            <input type="text" value="${skuForm.packagingComposition||''}" placeholder="e.g. PCR HDPE bottle + FSC cardboard outer"
+              oninput="skuForm.packagingComposition=this.value">
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">
+              Detail layer used in DPP — distinct from Tab 5 'Primary packaging material' enum.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-tag">Take-back scheme</div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="lbl">Take-back available?</label>
+              <select onchange="skuForm.takebackScheme=this.value;renderSkuEdit(document.getElementById('page-skus'))">
+                <option value=""${!skuForm.takebackScheme?' selected':''}>Not assessed</option>
+                <option value="Yes"${skuForm.takebackScheme==='Yes'?' selected':''}>Yes — scheme active</option>
+                <option value="No"${skuForm.takebackScheme==='No'?' selected':''}>No</option>
+                <option value="Planned"${skuForm.takebackScheme==='Planned'?' selected':''}>Planned — not yet live</option>
+              </select>
+            </div>
+            ${skuForm.takebackScheme==='Yes' || skuForm.takebackScheme==='Planned' ? `
+            <div class="field">
+              <label class="lbl">Take-back description</label>
+              <input type="text" value="${skuForm.takebackDesc||''}" placeholder="e.g. Return to any Apotek Hjärtat for recycling"
+                oninput="skuForm.takebackDesc=this.value">
+            </div>
+            ` : `<div class="field"></div>`}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-tag">PPWR Article 7 self-attestation</div>
+          <div class="field">
+            <label class="lbl">Meets PPWR recycled content target?</label>
+            <select onchange="skuForm.ppwrRecycledTargetCompliant=this.value==='yes'?true:this.value==='no'?false:null">
+              <option value=""${skuForm.ppwrRecycledTargetCompliant==null?' selected':''}>Not declared</option>
+              <option value="yes"${skuForm.ppwrRecycledTargetCompliant===true?' selected':''}>Yes — target met</option>
+              <option value="no"${skuForm.ppwrRecycledTargetCompliant===false?' selected':''}>No — gap to target</option>
+            </select>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">
+              PPWR Article 7 self-declaration. Enforcement triggers with ESPR Q3 2026 — brand-internal until then.
+              "Not declared" preserves regulatory honesty until evidence supports a claim.
+            </div>
+          </div>
+        </div>
+      `:``}
 
       <div class="vf-sticky-actions">
         <div style="display:flex;gap:.5rem">
@@ -29914,10 +30023,22 @@ function dppReadiness(sku){
   // publication-artifact metadata (.dppId, .versions, .generatedAt) but
   // those are not used by this readiness scorer.
 
+  // Materials/INCI label is type-aware (Phase 6 polish, D3 lock).
+  // Check logic OR's across inci/materialComposition/ingredientList already —
+  // only the displayed label varies. Devices use 'BOM / Materials list'
+  // (ESPR Article 6 component declaration), beauty_accessory + textile use
+  // 'Material composition' (no INCI applies), cosmetic + supplement default
+  // to 'Materials/INCI' (INCI for cosmetic, ingredient list for supplement).
+  const _materialsLabel = (function(t){
+    if(t==='device') return 'BOM / Materials list';
+    if(t==='beauty_accessory' || t==='textile' || t==='garment') return 'Material composition';
+    return 'Materials/INCI';
+  })(sku.productType||'cosmetic');
+
   const checks = [
     // From SKU data — already captured
     {id:'identity',  label:'Product identity',  done:!!(sku.name&&sku.ean),         source:'SKU'},
-    {id:'inci',      label:'Materials/INCI',     done:!!(sku.inci||sku.materialComposition||sku.ingredientList), source:'SKU'},
+    {id:'inci',      label:_materialsLabel,      done:!!(sku.inci||sku.materialComposition||sku.ingredientList), source:'SKU'},
     {id:'mfr',       label:'Country of manufacture', done:!!sku.countryOfMfr,       source:'SKU'},
     {id:'cpnp',      label:'CPNP/regulatory ref',done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
     {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
