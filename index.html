@@ -1407,6 +1407,12 @@ function loadState(){
     const sk=localStorage.getItem('ns_skus');
     if(sk) skus=safeJsonParse(sk)||[];
     if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
+    // Brand Schema Rationalization Phase 1 — Watchpoint AB cleanup
+    // (Decision 10 Trigger 7, G4 lock). Consolidates 3 EU RP field-name
+    // variants into canonical brand.euResponsible. Runs before loadDPP
+    // and SKU migrations so brand-level state is canonical before any
+    // downstream work. Idempotent on brand._schemaVersion=2.
+    if(typeof migrateBrandSchemaV2 === 'function') migrateBrandSchemaV2();
     // Hydrate dppData BEFORE migrations run. V2 + V6 read dppData; without
     // this, dppData is {} at migration time, the d=dppData[sku.id] lookup is
     // undefined, the inner migration block short-circuits, and _schemaVersion
@@ -4418,7 +4424,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(market.euMember){
         if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
         else{ blockers.push({id:'cpnpMissing',level:'red',label:'CPNP notification missing',impact:'Blocks all EU pharmacy and beauty retail listings. Required under EU Cosmetics Regulation (EC) 1223/2009.'}); }
-        if(sku.euResponsible||brand&&brand.euRP){ comp+=6; greens.push('EU Responsible Person on file'); }
+        if(sku.euResponsible||brand&&brand.euResponsible){ comp+=6; greens.push('EU Responsible Person on file'); }
         else{ blockers.push({id:'euRpMissing',level:'amber',label:'EU Responsible Person missing',impact:'Required for all EU cosmetics listings.'}); }
         if(sku.inci||sku.ingredients){ comp+=6; greens.push('INCI list on file'); }
         else{ blockers.push({id:'inciMissing',level:'amber',label:'INCI list missing',impact:'Mandatory for EU cosmetics PIF and retail listings.'}); }
@@ -11326,7 +11332,7 @@ const _ATM_SEED_TEMPLATES = {
       { label:'Net price (SEK)',                  source:'private' },
       { label:'VAT rate (%)',                     source:'const:25' },
       { label:'CPNP reference',                   source:'sku.cpnp||sku.cpnpRef' },
-      { label:'EU Responsible Person',            source:'brand.euResponsiblePerson' },
+      { label:'EU Responsible Person',            source:'brand.euResponsible' },
       { label:'Country of manufacture',           source:'sku.countryOfMfr' },
       { label:'Shelf life (months)',              source:'sku.shelfLifeMonths' },
       { label:'Net weight/volume',                source:'sku.netContent' },
@@ -14379,6 +14385,48 @@ function isEudrCompliant(status){
   const s = String(status).trim();
   return s === 'Compliant' || s === 'Compliant — documentation on file';
 }
+
+// ── Brand Schema Rationalization — Phase 1 (Decision 10 Trigger 7, May 2026) ─
+// Watchpoint AB cleanup per Decision 10 v1.1 supplement G4 lock.
+// Consolidates 3 brand-level EU Responsible Person field-name variants
+// into canonical brand.euResponsible (mirrors sku.euResponsible pattern):
+//   brand.euRP → brand.euResponsible
+//   brand.euResponsiblePerson.name → brand.euResponsible
+//   brand.euRpName → brand.euResponsible
+//
+// Conservative merge: takes first non-empty value in priority order
+// (euResponsible existing → euResponsiblePerson.name → euRP → euRpName).
+// Deletes legacy variants after merge. Idempotent via brand._schemaVersion.
+// First brand-level migration in codebase — establishes pattern.
+function migrateBrandSchemaV2(){
+  if(typeof brand === 'undefined' || !brand) return;  // no brand loaded
+  if(brand._schemaVersion === 2) return;  // idempotency
+
+  const existing = brand.euResponsible;
+  const variantA = brand.euResponsiblePerson && brand.euResponsiblePerson.name;
+  const variantB = brand.euRP;
+  const variantC = brand.euRpName;
+
+  // Priority: keep existing canonical if set, otherwise first non-empty variant
+  const canonical = existing || variantA || variantB || variantC || '';
+  if(canonical && canonical !== existing){
+    brand.euResponsible = canonical;
+  }
+
+  // Delete legacy variants (always — even if no canonical found, clean state)
+  let cleaned = 0;
+  if('euResponsiblePerson' in brand){ delete brand.euResponsiblePerson; cleaned++; }
+  if('euRP' in brand){ delete brand.euRP; cleaned++; }
+  if('euRpName' in brand){ delete brand.euRpName; cleaned++; }
+
+  brand._schemaVersion = 2;
+  try{localStorage.setItem('ns_brand', JSON.stringify(brand));}catch(e){}
+
+  if(canonical || cleaned){
+    console.log(`[migrateBrandSchemaV2] Consolidated to brand.euResponsible=${JSON.stringify(canonical||'')}, cleaned ${cleaned} legacy field(s).`);
+  }
+}
+
 
 // ── SKU Schema Rationalization — Phase 2 migration (May 2026) ─────────
 // Idempotent: marks SKU._schemaVersion=2 on completion, skips re-runs.
@@ -27303,7 +27351,7 @@ function renderGTMDeadlineBanner() {
 /* ═══════════════════════════════════════════════════
    COMPLIANCE CALENDAR
    12-month forward view, grouped by month.
-   Sources: brand.certifications[], brand.euResponsiblePerson,
+   Sources: brand.certifications[], brand.euResponsible,
             SUPPLIER_DATABASE nextAuditDue, static regulatory dates.
    Colour: RED <30d · AMBER 30-90d · GREEN >90d
 ═══════════════════════════════════════════════════ */
@@ -32312,7 +32360,7 @@ const LISTING_REQUIREMENTS = {
     requirements: [
       { id:'ean',                label:'EAN-13 barcode confirmed',                 autoCheck:'sku.ean',              fixPage:'skus' },
       { id:'cpnp',               label:'CPNP reference on file',                   autoCheck:'sku.cpnp',             fixPage:'skus', productTypes:['cosmetic'] },
-      { id:'eu_rp',              label:'EU Responsible Person confirmed',          autoCheck:'brand.euRP',           fixPage:'home', productTypes:['cosmetic'] },
+      { id:'eu_rp',              label:'EU Responsible Person confirmed',          autoCheck:'brand.euResponsible',           fixPage:'home', productTypes:['cosmetic'] },
       { id:'se_label',           label:'Swedish-language label approved',          autoCheck:null,                   fixPage:'skus' },
       { id:'images',             label:'Product images (1000×1000px white BG)',    autoCheck:null,                   fixPage:'brandpack' },
       { id:'article_template',   label:'Article template submitted via portal',    autoCheck:null,                   fixPage:'retail-templates' },
@@ -33319,9 +33367,9 @@ function getIncompleteChecklistSubmissions(){
 
 function retailChecklistAutoCheckValue(expr, sku){
   if(!expr) return false;
-  if(expr === 'brand.euRP'){
+  if(expr === 'brand.euResponsible'){
     if(!brand) return false;
-    return !!(brand.euResponsiblePerson || brand.euRP || brand.euRpName || (brand.euResponsiblePerson && brand.euResponsiblePerson.name));
+    return !!brand.euResponsible;
   }
   if(expr.indexOf('sku.') === 0){
     if(!sku) return false;
@@ -34072,13 +34120,8 @@ function retailTemplateResolveSource(source, sku, brandObj, manualFields){
   if(source === 'brand.name'){
     return {type: brandObj && brandObj.name ? 'auto' : 'missing', value: (brandObj && brandObj.name) || ''};
   }
-  if(source === 'brand.euResponsiblePerson'){
-    var rp = brandObj && (
-      (brandObj.euResponsiblePerson && brandObj.euResponsiblePerson.name) ||
-      brandObj.euResponsiblePerson ||
-      brandObj.euRP ||
-      brandObj.euRpName
-    );
+  if(source === 'brand.euResponsible'){
+    var rp = brandObj && brandObj.euResponsible;
     return {type: rp ? 'auto' : 'missing', value: (typeof rp==='string' ? rp : '')};
   }
   // compound: 'sku.x||sku.y' or 'sku.x'
