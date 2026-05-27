@@ -4316,7 +4316,7 @@ function computePatternStatus(pattern, brand, sku, retailerEntry, marketCode) {
       return {pass:false, label:`${claims.length} claim${claims.length!==1?'s':''} not yet documented in PIF`, detail:'complete safety assessment reference'};
     }
     case 'marginTooLow': {
-      const rsp = parseFloat(s.rspSEK||s.rspDKK||s.rspGBP||s.rspEUR||0);
+      const rsp = parseFloat(s.rspSEK||s.rspDKK||s.rspGBP||s.rspEUR||s.rspNOK||s.rspISK||0);
       if(!rsp) return {pass:null, label:'RSP not set', detail:'enter price in My Products'};
       const fit = checkRSPFit(rsp, pattern._retailerKey||retailerEntry?.id||'', retailerEntry?.name||'', s, b.category||'');
       if(fit&&fit.type==='ERROR')   return {pass:false, label:`${rsp} ${fit.currency} ${fit.floor?'below floor':'above ceiling'}`, detail:fit.message};
@@ -4496,7 +4496,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   // 2. COMMERCIAL (28)
   let comm = 0;
   if(skuValid&&retailer){
-    const rsp = parseFloat(sku.rspDKK||sku.rspGBP||sku.rspEUR||sku.rspSEK||0);
+    const rsp = parseFloat(sku.rspDKK||sku.rspGBP||sku.rspEUR||sku.rspSEK||sku.rspNOK||sku.rspISK||0);
     const net = parseFloat(sku.netPriceSEK||0);
     const moq = parseInt(sku.moq||0);
     const lead = parseInt(sku.leadDays||0);
@@ -12368,7 +12368,7 @@ Galaxus (Migros Digital): single listing covers 9 EU markets — highest cross-m
 
   // Board line — pre-calculated margin intel for retail module
   const sku0 = skus[0]||{};
-  const rsp = parseFloat(sku0.rspSEK||sku0.rspEUR||0);
+  const rsp = parseFloat(sku0.rspSEK||sku0.rspEUR||sku0.rspNOK||sku0.rspISK||0);
   const netPrice = parseFloat(sku0.netPriceSEK||0);
   const marginPct = rsp>0&&netPrice>0 ? Math.round((1-(netPrice/rsp))*100) : null;
   const boardLine = marginPct
@@ -13004,7 +13004,7 @@ function scoreMarketDimension(dim, marketCode, brand, sku){
     return {score, display:label, detail:market?.timingHook2026||'No specific 2026 timing signal identified.'};
   }
   if(dim==='revenueY1'){
-    const rsp = parseFloat(sku?.rspDKK||sku?.rspGBP||sku?.rspEUR||sku?.rspSEK||0);
+    const rsp = parseFloat(sku?.rspDKK||sku?.rspGBP||sku?.rspEUR||sku?.rspSEK||sku?.rspNOK||sku?.rspISK||0);
     const vatRate = {DK:0.25,DE:0.19,UK:0.20,NO:0.25,NL:0.21,FR:0.20,SE:0.25}[marketCode]||0.25;
     const topRetailer = RETAILER_REGISTRY.find(r=>r.market===marketCode&&retailerMatchesBrandTags(r,brand));
     const margin = topRetailer?.marginMin||0.48;
@@ -14323,7 +14323,7 @@ const RETAILER_SAFE_FIELDS = [
   'inci','hasFrag','allergens','ph',
   'cpnp','euResponsible','safetyRef',
   'claims','certifications',
-  'rspSEK','rspDKK','rspGBP','rspEUR',
+  'rspSEK','rspDKK','rspGBP','rspEUR','rspNOK','rspISK',
   'moq','caseQty','leadDays','warehouse',
   'descSV','descEN','descDA',
   // Phase 5 (May 2026) — DPP sustainability fields migrated from
@@ -14780,7 +14780,7 @@ function newSkuForm(){
     materialComposition:'', eudrStatus:'', reachCompliant:'',
     claims:[], certifications:[],
     // Tab 3 — Commercial
-    rspSEK:'', rspDKK:'', rspGBP:'', rspEUR:'',
+    rspSEK:'', rspDKK:'', rspGBP:'', rspEUR:'', rspNOK:'', rspISK:'',
     netPriceSEK:'', vatRate:25, moq:'', caseQty:'', leadDays:'', warehouse:'', gln:'',
     // Tab 4 — Assets
     descSV:'', descEN:'', descDA:'',
@@ -15196,7 +15196,7 @@ const FIELD_LABELS = {
   name:'Product name', ean:'EAN barcode', netContent:'Net content',
   countryOfMfr:'Country of manufacture', shelfLifeMonths:'Shelf life',
   inci:'INCI list', cpnp:'CPNP number', euResponsible:'EU Responsible Person',
-  safetyRef:'Safety Assessment', rspSEK:'RSP (SEK)', netPriceSEK:'Net price',
+  safetyRef:'Safety Assessment', rspSEK:'RSP (SEK)', rspNOK:'RSP (NOK)', rspISK:'RSP (ISK)', netPriceSEK:'Net price',
   moq:'MOQ', descEN:'Description (EN)', modelNo:'Model number',
   ceMarking:'CE marking', docOnFile:'Declaration of Conformity',
   voltageInput:'Voltage input', batteryType:'Battery type',
@@ -15319,6 +15319,38 @@ function skuReadiness(sku){
 
   return {pct, missing, ready, notReady};
 }
+
+
+// ── Sustainability readiness — Phase 7 D2-separate (May 2026) ───────────
+// Distinct from skuReadiness (compliance/regulatory). Per strategy chat lock
+// D2-separate: compliance and sustainability answer different questions and
+// warrant separate scoring surfaces, not blended. Future regulatory dimensions
+// (AI Act, CSRD, Track Record per Vector 30) follow same pattern — separate
+// readiness functions, not weight rebalancing of skuReadiness.
+//
+// 5 fields × weight 1 = max 5. Flat scoring per Open item 1 confirmation.
+// carbonKg||carbonEstimated combined check (Phase 5 Edit 6 contract: brand
+// has either exact value OR uses AI estimate, not both required).
+// Excludes ppwrRecycledTargetCompliant (self-attestation legal claim, not
+// platform-verifiable readiness metric).
+//
+// Applies to all product types (Phase 6 D1 lock: sustainability is universal).
+const SUSTAINABILITY_FIELDS = [
+  {id:'carbon',          label:'Carbon footprint',     check:s=>!!(s.carbonKg||s.carbonEstimated)},
+  {id:'recycledPack',    label:'Recycled packaging %', check:s=>!!(s.recycledPackagingPct!==undefined&&s.recycledPackagingPct!=='')},
+  {id:'recyclability',   label:'Recyclability rating', check:s=>!!s.recyclabilityRating},
+  {id:'takeback',        label:'Take-back scheme',     check:s=>!!s.takebackScheme},
+  {id:'composition',     label:'Packaging composition',check:s=>!!s.packagingComposition},
+];
+
+function sustainabilityReadiness(sku){
+  if(!sku) return {pct:0, populated:[], missing:SUSTAINABILITY_FIELDS.map(f=>f.label), total:SUSTAINABILITY_FIELDS.length};
+  const populated = SUSTAINABILITY_FIELDS.filter(f=>f.check(sku));
+  const missing   = SUSTAINABILITY_FIELDS.filter(f=>!f.check(sku)).map(f=>f.label);
+  const pct = Math.round((populated.length / SUSTAINABILITY_FIELDS.length) * 100);
+  return {pct, populated:populated.map(f=>f.label), missing, total:SUSTAINABILITY_FIELDS.length};
+}
+
 
 // Claims traffic light — pure logic, no API
 const CLAIM_RULES = {
@@ -16312,6 +16344,8 @@ const SKU_FIELDS = [
   {key:'rspDKK',     label:'RSP Denmark (DKK)',     aliases:['rsp dkk','price dkk','danish price','pris dkk']},
   {key:'rspGBP',     label:'RSP UK (GBP)',          aliases:['rsp gbp','price gbp','uk price','gbp']},
   {key:'rspEUR',     label:'RSP EU (EUR)',          aliases:['rsp eur','price eur','eu price','eur']},
+  {key:'rspNOK',     label:'RSP Norway (NOK)',      aliases:['rsp nok','price nok','norwegian price','pris nok','norsk pris']},
+  {key:'rspISK',     label:'RSP Iceland (ISK)',     aliases:['rsp isk','price isk','icelandic price','islenskt verd']},
   {key:'netPriceSEK',label:'Net price (SEK)',       aliases:['net price','netpris','wholesale price','trade price']},
   {key:'moq',        label:'MOQ',                  aliases:['moq','minimum order','min order','lagsta order']},
   {key:'leadDays',   label:'Lead time (days)',      aliases:['lead time','lead days','leveranstid','delivery time']},
@@ -17227,6 +17261,9 @@ async function submitSkuTypeFeedback(){
 
 function renderSkuEdit(el){
   const r = skuReadiness(skuForm);
+  // Phase 7 D2-separate: distinct sustainability readiness score, surfaced
+  // alongside compliance readiness as secondary chip on same card.
+  const sR = sustainabilityReadiness(skuForm);
   const isNew = skuEditId === 'new';
   // Tab spec is product-type-aware (Apr 2026 — bug-fix brief Task A).
   // Tab 2's label changes per type to reflect what the tab actually contains:
@@ -17286,15 +17323,29 @@ function renderSkuEdit(el){
       <!-- Readiness bar -->
       <div style="background:#fff;border:1px solid var(--border);padding:.85rem 1rem;margin-bottom:1rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
-          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">SKU Readiness</div>
+          <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Compliance readiness</div>
           <div style="font-family:var(--mono);font-size:.72rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div>
         </div>
         <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.5rem">
           <div style="background:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'};height:6px;border-radius:3px;width:${r.pct}%;transition:width .5s"></div>
         </div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem">
           ${r.ready.map(rt=>`<span style="font-family:var(--mono);font-size:.52rem;background:#ECFDF5;color:#065F46;padding:.1rem .5rem;border:1px solid #A7F3D0">✓ ${rt}</span>`).join('')}
           ${r.missing.slice(0,4).map(m=>`<span style="font-family:var(--mono);font-size:.52rem;background:#FEF2F2;color:#991B1B;padding:.1rem .5rem;border:1px solid #FCA5A5">Missing: ${m}</span>`).join('')}
+        </div>
+
+        <!-- Sustainability readiness — Phase 7 D2-separate secondary score -->
+        <div style="border-top:1px solid var(--border);padding-top:.6rem;margin-top:.2rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+            <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Sustainability readiness <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400">— Green Claims / ESPR / PPWR posture</span></div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:${sR.pct>=80?'#10B981':sR.pct>=50?'#F59E0B':sR.pct>0?'#EF4444':'var(--muted)'}">${sR.pct}%</div>
+              <div onclick="skuTab=7;renderSkuEdit(document.getElementById('page-skus'))" style="font-family:var(--mono);font-size:.52rem;color:var(--gold);cursor:pointer;text-decoration:underline">Tab 7 →</div>
+            </div>
+          </div>
+          <div style="background:var(--border);height:4px;border-radius:2px">
+            <div style="background:${sR.pct>=80?'#10B981':sR.pct>=50?'#F59E0B':sR.pct>0?'#EF4444':'var(--muted)'};height:4px;border-radius:2px;width:${sR.pct}%;transition:width .5s"></div>
+          </div>
         </div>
       </div>
 
@@ -17393,6 +17444,12 @@ function renderSkuEdit(el){
               <input type="number" value="${skuForm.rspGBP||''}" placeholder="e.g. 55" oninput="skuForm.rspGBP=this.value"></div>
             <div class="field"><label class="lbl">RSP EU (EUR)</label>
               <input type="number" value="${skuForm.rspEUR||''}" placeholder="e.g. 59" oninput="skuForm.rspEUR=this.value"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">RSP Norway (NOK)</label>
+              <input type="number" value="${skuForm.rspNOK||''}" placeholder="e.g. 649" oninput="skuForm.rspNOK=this.value"></div>
+            <div class="field"><label class="lbl">RSP Iceland (ISK)</label>
+              <input type="number" value="${skuForm.rspISK||''}" placeholder="e.g. 8990" oninput="skuForm.rspISK=this.value"></div>
           </div>
           <div class="grid-2">
             <div class="field"><label class="lbl">Net price to retailer (SEK)</label>
@@ -18436,6 +18493,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
       ['Safety Assessment ref',sku.safetyRef||''],['Certifications',(sku.certifications||[]).join('; ')],
       ['Claims',(sku.claims||[]).join('; ')],['RSP SEK',sku.rspSEK||''],['RSP DKK',sku.rspDKK||''],
       ['RSP GBP',sku.rspGBP||''],['RSP EUR',sku.rspEUR||''],
+      ['RSP NOK',sku.rspNOK||''],['RSP ISK',sku.rspISK||''],
       ['MOQ',sku.moq||''],['Case qty',sku.caseQty||''],['Lead time (days)',sku.leadDays||''],
       ['Warehouse',sku.warehouse||''],['Description EN',sku.descEN||''],
       ['Description SV',sku.descSV||''],['Description DA',sku.descDA||''],
@@ -20989,7 +21047,7 @@ function renderPrePitchBrief(retailerEntry, market){
 
   // ── 2. RSP fit ───────────────────────────────────
   const rspData  = RSP_INTELLIGENCE[Object.keys(RSP_INTELLIGENCE).find(k=>(RSP_INTELLIGENCE[k].name||'').toLowerCase()===rname.toLowerCase())||''];
-  const rsp      = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||0);
+  const rsp      = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||sku?.rspNOK||sku?.rspISK||0);
   let rspFitHtml = '';
   if(sku && rsp && rspData){
     const fit = checkRSPFit(rsp, rid, rname, sku, brand.category||'');
@@ -24144,7 +24202,7 @@ function renderCRM(el){
                         ${renderDistributorNote(card.id, {})}
                         ${(()=>{
                           const _sku = skus[0]||null;
-                          const _rsp = parseFloat((_sku?.rspSEK||_sku?.rspDKK||_sku?.rspEUR||_sku?.rspGBP)||0);
+                          const _rsp = parseFloat((_sku?.rspSEK||_sku?.rspDKK||_sku?.rspEUR||_sku?.rspGBP||_sku?.rspNOK||_sku?.rspISK)||0);
                           if(!_rsp||!_sku) return '';
                           const _fit = checkRSPFit(_rsp, card.id, card.name, _sku, brand?.category||'');
                           return _fit ? renderRSPFit(_fit, {small:true}) : '';
@@ -26271,7 +26329,7 @@ async function generateBrandPackPDF(){
       pdfKeyValue(doc,'Product',heroSku.name||'—',margin,y,30); y+=5.5;
       pdfKeyValue(doc,'EAN',heroSku.ean||'—',margin,y,30);
       pdfKeyValue(doc,'RSP (SE)',heroSku.rspSEK?heroSku.rspSEK+' SEK':'—',pageW/2,y,30); y+=5.5;
-      if(heroSku.rspDKK||heroSku.rspEUR||heroSku.rspGBP){
+      if(heroSku.rspDKK||heroSku.rspEUR||heroSku.rspGBP||heroSku.rspNOK||heroSku.rspISK){
         pdfKeyValue(doc,'RSP (target)',heroSku.rspDKK?heroSku.rspDKK+' DKK':heroSku.rspEUR?heroSku.rspEUR+' EUR':heroSku.rspGBP?heroSku.rspGBP+' GBP':'—',margin,y,30); y+=5.5;
       }
       if(heroSku.moq) { pdfKeyValue(doc,'MOQ',heroSku.moq+' units',margin,y,30); y+=5.5; }
@@ -27079,7 +27137,7 @@ function renderExpansionOverview(){
   const marginCards = listedCards.slice(0,3).map(card=>{
     const reg = RETAILER_REGISTRY.find(r=>r.id===card.id);
     const margin = reg?.marginMin ? Math.round(reg.marginMin*100) : null;
-    const rsp = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||0);
+    const rsp = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||sku?.rspNOK||sku?.rspISK||0);
     const catBenchmark = (brand.category||'').includes('Beauty') ? 50 :
                          (brand.category||'').includes('Food')   ? 35 : 45;
     const vs = margin!==null ? margin - catBenchmark : null;
