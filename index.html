@@ -768,6 +768,7 @@
     <div class="page" id="page-suppliers"></div>
     <div class="page" id="page-circular"></div>
     <div class="page" id="page-skus"></div>
+    <div class="page" id="page-rp-marketplace"></div>
     <div class="page" id="page-claims"></div>
     <div class="page" id="page-cfo"></div>
     <div class="page" id="page-crm"></div>
@@ -1093,6 +1094,25 @@ const PARTNERS=[
   {id:30,name:"Loopify EU",circularType:"donation",category:"Donation",productCategories:["Skincare & Beauty","Wellness & Supplements","Food & Beverage"],country:"Netherlands",markets:["NL","BE","DE","DK","SE"],city:"Amsterdam",valueRecoveryRate:0,buyback:null,minimumUnits:10,urgencyCapable:true,espr:true,description:"EU surplus donation platform connecting brands to verified charities. Handles beauty, supplements, baby, and food categories. Issues donation certificate and ESPR Article 24 summary.",contact:"brands@loopify.eu",verifiedDate:"2026-04",insiderNote:"Only donation partner that provides ESPR-compatible documentation. Good for brands needing both social impact and Article 24 coverage."},
 ];
 
+// ── RP Partner Marketplace (Decision 10 V1.0 — H4b lock, May 2026) ──────
+// Empty on ship per H4b strategy chat lock: real partner names displayed
+// pre-agreement creates reputational risk (Cosmeservice/Freyr discover
+// unauthorized listing before Charlotte outreach + Wave 1 brand trust
+// damage + visible marketplace shrinkage if 1-2 candidates decline).
+// Grows as partnerships sign (Aug-Sep 2026 per v1.0 Section 10.1).
+// First partner signed = first card appears + holding message updates.
+//
+// Schema documented inline so future additions follow consistent shape:
+//   {id, name, country, coverageMarkets:[ISO2,...], capabilities:[...],
+//    tier:'A'|'B'|'C' (INTERNAL — never rendered to brand customer per D10.6),
+//    status:'verified'|'tier_c_constrained' (PUBLIC),
+//    contactEmail (null until verified — gates intro request CTA),
+//    responseTimeMedianDays (manually tracked by Charlotte, null pre-launch),
+//    customerRatingAggregate (null pre-launch, populated post-V1.5 SLA tracking)}
+const RP_PARTNERS = [
+  // First partner appended here when Aug-Sep 2026 partnerships sign.
+];
+
 // MANUFACTURERS
 const CERT_SCORES={"COSMOS Organic":5,"COSMOS Natural":4,"Ecocert":4,"GOTS":4,"FSC":3,"OEKO-TEX":3,"B Corp":5,"Nordic Swan":4,"ISO 14001":3,"RSPO":3,"Rainforest Alliance":3,"Fairtrade":4,"Soil Association Organic":5,"Vegan Society":2,"Cruelty Free":2,"Natrue":3,"USDA Organic":4,"ISO 22716":1,"GMP":1,"ISO 9001":1,"Halal":2,"Kosher":1};
 const MARKET_REQS={"United Kingdom":["ISO 22716","UK Responsible Person","OPSS Registration"],"Germany":["ISO 22716","EU Responsible Person","CPNP Notification","German labelling"],"Denmark":["ISO 22716","EU Responsible Person","CPNP Notification","Danish labelling"],"Norway":["ISO 22716","EU Responsible Person","Mattilsynet Registration","Norwegian labelling"],"United States":["FDA MoCRA Registration","GMP","US Responsible Person"],"Australia":["AICIS Registration","GMP","TGA compliance","AU labelling"],"Sweden":["ISO 22716","EU Responsible Person","CPNP Notification"],"Netherlands":["ISO 22716","EU Responsible Person","CPNP Notification","Dutch labelling"],"France":["ISO 22716","EU Responsible Person","CPNP Notification","French labelling"]};
@@ -1408,11 +1428,12 @@ function loadState(){
     if(sk) skus=safeJsonParse(sk)||[];
     if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
     // Brand Schema Rationalization Phase 1 — Watchpoint AB cleanup
-    // (Decision 10 Trigger 7, G4 lock). Consolidates 3 EU RP field-name
-    // variants into canonical brand.euResponsible. Runs before loadDPP
-    // and SKU migrations so brand-level state is canonical before any
-    // downstream work. Idempotent on brand._schemaVersion=2.
-    if(typeof migrateBrandSchemaV2 === 'function') migrateBrandSchemaV2();
+    // (Decision 10 Trigger 7, G4 lock + J1-model-A object re-lock). V3
+    // supersedes lossy V2 string collapse — builds canonical object
+    // brand.euResponsible={name,email,address,renewalDate}. Runs before
+    // loadDPP and SKU migrations so brand-level state is canonical first.
+    // Idempotent on brand._schemaVersion=3.
+    if(typeof migrateBrandSchemaV3 === 'function') migrateBrandSchemaV3();
     // Hydrate dppData BEFORE migrations run. V2 + V6 read dppData; without
     // this, dppData is {} at migration time, the d=dppData[sku.id] lookup is
     // undefined, the inner migration block short-circuits, and _schemaVersion
@@ -2150,6 +2171,7 @@ const NAV=[
   {id:"claims",   sec:"brand", icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
   {id:"pitch",    sec:"brand", icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"brandpack",sec:"brand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"rp-marketplace",sec:"brand", icon:"⚖", label:"EU Responsible Person",stages:["trading","expanding","scaling"],          cats:RETAIL_CATS},
   {id:"bizcase",  sec:"brand", icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
   {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
   // ── SOURCE section ─────────────────────────────
@@ -2201,7 +2223,7 @@ function getVisibleNav(){
   return visible;
 }
 
-const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
+const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare",crm:"CRM",pitch:"Pitch",brandpack:"Pack","rp-marketplace":"EU RP",bizcase:"Biz Case",suppliers:"Nudge",circular:"Circular",skus:"Products",claims:"Claims",cfo:"CFO"};
 
 function switchNavSection(sec){
   navSection=sec;
@@ -2365,7 +2387,7 @@ function buildNav(){
   // Mobile nav — show current section items + section switcher
   var mobnav=document.getElementById('mobile-nav-inner');
   if(mobnav){
-    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','bizcase','cfo'];
+    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','rp-marketplace','bizcase','cfo'];
     var sourcePages=['find','suppliers','sourcing','circular','dpp','csrd'];
     var retailPages=['crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
     var inBrand=brandPages.includes(currentPage);
@@ -2826,6 +2848,7 @@ function renderPage(id){
   else if(id==='compare')renderCompare(el);
   else if(id==='pitch')renderPitch(el);
   else if(id==='brandpack')renderBrandPack(el);
+  else if(id==='rp-marketplace')renderRpMarketplace(el);
   else if(id==='bizcase')renderBizCase(el);
   else if(id==='suppliers')renderSuppliers(el);
   else if(id==='circular')renderCircular(el);
@@ -4376,7 +4399,7 @@ const BLOCKER_RESOLUTION = {
   amberClaim:     {days:3,  cost:'0 SEK',          fix:'Substantiate or rephrase — see claim localizer.'},
   noRpUK:         {days:21, cost:'1,500–3,000 SEK', fix:'Appoint a UK Responsible Person — several providers offer this service.'},
   ukCMR:          {days:30, cost:'2,000–5,000 SEK', fix:'Commission CMR audit from UK cosmetics consultant.'},
-  euRpMissing:    {days:14, cost:'800–2,000 SEK',  fix:'Appoint EU Responsible Person — most safety assessors offer this.'},
+  euRpMissing:    {days:14, cost:'800–2,000 SEK',  fix:'Appoint EU Responsible Person via the RP marketplace, or most safety assessors offer this.'},
   inciMissing:    {days:7,  cost:'0 SEK',          fix:'Compile INCI list from your formulation — add to PIF.'},
   eanMissing:     {days:3,  cost:'500 SEK',         fix:'Register EAN/GTIN at gs1.se or equivalent national body.'},
   noProof:        {days:0,  cost:'0 SEK',          fix:'Gather your DTC sales data — even estimated figures help.'},
@@ -4424,7 +4447,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(market.euMember){
         if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
         else{ blockers.push({id:'cpnpMissing',level:'red',label:'CPNP notification missing',impact:'Blocks all EU pharmacy and beauty retail listings. Required under EU Cosmetics Regulation (EC) 1223/2009.'}); }
-        if(sku.euResponsible||brand&&brand.euResponsible){ comp+=6; greens.push('EU Responsible Person on file'); }
+        if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){ comp+=6; greens.push('EU Responsible Person on file'); }
         else{ blockers.push({id:'euRpMissing',level:'amber',label:'EU Responsible Person missing',impact:'Required for all EU cosmetics listings.'}); }
         if(sku.inci||sku.ingredients){ comp+=6; greens.push('INCI list on file'); }
         else{ blockers.push({id:'inciMissing',level:'amber',label:'INCI list missing',impact:'Mandatory for EU cosmetics PIF and retail listings.'}); }
@@ -5478,7 +5501,7 @@ function getComplianceThresholds(b){
 const COMPLIANCE_RADAR_ITEMS = [
   // Cosmetics — EU
   {id:'cpnp',          label:'CPNP notification',              categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.cpnpRef||s?.cpnp||s?.cpnpNumber?'green':'red',     actionPage:'skus',        actionLabel:'Add in My Products'},
-  {id:'eu_rp',         label:'EU Responsible Person',          categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>b?.euResponsiblePerson?.name||b?.euRP||b?.euRpName?'green':'red',   actionPage:'home',  actionLabel:'Add in Brand Profile'},
+  {id:'eu_rp',         label:'EU Responsible Person',          categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>b?.euResponsible?.name?'green':'red',   actionPage:'rp-marketplace',  actionLabel:'View RP marketplace'},
   {id:'pif',           label:'Product Information File (PIF)', categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>s?.safetyAssessment||s?.safetyAssessor?'green':'amber', actionPage:'claims',     actionLabel:'Check in PIF Gap Checker'},
   {id:'reach_svhc',    label:'REACH SVHC check',               categories:['cosmetic_skincare'],        markets:['all_eu'],                     check:(b,s)=>{if(!s?.inci)return 'amber';return checkInciForSVHC(s.inci||'').length?'red':'green';}, actionPage:'skus', actionLabel:'Check INCI in My Products'},
   // Cosmetics — UK
@@ -13919,6 +13942,404 @@ const BASKET_DATA = {
   default:  {step1:149, step2:119, step3:279, step4:199, step5:159, currency:'SEK'},
 };
 
+function renderRpMarketplace(el){
+  if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
+
+  // Sort algorithm per D10.6 Section 7.2: brand-need-relevance → tier (hidden)
+  // → response time → rating. No-op while RP_PARTNERS empty (H4b). Activates
+  // automatically when partners append.
+  const brandMarkets = (brand.targetMarkets || []).concat([brand.currentMarket || '']).filter(Boolean);
+  const sortedPartners = RP_PARTNERS.slice().sort(function(a,b){
+    // Relevance: count of brand markets covered by partner.coverageMarkets
+    const aRel = (a.coverageMarkets || []).filter(function(m){ return brandMarkets.indexOf(m) >= 0; }).length;
+    const bRel = (b.coverageMarkets || []).filter(function(m){ return brandMarkets.indexOf(m) >= 0; }).length;
+    if(aRel !== bRel) return bRel - aRel;
+    // Tier (internal, hidden): A=1 B=2 C=3 → lower number first
+    const aTier = {A:1,B:2,C:3}[a.tier] || 9;
+    const bTier = {A:1,B:2,C:3}[b.tier] || 9;
+    if(aTier !== bTier) return aTier - bTier;
+    // Response time: lower median first (null sorts last)
+    const aRT = a.responseTimeMedianDays || 999;
+    const bRT = b.responseTimeMedianDays || 999;
+    if(aRT !== bRT) return aRT - bRT;
+    // Rating: higher first (null sorts last)
+    const aR = a.customerRatingAggregate || 0;
+    const bR = b.customerRatingAggregate || 0;
+    return bR - aR;
+  });
+
+  const hasExistingRp = !!(brand.euResponsible && brand.euResponsible.name);
+  const partnerCount = sortedPartners.length;
+
+  el.innerHTML = `
+    <div class="page-wrap" style="max-width:980px">
+      <div style="margin-bottom:1.5rem">
+        <h1 style="font-family:var(--serif);font-size:1.85rem;color:var(--navy);margin:0 0 .35rem">EU Responsible Person</h1>
+        <p style="color:var(--muted);font-family:var(--sans);font-size:.85rem;margin:0">Vetted EU RP partners for CPNP submission, PIF maintenance, and post-market surveillance.</p>
+      </div>
+
+      ${hasExistingRp ? `
+        <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.9rem 1.1rem;margin-bottom:1.5rem;font-family:var(--sans);font-size:.82rem;color:#065F46">
+          <strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.25rem">EU RP on file</strong>
+          ${brand.euResponsible.name}${brand.euResponsible.email?` · ${brand.euResponsible.email}`:''}${brand.euResponsible.renewalDate?` · renews ${brand.euResponsible.renewalDate}`:''}
+        </div>` : ''}
+
+      ${partnerCount > 0 ? `
+        <!-- Future state: partner cards render here when RP_PARTNERS populates -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-bottom:1.5rem">
+          ${sortedPartners.map(function(p){
+            const canIntro = p.status === 'verified' && !!p.contactEmail;
+            return `
+              <div style="background:#fff;border:1px solid var(--border);padding:1rem">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem">
+                  <div style="font-family:var(--serif);font-size:1.05rem;color:var(--navy)">${p.name}</div>
+                  <span style="font-family:var(--mono);font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;padding:.15rem .45rem;background:${p.status==='verified'?'#ECFDF5':'#FEF3C7'};color:${p.status==='verified'?'#065F46':'#92400E'};border:1px solid ${p.status==='verified'?'#A7F3D0':'#FDE68A'}">${p.status==='verified'?'✓ Verified':'Pending'}</span>
+                </div>
+                <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.5rem">${p.country} · ${(p.coverageMarkets||[]).join(', ')}</div>
+                <div style="font-family:var(--sans);font-size:.78rem;color:#333;line-height:1.4;margin-bottom:.75rem">${(p.capabilities||[]).join(' · ')}</div>
+                <button onclick="${canIntro?`requestRpIntro(${p.id})`:''}" ${canIntro?'':'disabled'} style="width:100%;padding:.5rem;font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:${canIntro?'var(--navy)':'var(--border)'};color:${canIntro?'#fff':'var(--muted)'};border:none;cursor:${canIntro?'pointer':'not-allowed'}">${canIntro?'Request introduction':'Pending vetting'}</button>
+              </div>`;
+          }).join('')}
+        </div>` : ''}
+
+      <!-- Holding message (H4b): empty marketplace state -->
+      <div style="background:#fff;border:1px solid var(--border);padding:1.5rem 1.6rem;margin-bottom:1.5rem">
+        <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem">Marketplace launches Q3 2026</div>
+        <p style="font-family:var(--sans);font-size:.88rem;color:#333;line-height:1.55;margin:0 0 1rem">${partnerCount === 0 ? 'EU Responsible Person marketplace launches Q3 2026 — vetted partners coming soon. Manual RP entry available if you already have an existing RP relationship.' : `${partnerCount} vetted partner${partnerCount===1?'':'s'} onboarded. More partners onboarding through Q3 2026.`}</p>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <button onclick="openManualRpEntry()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">${hasExistingRp ? 'Update existing RP' : 'Enter your existing RP'}</button>
+          <button onclick="showRpRequirementsInfo()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--navy);border:1px solid var(--navy);cursor:pointer">Learn about EU RP requirements</button>
+        </div>
+      </div>
+
+      <!-- Manual RP entry form (H6b — form lives on marketplace page) -->
+      <div id="rp-manual-entry-form" style="display:none"></div>
+    </div>
+  `;
+}
+
+// Stub functions — full definitions in Edit Groups 5 & 6
+function openManualRpEntry(){
+  const formEl = document.getElementById('rp-manual-entry-form');
+  if(!formEl) return;
+  if(formEl.style.display === 'none' || !formEl.style.display){
+    formEl.style.display = 'block';
+    renderManualRpEntryForm(formEl);
+    formEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+  } else {
+    formEl.style.display = 'none';
+  }
+}
+function showRpRequirementsInfo(){
+  // V1.0 minimal — opens regulatory monitor or external info. Defer to Group 6 polish if needed.
+  if(typeof showPage === 'function') showPage('reg_monitor');
+}
+let manualRpForm = {name:'', email:'', address:'', renewalDate:''};
+
+function renderManualRpEntryForm(container){
+  // Prefill from existing canonical object if present
+  const existing = (brand && brand.euResponsible && typeof brand.euResponsible === 'object') ? brand.euResponsible : {};
+  manualRpForm = {
+    name: existing.name||'',
+    email: existing.email||'',
+    address: existing.address||'',
+    renewalDate: existing.renewalDate||'',
+  };
+  container.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--border);padding:1.5rem 1.6rem">
+      <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.9rem">${existing.name?'Update':'Enter'} your EU Responsible Person</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:.9rem">
+        <div>
+          <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">RP company name *</label>
+          <input type="text" value="${manualRpForm.name}" placeholder="e.g. Cosmeservice GmbH" oninput="manualRpForm.name=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">RP email</label>
+          <input type="email" value="${manualRpForm.email}" placeholder="e.g. rp@cosmeservice.de" oninput="manualRpForm.email=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+        </div>
+      </div>
+      <div style="margin-bottom:.9rem">
+        <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">RP address</label>
+        <input type="text" value="${manualRpForm.address}" placeholder="EU postal address" oninput="manualRpForm.address=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+      </div>
+      <div style="margin-bottom:1.1rem">
+        <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">RP appointment renewal date</label>
+        <input type="date" value="${manualRpForm.renewalDate}" oninput="manualRpForm.renewalDate=this.value" style="padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+        <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-top:.25rem">Tracked in your compliance calendar so the appointment doesn't lapse.</div>
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button onclick="saveManualRp()" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">Save RP</button>
+        <button onclick="document.getElementById('rp-manual-entry-form').style.display='none'" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--muted);border:1px solid var(--border);cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function saveManualRp(){
+  if(!manualRpForm.name || !manualRpForm.name.trim()){
+    if(typeof showSuccess === 'function') showSuccess('RP company name is required');
+    return;
+  }
+  brand.euResponsible = {
+    name: manualRpForm.name.trim(),
+    email: (manualRpForm.email||'').trim(),
+    address: (manualRpForm.address||'').trim(),
+    renewalDate: manualRpForm.renewalDate||'',
+  };
+  if(typeof saveBrandState === 'function') saveBrandState();
+  // Clear gap dismissal so banner logic re-evaluates (RP now present → gap closes)
+  try{ localStorage.removeItem('ns_rpGapDismissed'); }catch(e){}
+  if(typeof showSuccess === 'function') showSuccess('EU Responsible Person saved');
+  // Re-render marketplace to reflect new RP-on-file state
+  if(typeof renderRpMarketplace === 'function'){
+    const el = document.getElementById('page-rp-marketplace');
+    if(el) renderRpMarketplace(el);
+  }
+}
+
+
+// ── Compliance gap trigger (Decision 10 D10.4 Section 5.2) ──────────────
+// Detects: brand at trading+ stage, no EU RP on file, EU market intent,
+// cosmetic SKUs in portfolio. Factored out for testability + reuse across
+// surfacing points (Brand Pack banner H5b + compliance radar + checklist).
+const EU_RP_MARKETS = ['Sweden','Norway','Finland','Denmark','Iceland','Germany','Netherlands','France','Belgium','Austria','Denmark','Italy','Spain','Portugal','Ireland','Poland'];
+
+function checkComplianceGap(b){
+  b = b || brand;
+  if(!b) return {hasGap:false, missingRp:false, euIntent:false, cosmeticSkus:0};
+  // V1.0 proxy for "in V1.0+": brand has progressed past idea/product stage
+  const activeStage = ['trading','expanding','scaling'].indexOf(b.stage||'trading') >= 0;
+  // No RP designation (J1-model-A object .name empty)
+  const missingRp = !(b.euResponsible && b.euResponsible.name);
+  // EU market entry intent
+  const markets = (b.targetMarkets||[]).concat([b.currentMarket||'']).filter(Boolean);
+  const euIntent = markets.some(function(m){ return EU_RP_MARKETS.indexOf(m) >= 0; });
+  // Cosmetic SKUs present (RP requirement is cosmetics-driven)
+  const skuList = Array.isArray(skus) ? skus : [];
+  const cosmeticSkus = skuList.filter(function(s){ return (s.productType||'cosmetic') === 'cosmetic'; }).length;
+
+  const hasGap = activeStage && missingRp && euIntent && cosmeticSkus > 0;
+  return {hasGap:hasGap, missingRp:missingRp, euIntent:euIntent, cosmeticSkus:cosmeticSkus};
+}
+
+// Soft banner (H5b) — non-blocking, dismissible, persists via localStorage flag.
+function renderComplianceGapBanner(){
+  const gap = checkComplianceGap();
+  if(!gap.hasGap) return '';
+  // Respect dismissal (resets if RP later added — dismissal keyed on missingRp state)
+  let dismissed = false;
+  try{ dismissed = localStorage.getItem('ns_rpGapDismissed') === 'true'; }catch(e){}
+  if(dismissed) return '';
+  return `
+    <div id="rp-gap-banner" style="background:#FFFBEB;border:1px solid #FDE68A;padding:.8rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.75rem">
+      <span style="color:#D97706;font-size:1rem;flex-shrink:0;line-height:1.3">⚠</span>
+      <div style="flex:1">
+        <div style="font-family:var(--sans);font-size:.82rem;color:#92400E;line-height:1.45;margin-bottom:.5rem">
+          <strong>EU Responsible Person not yet designated.</strong> EU retailers require an appointed RP for cosmetic listings. You can publish this Brand Pack now — the gap will be visible to retailers — or designate an RP first.
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button onclick="showPage('rp-marketplace')" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">View RP marketplace</button>
+          <button onclick="openManualRpEntryFromGap()" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:#fff;color:var(--navy);border:1px solid var(--navy);cursor:pointer">I already have an RP</button>
+          <button onclick="dismissRpGapBanner()" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:none;color:#92400E;border:none;cursor:pointer;text-decoration:underline">Dismiss</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function dismissRpGapBanner(){
+  try{ localStorage.setItem('ns_rpGapDismissed','true'); }catch(e){}
+  const banner = document.getElementById('rp-gap-banner');
+  if(banner) banner.remove();
+}
+
+function openManualRpEntryFromGap(){
+  // Navigate to marketplace, then open the manual entry form
+  showPage('rp-marketplace');
+  setTimeout(function(){ if(typeof openManualRpEntry === 'function') openManualRpEntry(); }, 100);
+}
+
+
+// ── RP intro flow (Decision 10 D10.3 + G2a mailto lock) ─────────────────
+// requestRpIntro → prefs modal → sendRpIntroViaEmail → mailto (or clipboard
+// fallback if payload exceeds safe URL ceiling). Mirrors Bridge Invitation
+// Copy mailto pattern. Activates when RP_PARTNERS populated (H4b).
+let rpIntroModalState = {partnerId:null, timeline:'', budget:'', contactMethod:'Email', notes:''};
+
+function requestRpIntro(partnerId){
+  const partner = RP_PARTNERS.find(function(p){ return p.id === partnerId; });
+  if(!partner){ console.warn('[requestRpIntro] partner not found:', partnerId); return; }
+  rpIntroModalState = {partnerId:partnerId, timeline:'', budget:'', contactMethod:'Email', notes:''};
+  renderRpIntroModal(partner);
+}
+
+function renderRpIntroModal(partner){
+  let modal = document.getElementById('rp-intro-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'rp-intro-modal';
+    document.body.appendChild(modal);
+  }
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:1.5rem';
+  modal.innerHTML = `
+    <div style="background:#fff;max-width:520px;width:100%;padding:1.75rem;box-shadow:0 12px 48px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
+        <div>
+          <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.3rem">Request introduction</div>
+          <div style="font-family:var(--serif);font-size:1.3rem;color:var(--navy)">${partner.name}</div>
+        </div>
+        <button onclick="closeRpIntroModal()" style="background:none;border:none;font-size:1.3rem;color:var(--muted);cursor:pointer;line-height:1">×</button>
+      </div>
+      <p style="font-family:var(--sans);font-size:.8rem;color:#555;line-height:1.5;margin:0 0 1.25rem">VeyaFlow will prepare a structured introduction containing your brand profile, product portfolio summary, and compliance status. You'll review and send it from your own email client.</p>
+
+      <div style="margin-bottom:1rem">
+        <label style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem">Timeline</label>
+        <select onchange="rpIntroModalState.timeline=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+          <option value="">Select timeline…</option>
+          <option value="Urgent (within 1 month)">Urgent — within 1 month</option>
+          <option value="Near-term (1-3 months)">Near-term — 1-3 months</option>
+          <option value="Planning (3-6 months)">Planning — 3-6 months</option>
+          <option value="Exploratory">Exploratory — no fixed timeline</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:1rem">
+        <label style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem">Budget range (optional)</label>
+        <input type="text" placeholder="e.g. €2,000-5,000 setup + annual" oninput="rpIntroModalState.budget=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+      </div>
+
+      <div style="margin-bottom:1rem">
+        <label style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem">Additional notes (optional)</label>
+        <textarea rows="3" placeholder="Anything specific the RP should know…" oninput="rpIntroModalState.notes=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border);resize:vertical"></textarea>
+      </div>
+
+      <div style="display:flex;gap:.6rem;margin-top:1.5rem">
+        <button onclick="confirmRpIntro()" style="flex:1;padding:.6rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">Prepare introduction email</button>
+        <button onclick="closeRpIntroModal()" style="padding:.6rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--muted);border:1px solid var(--border);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeRpIntroModal(){
+  const modal = document.getElementById('rp-intro-modal');
+  if(modal) modal.remove();
+}
+
+function confirmRpIntro(){
+  const partner = RP_PARTNERS.find(function(p){ return p.id === rpIntroModalState.partnerId; });
+  if(!partner) return;
+  closeRpIntroModal();
+  sendRpIntroViaEmail(partner.id);
+}
+
+function sendRpIntroViaEmail(partnerId){
+  const partner = RP_PARTNERS.find(function(p){ return p.id === partnerId; });
+  if(!partner || !partner.contactEmail){
+    console.warn('[sendRpIntroViaEmail] partner missing or no contact email:', partnerId);
+    return;
+  }
+  const prefs = {
+    timeline: rpIntroModalState.timeline,
+    budget: rpIntroModalState.budget,
+    contactMethod: rpIntroModalState.contactMethod,
+    notes: rpIntroModalState.notes,
+  };
+  const payload = generateRpHandoffPayload(partner, prefs);
+  const subject = encodeURIComponent(payload.subject);
+  const body = encodeURIComponent(payload.body);
+  const mailtoUrl = `mailto:${partner.contactEmail}?subject=${subject}&body=${body}`;
+
+  // 7KB ceiling check — some mail clients truncate long mailto URLs.
+  // Fallback: copy payload to clipboard, open blank mailto, instruct paste.
+  if(mailtoUrl.length > 7000){
+    const fullText = `To: ${partner.contactEmail}\nSubject: ${payload.subject}\n\n${payload.body}`;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(fullText).then(function(){
+        if(typeof showSuccess === 'function') showSuccess('Introduction copied to clipboard — paste into your email client');
+        window.location.href = `mailto:${partner.contactEmail}?subject=${subject}`;
+      }).catch(function(){
+        window.location.href = mailtoUrl; // attempt anyway
+      });
+    } else {
+      window.location.href = mailtoUrl;
+    }
+  } else {
+    window.location.href = mailtoUrl;
+    if(typeof showSuccess === 'function') showSuccess('Opening your email client…');
+  }
+}
+
+
+// ── RP handoff payload generation (Decision 10 D10.3 Section 4.2 Step 3) ──
+// Pure function: assembles structured intro payload from brand + SKU state.
+// Returns {subject, body} suitable for mailto: construction (Edit Group 4).
+// Five sections per D10.3 spec. No side effects — testable in isolation.
+function generateRpHandoffPayload(rpPartner, prefs){
+  prefs = prefs || {};
+  const cats = (typeof getBrandCategories === 'function' ? getBrandCategories() : null) || (brand.category ? [brand.category] : []);
+  const markets = (brand.targetMarkets || []).concat([brand.currentMarket || '']).filter(Boolean);
+  const uniqMarkets = markets.filter(function(m,i){ return markets.indexOf(m) === i; });
+
+  // Section 2: Product portfolio overview (anonymized — count + categories + ingredient highlights)
+  const skuList = Array.isArray(skus) ? skus : [];
+  const cosmeticCount = skuList.filter(function(s){ return (s.productType||'cosmetic') === 'cosmetic'; }).length;
+  const totalSkus = skuList.length;
+  const productTypes = skuList.map(function(s){ return s.productType||'cosmetic'; });
+  const uniqTypes = productTypes.filter(function(t,i){ return productTypes.indexOf(t) === i; });
+  // Ingredient highlights (anonymized — categories of concern, not full INCI)
+  const hasInci = skuList.some(function(s){ return s.inci || s.ingredients; });
+
+  // Section 3: Compliance current state (what's done via VeyaFlow)
+  const withCpnp = skuList.filter(function(s){ return s.cpnp || s.cpnpNumber; }).length;
+  const withSafety = skuList.filter(function(s){ return s.safetyRef || s.technicalFile; }).length;
+  const existingRp = (brand.euResponsible && brand.euResponsible.name) ? brand.euResponsible.name : null;
+  const existingRpEmail = (brand.euResponsible && brand.euResponsible.email) ? brand.euResponsible.email : null;
+
+  // Section 4: Estimated RP services scope
+  const estCpnpSubmissions = cosmeticCount - withCpnp; // cosmetic SKUs lacking CPNP
+  const pifComplexity = hasInci ? 'Standard (INCI lists on file)' : 'Higher (INCI lists to be compiled)';
+
+  const subject = `EU RP enquiry — ${brand.name||'Brand'} (${cosmeticCount} cosmetic SKU${cosmeticCount===1?'':'s'}, ${uniqMarkets.join('/')||'EU'})`;
+
+  const body =
+`EU Responsible Person enquiry — submitted via VeyaFlow
+
+═══ BRAND ═══
+Company: ${brand.name||'(not set)'}
+Contact: ${brand.userName||'(not set)'}${brand.email?' · '+brand.email:''}
+Website: ${brand.website||'(not set)'}
+Category: ${cats.join(', ')||'(not set)'}
+Target markets: ${uniqMarkets.join(', ')||'(not set)'}
+
+═══ PRODUCT PORTFOLIO ═══
+Total SKUs: ${totalSkus}
+Cosmetic SKUs (EU CPNP scope): ${cosmeticCount}
+Product types: ${uniqTypes.join(', ')||'cosmetic'}
+INCI/ingredient lists on file: ${hasInci?'Yes':'No — to be compiled'}
+
+═══ COMPLIANCE CURRENT STATE (via VeyaFlow) ═══
+SKUs with CPNP notification: ${withCpnp} of ${cosmeticCount}
+SKUs with safety assessment / technical file: ${withSafety} of ${totalSkus}
+Existing EU RP on file: ${existingRp||'None'}${existingRpEmail?' ('+existingRpEmail+')':''}
+
+═══ ESTIMATED RP SERVICES SCOPE ═══
+CPNP submissions needed: ~${estCpnpSubmissions>0?estCpnpSubmissions:0}
+PIF complexity: ${pifComplexity}
+Markets requiring RP coverage: ${uniqMarkets.filter(function(m){return m!=='Sweden';}).join(', ')||'EU (general)'}
+
+═══ BRAND PREFERENCES ═══
+Timeline: ${prefs.timeline||'Not specified'}
+Budget range: ${prefs.budget||'Not specified'}
+Preferred contact method: ${prefs.contactMethod||'Email'}
+Additional notes: ${prefs.notes||'None'}
+
+───
+This enquiry was generated by VeyaFlow on behalf of the brand customer.
+Partner: ${rpPartner?rpPartner.name:'(RP marketplace)'}`;
+
+  return {subject: subject, body: body};
+}
+
+
 function renderBrandPack(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
@@ -14210,6 +14631,7 @@ function renderBrandPackResult(el){
       </div>
 
       <!-- Cover page -->
+      ${renderComplianceGapBanner()}
       ${renderMagicLinkCard()}
       <div style="background:${cover.accent};padding:2rem 1.75rem;margin-bottom:1rem">
         <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.4);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.35rem">Prepared for</div>
@@ -14388,42 +14810,75 @@ function isEudrCompliant(status){
 
 // ── Brand Schema Rationalization — Phase 1 (Decision 10 Trigger 7, May 2026) ─
 // Watchpoint AB cleanup per Decision 10 v1.1 supplement G4 lock.
-// Consolidates 3 brand-level EU Responsible Person field-name variants
-// into canonical brand.euResponsible (mirrors sku.euResponsible pattern):
-//   brand.euRP → brand.euResponsible
-//   brand.euResponsiblePerson.name → brand.euResponsible
-//   brand.euRpName → brand.euResponsible
+// Consolidates brand-level EU Responsible Person field-name variants into
+// canonical OBJECT brand.euResponsible = {name, email, address, renewalDate}
+// per J1-model-A lock (re-locks H2: object, not bare string).
 //
-// Conservative merge: takes first non-empty value in priority order
-// (euResponsible existing → euResponsiblePerson.name → euRP → euRpName).
-// Deletes legacy variants after merge. Idempotent via brand._schemaVersion.
-// First brand-level migration in codebase — establishes pattern.
-function migrateBrandSchemaV2(){
+// History: V2 (shipped) collapsed variants to a bare string (name only) —
+// LOSSY: discarded email/address/renewalDate that 8 read sites expect.
+// Caught mid-Group-5 via Rule #22 shape-verification scout. V3 supersedes:
+// builds full object, recovers sub-fields where they survive, converts the
+// V2 string back to {name:<string>, ...}. Bump to _schemaVersion=3 forces
+// re-run on already-V2 workspaces. No production harm (Cloud & Glow had no
+// RP data); corrected before Wave 1 brands populate RP data Q3 2026.
+//
+// Sources merged (priority order per field): existing object → V2 string →
+// legacy euResponsiblePerson.{name,email,address,renewalDate} → flat
+// euRpName/euRpEmail/euRpAddress/euRpRenewal. Deletes all legacy forms.
+// Idempotent via brand._schemaVersion=3. First brand-level migration — pattern
+// template for future brand-schema work.
+function migrateBrandSchemaV3(){
   if(typeof brand === 'undefined' || !brand) return;  // no brand loaded
-  if(brand._schemaVersion === 2) return;  // idempotency
+  if(brand._schemaVersion === 3) return;  // idempotency
 
-  const existing = brand.euResponsible;
-  const variantA = brand.euResponsiblePerson && brand.euResponsiblePerson.name;
-  const variantB = brand.euRP;
-  const variantC = brand.euRpName;
+  // Gather from all possible sources, in priority order. Handles three states:
+  //  (a) fresh workspace — legacy object/flat fields present
+  //  (b) workspace at V2 (string) — brand.euResponsible is a bare string (name)
+  //  (c) already-V3 — short-circuited above
+  const legacyObj  = (brand.euResponsiblePerson && typeof brand.euResponsiblePerson === 'object') ? brand.euResponsiblePerson : null;
+  const existingVal = brand.euResponsible;
+  // If V2 already ran, existingVal is a string (name). If never migrated, undefined.
+  const existingStr = (typeof existingVal === 'string') ? existingVal : '';
+  // If somehow already an object (defensive), preserve it.
+  const existingObj = (existingVal && typeof existingVal === 'object') ? existingVal : null;
 
-  // Priority: keep existing canonical if set, otherwise first non-empty variant
-  const canonical = existing || variantA || variantB || variantC || '';
-  if(canonical && canonical !== existing){
-    brand.euResponsible = canonical;
-  }
+  const name = (existingObj && existingObj.name)
+            || existingStr
+            || (legacyObj && legacyObj.name)
+            || brand.euRP
+            || brand.euRpName
+            || '';
+  const email = (existingObj && existingObj.email)
+             || (legacyObj && legacyObj.email)
+             || brand.euRpEmail
+             || '';
+  const address = (existingObj && existingObj.address)
+               || (legacyObj && legacyObj.address)
+               || brand.euRpAddress
+               || '';
+  const renewalDate = (existingObj && existingObj.renewalDate)
+                   || (legacyObj && legacyObj.renewalDate)
+                   || brand.euRpRenewal
+                   || '';
 
-  // Delete legacy variants (always — even if no canonical found, clean state)
+  // Build canonical object. Always materialize (per J1-model-A) so downstream
+  // object reads (rp.name, rp.email, rp.renewalDate) never hit undefined.
+  brand.euResponsible = {name:name, email:email, address:address, renewalDate:renewalDate};
+
+  // Delete all legacy variants (flat + object form)
   let cleaned = 0;
   if('euResponsiblePerson' in brand){ delete brand.euResponsiblePerson; cleaned++; }
   if('euRP' in brand){ delete brand.euRP; cleaned++; }
   if('euRpName' in brand){ delete brand.euRpName; cleaned++; }
+  if('euRpEmail' in brand){ delete brand.euRpEmail; cleaned++; }
+  if('euRpAddress' in brand){ delete brand.euRpAddress; cleaned++; }
+  if('euRpRenewal' in brand){ delete brand.euRpRenewal; cleaned++; }
 
-  brand._schemaVersion = 2;
+  brand._schemaVersion = 3;
   try{localStorage.setItem('ns_brand', JSON.stringify(brand));}catch(e){}
 
-  if(canonical || cleaned){
-    console.log(`[migrateBrandSchemaV2] Consolidated to brand.euResponsible=${JSON.stringify(canonical||'')}, cleaned ${cleaned} legacy field(s).`);
+  if(name || cleaned){
+    console.log(`[migrateBrandSchemaV3] Canonical object: brand.euResponsible={name:${JSON.stringify(name)}, email:${JSON.stringify(email)}, ...}, cleaned ${cleaned} legacy field(s).`);
   }
 }
 
@@ -15963,7 +16418,7 @@ function renderCPNPModal(skuId, view){
   const sku = skus.find(s=>s.id===skuId);
   if(!sku){ modal.remove(); return; }
 
-  const rp = brand?.euResponsiblePerson || {};
+  const rp = brand?.euResponsible || {};
   const STATUS_OPTS = [
     {id:'not_started', label:'Not started',    color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB'},
     {id:'ready',       label:'Package ready',  color:'#92400E', bg:'#FFFBEB', border:'#FCD34D'},
@@ -15981,10 +16436,10 @@ function renderCPNPModal(skuId, view){
       {portal:'Product available online', value: brand?.dtcWebsite?'Yes — '+brand.dtcWebsite:'Specify',filled:!!brand?.dtcWebsite,required:false},
     ]},
     {section:'B. Responsible Person',fields:[
-      {portal:'RP company name',          value: rp.name||brand?.euRpName||'',      filled:!!(rp.name||brand?.euRpName),    required:true},
-      {portal:'RP address',               value: rp.address||brand?.euRpAddress||'',filled:!!(rp.address||brand?.euRpAddress),required:true},
-      {portal:'RP email',                 value: rp.email||brand?.euRpEmail||'',    filled:!!(rp.email||brand?.euRpEmail),  required:true},
-      {portal:'RP phone',                 value: rp.phone||brand?.euRpPhone||'',    filled:!!(rp.phone||brand?.euRpPhone),  required:false},
+      {portal:'RP company name',          value: rp.name||'',      filled:!!rp.name,    required:true},
+      {portal:'RP address',               value: rp.address||'',filled:!!rp.address,required:true},
+      {portal:'RP email',                 value: rp.email||'',    filled:!!rp.email,  required:true},
+      {portal:'RP phone',                 value: rp.phone||'',    filled:!!rp.phone,  required:false},
     ]},
     {section:'C. Formulation',fields:[
       {portal:'INCI ingredient list',     value: (sku.inci||sku.ingredients||'').slice(0,200)+(((sku.inci||sku.ingredients)||'').length>200?'…':''),filled:!!(sku.inci||sku.ingredients),required:true},
@@ -16015,7 +16470,7 @@ function renderCPNPModal(skuId, view){
   const checklist = [
     {id:'safety', label:'Safety Assessment document signed by EU-qualified assessor', done:!!(sku.safetyAssessment||sku.safetyAssessor)},
     {id:'pif',    label:'Complete Product Information File (PIF) compiled',           done:!!sku.pifRef},
-    {id:'eu_rp',  label:'EU Responsible Person appointed + contact details confirmed',done:!!(rp.name||brand?.euRpName)},
+    {id:'eu_rp',  label:'EU Responsible Person appointed + contact details confirmed',done:!!rp.name},
     {id:'inci',   label:'Full INCI list confirmed with manufacturer',                 done:!!(sku.inci||sku.ingredients)},
     {id:'account',label:'CPNP account registered at portal.cpnp.eu',                 done:false},
     {id:'ean',    label:'EAN/GTIN registered and confirmed',                          done:!!sku.ean},
@@ -16769,7 +17224,7 @@ function startManualSku(){
   skuEditId = 'new';
   skuTab = 1;
   skuForm = newSkuForm();
-  if(brand?.euResponsible) skuForm.euResponsible = brand.euResponsible;
+  if(brand?.euResponsible?.name) skuForm.euResponsible = brand.euResponsible.name;
   renderPage('skus');
 }
 
@@ -18912,8 +19367,8 @@ const PIF_REQUIREMENTS = [
   // E. Animal testing data
   {id:'no_animal',     section:'E', label:'Animal testing statement',          description:'Declaration that product + ingredients have not been tested on animals post-March 2013.',  check: (b,s)=>!!(s?.noAnimalTesting||s?.crueltyFree||b?.crueltyFree), fixPage:'skus', fixLabel:'Add declaration', severity:'required'},
   // F. EU Responsible Person
-  {id:'eu_rp',         section:'F', label:'EU Responsible Person',            description:'Appointed EU RP with name, address, contact. Mandatory for EU market.',                    check: b=>!!(b?.euResponsiblePerson?.name||b?.euRP||b?.euRpName), fixPage:'brand', fixLabel:'Appoint EU RP', severity:'blocker'},
-  {id:'eu_rp_contact', section:'F', label:'EU RP contact details on file',   description:'EU RP email and postal address.',                                                           check: b=>!!(b?.euResponsiblePerson?.email||b?.euRpEmail), fixPage:'brand', fixLabel:'Add RP contact', severity:'required'},
+  {id:'eu_rp',         section:'F', label:'EU Responsible Person',            description:'Appointed EU RP with name, address, contact. Mandatory for EU market.',                    check: b=>!!(b?.euResponsible?.name), fixPage:'rp-marketplace', fixLabel:'Appoint EU RP', severity:'blocker'},
+  {id:'eu_rp_contact', section:'F', label:'EU RP contact details on file',   description:'EU RP email and postal address.',                                                           check: b=>!!(b?.euResponsible?.email), fixPage:'rp-marketplace', fixLabel:'Add RP contact', severity:'required'},
   // G. CPNP notification
   {id:'cpnp',          section:'G', label:'CPNP notification',               description:'Notification via portal.cpnp.eu before first EU placement. Product reference number.',     check: (b,s)=>!!(s?.cpnpRef||s?.cpnp||b?.cpnpRef), fixPage:'skus', fixLabel:'Notify at cpnp.eu', severity:'blocker'},
   // H. UK-specific (if UK market targeted)
@@ -29044,7 +29499,7 @@ function buildComplianceEvents(){
   });
 
   // 3. EU Responsible Person renewal
-  const rpRenewal = brand?.euResponsiblePerson?.renewalDate || brand?.euRP?.renewalDate;
+  const rpRenewal = brand?.euResponsible?.renewalDate;
   if(rpRenewal){
     addEvent(rpRenewal, 'EU Responsible Person agreement renewal', 'Review contract', 'brand', 'rp', 'eu-rp');
   }
@@ -29118,7 +29573,7 @@ function renderComplianceCalendar(){
   const events = buildComplianceEvents();
 
   // Empty state
-  const hasCertData = (brand?.certifications||[]).some(c=>c.expiryDate) || brand?.euResponsiblePerson?.renewalDate;
+  const hasCertData = (brand?.certifications||[]).some(c=>c.expiryDate) || brand?.euResponsible?.renewalDate;
   if(!events.length){
     return `
       <div style="margin-bottom:1.25rem">
@@ -33369,7 +33824,7 @@ function retailChecklistAutoCheckValue(expr, sku){
   if(!expr) return false;
   if(expr === 'brand.euResponsible'){
     if(!brand) return false;
-    return !!brand.euResponsible;
+    return !!(brand.euResponsible && brand.euResponsible.name);
   }
   if(expr.indexOf('sku.') === 0){
     if(!sku) return false;
@@ -34121,7 +34576,7 @@ function retailTemplateResolveSource(source, sku, brandObj, manualFields){
     return {type: brandObj && brandObj.name ? 'auto' : 'missing', value: (brandObj && brandObj.name) || ''};
   }
   if(source === 'brand.euResponsible'){
-    var rp = brandObj && brandObj.euResponsible;
+    var rp = brandObj && brandObj.euResponsible && brandObj.euResponsible.name;
     return {type: rp ? 'auto' : 'missing', value: (typeof rp==='string' ? rp : '')};
   }
   // compound: 'sku.x||sku.y' or 'sku.x'
