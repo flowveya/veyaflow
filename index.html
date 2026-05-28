@@ -21735,6 +21735,24 @@ function renderPrePitchBrief(retailerEntry, market){
 function renderPitch(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
+  // Validate pitchResult BEFORE the render ternary (fixes blank-page re-entrancy
+  // bug, Cleanup Sprint May 2026). Previously renderPitchResult()'s recovery
+  // guards called renderPitch() back mid-render, and the nested innerHTML was
+  // clobbered when the outer call completed with an empty result string. Now we
+  // clear a stale/malformed pitchResult here so the ternary falls to the form.
+  if(pitchResult){
+    var _valid = pitchResult.text && typeof pitchResult.text === 'string';
+    if(_valid){
+      var _blocks = pitchResult.text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.includes('VARIANT:');});
+      var _hasBody = _blocks.some(function(b){var m=b.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/);return m&&m[1]&&m[1].trim().length>20;});
+      if(!_hasBody) _valid = false;
+    }
+    if(!_valid){
+      pitchResult = null;
+      try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
+    }
+  }
+
   // Pre-fill from brand profile — always refresh from canonical brand state (Apr 2026)
   pitchForm.brandName       = brand?.name          || pitchForm.brandName       || '';
   pitchForm.category        = brand?.category      || pitchForm.category        || '';
@@ -22470,12 +22488,11 @@ function sendPitchViaEmail(variantIdx){
 
 function renderPitchResult(){
   if(!pitchResult) return '';
-  // Guard: stale localStorage format — clear and show form
+  // Guard: stale format — pre-validated in renderPitch now, but stay safe.
+  // Do NOT call renderPitch() here (re-entrancy clobbers innerHTML).
   if(!pitchResult.text || typeof pitchResult.text !== 'string'){
     pitchResult = null;
     try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
-    const el = document.getElementById('page-pitch');
-    if(el) renderPitch(el);
     return '';
   }
   const intel = PITCH_INTEL[pitchResult.retailer]||{};
@@ -22496,9 +22513,7 @@ function renderPitchResult(){
 
   if(!parsed.length){
     pitchResult=null;
-    localStorage.removeItem('ns_pitchResult');
-    const el=document.getElementById('page-pitch');
-    if(el) renderPitch(el);
+    try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
     return '';
   }
 
@@ -22506,11 +22521,10 @@ function renderPitchResult(){
   if(pitchActiveVariant>=parsed.length) pitchActiveVariant=0;
   const active = parsed[pitchActiveVariant];
 
-  // Guard: if active is undefined (stale saved pitchResult format), clear and re-render form
+  // Guard: if active is undefined (stale saved pitchResult format), clear.
   if(!active || !active.body){
     pitchResult = null;
-    const el = document.getElementById('page-pitch');
-    if(el) renderPitch(el);
+    try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
     return '';
   }
 
