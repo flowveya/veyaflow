@@ -4345,7 +4345,7 @@ function computePatternStatus(pattern, brand, sku, retailerEntry, marketCode) {
       return {pass:false, label:`${claims.length} claim${claims.length!==1?'s':''} not yet documented in PIF`, detail:'complete safety assessment reference'};
     }
     case 'marginTooLow': {
-      const rsp = parseFloat(s.rspSEK||s.rspDKK||s.rspGBP||s.rspEUR||s.rspNOK||s.rspISK||0);
+      const rsp = rspCanonical(s);
       if(!rsp) return {pass:null, label:'RSP not set', detail:'enter price in My Products'};
       const fit = checkRSPFit(rsp, pattern._retailerKey||retailerEntry?.id||'', retailerEntry?.name||'', s, b.category||'');
       if(fit&&fit.type==='ERROR')   return {pass:false, label:`${rsp} ${fit.currency} ${fit.floor?'below floor':'above ceiling'}`, detail:fit.message};
@@ -4525,7 +4525,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   // 2. COMMERCIAL (28)
   let comm = 0;
   if(skuValid&&retailer){
-    const rsp = parseFloat(sku.rspDKK||sku.rspGBP||sku.rspEUR||sku.rspSEK||sku.rspNOK||sku.rspISK||0);
+    const rsp = rspCanonical(sku);
     const net = parseFloat(sku.netPriceSEK||0);
     const moq = parseInt(sku.moq||0);
     const lead = parseInt(sku.leadDays||0);
@@ -6443,6 +6443,21 @@ const MARKET_REGISTRY = {
 };
 
 // ── LAYER 2: RETAILER REGISTRY ────────────────────
+//
+// DEFERRED CLEANUP TASK (Cleanup Sprint May 2026, resolution E-3):
+// 8 retailers appear TWICE in this array with conflicting research generations:
+//   kicks_dk, normal_dk, magasin_dk, illum_dk, helsam_dk (DK),
+//   ici_paris_xl_be, di_be, kruidvat_be (BE).
+// Each pair has an "early" entry (~L7200-8400) and a "late" entry (~L9700-9970).
+// .find() returns the EARLY entry; the LATE research is currently dead/unreachable.
+// Conflicts are in CORE COMMERCIAL FACTS (storeCount, margins, moq, leadTimeDays,
+// some accessTier + name variants) — e.g. normal_dk: 120 vs 180 stores, 50-60%
+// vs 55-65% margin, MOQ 500 vs 1000. di_be/kruidvat_be even disagree on accessTier.
+// Resolution requires Charlotte's verified-research reconciliation (which figures
+// are authoritative) — NOT a coding decision. Latent (no crash; consistent early
+// generation shows today). Full conflict diff captured in Cleanup Sprint ship
+// report. Do NOT auto-dedup — would bake in unverified facts into live retailer
+// intelligence. (Watchpoint: duplicate retailer IDs.)
 const RETAILER_REGISTRY = [
   // ── DENMARK ──────────────────────────────────────
   {
@@ -12397,7 +12412,7 @@ Galaxus (Migros Digital): single listing covers 9 EU markets — highest cross-m
 
   // Board line — pre-calculated margin intel for retail module
   const sku0 = skus[0]||{};
-  const rsp = parseFloat(sku0.rspSEK||sku0.rspEUR||sku0.rspNOK||sku0.rspISK||0);
+  const rsp = rspCanonical(sku0);
   const netPrice = parseFloat(sku0.netPriceSEK||0);
   const marginPct = rsp>0&&netPrice>0 ? Math.round((1-(netPrice/rsp))*100) : null;
   const boardLine = marginPct
@@ -13033,7 +13048,7 @@ function scoreMarketDimension(dim, marketCode, brand, sku){
     return {score, display:label, detail:market?.timingHook2026||'No specific 2026 timing signal identified.'};
   }
   if(dim==='revenueY1'){
-    const rsp = parseFloat(sku?.rspDKK||sku?.rspGBP||sku?.rspEUR||sku?.rspSEK||sku?.rspNOK||sku?.rspISK||0);
+    const rsp = rspCanonical(sku);
     const vatRate = {DK:0.25,DE:0.19,UK:0.20,NO:0.25,NL:0.21,FR:0.20,SE:0.25}[marketCode]||0.25;
     const topRetailer = RETAILER_REGISTRY.find(r=>r.market===marketCode&&retailerMatchesBrandTags(r,brand));
     const margin = topRetailer?.marginMin||0.48;
@@ -14788,24 +14803,45 @@ function assertNoPrivateData(str){
 
 // ── EUDR compliance derived getter ────────────────────────────────────
 // Replaces phantom field `eudrCompliant` reads. The canonical SKU field is
-// `eudrStatus` (string enum), but two form sites use DIFFERENT vocabularies
-// for the same semantic field (Watchpoint M, backlog-logged for future
-// reconciliation):
+// `eudrStatus` (string enum). Two form sites use DIFFERENT vocabularies for
+// the same semantic field:
 //
-//   Cosmetic Tab 2 (L16493): 'Compliant — documentation on file' / 'In progress' /
-//                            'Not applicable (synthetic only)' / 'Requires assessment'
-//   Device Tab 2   (L16581): 'Compliant' / 'Not in scope' / 'In progress'
+//   Cosmetic Tab 2: 'Compliant — documentation on file' / 'In progress' /
+//                   'Not applicable (synthetic only)' / 'Requires assessment'
+//   Device Tab 2:   'Compliant' / 'Not in scope' / 'In progress'
 //
 // Both 'Compliant' and 'Compliant — documentation on file' map to compliant=true.
-// All other values (including 'In progress', 'Not in scope', 'Not applicable',
-// 'Requires assessment', null, '') map to compliant=false.
+// All other values map to compliant=false.
 //
-// When Watchpoint M reconciliation lands, this helper's match list converges
-// or normalizes. Read sites stay unchanged.
+// WATCHPOINT M RESOLVED (M-a, Cleanup Sprint May 2026): EUDR vocabulary
+// intentionally diverges by product type — cosmetic uses 'synthetic only'
+// exemption (forest-risk commodity assessment), device uses 'not in scope'.
+// Reads normalized via isEudrCompliant(). DO NOT converge — domain-appropriate
+// compliance precision. Forcing generic vocabulary would lose the cosmetics-
+// specific EUDR exemption distinction. Future cleanup passes: leave as-is.
 function isEudrCompliant(status){
   if(!status) return false;
   const s = String(status).trim();
   return s === 'Compliant' || s === 'Compliant — documentation on file';
+}
+
+// ── Canonical RSP resolution (Watchpoint AE, Cleanup Sprint May 2026) ───
+// Single source of truth for currency fallback order, eliminating the
+// 7-site ordering drift logged as Watchpoint AE during Trigger 7. Canonical
+// order is SEK-first per strategic anchor (VeyaFlow Swedish-founded, Nordic
+// primary market): SEK → DKK → NOK → EUR → GBP → ISK. Nordic bloc first,
+// then Continental + UK, ISK last (smallest market). Future currency
+// additions touch this one function, not scattered chains.
+// Accepts any object with rspXXX string fields. Returns numeric or 0.
+function rspCanonical(obj){
+  if(!obj) return 0;
+  return parseFloat(obj.rspSEK||obj.rspDKK||obj.rspNOK||obj.rspEUR||obj.rspGBP||obj.rspISK||0) || 0;
+}
+// Presence check companion — true if any non-SEK currency is set (used for
+// "has international pricing" signals). Order-independent by nature.
+function rspHasNonDefault(obj){
+  if(!obj) return false;
+  return !!(obj.rspDKK||obj.rspNOK||obj.rspEUR||obj.rspGBP||obj.rspISK);
 }
 
 // ── Brand Schema Rationalization — Phase 1 (Decision 10 Trigger 7, May 2026) ─
@@ -21550,7 +21586,7 @@ function renderPrePitchBrief(retailerEntry, market){
 
   // ── 2. RSP fit ───────────────────────────────────
   const rspData  = RSP_INTELLIGENCE[Object.keys(RSP_INTELLIGENCE).find(k=>(RSP_INTELLIGENCE[k].name||'').toLowerCase()===rname.toLowerCase())||''];
-  const rsp      = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||sku?.rspNOK||sku?.rspISK||0);
+  const rsp      = rspCanonical(sku);
   let rspFitHtml = '';
   if(sku && rsp && rspData){
     const fit = checkRSPFit(rsp, rid, rname, sku, brand.category||'');
@@ -21744,7 +21780,7 @@ function renderPitch(el){
             </select>
           </div>
           <div class="field"><label class="lbl">Retailer</label>
-            <select id="p-retailer" onchange="pitchForm.retailer=this.value">
+            <select id="p-retailer" onchange="pitchForm.retailer=this.value;renderPitch(document.getElementById('page-pitch'))">
               <option value="">Select retailer…</option>
               ${retailers.map(r=>`<option${pitchForm.retailer===r?' selected':''}>${r}</option>`).join('')}
             </select>
@@ -24705,7 +24741,7 @@ function renderCRM(el){
                         ${renderDistributorNote(card.id, {})}
                         ${(()=>{
                           const _sku = skus[0]||null;
-                          const _rsp = parseFloat((_sku?.rspSEK||_sku?.rspDKK||_sku?.rspEUR||_sku?.rspGBP||_sku?.rspNOK||_sku?.rspISK)||0);
+                          const _rsp = rspCanonical(_sku);
                           if(!_rsp||!_sku) return '';
                           const _fit = checkRSPFit(_rsp, card.id, card.name, _sku, brand?.category||'');
                           return _fit ? renderRSPFit(_fit, {small:true}) : '';
@@ -26832,7 +26868,7 @@ async function generateBrandPackPDF(){
       pdfKeyValue(doc,'Product',heroSku.name||'—',margin,y,30); y+=5.5;
       pdfKeyValue(doc,'EAN',heroSku.ean||'—',margin,y,30);
       pdfKeyValue(doc,'RSP (SE)',heroSku.rspSEK?heroSku.rspSEK+' SEK':'—',pageW/2,y,30); y+=5.5;
-      if(heroSku.rspDKK||heroSku.rspEUR||heroSku.rspGBP||heroSku.rspNOK||heroSku.rspISK){
+      if(rspHasNonDefault(heroSku)){
         pdfKeyValue(doc,'RSP (target)',heroSku.rspDKK?heroSku.rspDKK+' DKK':heroSku.rspEUR?heroSku.rspEUR+' EUR':heroSku.rspGBP?heroSku.rspGBP+' GBP':'—',margin,y,30); y+=5.5;
       }
       if(heroSku.moq) { pdfKeyValue(doc,'MOQ',heroSku.moq+' units',margin,y,30); y+=5.5; }
@@ -27640,7 +27676,7 @@ function renderExpansionOverview(){
   const marginCards = listedCards.slice(0,3).map(card=>{
     const reg = RETAILER_REGISTRY.find(r=>r.id===card.id);
     const margin = reg?.marginMin ? Math.round(reg.marginMin*100) : null;
-    const rsp = parseFloat(sku?.rspSEK||sku?.rspDKK||sku?.rspEUR||sku?.rspGBP||sku?.rspNOK||sku?.rspISK||0);
+    const rsp = rspCanonical(sku);
     const catBenchmark = (brand.category||'').includes('Beauty') ? 50 :
                          (brand.category||'').includes('Food')   ? 35 : 45;
     const vs = margin!==null ? margin - catBenchmark : null;
