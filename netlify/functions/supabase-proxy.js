@@ -12,6 +12,9 @@
 //   crm.load, crm.upsert, crm.delete
 //   listing.submit, listing.list
 //   field.load, field.set
+//   loop.upsert, loop.list, loop.update
+//   bil.log, bil.list, bil.update          ← Trigger 8 (BIL Use Case A)
+//   waitlist.create
 //
 // Retailer Portal actions:
 //   portal.auth.login       — email+password → access_token + retailer info
@@ -20,6 +23,9 @@
 //   portal.submission.get   — single submission (retailer-scoped)
 //   portal.status.update    — update submission status + log change
 //   portal.rejection.create — reject submission with structured reason
+//
+// Brand → Portal bridge:
+//   portal.submission.create, portal.status.sync
 // ═══════════════════════════════════════════════════
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -543,6 +549,96 @@ exports.handler = async (event) => {
 
       const updated = await supabase('PATCH', `loop_events?id=eq.${encodeURIComponent(id)}&session_id=eq.${encodeURIComponent(session_id)}`, allowed);
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, event: updated[0] || null }) };
+    }
+
+    // ═══════════════════════════════════════════════
+    // ── BIL Use Case A monitoring (Trigger 8) ────
+    // ═══════════════════════════════════════════════
+    //
+    // All three actions use session_id auth (matches brand-side pattern —
+    // loop.*, brand.save, crm.upsert). No access_token required.
+    //
+    // F1.1 lock: server-side mirror gives Charlotte cross-machine visibility
+    // of BIL usage. Identity (session_id) remains resettable; these are
+    // MONITORING, not enforcement. V1.5+ adds auth-gated hard limits.
+
+    // Idempotent upsert by dedupe_key. If an extraction with this key already
+    // exists (e.g. retry collision), return it untouched (isNew=false).
+    if (action === 'bil.log') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const ex = payload.extraction || {};
+      if (!ex.dedupe_key) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'extraction.dedupe_key required' }) };
+      }
+      const existing = await supabase('GET', `bil_extractions?dedupe_key=eq.${encodeURIComponent(ex.dedupe_key)}&limit=1`);
+      if (existing.length) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, isNew: false, extraction: existing[0] }) };
+      }
+      const inserted = await supabase('POST', 'bil_extractions', {
+        session_id,
+        dedupe_key:             ex.dedupe_key,
+        pdf_filename:           ex.pdf_filename            || null,
+        page_count:             ex.page_count              || null,
+        pdf_size_kb:            ex.pdf_size_kb             || null,
+        model:                  ex.model                   || null,
+        latency_ms:             ex.latency_ms              || null,
+        status:                 ex.status                  || 'pending',
+        error_type:             ex.error_type              || null,
+        fields_extracted_count: ex.fields_extracted_count  || null,
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, isNew: true, extraction: inserted[0] || null }) };
+    }
+
+    // Fetch this session's extractions for usage display ("3 of 5 used this month").
+    // Returns rows ordered by created_at DESC, default limit 100.
+    if (action === 'bil.list') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const limit = Math.min(parseInt(payload.limit || 100, 10) || 100, 500);
+      const rows = await supabase('GET', `bil_extractions?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.desc&limit=${limit}`);
+      return { statusCode: 200, headers, body: JSON.stringify({ extractions: rows }) };
+    }
+
+    // Update a single extraction's mutable fields (status transition, activation,
+    // dismissal). Only whitelisted fields can be updated; everything else ignored.
+    // Session-scoped ownership guard prevents cross-session writes.
+    if (action === 'bil.update') {
+      if (!session_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'session_id required' }) };
+      const id = payload.id;
+      const updates = payload.updates || {};
+      if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) };
+
+      // Verify ownership before update
+      const existing = await supabase('GET', `bil_extractions?id=eq.${encodeURIComponent(id)}&session_id=eq.${encodeURIComponent(session_id)}&limit=1`);
+      if (!existing.length) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Extraction not found' }) };
+
+      const allowed = {};
+      const now = new Date().toISOString();
+      if (typeof updates.status === 'string' && ['pending','success','failed','retried'].indexOf(updates.status) >= 0) {
+        allowed.status = updates.status;
+      }
+      if (typeof updates.error_type === 'string') {
+        allowed.error_type = updates.error_type;
+      }
+      if (typeof updates.latency_ms === 'number') {
+        allowed.latency_ms = updates.latency_ms;
+      }
+      if (typeof updates.fields_extracted_count === 'number') {
+        allowed.fields_extracted_count = updates.fields_extracted_count;
+      }
+      if (updates.activated === true) {
+        allowed.activated = true;
+        allowed.activated_at = now;
+      }
+      if (updates.dismissed === true) {
+        allowed.dismissed = true;
+        allowed.dismissed_at = now;
+      }
+      if (Object.keys(allowed).length === 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'No valid fields to update' }) };
+      }
+
+      const updated = await supabase('PATCH', `bil_extractions?id=eq.${encodeURIComponent(id)}&session_id=eq.${encodeURIComponent(session_id)}`, allowed);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, extraction: updated[0] || null }) };
     }
 
     // ── Category waitlist (Round-1 beauty foundation) ──────────────────
