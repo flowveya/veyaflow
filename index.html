@@ -36730,14 +36730,16 @@ async function bilLogExtraction(extraction){
     console.warn('[bilLogExtraction] dedupe_key required');
     return null;
   }
-  return await dbCall('bil.log', {extraction});
+  // portalCall (not dbCall) — proxy reads payload.extraction at root level,
+  // matching the loop.upsert convention. dbCall would nest under .data.
+  return await portalCall('bil.log', {extraction});
 }
 
 // Fetch this session's recent extractions — used for "X of Y used this month"
 // usage display in the BIL UI. Resettable: clearing localStorage gets a fresh
 // session_id and the server sees zero history. Per F1 lock, that's by design.
 async function bilListExtractions(limit){
-  return await dbCall('bil.list', {limit: limit || 100});
+  return await portalCall('bil.list', {limit: limit || 100});
 }
 
 // Update an extraction row (status transition, activation, dismissal).
@@ -36748,7 +36750,7 @@ async function bilUpdateExtraction(id, updates){
     console.warn('[bilUpdateExtraction] id and updates required');
     return null;
   }
-  return await dbCall('bil.update', {id, updates});
+  return await portalCall('bil.update', {id, updates});
 }
 
 
