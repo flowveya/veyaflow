@@ -1434,6 +1434,12 @@ function loadState(){
     // loadDPP and SKU migrations so brand-level state is canonical first.
     // Idempotent on brand._schemaVersion=3.
     if(typeof migrateBrandSchemaV3 === 'function') migrateBrandSchemaV3();
+    // Brand Schema V4 — BIL Use Case A extension (Trigger 8, May 2026).
+    // Adds founderName/foundingYear/originStory/targetCustomer/values[]/
+    // draftStatus per F7.2/F7.3/BIL.4 locks. All initialize empty —
+    // pre-BIL brands see no behavioral change. Runs after V3 (sequential
+    // schema version contract); independent of loadDPP.
+    if(typeof migrateBrandSchemaV4 === 'function') migrateBrandSchemaV4();
     // Hydrate dppData BEFORE migrations run. V2 + V6 read dppData; without
     // this, dppData is {} at migration time, the d=dppData[sku.id] lookup is
     // undefined, the inner migration block short-circuits, and _schemaVersion
@@ -14915,6 +14921,54 @@ function migrateBrandSchemaV3(){
 
   if(name || cleaned){
     console.log(`[migrateBrandSchemaV3] Canonical object: brand.euResponsible={name:${JSON.stringify(name)}, email:${JSON.stringify(email)}, ...}, cleaned ${cleaned} legacy field(s).`);
+  }
+}
+
+
+// ── Brand Schema V4 migration (Trigger 8 BIL Use Case A, May 2026) ──────
+// Adds the 5 net-new fields BIL extraction populates per F7.2/F7.3 locks +
+// the draftStatus field BIL.4 requires. All initialize empty so V1.0 brands
+// (pre-BIL) experience no behavioral change; BIL-extracted brands populate
+// these via the draft review activation flow.
+//
+// Design notes:
+//  - founderName is DISTINCT from brand.userName (F7.2 lock: brand founder
+//    vs platform user are different concepts; matters for non-founder users
+//    on V1.5+ when multi-user accounts arrive).
+//  - foundingYear is a STRING (not number) to preserve free-form extraction
+//    fidelity ("circa 2018", "Founded in 2015", "2018-2019"). Normalisation
+//    deferred to V5+ if derived year math becomes a feature.
+//  - values is DISTINCT from sustainabilityGoals (F7.3 lock: brand values
+//    are broader than sustainability — heritage, craftsmanship, etc.).
+//  - draftStatus is a STRING ENUM ('' | 'pending_review') not a boolean —
+//    allows future states ('extracting', 'extraction_failed', 'archived')
+//    without re-migration. Mirrors how sku.status is a string enum.
+//
+// Idempotent on brand._schemaVersion === 4. Rule #19 defensive pattern:
+// every field gated by `in` check so re-runs are no-ops.
+function migrateBrandSchemaV4(){
+  if(typeof brand === 'undefined' || !brand) return;
+  if(brand._schemaVersion === 4) return;  // idempotency
+
+  let added = 0;
+
+  // F7.2 lock — 4 net-new brand-profile extraction targets
+  if(!('founderName'    in brand)){ brand.founderName    = ''; added++; }
+  if(!('foundingYear'   in brand)){ brand.foundingYear   = ''; added++; }
+  if(!('originStory'    in brand)){ brand.originStory    = ''; added++; }
+  if(!('targetCustomer' in brand)){ brand.targetCustomer = ''; added++; }
+
+  // F7.3 lock — values distinct from sustainabilityGoals
+  if(!('values' in brand)){ brand.values = []; added++; }
+
+  // BIL.4 lock — draft status for review-before-activation flow
+  if(!('draftStatus' in brand)){ brand.draftStatus = ''; added++; }
+
+  brand._schemaVersion = 4;
+  try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); }catch(e){}
+
+  if(added){
+    console.log(`[migrateBrandSchemaV4] Added ${added} BIL-extension field(s).`);
   }
 }
 
@@ -36658,6 +36712,45 @@ async function loopEventEdit(eventId){
   // Accept with the edited content
   loopEventAccept(eventId);
 }
+
+/* ─── BIL Use Case A — extraction logging (Trigger 8, F1.1 lock) ─── */
+//
+// Server-side mirror of BIL extraction events via supabase-proxy bil.* actions.
+// F1.1 lock: centralized monitoring (cross-machine visibility for Charlotte)
+// keyed on session_id. Identity remains resettable per F1 — these provide
+// MONITORING, not enforcement. V1.5+ adds auth-gated hard limits.
+//
+// Mirror of the loop.* wrapper pattern. All use dbCall which silently falls
+// back to null if proxy unavailable (L35672) — never blocks user flow.
+
+// Log a new extraction. Idempotent via dedupe_key (e.g. session_id + file
+// hash + timestamp). Returns the server row {id, isNew, ...} or null.
+async function bilLogExtraction(extraction){
+  if(!extraction || !extraction.dedupe_key){
+    console.warn('[bilLogExtraction] dedupe_key required');
+    return null;
+  }
+  return await dbCall('bil.log', {extraction});
+}
+
+// Fetch this session's recent extractions — used for "X of Y used this month"
+// usage display in the BIL UI. Resettable: clearing localStorage gets a fresh
+// session_id and the server sees zero history. Per F1 lock, that's by design.
+async function bilListExtractions(limit){
+  return await dbCall('bil.list', {limit: limit || 100});
+}
+
+// Update an extraction row (status transition, activation, dismissal).
+// updates = {status?, error_type?, latency_ms?, fields_extracted_count?,
+//            activated?, dismissed?}
+async function bilUpdateExtraction(id, updates){
+  if(!id || !updates){
+    console.warn('[bilUpdateExtraction] id and updates required');
+    return null;
+  }
+  return await dbCall('bil.update', {id, updates});
+}
+
 
 /* ─── RENDER (Brand Home alerts row) ─── */
 function _retailEscSafe(s){
