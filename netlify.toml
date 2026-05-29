@@ -6,6 +6,14 @@
   # Use Node.js 20 for all functions
   node_bundler = "esbuild"
 
+# Trigger 8 BIL Use Case A — F2a lock (Vision extraction via Anthropic API).
+# Harness-measured p95 ~10s on dense single-page deck (May 2026); 26s ceiling
+# provides headroom for multi-page extractions up to F3.1's 15-page cap.
+# NOTE: this value requires a Netlify support ticket to enable per site on
+# Personal plan — file at https://answers.netlify.com referencing this site.
+[functions."anthropic-proxy"]
+  timeout = 26
+
 # Redirect /dpp/:dppId to the static DPP viewer HTML
 # The viewer JS then calls /.netlify/functions/get-dpp?id=:dppId
 [[redirects]]
@@ -28,6 +36,6 @@
 
 [context.production.environment]
   # These are read by Netlify functions — set actual values in Netlify dashboard
-  # SUPABASE_URL       = "https://your-project.supabase.co"
+  # SUPABASE_URL         = "https://your-project.supabase.co"
   # SUPABASE_SERVICE_KEY = "eyJ..."   (service role — functions/share-brand-pack.js, share-dpp.js)
   # SUPABASE_ANON_KEY    = "eyJ..."   (anon — functions/get-brand-pack.js, get-dpp.js)
