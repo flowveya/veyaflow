@@ -2304,6 +2304,174 @@ async function renderBilPages(){
   _bilRefreshReadout();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// BIL extraction call (B4) — page images → anthropic-proxy → validate → display
+// ════════════════════════════════════════════════════════════════════════════
+// Bridges B2/B3 output to the B5 pipeline. Mirrors runAutofill()'s proxy call
+// (POST /.netlify/functions/anthropic-proxy, JSON body, res.json()). Adds two
+// things runAutofill lacks, required by B4/minimal-B6: a res.ok HTTP-error check
+// and a client AbortController. Stops at validated data shown in the dev panel —
+// no Sequence C form, no full B6 retry logic.
+
+// Function ceiling is 30s (netlify.toml [functions."anthropic-proxy"]). Client
+// waits ceiling + ~9s network slack = 39s. Per continuation brief §1.1 this
+// corrects the stale 35s figure — do NOT use 35s.
+const BIL_CLIENT_ABORT_MS = 39000;
+
+async function runBilExtraction(){
+  var progEl = document.getElementById('bil-extract-progress');
+  function setProg(txt, color){
+    if(!progEl) return;
+    progEl.style.color = color || 'var(--navy)';
+    progEl.textContent = txt;   // textContent — model/proxy text is untrusted
+  }
+  // Minimal B6: distinguish failure stages so the message is useful. Never throws.
+  function fail(stage, msg){
+    bilState.status = 'failed';
+    bilState.extractError = { stage: stage, message: msg };
+    setProg('✗ '+stage+': '+msg, '#991B1B');
+    _bilRefreshReadout();
+    _bilRenderExtraction();
+  }
+
+  // ── Guard: B3 must have produced page images first ────────────────────────
+  if(bilState.status !== 'pages-ready' || !bilState.pageImages || bilState.pageImages.length === 0){
+    setProg('Render pages first — no page images in state. Run "Render pages" (B3).', '#991B1B');
+    return;
+  }
+
+  // ── Build the request body via the B5 pipeline ────────────────────────────
+  var body;
+  try {
+    body = buildBilExtractionCall(bilState.pageImages, {
+      pdfFilename: bilState.filename,
+      pageCount: bilState.pageImages.length,
+      originalPageCount: bilState.pageCount || bilState.pageImages.length,
+    });
+  } catch(err){
+    // >15-page backstop / empty array — shouldn't happen post-B3, but guard.
+    fail('build', (err&&err.message?err.message:'could not build request'));
+    return;
+  }
+
+  // ── POST to the proxy (mirrors runAutofill) with a 39s client abort ───────
+  bilState.status = 'extracting';
+  bilState.extractError = null;
+  setProg('Extracting via Vision… (waiting up to '+(BIL_CLIENT_ABORT_MS/1000)+'s)');
+  _bilRefreshReadout();
+
+  var controller = new AbortController();
+  var timedOut = false;
+  var timer = setTimeout(function(){ timedOut = true; controller.abort(); }, BIL_CLIENT_ABORT_MS);
+
+  var res;
+  try {
+    res = await fetch('/.netlify/functions/anthropic-proxy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch(err){
+    clearTimeout(timer);
+    if(timedOut || (err && err.name === 'AbortError')){
+      fail('timeout', 'No response within '+(BIL_CLIENT_ABORT_MS/1000)+'s (function ceiling is 30s). The deck may be too dense — try fewer pages.');
+    } else {
+      fail('network', 'Could not reach the extraction service: '+(err&&err.message?err.message:'unknown')+'.');
+    }
+    return;
+  }
+  clearTimeout(timer);
+
+  // ── HTTP-level error (runAutofill skips this; B4 needs it) ────────────────
+  if(!res.ok){
+    var bodyText = '';
+    try { bodyText = (await res.text()).slice(0,200); } catch(e){}
+    fail('http', 'Service returned HTTP '+res.status+(bodyText?(' — '+bodyText):'')+'.');
+    return;
+  }
+
+  // ── Parse the proxy's JSON envelope (same shape runAutofill reads) ────────
+  var data;
+  try {
+    data = await res.json();
+  } catch(err){
+    fail('http', 'Service returned a non-JSON response.');
+    return;
+  }
+
+  // ── Validate via B5 ───────────────────────────────────────────────────────
+  var result;
+  try {
+    result = validateBilExtraction(data);
+  } catch(err){
+    fail('validation', 'Validator threw: '+(err&&err.message?err.message:'unknown')+'.');
+    return;
+  }
+
+  // parse_error = Vision text couldn't be parsed into the schema → failure.
+  if(result.outcome === 'parse_error'){
+    bilState.extraction = result;
+    fail('validation', 'Vision output could not be parsed: '+(result.parseError||'unknown parse error')+'.');
+    return;
+  }
+
+  // success / partial / low_quality / empty all carry a usable result object.
+  bilState.extraction = result;
+  bilState.status = 'extracted';
+  bilState.extractError = null;
+  setProg('✓ Extracted — outcome: '+result.outcome+' · '+result.fieldsExtractedCount+' field(s) populated.',
+    (result.outcome==='success'||result.outcome==='partial') ? '#065F46' : '#92400E');
+  _bilRefreshReadout();
+  _bilRenderExtraction();
+}
+
+// Render the validated extraction into the dev panel. Every model-returned value
+// goes through textContent / DOM nodes — model output is untrusted, never innerHTML.
+function _bilRenderExtraction(){
+  var el = document.getElementById('bil-extract-result');
+  if(!el) return;
+  el.textContent='';
+  var ex = bilState.extraction;
+  if(!ex) return;
+
+  var head=document.createElement('div');
+  head.style.cssText='font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem';
+  head.textContent='extraction result';
+  el.appendChild(head);
+
+  var meta=[
+    ['outcome',          ex.outcome||'—'],
+    ['fields populated', (ex.fieldsExtractedCount!=null)?String(ex.fieldsExtractedCount):'—'],
+    ['vision confidence',ex.visionConfidence||'—'],
+  ];
+  meta.forEach(function(r){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.62rem';
+    var k=document.createElement('span'); k.style.color='var(--muted)'; k.textContent=r[0];
+    var v=document.createElement('span'); v.style.color='var(--navy)';  v.textContent=r[1];
+    row.appendChild(k); row.appendChild(v); el.appendChild(row);
+  });
+
+  if(ex.visionNotes){
+    var notes=document.createElement('div');
+    notes.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.4rem;line-height:1.5';
+    notes.textContent='notes: '+ex.visionNotes;   // untrusted — textContent
+    el.appendChild(notes);
+  }
+
+  // Pretty-print the populated structure. textContent on <pre> is injection-safe
+  // even though the payload is model-derived.
+  var payload = ex.populated || ex.extracted || null;
+  if(payload){
+    var pre=document.createElement('pre');
+    pre.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--navy);background:#F8FAFC;border:1px solid var(--border);padding:.6rem;margin-top:.5rem;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word';
+    try { pre.textContent = JSON.stringify(payload, null, 2); }
+    catch(e){ pre.textContent='(could not stringify extraction)'; }
+    el.appendChild(pre);
+  }
+}
+
 // Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
 // Injects a self-contained overlay; touches no existing page or nav. Idempotent
 // (defensive loader convention) — removes any prior instance before mounting.
@@ -2331,10 +2499,14 @@ function renderBilDevPanel(){
       <div id="bil-upload-error" style="font-family:var(--mono);font-size:.65rem;color:#991B1B;margin-top:.3rem;line-height:1.5"></div>
       <button class="btn-primary" onclick="renderBilPages()" style="width:100%;margin-top:.9rem">Render pages → base64 images</button>
       <div id="bil-render-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
+      <button class="btn-primary" onclick="runBilExtraction()" style="width:100%;margin-top:.9rem">EXTRACT → Vision</button>
+      <div id="bil-extract-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
       <div id="bil-state-readout" style="margin-top:1rem"></div>
+      <div id="bil-extract-result" style="margin-top:1rem"></div>
     </div>`;
   document.body.appendChild(ov);
   _bilRefreshReadout();
+  _bilRenderExtraction();
 }
 
 function closeBilDevPanel(){
