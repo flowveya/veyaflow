@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeyaFlow — Landing Page Sketch</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Geist:wght@400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* PROVISIONAL — editorial-instrument direction · WHITE ground */
+    --paper: #FFFFFF;          /* true white page */
+    --surface: #FAF8F4;        /* barely-warm off-white — recessed fills (rows, chips) */
+    --paper-deep: #F0ECE4;     /* deeper warm neutral — visual blocks */
+    --ink: #1C1A17;            /* near-black */
+    --ink-soft: #4A463F;
+    --ink-mute: #8A857B;
+    --accent: #C0613A;         /* warm clay — single accent, NOT violet */
+    --accent-deep: #9E4A28;
+    --line: #E7E2D8;           /* warm hairline */
+    --white: #FFFFFF;          /* raised cards (lean on shadow + border for separation) */
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Geist', system-ui, sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+
+  .provisional { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 200; background: var(--ink); color: var(--paper); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 6px 16px; border-radius: 9999px; font-family: var(--sans); }
+  .provisional b { color: var(--accent); }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .logo { font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  .nav-links { display: flex; align-items: center; gap: 34px; }
+  .nav-links a { color: var(--ink-soft); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--ink); }
+  .btn { font-family: var(--sans); font-size: 14px; font-weight: 600; padding: 11px 22px; border-radius: 9999px; cursor: pointer; border: none; text-decoration: none; display: inline-block; transition: all 0.2s; }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: var(--accent-deep); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--ink); }
+
+  /* HERO */
+  .hero { padding: 90px 0 80px; position: relative; }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 56px; align-items: center; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: 24px; }
+  .eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--accent); }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: 62px; line-height: 1.02; letter-spacing: -0.025em; margin-bottom: 24px; }
+  h1 em { font-style: italic; color: var(--accent-deep); }
+  .hero-sub { font-size: 19px; color: var(--ink-soft); line-height: 1.5; max-width: 480px; margin-bottom: 32px; }
+  .hero-cta { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+  .hero-trust { font-size: 13px; color: var(--ink-mute); display: flex; align-items: center; gap: 8px; }
+  .hero-trust strong { color: var(--ink-soft); font-weight: 600; }
+
+  /* HERO VISUAL — abstract product peek */
+  .hero-visual { position: relative; }
+  .product-card { background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 60px -24px rgba(28,26,23,0.22); overflow: hidden; }
+  .pc-bar { height: 38px; background: var(--ink); display: flex; align-items: center; padding: 0 14px; gap: 6px; }
+  .pc-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(252,251,248,0.3); }
+  .pc-body { padding: 20px; }
+  .pc-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 9px; background: var(--surface); margin-bottom: 8px; }
+  .pc-label { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .pc-meta { font-size: 11px; color: var(--ink-mute); }
+  .pc-pill { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 9px; border-radius: 9999px; background: var(--accent); color: var(--white); }
+  .pc-pill.warm { background: var(--paper-deep); color: var(--ink-soft); }
+  .pc-stat { display: flex; gap: 8px; margin-bottom: 14px; }
+  .pc-stat-card { flex: 1; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 13px; }
+  .pc-stat-card.alt { background: var(--accent); color: var(--white); }
+  .pc-stat-card.light { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+  .pc-stat-val { font-family: var(--serif); font-size: 26px; font-weight: 500; line-height: 1; }
+  .pc-stat-lab { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; margin-top: 5px; font-weight: 600; }
+  .float-badge { position: absolute; background: var(--white); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 12px 30px -10px rgba(28,26,23,0.2); }
+  .fb-1 { top: -18px; right: -16px; }
+  .fb-label { font-size: 10px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .fb-val { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--accent-deep); }
+
+  /* LOGO STRIP */
+  .strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 28px 0; }
+  .strip-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .strip-label { font-size: 12px; color: var(--ink-mute); white-space: nowrap; font-weight: 500; }
+  .strip-logos { display: flex; gap: 44px; flex: 1; justify-content: flex-end; }
+  .strip-logo { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink-mute); }
+
+  /* SECTION */
+  section.block { padding: 90px 0; }
+  .section-head { max-width: 620px; margin-bottom: 56px; }
+  .section-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: 16px; }
+  h2 { font-family: var(--serif); font-weight: 500; font-size: 42px; line-height: 1.08; letter-spacing: -0.02em; margin-bottom: 18px; }
+  .section-head p { font-size: 17px; color: var(--ink-soft); }
+
+  /* FEATURE GRID */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .feature { background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 30px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 1px 2px rgba(28,26,23,0.04); }
+  .feature:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -20px rgba(28,26,23,0.18); }
+  .feature-num { font-family: var(--serif); font-size: 14px; color: var(--accent); font-weight: 600; margin-bottom: 18px; }
+  .feature h3 { font-family: var(--serif); font-size: 23px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 10px; }
+  .feature p { font-size: 14px; color: var(--ink-soft); line-height: 1.55; }
+
+  /* SPLIT FEATURE */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .split.flip { direction: rtl; } .split.flip > * { direction: ltr; }
+  .split-visual { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 16px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .split-visual .mini-pill { position: absolute; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 12px; border-radius: 9999px; }
+  .split-list { list-style: none; margin-top: 22px; }
+  .split-list li { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; font-size: 15px; color: var(--ink-soft); }
+  .split-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 8px; flex-shrink: 0; }
+
+  /* QUOTE */
+  .quote-block { background: var(--ink); color: var(--paper); border-radius: 20px; padding: 64px 56px; text-align: center; }
+  .quote-block blockquote { font-family: var(--serif); font-size: 32px; font-weight: 400; line-height: 1.28; letter-spacing: -0.015em; max-width: 760px; margin: 0 auto 24px; }
+  .quote-block .attr { font-size: 14px; color: rgba(244,242,237,0.7); }
+  .quote-block .attr strong { color: var(--paper); font-weight: 600; }
+
+  /* CTA */
+  .cta-final { text-align: center; padding: 100px 0; }
+  .cta-final h2 { font-size: 50px; margin-bottom: 20px; }
+  .cta-final p { font-size: 18px; color: var(--ink-soft); margin-bottom: 32px; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--line); padding: 56px 0 40px; }
+  .foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; margin-bottom: 48px; }
+  .foot-brand .logo { margin-bottom: 12px; }
+  .foot-brand p { font-size: 14px; color: var(--ink-mute); max-width: 260px; }
+  .foot-col h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-mute); margin-bottom: 14px; font-weight: 600; }
+  .foot-col a { display: block; font-size: 14px; color: var(--ink-soft); text-decoration: none; margin-bottom: 9px; }
+  .foot-col a:hover { color: var(--accent-deep); }
+  .foot-bottom { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-mute); padding-top: 24px; border-top: 1px solid var(--line); }
+
+  @media (max-width: 900px) {
+    .hero-grid, .split, .foot-grid { grid-template-columns: 1fr; gap: 40px; }
+    .features { grid-template-columns: 1fr; }
+    h1 { font-size: 44px; } h2 { font-size: 32px; }
+    .split.flip { direction: ltr; }
+    .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="provisional">SKETCH · type &amp; color <b>provisional</b></div>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="logo">VeyaFlow</div>
+    <div class="nav-links">
+      <a href="#">Platform</a>
+      <a href="#">Compliance</a>
+      <a href="#">Retailers</a>
+      <a href="#">Pricing</a>
+      <a href="#">About</a>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <a href="#" class="btn btn-ghost">Sign in</a>
+      <a href="#" class="btn btn-primary">Book a demo</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">For beauty brands expanding into Europe</span>
+      <h1>Sell into Europe<br>without the <em>compliance maze.</em></h1>
+      <p class="hero-sub">VeyaFlow turns EU market entry into one clear workflow — pipeline, compliance, and a retailer-ready Brand Pack, in one place.</p>
+      <div class="hero-cta">
+        <a href="#" class="btn btn-primary">Book a demo</a>
+        <a href="#" class="btn btn-ghost">See how it works →</a>
+      </div>
+      <div class="hero-trust"><strong>Built for</strong> indie &amp; scaling beauty brands · SE · DK · DE</div>
+    </div>
+    <div class="hero-visual">
+      <div class="product-card">
+        <div class="pc-bar"><div class="pc-dot"></div><div class="pc-dot"></div><div class="pc-dot"></div></div>
+        <div class="pc-body">
+          <div class="pc-stat">
+            <div class="pc-stat-card"><div class="pc-stat-val">73%</div><div class="pc-stat-lab">Compliance</div></div>
+            <div class="pc-stat-card alt"><div class="pc-stat-val">4</div><div class="pc-stat-lab">Active pitches</div></div>
+            <div class="pc-stat-card light"><div class="pc-stat-val">12</div><div class="pc-stat-lab">Products</div></div>
+          </div>
+          <div class="pc-row"><div><div class="pc-label">Matas</div><div class="pc-meta">Denmark · buyer meeting</div></div><span class="pc-pill">Hot</span></div>
+          <div class="pc-row"><div><div class="pc-label">Kicks</div><div class="pc-meta">Sweden · pitch sent</div></div><span class="pc-pill">Hot</span></div>
+          <div class="pc-row"><div><div class="pc-label">Sephora SE</div><div class="pc-meta">Sweden · researching</div></div><span class="pc-pill warm">Warm</span></div>
+        </div>
+      </div>
+      <div class="float-badge fb-1"><div class="fb-label">EU RP</div><div class="fb-val">Designated ✓</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="strip">
+  <div class="wrap strip-inner">
+    <span class="strip-label">Trusted by brands selling into</span>
+    <div class="strip-logos">
+      <span class="strip-logo">Matas</span>
+      <span class="strip-logo">Kicks</span>
+      <span class="strip-logo">Sephora</span>
+      <span class="strip-logo">Douglas</span>
+      <span class="strip-logo">Normal</span>
+    </div>
+  </div>
+</div>
+
+<section class="block">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-eyebrow">The problem</div>
+      <h2>Three tools, four spreadsheets, and a lawyer on retainer.</h2>
+      <p>Most beauty brands piece together EU expansion from scattered tools and expensive consultants. VeyaFlow brings the whole journey into one operator-grade workspace.</p>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="feature-num">01</div><h3>Pipeline</h3><p>Track every retailer relationship from first research to signed order — see what's hot, what's stalling, and what needs you today.</p></div>
+      <div class="feature"><div class="feature-num">02</div><h3>Compliance</h3><p>Know exactly which EU requirements you've met and which are blocking a launch. No more guessing what a regulator wants.</p></div>
+      <div class="feature"><div class="feature-num">03</div><h3>Brand Pack</h3><p>One polished, retailer-ready profile for due-diligence — your products, claims, and compliance in a link you control.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="padding-top:0;">
+  <div class="wrap split">
+    <div>
+      <div class="section-eyebrow">Pipeline</div>
+      <h2>Every retailer, every stage, one board.</h2>
+      <p style="color:var(--ink-soft); font-size:17px;">Stop reconstructing where each conversation stands from your inbox. See the whole pipeline the way your buyers think about it.</p>
+      <ul class="split-list">
+        <li>Hot / warm status at a glance, sorted by what needs action</li>
+        <li>Last-contact tracking so nothing goes cold unnoticed</li>
+        <li>Compliance state visible right on the retailer row</li>
+      </ul>
+    </div>
+    <div class="split-visual">
+      <span class="mini-pill" style="background:var(--accent); color:var(--white); top:24px; left:24px;">Hot</span>
+      <span class="mini-pill" style="background:var(--white); color:var(--ink-soft); border:1px solid var(--line); bottom:30px; right:28px;">Buyer meeting · 75%</span>
+      <div style="font-family:var(--serif); font-size:54px; color:var(--ink-mute); opacity:0.35;">Pipeline</div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="padding-top:0;">
+  <div class="wrap split flip">
+    <div>
+      <div class="section-eyebrow">Compliance</div>
+      <h2>The regulation, translated into a checklist.</h2>
+      <p style="color:var(--ink-soft); font-size:17px;">EU cosmetics rules are dense. VeyaFlow turns them into clear, trackable requirements — so you always know what's done and what's blocking you.</p>
+      <ul class="split-list">
+        <li>Requirement-by-requirement progress, not legal PDFs</li>
+        <li>Blockers surfaced before they delay a launch</li>
+        <li>Upcoming deadlines (CSRD, ESPR) on a radar, not a surprise</li>
+      </ul>
+    </div>
+    <div class="split-visual">
+      <span class="mini-pill" style="background:var(--ink); color:var(--paper); top:26px; right:26px;">8 of 11 ✓</span>
+      <span class="mini-pill" style="background:#E7C9C3; color:#9A3C2E; bottom:28px; left:26px;">1 blocker</span>
+      <div style="font-family:var(--serif); font-size:48px; color:var(--ink-mute); opacity:0.35;">Compliance</div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="padding-top:0;">
+  <div class="wrap">
+    <div class="quote-block">
+      <blockquote>"We went from a folder of half-finished spreadsheets to one screen that tells me what to do before my Tuesday buyer call."</blockquote>
+      <div class="attr"><strong>Charlotte Hedlund</strong> · Founder, Cloud &amp; Glow <span style="opacity:0.5;">(illustrative)</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="wrap">
+    <h2 style="font-family:var(--serif);">Ready to make Europe simple?</h2>
+    <p>See VeyaFlow with your own products and pipeline in a 30-minute walkthrough.</p>
+    <a href="#" class="btn btn-primary" style="padding:14px 30px; font-size:15px;">Book a demo</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="logo">VeyaFlow</div>
+        <p>The operating system for beauty brands expanding into Europe.</p>
+      </div>
+      <div class="foot-col"><h4>Platform</h4><a href="#">Pipeline</a><a href="#">Compliance</a><a href="#">Brand Pack</a><a href="#">Markets</a></div>
+      <div class="foot-col"><h4>Company</h4><a href="#">About</a><a href="#">Careers</a><a href="#">Contact</a></div>
+      <div class="foot-col"><h4>Resources</h4><a href="#">EU guide</a><a href="#">Blog</a><a href="#">Help center</a></div>
+    </div>
+    <div class="foot-bottom"><span>© 2026 VeyaFlow</span><span>Stockholm · Sweden</span></div>
+  </div>
+</footer>
+</body>
+</html>

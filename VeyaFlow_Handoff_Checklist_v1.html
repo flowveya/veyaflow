@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeyaFlow — Design → Coding Handoff Checklist</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Geist:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Geist+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Inherited from VeyaFlow Landing Sketch v1 — editorial-instrument direction · WHITE ground */
+    --paper: #FFFFFF; --surface: #FAF8F4; --paper-deep: #F0ECE4;
+    --ink: #1C1A17; --ink-soft: #4A463F; --ink-mute: #8A857B;
+    --accent: #C0613A; --accent-deep: #9E4A28;
+    --line: #E7E2D8; --white: #FFFFFF;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Geist', system-ui, sans-serif;
+    --display: 'Newsreader', Georgia, serif;
+    --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 32px; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .nav-inner { max-width: 880px; margin: 0 auto; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { font-family: var(--display); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+  .badge { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-deep); background: var(--surface); border: 1px solid var(--line); padding: 4px 10px; border-radius: 9999px; }
+  .nav-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); }
+
+  /* HERO */
+  .hero { padding: 80px 0 48px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: 22px; }
+  .eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--accent); }
+  h1 { font-family: var(--serif); font-weight: 500; font-size: 52px; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 22px; }
+  .hero-sub { font-size: 17px; color: var(--ink-soft); font-style: italic; line-height: 1.55; max-width: 640px; }
+
+  /* THE ONE RULE — ink callout */
+  .one-rule { background: var(--ink); color: var(--paper); border-radius: 18px; padding: 40px 44px; margin: 8px 0 16px; }
+  .one-rule .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .one-rule p { font-family: var(--serif); font-size: 24px; font-weight: 400; line-height: 1.35; letter-spacing: -0.01em; }
+  .one-rule p strong { color: var(--accent); font-weight: 500; }
+
+  /* SECTIONS */
+  section.block { padding: 40px 0; border-top: 1px solid var(--line); }
+  section.block:first-of-type { border-top: none; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; }
+  .sec-num { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); padding-top: 6px; }
+  h2 { font-family: var(--serif); font-weight: 500; font-size: 28px; line-height: 1.12; letter-spacing: -0.015em; }
+
+  /* CHECKLIST */
+  ul.check { list-style: none; }
+  ul.check li { position: relative; padding-left: 32px; margin-bottom: 14px; font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+  ul.check li::before { content: ''; position: absolute; left: 0; top: 2px; width: 17px; height: 17px; border: 1.5px solid var(--line); border-radius: 5px; background: var(--white); }
+  ul.check li strong { color: var(--ink); font-weight: 600; }
+  ul.check li code { font-family: var(--mono); font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--accent-deep); }
+
+  /* QUICK PASS — deep band */
+  .quick { background: var(--paper-deep); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 56px 0; }
+  .quick h2 { margin-bottom: 8px; }
+  .quick-lead { font-size: 15px; color: var(--ink-soft); margin-bottom: 28px; }
+  ol.quick-list { list-style: none; counter-reset: q; }
+  ol.quick-list li { counter-increment: q; position: relative; padding-left: 44px; margin-bottom: 16px; font-size: 16px; color: var(--ink); min-height: 30px; display: flex; align-items: center; }
+  ol.quick-list li::before { content: counter(q); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--white); border: 1px solid var(--line); font-family: var(--mono); font-size: 13px; display: flex; align-items: center; justify-content: center; color: var(--accent-deep); }
+  .quick-foot { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--ink-soft); margin-top: 28px; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--line); padding: 44px 0; }
+  .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .foot-feedback { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+  .foot-feedback a { color: var(--accent-deep); text-decoration: none; }
+  .foot-feedback a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .foot-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); }
+  .foot-meta .brandname { font-family: var(--display); font-size: 14px; color: var(--ink-soft); }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 38px; } h2 { font-size: 24px; }
+    .one-rule { padding: 30px 26px; } .one-rule p { font-size: 20px; }
+    .nav-meta { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand">
+      <span class="logo">VeyaFlow</span>
+      <span class="badge">Process</span>
+    </div>
+    <span class="nav-meta">Internal standard</span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Internal · process standard</span>
+    <h1>Design → Coding<br>Handoff Checklist.</h1>
+    <p class="hero-sub">The standard for any design file handed to the coding chat. Built from what actually tripped us up this project — wrong filenames, stale token refs, placeholder-vs-real ambiguity, superseded mockups. Run every deliverable through this before handing off.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="one-rule">
+    <div class="tag">0 · The one rule</div>
+    <p>The coding chat builds against the <strong>REAL app</strong>, not against a guess. Every file must make clear what is real, what is placeholder, and what is a design decision. <strong>Ambiguity here is what costs the most time.</strong></p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Identity &amp; status</h2></div>
+    <ul class="check">
+      <li><strong>Filename is descriptive and versioned</strong> — <code>VeyaFlow_&lt;Page&gt;_Reskin_v&lt;N&gt;.html</code>. No generic <code>index.html</code>.</li>
+      <li><strong>Names the real target file</strong> it maps to, using the ACTUAL repo filename (e.g. <code>brand-viewer.html</code>, not a guessed <code>brand/index.html</code>). If unknown, say "target file TBD — coding to confirm path," don't invent one.</li>
+      <li><strong>Status banner</strong> in the file: <code>current</code> / <code>superseded</code> / <code>exploration-only</code>. Superseded files say what replaced them.</li>
+      <li><strong>Dated</strong>, and notes which token-spec version it's built against (e.g. "Tokens v4.3").</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Real vs placeholder <em style="font-style:italic; color:var(--ink-mute); font-size:18px;">(the big one)</em></h2></div>
+    <ul class="check">
+      <li><strong>Every placeholder is labelled as such.</strong> Icons, sample copy, invented data, lorem — all explicitly flagged so coding never ships them as final.</li>
+      <li><strong>Icons:</strong> state they're placeholders for library icons (Lucide/Phosphor), and which library + ideally which icon name per slot.</li>
+      <li><strong>Domain content flagged</strong> where design isn't the source of truth — compliance vocabulary, regulatory requirement names, legal text. Mark "needs validation by [owner]," never present as fact.</li>
+      <li><strong>Qualitative→visual mappings noted</strong> — e.g. "bar fill widths for 'High' / 'Very positive' are a presentation choice, not data."</li>
+      <li><strong>Truncation noted</strong> — if a page shows only part of a real document, say so ("real doc continues; built enough to prove structure").</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Tokens &amp; system fidelity</h2></div>
+    <ul class="check">
+      <li><strong>Uses the current locked tokens</strong> (clay / ink / semantic, the three font roles). No off-token hex values; if one's needed, flag it for adding to the spec.</li>
+      <li><strong>Points to the current token spec by version</strong> — never an older one. (Stale token refs caused real confusion.)</li>
+      <li><strong>Follows locked rules:</strong> ampersand rule (v4.3), covers-are-light (v4.1), brand names = Newsreader upright (never italic), privacy pill = green + shield-check (v4.2), semantic color stays semantic.</li>
+      <li><strong>Reuses shared components</strong> (shell, framed cover, confidence tag, deadline bar) rather than re-inventing them per file — and says "uses shared X" so coding builds it once.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Structure grounded in reality</h2></div>
+    <ul class="check">
+      <li><strong>Built from a real screenshot</strong> where one exists. If no screenshot, the file is marked <strong>provisional / guessed structure</strong> and flagged for verification — never presented as a re-skin of something unseen.</li>
+      <li><strong>Preserves real patterns</strong> the app already has (deadline bar, confidence tags, privacy treatment, section numbering) — re-skin them, don't remove them.</li>
+      <li><strong>Doesn't re-architect IA</strong> — page set, nav structure, naming are strategy's call. Design re-skins what's there.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Companion spec <em style="font-style:italic; color:var(--ink-mute); font-size:18px;">(for non-trivial surfaces)</em></h2></div>
+    <ul class="check">
+      <li><strong>Paired <code>.md</code> spec</strong> stating intent: what the page is for, why each decision, states authored, and considered-and-rejected alternatives (so they're not reopened).</li>
+      <li><strong>Open items / decisions-needed</strong> listed, with owner (design / strategy / coding).</li>
+      <li><strong>HTML = source of truth for <em>what</em>; spec = source of truth for <em>why</em>.</strong> Say this so coding knows which to trust for which question.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">06</span><h2>States &amp; completeness</h2></div>
+    <ul class="check">
+      <li><strong>Which states are authored</strong> (populated / empty / all-clear / loading / error) and which aren't.</li>
+      <li><strong>Empty / first-session state</strong> addressed or explicitly flagged as a gap (it's our biggest recurring one).</li>
+      <li><strong>Interaction notes</strong> for anything not visible in a static mock (collapse behavior, hover, persistence-across-pages, what's a coding-state concern).</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Cross-chat hygiene</h2></div>
+    <ul class="check">
+      <li><strong>Divergences from strategy / coding flagged</strong> (e.g. "sidebar went light, not strategy's dark vote") so chats don't silently drift.</li>
+      <li><strong>No duplicate re-sends</strong> — if coding already has a file, point to it by name, don't re-upload. (Re-sending files they had caused a loop.)</li>
+      <li><strong>Binary questions for coding are answerable by coding</strong> — don't ask design to resolve repo facts; route repo / file questions to whoever holds the repo.</li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Handoff packaging</h2></div>
+    <ul class="check">
+      <li><strong>Manifest exists</strong> — one current list of deliverables with status (current / superseded / reference), so nobody hunts or reconciles folders by hand.</li>
+      <li><strong>Superseded files marked, not deleted</strong> — kept as reference but clearly labelled so they're never built from.</li>
+      <li><strong>Present the file</strong> (don't just describe it), with a succinct note on what it is and what's still open.</li>
+    </ul>
+  </section>
+
+</div>
+
+<div class="quick">
+  <div class="wrap">
+    <h2>Quick pre-handoff pass</h2>
+    <p class="quick-lead">The six that matter most.</p>
+    <ol class="quick-list">
+      <li>Real filename named (not guessed)?</li>
+      <li>Placeholders all labelled (icons, copy, domain content)?</li>
+      <li>Built against a real screenshot — or flagged provisional?</li>
+      <li>Current token-spec version cited, locked rules followed?</li>
+      <li>States listed; empty-state addressed-or-flagged?</li>
+      <li>Divergences flagged; no duplicate re-sends?</li>
+    </ol>
+    <p class="quick-foot">If all six pass, it's ready for coding.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span class="foot-feedback">Questions on the standard? <a href="mailto:hello@veyaflow.com">hello@veyaflow.com</a></span>
+    <span class="foot-meta"><span class="brandname">VeyaFlow</span> · internal process doc</span>
+  </div>
+</footer>
+
+</body>
+</html>
