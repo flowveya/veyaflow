@@ -2472,6 +2472,204 @@ function _bilRenderExtraction(){
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// BIL draft review screen (C1) — Supplement §5.2
+// ════════════════════════════════════════════════════════════════════════════
+// Full editable form over bilState.extraction (validateBilExtraction output):
+// .populated fields render pre-filled, .missingFields render as empty inputs to
+// fill. Sets brand.draftStatus='pending_review' on entry (in-memory; no save).
+// Mirrors the SPA's field/label/input conventions + tokens, but builds via DOM
+// nodes + .value/.textContent (NOT innerHTML interpolation) because extraction
+// content is model-derived/untrusted (item 6).
+//
+// SCOPE = C1 ONLY: editable form + draftStatus marker. NO activation (C2), NO
+// dismiss/fallback (C3), NO brand-edit surfacing (C4), NO Sequence D entry
+// points, NO save / brand-data write. Edits live in bilState.draft (transient).
+// Reached from the dev panel for now.
+
+// Canonical field metadata — same field sets validateBilExtraction + F7 use.
+const BIL_C1_BRAND_FIELDS = [
+  {key:'name',             label:'Brand name',                        type:'text'},
+  {key:'founderName',      label:'Founder name',                      type:'text'},
+  {key:'foundingYear',     label:'Founding year',                     type:'text'},
+  {key:'originStory',      label:'Origin story',                      type:'textarea'},
+  {key:'positioning',      label:'Positioning (maps to brand USP)',   type:'textarea'},
+  {key:'values',           label:'Brand values',                      type:'array'},
+  {key:'targetCustomer',   label:'Target customer',                   type:'textarea'},
+  {key:'geographicOrigin', label:'Geographic origin (maps to home market)', type:'text'},
+  {key:'primaryMarkets',   label:'Primary markets',                   type:'array'},
+];
+const BIL_C1_COMMERCIAL_FIELDS = [
+  {key:'marginStructure',   label:'Margin structure',       type:'text'},
+  {key:'moq',               label:'MOQ',                    type:'text'},
+  {key:'leadTimes',         label:'Lead times',             type:'text'},
+  {key:'existingRetailers', label:'Existing retailers',     type:'array'},
+  {key:'salesChannels',     label:'Sales channels',         type:'array'},
+  {key:'revenueStageSignal',label:'Revenue / stage signal', type:'text'},
+  {key:'yearOverYearGrowth',label:'Year-over-year growth',  type:'text'},
+];
+const BIL_C1_SKU_FIELDS = [
+  {key:'name',              label:'Product name',    type:'text'},
+  {key:'category',          label:'Category',        type:'text'},
+  {key:'productDescription',label:'Description',     type:'textarea'},
+  {key:'keyIngredients',    label:'Key ingredients', type:'array'},
+  {key:'heroBenefit',       label:'Hero benefit',    type:'text'},
+  {key:'claims',            label:'Claims',          type:'array'},
+  {key:'pricePoint',        label:'Price point',     type:'text'},
+  {key:'sizes',             label:'Sizes',           type:'array'},
+];
+
+// Build bilState.draft (transient, editable) from the validated extraction,
+// normalized to the full schema so missing fields render as empty inputs.
+function _bilBuildDraft(ex){
+  var src = (ex && ex.extracted) || {};
+  function s(v){ return (typeof v === 'string') ? v : ''; }
+  function a(v){ return Array.isArray(v) ? v.slice() : []; }
+  var bp = src.brandProfile || {};
+  var ci = src.commercialIntelligence || {};
+  var pp = Array.isArray(src.productPortfolio) ? src.productPortfolio : [];
+  var draft = { brandProfile:{}, commercialIntelligence:{}, productPortfolio:[] };
+  BIL_C1_BRAND_FIELDS.forEach(function(f){ draft.brandProfile[f.key] = (f.type==='array') ? a(bp[f.key]) : s(bp[f.key]); });
+  BIL_C1_COMMERCIAL_FIELDS.forEach(function(f){ draft.commercialIntelligence[f.key] = (f.type==='array') ? a(ci[f.key]) : s(ci[f.key]); });
+  pp.forEach(function(sku){
+    var o={}; BIL_C1_SKU_FIELDS.forEach(function(f){ o[f.key] = (f.type==='array') ? a(sku&&sku[f.key]) : s(sku&&sku[f.key]); });
+    draft.productPortfolio.push(o);
+  });
+  // No SKUs extracted: seed one empty SKU so the 8-field sub-schema is visible +
+  // fillable. Add/remove-SKU UI is out of C1 scope (C1 renders the form).
+  if(draft.productPortfolio.length===0){
+    var empty={}; BIL_C1_SKU_FIELDS.forEach(function(f){ empty[f.key] = (f.type==='array') ? [] : ''; });
+    draft.productPortfolio.push(empty);
+  }
+  return draft;
+}
+
+// Was this schema path flagged by the validator as missing? (drives the hint)
+function _bilIsMissing(ex, path){
+  return !!(ex && Array.isArray(ex.missingFields) && ex.missingFields.indexOf(path) !== -1);
+}
+
+// One labelled, bound field. DOM-only: extraction value set via .value, never
+// interpolated into innerHTML. Arrays edited as comma-separated text (mirrors
+// the SPA's join/split convention).
+function _bilField(label, type, value, isMissing, onChange){
+  var wrap=document.createElement('div');
+  wrap.className='field';
+  wrap.style.cssText='margin-bottom:.7rem';
+  var lbl=document.createElement('label');
+  lbl.className='lbl';
+  lbl.textContent=label;
+  if(isMissing){
+    var tag=document.createElement('span');
+    tag.style.cssText='font-family:var(--mono);font-size:.5rem;color:#92400E;margin-left:.45rem;letter-spacing:.05em';
+    tag.textContent='not detected — add';
+    lbl.appendChild(tag);
+  }
+  wrap.appendChild(lbl);
+  var input;
+  if(type==='textarea'){
+    input=document.createElement('textarea');
+    input.rows=2;
+    input.style.cssText='width:100%;font-size:16px;font-family:var(--sans);padding:.5rem .6rem;border:1px solid var(--border);resize:vertical';
+  } else {
+    input=document.createElement('input');
+    input.type='text';
+    input.style.cssText='width:100%;font-size:16px;font-family:var(--sans);padding:.5rem .6rem;border:1px solid var(--border)';
+  }
+  input.value = (type==='array') ? (Array.isArray(value) ? value.join(', ') : '') : (value || '');
+  if(type==='array') input.placeholder='comma, separated, values';
+  input.oninput=function(){
+    if(type==='array'){
+      onChange(this.value.split(',').map(function(x){return x.trim();}).filter(function(x){return x.length>0;}));
+    } else {
+      onChange(this.value);
+    }
+  };
+  wrap.appendChild(input);
+  return wrap;
+}
+
+// C1 entry point. Reached from the dev panel for now (real entry = Sequence D).
+function renderBilReviewForm(){
+  var ex = bilState.extraction;
+  if(!ex || ex.outcome === 'parse_error'){
+    alert('No validated extraction to review yet — run EXTRACT → Vision first.');
+    return;
+  }
+
+  // §5.2 / item 4: mark draft state on entry. In-memory only — no save (C2 owns
+  // persistence + activation). This is the single sanctioned brand write; NO
+  // extracted field values are written to the brand object here.
+  if(typeof brand !== 'undefined' && brand) brand.draftStatus = 'pending_review';
+
+  // (Re)build the transient editable draft from the extraction.
+  bilState.draft = _bilBuildDraft(ex);
+  var draft = bilState.draft;
+
+  // Full-screen overlay (mirrors the dev-panel overlay; idempotent).
+  var prev=document.getElementById('bil-review-screen'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.id='bil-review-screen';
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;background:var(--paper,#fff);overflow:auto;padding:1.5rem 1rem';
+  var wrap=document.createElement('div');
+  wrap.style.cssText='max-width:680px;margin:0 auto;font-family:var(--sans)';
+  ov.appendChild(wrap);
+
+  // Header
+  var top=document.createElement('div');
+  top.style.cssText='display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.25rem';
+  var h=document.createElement('div');
+  h.style.cssText='font-family:var(--serif,var(--sans));font-size:1.3rem;font-weight:600;color:var(--navy)';
+  h.textContent='Review your brand draft';
+  var close=document.createElement('button');
+  close.className='btn-outline'; close.style.cssText='font-size:.7rem'; close.textContent='Close';
+  close.onclick=function(){ ov.remove(); };
+  top.appendChild(h); top.appendChild(close); wrap.appendChild(top);
+
+  var sub=document.createElement('div');
+  sub.style.cssText='font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.1rem;line-height:1.5';
+  sub.textContent='Extracted from your deck — edit before it is used. Outcome: '+ex.outcome+' · '+ex.fieldsExtractedCount+' field(s) detected · confidence '+(ex.visionConfidence||'unknown')+'. draftStatus = pending_review.';
+  wrap.appendChild(sub);
+
+  function section(title){
+    var card=document.createElement('div');
+    card.className='card'; card.style.cssText='margin-bottom:1rem;padding:1rem';
+    var tag=document.createElement('div'); tag.className='section-tag'; tag.textContent=title;
+    card.appendChild(tag); wrap.appendChild(card); return card;
+  }
+
+  // ── Brand profile ──
+  var bpCard=section('Brand profile');
+  BIL_C1_BRAND_FIELDS.forEach(function(f){
+    var missing=_bilIsMissing(ex,'brandProfile.'+f.key);
+    bpCard.appendChild(_bilField(f.label,f.type,draft.brandProfile[f.key],missing,function(v){ draft.brandProfile[f.key]=v; }));
+  });
+
+  // ── Products (one card per SKU) ──
+  draft.productPortfolio.forEach(function(sku,idx){
+    var card=section('Product '+(idx+1));
+    BIL_C1_SKU_FIELDS.forEach(function(f){
+      var missing=_bilIsMissing(ex,'productPortfolio['+idx+'].'+f.key);
+      card.appendChild(_bilField(f.label,f.type,sku[f.key],missing,function(v){ sku[f.key]=v; }));
+    });
+  });
+
+  // ── Commercial intelligence ──
+  var ciCard=section('Commercial intelligence');
+  BIL_C1_COMMERCIAL_FIELDS.forEach(function(f){
+    var missing=_bilIsMissing(ex,'commercialIntelligence.'+f.key);
+    ciCard.appendChild(_bilField(f.label,f.type,draft.commercialIntelligence[f.key],missing,function(v){ draft.commercialIntelligence[f.key]=v; }));
+  });
+
+  // Scope note — C2/C3 actions deliberately absent.
+  var note=document.createElement('div');
+  note.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.5rem;line-height:1.5';
+  note.textContent='C1 only — edits are held in bilState.draft. Confirm/activate (C2) and dismiss/fallback (C3) are not wired yet.';
+  wrap.appendChild(note);
+
+  document.body.appendChild(ov);
+}
+
 // Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
 // Injects a self-contained overlay; touches no existing page or nav. Idempotent
 // (defensive loader convention) — removes any prior instance before mounting.
@@ -2503,6 +2701,7 @@ function renderBilDevPanel(){
       <div id="bil-extract-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
       <div id="bil-state-readout" style="margin-top:1rem"></div>
       <div id="bil-extract-result" style="margin-top:1rem"></div>
+      <button class="btn-primary" onclick="renderBilReviewForm()" style="width:100%;margin-top:.9rem">REVIEW DRAFT → (C1)</button>
     </div>`;
   document.body.appendChild(ov);
   _bilRefreshReadout();
