@@ -1660,6 +1660,889 @@ async function runAutofill(){
   renderSetupModal();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// BIL extraction pipeline (B5) — inlined from bil_extraction_pipeline_b5.js
+// CommonJS exports guard from the standalone B5 file omitted (dead in a browser).
+// Dead code until B1–B4 wire it. See file header in the standalone B5 artifact.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ────────────────────────────────────────────────────────────────────────────
+// 1. BIL_EXTRACTION_SCHEMA — canonical output shape
+//
+// Three top-level objects + a _meta block. All string fields are V1.0
+// free-text per F7.1 lock (no normalization). Arrays may be empty when the
+// deck doesn't surface that information; never null. Missing/absent
+// information should result in empty string ("") for string fields and
+// empty array ([]) for array fields, NEVER null and NEVER "N/A"/"unknown"/
+// hallucinated stand-ins.
+//
+// This object is exported for documentation and (future) editor-side schema-
+// driven UI. It is NOT directly fed to Vision; the PROMPT below contains an
+// inlined version Vision actually sees.
+// ────────────────────────────────────────────────────────────────────────────
+
+const BIL_EXTRACTION_SCHEMA = {
+  // Brand-level identity, founder, positioning, audience (F7.2 + F7.3 locks).
+  brandProfile: {
+    name:             { type: "string",   required: true,  notes: "Brand display name as it appears on the deck cover or hero page." },
+    founderName:      { type: "string",   required: false, notes: "Named founder if disclosed. DISTINCT from the VeyaFlow user. Leave empty if the deck doesn't name a founder." },
+    foundingYear:     { type: "string",   required: false, notes: "STRING not number — preserves 'circa 2018', '2018-2019', 'Founded in 2015' fidelity. Extract verbatim from deck." },
+    originStory:      { type: "string",   required: false, notes: "Origin / founding context narrative. 1-3 sentences max. Verbatim quotes from deck preferred over paraphrase." },
+    positioning:      { type: "string",   required: false, notes: "Brand's positioning statement (alias maps to brand.usp on integration). Often labelled 'positioning', 'mission', 'we are', 'we believe'." },
+    values:           { type: "string[]", required: false, notes: "Brand values as an array of short phrases. DISTINCT from sustainability goals — values may include heritage, craftsmanship, transparency, science-led, etc." },
+    targetCustomer:   { type: "string",   required: false, notes: "Description of the brand's target customer. Often a persona, age range, lifestyle, or segment description." },
+    geographicOrigin: { type: "string",   required: false, notes: "Country or region where brand is based / manufactured. Alias maps to brand.currentMarket. Examples: 'Sweden', 'Lund, Sweden', 'Nordic'." },
+    primaryMarkets:   { type: "string[]", required: false, notes: "Markets currently sold into. Array of country names. Alias maps to brand.targetMarkets." },
+  },
+
+  // Per-SKU product portfolio (F7.1 lock — 8-field array of per-SKU objects).
+  productPortfolio: {
+    type:    "object[]",
+    notes:   "One entry per distinct product. Order in array matches order in deck where determinable; otherwise order by hero-product-first heuristic.",
+    itemSchema: {
+      name:                { type: "string",   required: true,  notes: "Product display name." },
+      category:            { type: "string",   required: false, notes: "Product category as the deck describes it (e.g. 'serum', 'face cream', 'LED device'). FREE TEXT V1.0 — no enum constraint. Category-enum mapping happens downstream at activation time." },
+      productDescription:  { type: "string",   required: false, notes: "1-2 sentence description of what the product does and how it's positioned." },
+      keyIngredients:      { type: "string[]", required: false, notes: "Hero ingredients mentioned for this SKU. Don't include filler/excipient ingredients unless the deck explicitly markets them. Verbatim names from deck." },
+      heroBenefit:         { type: "string",   required: false, notes: "Single most-prominent benefit claim for this SKU. E.g. '24h hydration', 'restores barrier in 14 days'." },
+      claims:              { type: "string[]", required: false, notes: "Other claims associated with this SKU — array of short phrases. Includes regulatory-relevant claims AND marketing claims; do not filter." },
+      pricePoint:          { type: "string",   required: false, notes: "Price as written in the deck. FREE TEXT V1.0 — keep currency and any range. Examples: '€65', '€45-€85', 'SEK 590', '$48 RSP'." },
+      sizes:               { type: "string[]", required: false, notes: "Size variants available. Examples: ['30ml', '50ml'], ['Standard', 'Travel']." },
+    },
+  },
+
+  // Brand-level commercial intelligence (F7.1 lock — 7-field brand-level object).
+  commercialIntelligence: {
+    marginStructure:      { type: "string", required: false, notes: "Margin information as written in deck. FREE TEXT V1.0. Examples: '48-55%', '52% on hero SKU', 'standard 50% sliding by volume'." },
+    moq:                  { type: "string", required: false, notes: "Minimum order quantity. FREE TEXT V1.0. Examples: '200 units mixed SKU', '50 units per SKU, MOQ 200 total', 'No MOQ for first order'." },
+    leadTimes:            { type: "string", required: false, notes: "Lead time from order to delivery. FREE TEXT V1.0. Examples: '21 days ex-factory', '4-6 weeks', 'next-day for stock SKUs'." },
+    existingRetailers:    { type: "string[]", required: false, notes: "Named retailers brand is currently in. Array of retailer names. Country annotations welcome inline (e.g. 'Kicks SE', 'Matas DK')." },
+    salesChannels:        { type: "string[]", required: false, notes: "Channel mix descriptors. Examples: ['DTC website', 'Specialty beauty', 'Pharmacy chain', 'Trade shows']." },
+    revenueStageSignal:   { type: "string", required: false, notes: "Stage/scale indicator: revenue figures, growth phase, funding status. FREE TEXT V1.0. Examples: 'SEK 31M FY2025', 'Bootstrapped, profitable since Q2 2024', 'Series A target Q4 2026'." },
+    yearOverYearGrowth:   { type: "string", required: false, notes: "Growth rate as written. FREE TEXT V1.0. Examples: '+70% YoY', 'Doubled in 2024', 'Flat 2024, +30% YTD 2025'." },
+  },
+
+  // Vision-self-reported metadata about the extraction quality.
+  _meta: {
+    confidence: { type: "string", enum: ["high", "medium", "low"], required: true, notes: "Vision's self-reported confidence. HIGH: most fields populated, deck was a real brand pitch with structured info. MEDIUM: partial extraction, some sections unclear. LOW: deck wasn't actually a brand pitch (wrong document type), OR text was unreadable, OR fewer than ~5 fields could be populated." },
+    notes:      { type: "string", required: false, notes: "Free-text observations from Vision about extraction quality, e.g. 'last 3 pages were appendix with no relevant info', 'deck appears to be product catalog not a brand pitch'." },
+  },
+};
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// 2. BIL_EXTRACTION_PROMPT — the system prompt Vision sees
+//
+// Design principles:
+//   • SCHEMA-FIRST: Vision sees the exact JSON shape it must produce, inline.
+//   • LOSSY-RESILIENT: explicit instructions to leave fields empty rather
+//     than invent. The most common Vision failure mode on brand decks is
+//     plausible-sounding hallucination of fields the deck doesn't contain.
+//   • CURRENCY-AWARE (Nordic-bloc): preserve currency markers verbatim,
+//     don't auto-convert.
+//   • DIGIT-PRESERVING: EAN-13 codes, SKU IDs, year figures — all kept as
+//     literal strings, never paraphrased.
+//   • CONFIDENCE-FORCING: Vision self-reports a confidence band; BIL.6 retry
+//     logic uses this + the validator's populated-count to decide retry.
+//
+// The prompt is intentionally directive and structured. Anthropic Vision
+// performs significantly better with explicit JSON schemas + per-field
+// constraints than with general "extract brand info" prompts.
+// ────────────────────────────────────────────────────────────────────────────
+
+const BIL_EXTRACTION_PROMPT = `You are extracting brand intake data from a brand pitch deck for a European retail-buyer-facing platform. The deck has been split into one image per page; you will see up to 15 page images.
+
+Your job: extract structured brand data into the JSON schema below. Return JSON only, no commentary, no markdown fences, no preamble.
+
+═══ JSON SCHEMA ═══
+
+{
+  "brandProfile": {
+    "name":             string,         // brand display name
+    "founderName":      string,         // named founder if disclosed, else ""
+    "foundingYear":     string,         // STRING not number — preserve "circa 2018", "2018-2019", "Founded in 2015" verbatim
+    "originStory":      string,         // 1-3 sentences max, verbatim quotes preferred
+    "positioning":      string,         // brand positioning / mission / "we are" statement
+    "values":           string[],       // brand values — heritage, craftsmanship, transparency, science-led, etc. NOT sustainability goals only
+    "targetCustomer":   string,         // target customer description / persona / segment
+    "geographicOrigin": string,         // country or region brand is based/manufactured in
+    "primaryMarkets":   string[]        // current markets sold into, as country names
+  },
+  "productPortfolio": [                 // one entry per distinct product
+    {
+      "name":               string,
+      "category":           string,     // free-text — "serum", "face cream", "LED device", etc.
+      "productDescription": string,     // 1-2 sentences
+      "keyIngredients":     string[],   // hero ingredients only, verbatim names
+      "heroBenefit":        string,     // single most-prominent claim
+      "claims":             string[],   // other associated claims
+      "pricePoint":         string,     // free-text including currency: "€65", "€45-€85", "SEK 590"
+      "sizes":              string[]    // size variants: ["30ml", "50ml"], ["Standard", "Travel"]
+    }
+  ],
+  "commercialIntelligence": {
+    "marginStructure":    string,       // free-text — "48-55%", "52% on hero SKU", etc.
+    "moq":                string,       // free-text — "200 units mixed SKU", etc.
+    "leadTimes":          string,       // free-text — "21 days ex-factory", etc.
+    "existingRetailers":  string[],     // named retailers brand is currently in
+    "salesChannels":      string[],     // ["DTC website", "Specialty beauty", etc.]
+    "revenueStageSignal": string,       // revenue + stage signals: "SEK 31M FY2025", "Bootstrapped, profitable since Q2 2024"
+    "yearOverYearGrowth": string        // "+70% YoY", "Doubled in 2024", etc.
+  },
+  "_meta": {
+    "confidence": "high" | "medium" | "low",
+    "notes":      string                // your observations on extraction quality
+  }
+}
+
+═══ CRITICAL EXTRACTION RULES ═══
+
+1. EMPTY OVER INVENTED. If a field's information is NOT present in the deck, leave it as empty string "" or empty array []. NEVER invent plausible-sounding values. NEVER fill with "N/A", "unknown", "not specified" — use "" / [].
+
+2. VERBATIM WHEN POSSIBLE. For phrases the deck states literally (founder name, brand values, claims, prices, dates), copy the deck's wording. Don't paraphrase brand-defining language.
+
+3. PRESERVE DIGITS LITERALLY. EAN-13 codes ("5012345678901"), SKU IDs ("4521-AUR"), year figures ("2019"), revenue numbers ("SEK 31.2 M"), percentages ("+70% YoY") — extract as written, do not reformat. Currency markers stay attached to numbers.
+
+4. CURRENCY: NORDIC-BLOC NORMAL. Common currencies are SEK, NOK, DKK, EUR, GBP, ISK. Preserve whatever the deck uses. Don't convert. If a price has no explicit currency, leave it as written ("€65" not "65 EUR", "190 SEK" not "190 kr").
+
+5. PRODUCT SCOPE. productPortfolio is per-SKU. If the deck shows 4 distinct products, return 4 entries. If the deck only mentions products generically without naming SKUs, return [] for productPortfolio — do NOT invent SKU names.
+
+6. RETAILER NAMES. Common Nordic beauty retailers include: Kicks, Lyko, Matas, Sephora, Apotek Hjärtat, Vita, Boots, Douglas. If retailers are mentioned in passing (e.g. "sold in Lyko"), include them in existingRetailers. If only aspirational ("we want to be in Sephora"), DO NOT include — that's not existing distribution.
+
+7. VALUES vs SUSTAINABILITY. The "values" field is broader than sustainability. If the deck lists "Nordic provenance", "barrier respect", "clinical transparency" — those are values. If the deck lists "carbon-neutral by 2030" — that's a sustainability goal, NOT a value. Only include things the deck frames as values, mission, or principles.
+
+8. CONFIDENCE SELF-REPORT.
+   • "high"   — deck was clearly a brand pitch deck, most schema fields could be populated from clearly-presented information.
+   • "medium" — deck was a brand pitch but some sections were sparse or unclear, only partial extraction possible.
+   • "low"    — deck was NOT a brand pitch (e.g. it was a product catalog, a financial report, a wrong document type), OR text was largely unreadable, OR fewer than ~5 fields across the entire schema could be populated.
+
+9. RETURN JSON ONLY. No markdown fences. No commentary before or after the JSON. No "Here is the extraction:" preamble. The first character of your response must be { and the last must be }.`;
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// 3. buildBilExtractionCall(pdfPageImages, fileMetadata)
+//
+//   Constructs the messages array for the Anthropic API request.
+//
+//   pdfPageImages: Array<{ media_type: "image/jpeg" | "image/png", data: string (base64) }>
+//                  One entry per PDF page after pdf.js render. F3.1 lock: max 15 entries.
+//   fileMetadata:  { pdfFilename: string, pageCount: number, originalPageCount: number }
+//                  Passed for logging only — not consumed by the call itself.
+//
+//   Returns: { model, max_tokens, system, messages } — ready to JSON.stringify
+//             and POST to /.netlify/functions/anthropic-proxy.
+//
+//   Notes:
+//     • Model is claude-sonnet-4-6 per F2 lock (vision quality > Haiku).
+//     • max_tokens 4000 — accommodates 4 products × ~700-tok JSON each.
+//     • System prompt is the BIL_EXTRACTION_PROMPT above.
+//     • User message is a single content array: one text block (orientation
+//       cue with the deck's filename + page count) followed by N image blocks.
+// ────────────────────────────────────────────────────────────────────────────
+
+function buildBilExtractionCall(pdfPageImages, fileMetadata) {
+  if (!Array.isArray(pdfPageImages) || pdfPageImages.length === 0) {
+    throw new Error("buildBilExtractionCall: pdfPageImages must be a non-empty array");
+  }
+  if (pdfPageImages.length > 15) {
+    throw new Error("buildBilExtractionCall: max 15 pages per F3.1 lock — caller must truncate upstream");
+  }
+
+  const meta = fileMetadata || {};
+  const filename = meta.pdfFilename || "(uploaded deck)";
+  const pageCount = meta.pageCount || pdfPageImages.length;
+  const originalPageCount = meta.originalPageCount || pageCount;
+
+  // Page-count framing helps Vision orient (knows when it's seeing 1 vs 15 pages)
+  // and surfaces F3.1 truncation honestly when originalPageCount > pageCount.
+  const orientText = (originalPageCount > pageCount)
+    ? `Brand pitch deck: ${filename}. Showing first ${pageCount} of ${originalPageCount} pages (truncated per platform policy; extract from what is visible).`
+    : `Brand pitch deck: ${filename}. ${pageCount} page${pageCount === 1 ? "" : "s"} total.`;
+
+  // Build content array: text first, then image blocks in page order.
+  const contentBlocks = [
+    { type: "text", text: orientText },
+  ];
+
+  for (const img of pdfPageImages) {
+    contentBlocks.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: img.media_type,
+        data: img.data,
+      },
+    });
+  }
+
+  return {
+    model: "claude-sonnet-4-6",
+    max_tokens: 4000,
+    system: BIL_EXTRACTION_PROMPT,
+    messages: [
+      { role: "user", content: contentBlocks },
+    ],
+  };
+}
+
+
+// ────────────────────────────────────────────────────────────────────────────
+// 4. validateBilExtraction(rawApiResponse)
+//
+//   Parses Vision's raw response, validates shape, computes the BIL.6 inputs.
+//
+//   rawApiResponse: the JSON object returned from the Anthropic API (already
+//                   parsed by the caller). Expected shape:
+//                   { content: [{ type: "text", text: "..." }], ... }
+//
+//   Returns:
+//     {
+//       outcome:                "success" | "partial" | "low_quality" | "parse_error" | "empty",
+//       extracted:              <schema-shaped object>  OR null if parse failed,
+//       populated:              <subset of schema with non-empty fields>,
+//       missingFields:          string[]  (dot-paths of fields that came back empty),
+//       fieldsExtractedCount:   number,
+//       visionConfidence:       "high" | "medium" | "low" | null,
+//       visionNotes:            string  (Vision's _meta.notes if present),
+//       parseError:             string | null,
+//     }
+//
+//   Outcome rules:
+//     • "parse_error"  — could not parse JSON at all. Triggers BIL.6 mode 4
+//                        (network/format failure → retry once, then fallback CTA).
+//     • "empty"        — parsed cleanly but every schema field is empty.
+//                        Almost certainly a wrong document type was uploaded.
+//                        Triggers BIL.6 mode 2 (low quality → confirm + fallback).
+//     • "low_quality"  — visionConfidence==="low" OR fieldsExtractedCount < 5.
+//                        Triggers BIL.6 mode 2.
+//     • "partial"      — between 5 and ~70% of schema fields populated.
+//                        Proceeds to draft review (Sequence C) with clear gaps.
+//     • "success"      — most fields populated, confidence high.
+// ────────────────────────────────────────────────────────────────────────────
+
+function validateBilExtraction(rawApiResponse) {
+  const result = {
+    outcome: null,
+    extracted: null,
+    populated: null,
+    missingFields: [],
+    fieldsExtractedCount: 0,
+    visionConfidence: null,
+    visionNotes: "",
+    parseError: null,
+  };
+
+  // ── Step 1: extract the text block from Anthropic's response envelope ──
+  let rawText = "";
+  try {
+    rawText = (rawApiResponse?.content || [])
+      .find((b) => b.type === "text")?.text || "";
+  } catch (e) {
+    result.outcome = "parse_error";
+    result.parseError = "Anthropic response envelope malformed: " + e.message;
+    return result;
+  }
+  if (!rawText) {
+    result.outcome = "parse_error";
+    result.parseError = "No text block in Anthropic response.";
+    return result;
+  }
+
+  // ── Step 2: strip markdown fences (existing SPA convention) ──
+  const clean = rawText.replace(/```json|```/g, "").trim();
+
+  // ── Step 3: parse JSON ──
+  let parsed;
+  try {
+    parsed = JSON.parse(clean);
+  } catch (e) {
+    result.outcome = "parse_error";
+    result.parseError = "Vision returned non-JSON: " + e.message + ". First 200 chars: " + clean.slice(0, 200);
+    return result;
+  }
+  if (!parsed || typeof parsed !== "object") {
+    result.outcome = "parse_error";
+    result.parseError = "Vision returned non-object JSON.";
+    return result;
+  }
+
+  // ── Step 4: shape-fill missing top-level keys (defensive) ──
+  // Vision may omit entire top-level sections if the deck had nothing for
+  // them. Don't treat as parse_error — treat as fully-empty section.
+  if (!parsed.brandProfile || typeof parsed.brandProfile !== "object") parsed.brandProfile = {};
+  if (!Array.isArray(parsed.productPortfolio))                          parsed.productPortfolio = [];
+  if (!parsed.commercialIntelligence || typeof parsed.commercialIntelligence !== "object") parsed.commercialIntelligence = {};
+  if (!parsed._meta || typeof parsed._meta !== "object")                 parsed._meta = {};
+
+  // ── Step 5: count populated fields + collect missing paths ──
+  // brandProfile fields (9)
+  const bpFields = ["name", "founderName", "foundingYear", "originStory", "positioning", "values", "targetCustomer", "geographicOrigin", "primaryMarkets"];
+  let populatedCount = 0;
+  const populated = { brandProfile: {}, productPortfolio: [], commercialIntelligence: {} };
+  const missing = [];
+
+  for (const f of bpFields) {
+    const v = parsed.brandProfile[f];
+    if (isPopulated(v)) {
+      populated.brandProfile[f] = v;
+      populatedCount++;
+    } else {
+      missing.push("brandProfile." + f);
+    }
+  }
+
+  // productPortfolio: each populated SKU adds to count, but per-product gaps
+  // surface as missingFields scoped to that product index.
+  parsed.productPortfolio.forEach((sku, idx) => {
+    if (!sku || typeof sku !== "object") return;
+    const popSku = {};
+    let skuPopulated = false;
+    const skuFields = ["name", "category", "productDescription", "keyIngredients", "heroBenefit", "claims", "pricePoint", "sizes"];
+    for (const f of skuFields) {
+      const v = sku[f];
+      if (isPopulated(v)) {
+        popSku[f] = v;
+        skuPopulated = true;
+      } else {
+        missing.push("productPortfolio[" + idx + "]." + f);
+      }
+    }
+    if (skuPopulated) {
+      populated.productPortfolio.push(popSku);
+      populatedCount++;   // count each non-empty SKU as one populated unit
+    }
+  });
+  if (parsed.productPortfolio.length === 0) {
+    missing.push("productPortfolio (no products extracted)");
+  }
+
+  // commercialIntelligence fields (7)
+  const ciFields = ["marginStructure", "moq", "leadTimes", "existingRetailers", "salesChannels", "revenueStageSignal", "yearOverYearGrowth"];
+  for (const f of ciFields) {
+    const v = parsed.commercialIntelligence[f];
+    if (isPopulated(v)) {
+      populated.commercialIntelligence[f] = v;
+      populatedCount++;
+    } else {
+      missing.push("commercialIntelligence." + f);
+    }
+  }
+
+  // ── Step 6: read Vision's self-reported confidence ──
+  const conf = parsed._meta.confidence;
+  const validConf = (conf === "high" || conf === "medium" || conf === "low") ? conf : null;
+  const notes = typeof parsed._meta.notes === "string" ? parsed._meta.notes : "";
+
+  // ── Step 7: classify the outcome ──
+  // Total possible "populated units" = 9 (brandProfile) + N (products, variable)
+  // + 7 (commercialIntelligence). Use thresholds vs. a 16-unit reference baseline
+  // (9 + 7 + ~assume 1 product min for "useful"), not strict %.
+  let outcome;
+  if (populatedCount === 0) {
+    outcome = "empty";
+  } else if (validConf === "low" || populatedCount < 5) {
+    outcome = "low_quality";
+  } else if (populatedCount >= 12) {
+    outcome = "success";
+  } else {
+    outcome = "partial";
+  }
+
+  result.outcome = outcome;
+  result.extracted = parsed;
+  result.populated = populated;
+  result.missingFields = missing;
+  result.fieldsExtractedCount = populatedCount;
+  result.visionConfidence = validConf;
+  result.visionNotes = notes;
+  return result;
+}
+
+// ──────────── helper ────────────
+// "Populated" means: non-empty string, non-empty array, non-null, not "N/A"/etc.
+// Catches lazy hallucination patterns even when Vision ignores the rule.
+function isPopulated(v) {
+  if (v === null || v === undefined) return false;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (!s) return false;
+    if (s === "n/a" || s === "na" || s === "unknown" || s === "not specified" || s === "not provided") return false;
+    return true;
+  }
+  if (Array.isArray(v)) {
+    return v.length > 0 && v.some(isPopulated);
+  }
+  // Numbers, booleans, etc. — treat as populated if defined
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL upload entry point (B1) — file picker + type/size validation
+// ════════════════════════════════════════════════════════════════════════════
+// First piece of BIL Sequence B's UI. Accepts a single brand-pitch-deck PDF,
+// validates type + size, and holds the validated File in bilState. It does NOT
+// read bytes, render pages, call Vision, or invoke the B5 pipeline above — those
+// are B2–B4. This stops at "a validated File held in state."
+//
+// Mount: a minimal, console-invokable dev panel (renderBilDevPanel) — the
+// production entry points (onboarding / ad-hoc) are Sequence D, deferred. Per
+// the continuation brief, this slice's output goes to a dev panel, not the
+// (also-deferred) Sequence C review form.
+//
+// State shape mirrors brandPackState: a flat object of in-progress user input,
+// mutated in place.
+let bilState = { file:null, filename:'', fileSize:0, status:'idle', error:null, timestamp:null, pageCount:0, pageImages:[] };
+
+// F3c lock: 25MB ceiling. F1 lock = client-side messaging only (trust + monitor,
+// never silent enforcement) — so an oversize file is rejected WITH a message.
+const BIL_MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+function handleBilFileUpload(input){
+  var file = input.files && input.files[0];
+  if(!file) return; // dialog cancelled / nothing picked — leave state untouched
+  var errEl  = document.getElementById('bil-upload-error');
+  var statEl = document.getElementById('bil-upload-status');
+  if(errEl)  errEl.textContent='';
+  if(statEl) statEl.textContent='';
+
+  // Every rejection path lands here — never a silent drop.
+  function reject(msgHtml){
+    bilState.file=null; bilState.status='rejected'; bilState.error=msgHtml; bilState.timestamp=null;
+    if(errEl) errEl.innerHTML=msgHtml; else alert(msgHtml.replace(/<[^>]+>/g,' '));
+    input.value=''; // clear so the user can re-pick the same or another file
+    _bilRefreshReadout();
+  }
+
+  try {
+    // ── Type: PDF only ────────────────────────────────────────────────────
+    // file.type is the reliable signal, but some OS/browser combos report an
+    // empty type for a .pdf — fall back to the extension before rejecting.
+    var ext = (file.name.split('.').pop()||'').toLowerCase();
+    var isPdf = file.type === 'application/pdf' || (file.type === '' && ext === 'pdf');
+    if(!isPdf){
+      reject('<strong>That isn\'t a PDF.</strong><br>The brand pitch deck must be a single PDF file (application/pdf).');
+      return;
+    }
+
+    // ── Size: 25MB cap (F3c) ──────────────────────────────────────────────
+    if(file.size > BIL_MAX_FILE_BYTES){
+      var mb = (file.size/1024/1024).toFixed(1);
+      reject('<strong>File too large.</strong><br>Maximum size is 25MB — this file is '+mb+'MB. Export a lighter PDF (or fewer pages) and try again.');
+      return;
+    }
+
+    // ── Page count: 15-page cap (F3c) — DEFERRED to B3 ────────────────────
+    // Counting pages requires parsing the PDF, which needs pdf.js. pdf.js is
+    // NOT loaded yet (B2 lazy-loads it from CDN). So the page check CANNOT run
+    // here — B3 enforces the 15-page cap after pdf.js parses the document, and
+    // buildBilExtractionCall() (above) throws on >15 pages as a backstop.
+    // DO NOT add a page check here; it would require pulling pdf.js into B1.
+
+    // ── Valid: hold the File in state. No read, no render, no extraction. ──
+    bilState.file = file;
+    bilState.filename = file.name;
+    bilState.fileSize = file.size;
+    bilState.status = 'ready';
+    bilState.error = null;
+    bilState.pageImages = [];   // a freshly-picked file invalidates any prior B3 render
+    bilState.pageCount = 0;
+    bilState.timestamp = new Date().toISOString();
+    if(statEl){
+      statEl.style.color='#065F46';
+      // textContent — never interpolate a user-supplied filename through innerHTML.
+      statEl.textContent='✓ '+file.name+' — '+(file.size/1024/1024).toFixed(1)+'MB held. Page-count check runs in B3.';
+    }
+  } catch(err){
+    reject('<strong>Could not read this file.</strong><br>'+(err&&err.message?err.message:'Unknown error')+'. Try re-selecting it.');
+    return;
+  }
+  _bilRefreshReadout();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL render pipeline (B2 + B3) — lazy-load pdf.js, render pages → base64 images
+// ════════════════════════════════════════════════════════════════════════════
+// B2: lazy-load pdf.js from cdnjs on first use (mirrors loadJsPDF, ~L27206) and
+//     point it at its worker. B3: parse bilState.file, enforce the 15-page cap
+//     (the check B1 deferred — F3c lock), render each page to a canvas, convert
+//     to base64 JPEG, and store the array in bilState.pageImages in the EXACT
+//     shape buildBilExtractionCall() consumes: { media_type, data } where data
+//     is raw base64 (no data: prefix). Stops at "page images ready in state."
+//     Does NOT call Vision or run the B5 extraction — that is B4.
+
+// Pin a UMD build (exposes window.pdfjsLib). pdf.js v4+ is ESM-only and won't
+// attach a global via a plain <script src>, so stay on the 3.x UMD line.
+const BIL_PDFJS_VERSION = '3.11.174';
+let _pdfjsLoaded = false;
+
+// B2 — lazy CDN load, mirroring the loadJsPDF promise pattern (L27206) exactly:
+// resolve immediately if already present, inject <script>, resolve on onload,
+// reject on onerror with a user-facing Error.
+function loadPdfJs(){
+  return new Promise((resolve, reject) => {
+    if(window.pdfjsLib){ _pdfjsLoaded=true; _setPdfWorkerSrc(); resolve(); return; }
+    if(_pdfjsLoaded){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+BIL_PDFJS_VERSION+'/pdf.min.js';
+    s.onload = () => { _pdfjsLoaded=true; _setPdfWorkerSrc(); resolve(); };
+    s.onerror = () => reject(new Error('Could not load PDF library'));
+    document.head.appendChild(s);
+  });
+}
+
+// The worker source must be set before getDocument(). Best-effort: if it can't
+// be set, getDocument() still runs (slower, on the main thread).
+function _setPdfWorkerSrc(){
+  try {
+    if(window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions){
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+BIL_PDFJS_VERSION+'/pdf.worker.min.js';
+    }
+  } catch(e){ /* non-fatal — render can still proceed */ }
+}
+
+// F3c lock: 15-page cap + render settings live here.
+const BIL_MAX_PAGES = 15;
+const BIL_RENDER_SCALE = 2;       // 2× so page text stays legible for Vision
+const BIL_JPEG_QUALITY = 0.85;
+
+// B3 — render the held PDF's pages to base64 images. Drives bilState + the
+// dev-panel progress line; returns nothing. Defensive (Rule #19): every failure
+// path rejects gracefully (status 'rejected'), never throws uncaught.
+async function renderBilPages(){
+  var progEl = document.getElementById('bil-render-progress');
+  function setProg(txt, color){
+    if(!progEl) return;
+    progEl.style.color = color || 'var(--navy)';
+    progEl.textContent = txt;   // textContent — never innerHTML for derived values
+  }
+  function fail(msg){
+    bilState.status='rejected';
+    bilState.error=msg;
+    bilState.pageImages=[];
+    setProg('✗ '+msg, '#991B1B');
+    _bilRefreshReadout();
+  }
+
+  if(!bilState.file){
+    fail('No PDF held — pick a file first (B1).');
+    return;
+  }
+
+  // Fresh run — clear any prior render output before we start.
+  bilState.pageImages=[];
+  bilState.pageCount=0;
+
+  // ── B2: ensure pdf.js is loaded ───────────────────────────────────────────
+  bilState.status='loading-pdfjs';
+  setProg('Loading PDF engine…');
+  _bilRefreshReadout();
+  try {
+    await loadPdfJs();
+  } catch(err){
+    fail('Could not load the PDF engine (network/CDN blocked). '+(err&&err.message?err.message:''));
+    return;
+  }
+  if(!window.pdfjsLib){
+    fail('PDF engine loaded but unavailable.');
+    return;
+  }
+
+  // ── B3: parse the document ────────────────────────────────────────────────
+  bilState.status='rendering';
+  setProg('Reading PDF…');
+  _bilRefreshReadout();
+
+  var pdf;
+  try {
+    var buf = await bilState.file.arrayBuffer();
+    pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  } catch(err){
+    // Corrupt / password-protected / not-really-a-PDF — reject, do not throw.
+    fail('Could not read this PDF — it may be corrupt or password-protected.');
+    return;
+  }
+
+  var pageCount = pdf.numPages;
+  bilState.pageCount = pageCount;
+
+  // ── F3c lock: 15-page cap — THIS is the check B1 deferred. Reject; no render.
+  if(pageCount > BIL_MAX_PAGES){
+    fail('Too many pages — '+pageCount+' found, maximum is '+BIL_MAX_PAGES+'. Trim the deck to its '+BIL_MAX_PAGES+' most important pages and re-upload.');
+    return;
+  }
+
+  // ── Render each page → canvas → base64 JPEG (page order preserved) ────────
+  var images = [];
+  try {
+    for(var i=1; i<=pageCount; i++){
+      setProg('Rendering page '+i+' of '+pageCount+'…');
+      var page = await pdf.getPage(i);
+      var viewport = page.getViewport({ scale: BIL_RENDER_SCALE });
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      // toDataURL → "data:image/jpeg;base64,XXXX"; strip the prefix to the raw
+      // base64 that buildBilExtractionCall()/Anthropic source.data expects.
+      var dataUrl = canvas.toDataURL('image/jpeg', BIL_JPEG_QUALITY);
+      images.push({ media_type:'image/jpeg', data: dataUrl.split(',')[1] || '' });
+      // Free the canvas eagerly — 15 pages at 2× can be memory-heavy.
+      canvas.width = 0; canvas.height = 0;
+    }
+  } catch(err){
+    fail('Failed while rendering pages: '+(err&&err.message?err.message:'unknown error')+'.');
+    return;
+  }
+
+  // ── Done: page images ready in state. STOP — no Vision call, no extraction.
+  bilState.pageImages = images;
+  bilState.status = 'pages-ready';
+  bilState.error = null;
+  setProg('✓ '+images.length+' page image'+(images.length===1?'':'s')+' ready in bilState.pageImages. (B4 wires Vision next.)', '#065F46');
+  _bilRefreshReadout();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL extraction call (B4) — page images → anthropic-proxy → validate → display
+// ════════════════════════════════════════════════════════════════════════════
+// Bridges B2/B3 output to the B5 pipeline. Mirrors runAutofill()'s proxy call
+// (POST /.netlify/functions/anthropic-proxy, JSON body, res.json()). Adds two
+// things runAutofill lacks, required by B4/minimal-B6: a res.ok HTTP-error check
+// and a client AbortController. Stops at validated data shown in the dev panel —
+// no Sequence C form, no full B6 retry logic.
+
+// Function ceiling is 30s (netlify.toml [functions."anthropic-proxy"]). Client
+// waits ceiling + ~9s network slack = 39s. Per continuation brief §1.1 this
+// corrects the stale 35s figure — do NOT use 35s.
+const BIL_CLIENT_ABORT_MS = 39000;
+
+async function runBilExtraction(){
+  var progEl = document.getElementById('bil-extract-progress');
+  function setProg(txt, color){
+    if(!progEl) return;
+    progEl.style.color = color || 'var(--navy)';
+    progEl.textContent = txt;   // textContent — model/proxy text is untrusted
+  }
+  // Minimal B6: distinguish failure stages so the message is useful. Never throws.
+  function fail(stage, msg){
+    bilState.status = 'failed';
+    bilState.extractError = { stage: stage, message: msg };
+    setProg('✗ '+stage+': '+msg, '#991B1B');
+    _bilRefreshReadout();
+    _bilRenderExtraction();
+  }
+
+  // ── Guard: B3 must have produced page images first ────────────────────────
+  if(bilState.status !== 'pages-ready' || !bilState.pageImages || bilState.pageImages.length === 0){
+    setProg('Render pages first — no page images in state. Run "Render pages" (B3).', '#991B1B');
+    return;
+  }
+
+  // ── Build the request body via the B5 pipeline ────────────────────────────
+  var body;
+  try {
+    body = buildBilExtractionCall(bilState.pageImages, {
+      pdfFilename: bilState.filename,
+      pageCount: bilState.pageImages.length,
+      originalPageCount: bilState.pageCount || bilState.pageImages.length,
+    });
+  } catch(err){
+    // >15-page backstop / empty array — shouldn't happen post-B3, but guard.
+    fail('build', (err&&err.message?err.message:'could not build request'));
+    return;
+  }
+
+  // ── POST to the proxy (mirrors runAutofill) with a 39s client abort ───────
+  bilState.status = 'extracting';
+  bilState.extractError = null;
+  setProg('Extracting via Vision… (waiting up to '+(BIL_CLIENT_ABORT_MS/1000)+'s)');
+  _bilRefreshReadout();
+
+  var controller = new AbortController();
+  var timedOut = false;
+  var timer = setTimeout(function(){ timedOut = true; controller.abort(); }, BIL_CLIENT_ABORT_MS);
+
+  var res;
+  try {
+    res = await fetch('/.netlify/functions/anthropic-proxy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch(err){
+    clearTimeout(timer);
+    if(timedOut || (err && err.name === 'AbortError')){
+      fail('timeout', 'No response within '+(BIL_CLIENT_ABORT_MS/1000)+'s (function ceiling is 30s). The deck may be too dense — try fewer pages.');
+    } else {
+      fail('network', 'Could not reach the extraction service: '+(err&&err.message?err.message:'unknown')+'.');
+    }
+    return;
+  }
+  clearTimeout(timer);
+
+  // ── HTTP-level error (runAutofill skips this; B4 needs it) ────────────────
+  if(!res.ok){
+    var bodyText = '';
+    try { bodyText = (await res.text()).slice(0,200); } catch(e){}
+    fail('http', 'Service returned HTTP '+res.status+(bodyText?(' — '+bodyText):'')+'.');
+    return;
+  }
+
+  // ── Parse the proxy's JSON envelope (same shape runAutofill reads) ────────
+  var data;
+  try {
+    data = await res.json();
+  } catch(err){
+    fail('http', 'Service returned a non-JSON response.');
+    return;
+  }
+
+  // ── Validate via B5 ───────────────────────────────────────────────────────
+  var result;
+  try {
+    result = validateBilExtraction(data);
+  } catch(err){
+    fail('validation', 'Validator threw: '+(err&&err.message?err.message:'unknown')+'.');
+    return;
+  }
+
+  // parse_error = Vision text couldn't be parsed into the schema → failure.
+  if(result.outcome === 'parse_error'){
+    bilState.extraction = result;
+    fail('validation', 'Vision output could not be parsed: '+(result.parseError||'unknown parse error')+'.');
+    return;
+  }
+
+  // success / partial / low_quality / empty all carry a usable result object.
+  bilState.extraction = result;
+  bilState.status = 'extracted';
+  bilState.extractError = null;
+  setProg('✓ Extracted — outcome: '+result.outcome+' · '+result.fieldsExtractedCount+' field(s) populated.',
+    (result.outcome==='success'||result.outcome==='partial') ? '#065F46' : '#92400E');
+  _bilRefreshReadout();
+  _bilRenderExtraction();
+}
+
+// Render the validated extraction into the dev panel. Every model-returned value
+// goes through textContent / DOM nodes — model output is untrusted, never innerHTML.
+function _bilRenderExtraction(){
+  var el = document.getElementById('bil-extract-result');
+  if(!el) return;
+  el.textContent='';
+  var ex = bilState.extraction;
+  if(!ex) return;
+
+  var head=document.createElement('div');
+  head.style.cssText='font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem';
+  head.textContent='extraction result';
+  el.appendChild(head);
+
+  var meta=[
+    ['outcome',          ex.outcome||'—'],
+    ['fields populated', (ex.fieldsExtractedCount!=null)?String(ex.fieldsExtractedCount):'—'],
+    ['vision confidence',ex.visionConfidence||'—'],
+  ];
+  meta.forEach(function(r){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.62rem';
+    var k=document.createElement('span'); k.style.color='var(--muted)'; k.textContent=r[0];
+    var v=document.createElement('span'); v.style.color='var(--navy)';  v.textContent=r[1];
+    row.appendChild(k); row.appendChild(v); el.appendChild(row);
+  });
+
+  if(ex.visionNotes){
+    var notes=document.createElement('div');
+    notes.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.4rem;line-height:1.5';
+    notes.textContent='notes: '+ex.visionNotes;   // untrusted — textContent
+    el.appendChild(notes);
+  }
+
+  // Pretty-print the populated structure. textContent on <pre> is injection-safe
+  // even though the payload is model-derived.
+  var payload = ex.populated || ex.extracted || null;
+  if(payload){
+    var pre=document.createElement('pre');
+    pre.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--navy);background:#F8FAFC;border:1px solid var(--border);padding:.6rem;margin-top:.5rem;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word';
+    try { pre.textContent = JSON.stringify(payload, null, 2); }
+    catch(e){ pre.textContent='(could not stringify extraction)'; }
+    el.appendChild(pre);
+  }
+}
+
+// Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
+// Injects a self-contained overlay; touches no existing page or nav. Idempotent
+// (defensive loader convention) — removes any prior instance before mounting.
+function renderBilDevPanel(){
+  closeBilDevPanel();
+  var ov = document.createElement('div');
+  ov.id='bil-dev-panel';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML=`
+    <div style="background:#fff;border:1px solid var(--border);max-width:520px;width:100%;padding:1.5rem;font-family:var(--sans)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem">
+        <div>
+          <div style="font-family:var(--sans);font-size:.95rem;font-weight:700;color:var(--navy)">BIL upload — dev panel</div>
+          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">B1–B3 · validate, hold, and render a brand-deck PDF to page images. No extraction wired.</div>
+        </div>
+        <button onclick="closeBilDevPanel()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted)">×</button>
+      </div>
+      <div style="border:2px dashed var(--border);padding:1.25rem;text-align:center;cursor:pointer" onclick="document.getElementById('bil-file-input').click()">
+        <div style="font-size:1.4rem;margin-bottom:.4rem">📄</div>
+        <div style="font-family:var(--sans);font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">Choose a brand pitch deck (PDF)</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">PDF only · max 25MB · ≤15 pages (page check deferred to B3)</div>
+      </div>
+      <input type="file" id="bil-file-input" accept="application/pdf" style="display:none" onchange="handleBilFileUpload(this)">
+      <div id="bil-upload-status" style="font-family:var(--mono);font-size:.65rem;margin-top:.6rem"></div>
+      <div id="bil-upload-error" style="font-family:var(--mono);font-size:.65rem;color:#991B1B;margin-top:.3rem;line-height:1.5"></div>
+      <button class="btn-primary" onclick="renderBilPages()" style="width:100%;margin-top:.9rem">Render pages → base64 images</button>
+      <div id="bil-render-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
+      <button class="btn-primary" onclick="runBilExtraction()" style="width:100%;margin-top:.9rem">EXTRACT → Vision</button>
+      <div id="bil-extract-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
+      <div id="bil-state-readout" style="margin-top:1rem"></div>
+      <div id="bil-extract-result" style="margin-top:1rem"></div>
+    </div>`;
+  document.body.appendChild(ov);
+  _bilRefreshReadout();
+  _bilRenderExtraction();
+}
+
+function closeBilDevPanel(){
+  var ov=document.getElementById('bil-dev-panel');
+  if(ov) ov.remove();
+}
+
+// Render the current bilState into the dev panel so the held file is visible.
+// Built via DOM nodes + textContent so a user-supplied filename is never an
+// innerHTML injection vector.
+function _bilRefreshReadout(){
+  var el=document.getElementById('bil-state-readout');
+  if(!el) return;
+  el.textContent='';
+  var head=document.createElement('div');
+  head.style.cssText='font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem';
+  head.textContent='bilState';
+  el.appendChild(head);
+  var rows=[
+    ['status',     bilState.status],
+    ['filename',   bilState.filename||'—'],
+    ['size',       bilState.fileSize?(bilState.fileSize/1024/1024).toFixed(2)+'MB':'—'],
+    ['file held',  bilState.file?'yes':'no'],
+    ['page count', bilState.pageCount?String(bilState.pageCount):'—'],
+    ['images',     (bilState.pageImages&&bilState.pageImages.length)?String(bilState.pageImages.length):'—'],
+    ['timestamp',  bilState.timestamp||'—'],
+  ];
+  rows.forEach(function(r){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.62rem';
+    var k=document.createElement('span'); k.style.color='var(--muted)'; k.textContent=r[0];
+    var v=document.createElement('span'); v.style.color='var(--navy)';  v.textContent=r[1];
+    row.appendChild(k); row.appendChild(v); el.appendChild(row);
+  });
+}
+
 function applyAutofillToProfile(){
   if(!_autofillResult) return;
   if(!brand) brand = {name:'',category:'',currentMarket:'Sweden',stage:'trading',targetMarkets:[],skus:''};
