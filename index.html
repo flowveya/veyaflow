@@ -2091,7 +2091,7 @@ function isPopulated(v) {
 //
 // State shape mirrors brandPackState: a flat object of in-progress user input,
 // mutated in place.
-let bilState = { file:null, filename:'', fileSize:0, status:'idle', error:null, timestamp:null };
+let bilState = { file:null, filename:'', fileSize:0, status:'idle', error:null, timestamp:null, pageCount:0, pageImages:[] };
 
 // F3c lock: 25MB ceiling. F1 lock = client-side messaging only (trust + monitor,
 // never silent enforcement) — so an oversize file is rejected WITH a message.
@@ -2144,6 +2144,8 @@ function handleBilFileUpload(input){
     bilState.fileSize = file.size;
     bilState.status = 'ready';
     bilState.error = null;
+    bilState.pageImages = [];   // a freshly-picked file invalidates any prior B3 render
+    bilState.pageCount = 0;
     bilState.timestamp = new Date().toISOString();
     if(statEl){
       statEl.style.color='#065F46';
@@ -2154,6 +2156,151 @@ function handleBilFileUpload(input){
     reject('<strong>Could not read this file.</strong><br>'+(err&&err.message?err.message:'Unknown error')+'. Try re-selecting it.');
     return;
   }
+  _bilRefreshReadout();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL render pipeline (B2 + B3) — lazy-load pdf.js, render pages → base64 images
+// ════════════════════════════════════════════════════════════════════════════
+// B2: lazy-load pdf.js from cdnjs on first use (mirrors loadJsPDF, ~L27206) and
+//     point it at its worker. B3: parse bilState.file, enforce the 15-page cap
+//     (the check B1 deferred — F3c lock), render each page to a canvas, convert
+//     to base64 JPEG, and store the array in bilState.pageImages in the EXACT
+//     shape buildBilExtractionCall() consumes: { media_type, data } where data
+//     is raw base64 (no data: prefix). Stops at "page images ready in state."
+//     Does NOT call Vision or run the B5 extraction — that is B4.
+
+// Pin a UMD build (exposes window.pdfjsLib). pdf.js v4+ is ESM-only and won't
+// attach a global via a plain <script src>, so stay on the 3.x UMD line.
+const BIL_PDFJS_VERSION = '3.11.174';
+let _pdfjsLoaded = false;
+
+// B2 — lazy CDN load, mirroring the loadJsPDF promise pattern (L27206) exactly:
+// resolve immediately if already present, inject <script>, resolve on onload,
+// reject on onerror with a user-facing Error.
+function loadPdfJs(){
+  return new Promise((resolve, reject) => {
+    if(window.pdfjsLib){ _pdfjsLoaded=true; _setPdfWorkerSrc(); resolve(); return; }
+    if(_pdfjsLoaded){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+BIL_PDFJS_VERSION+'/pdf.min.js';
+    s.onload = () => { _pdfjsLoaded=true; _setPdfWorkerSrc(); resolve(); };
+    s.onerror = () => reject(new Error('Could not load PDF library'));
+    document.head.appendChild(s);
+  });
+}
+
+// The worker source must be set before getDocument(). Best-effort: if it can't
+// be set, getDocument() still runs (slower, on the main thread).
+function _setPdfWorkerSrc(){
+  try {
+    if(window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions){
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+BIL_PDFJS_VERSION+'/pdf.worker.min.js';
+    }
+  } catch(e){ /* non-fatal — render can still proceed */ }
+}
+
+// F3c lock: 15-page cap + render settings live here.
+const BIL_MAX_PAGES = 15;
+const BIL_RENDER_SCALE = 2;       // 2× so page text stays legible for Vision
+const BIL_JPEG_QUALITY = 0.85;
+
+// B3 — render the held PDF's pages to base64 images. Drives bilState + the
+// dev-panel progress line; returns nothing. Defensive (Rule #19): every failure
+// path rejects gracefully (status 'rejected'), never throws uncaught.
+async function renderBilPages(){
+  var progEl = document.getElementById('bil-render-progress');
+  function setProg(txt, color){
+    if(!progEl) return;
+    progEl.style.color = color || 'var(--navy)';
+    progEl.textContent = txt;   // textContent — never innerHTML for derived values
+  }
+  function fail(msg){
+    bilState.status='rejected';
+    bilState.error=msg;
+    bilState.pageImages=[];
+    setProg('✗ '+msg, '#991B1B');
+    _bilRefreshReadout();
+  }
+
+  if(!bilState.file){
+    fail('No PDF held — pick a file first (B1).');
+    return;
+  }
+
+  // Fresh run — clear any prior render output before we start.
+  bilState.pageImages=[];
+  bilState.pageCount=0;
+
+  // ── B2: ensure pdf.js is loaded ───────────────────────────────────────────
+  bilState.status='loading-pdfjs';
+  setProg('Loading PDF engine…');
+  _bilRefreshReadout();
+  try {
+    await loadPdfJs();
+  } catch(err){
+    fail('Could not load the PDF engine (network/CDN blocked). '+(err&&err.message?err.message:''));
+    return;
+  }
+  if(!window.pdfjsLib){
+    fail('PDF engine loaded but unavailable.');
+    return;
+  }
+
+  // ── B3: parse the document ────────────────────────────────────────────────
+  bilState.status='rendering';
+  setProg('Reading PDF…');
+  _bilRefreshReadout();
+
+  var pdf;
+  try {
+    var buf = await bilState.file.arrayBuffer();
+    pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  } catch(err){
+    // Corrupt / password-protected / not-really-a-PDF — reject, do not throw.
+    fail('Could not read this PDF — it may be corrupt or password-protected.');
+    return;
+  }
+
+  var pageCount = pdf.numPages;
+  bilState.pageCount = pageCount;
+
+  // ── F3c lock: 15-page cap — THIS is the check B1 deferred. Reject; no render.
+  if(pageCount > BIL_MAX_PAGES){
+    fail('Too many pages — '+pageCount+' found, maximum is '+BIL_MAX_PAGES+'. Trim the deck to its '+BIL_MAX_PAGES+' most important pages and re-upload.');
+    return;
+  }
+
+  // ── Render each page → canvas → base64 JPEG (page order preserved) ────────
+  var images = [];
+  try {
+    for(var i=1; i<=pageCount; i++){
+      setProg('Rendering page '+i+' of '+pageCount+'…');
+      var page = await pdf.getPage(i);
+      var viewport = page.getViewport({ scale: BIL_RENDER_SCALE });
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      // toDataURL → "data:image/jpeg;base64,XXXX"; strip the prefix to the raw
+      // base64 that buildBilExtractionCall()/Anthropic source.data expects.
+      var dataUrl = canvas.toDataURL('image/jpeg', BIL_JPEG_QUALITY);
+      images.push({ media_type:'image/jpeg', data: dataUrl.split(',')[1] || '' });
+      // Free the canvas eagerly — 15 pages at 2× can be memory-heavy.
+      canvas.width = 0; canvas.height = 0;
+    }
+  } catch(err){
+    fail('Failed while rendering pages: '+(err&&err.message?err.message:'unknown error')+'.');
+    return;
+  }
+
+  // ── Done: page images ready in state. STOP — no Vision call, no extraction.
+  bilState.pageImages = images;
+  bilState.status = 'pages-ready';
+  bilState.error = null;
+  setProg('✓ '+images.length+' page image'+(images.length===1?'':'s')+' ready in bilState.pageImages. (B4 wires Vision next.)', '#065F46');
   _bilRefreshReadout();
 }
 
@@ -2170,7 +2317,7 @@ function renderBilDevPanel(){
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem">
         <div>
           <div style="font-family:var(--sans);font-size:.95rem;font-weight:700;color:var(--navy)">BIL upload — dev panel</div>
-          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">B1 · validate + hold a brand-deck PDF in state. No extraction wired.</div>
+          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">B1–B3 · validate, hold, and render a brand-deck PDF to page images. No extraction wired.</div>
         </div>
         <button onclick="closeBilDevPanel()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted)">×</button>
       </div>
@@ -2182,6 +2329,8 @@ function renderBilDevPanel(){
       <input type="file" id="bil-file-input" accept="application/pdf" style="display:none" onchange="handleBilFileUpload(this)">
       <div id="bil-upload-status" style="font-family:var(--mono);font-size:.65rem;margin-top:.6rem"></div>
       <div id="bil-upload-error" style="font-family:var(--mono);font-size:.65rem;color:#991B1B;margin-top:.3rem;line-height:1.5"></div>
+      <button class="btn-primary" onclick="renderBilPages()" style="width:100%;margin-top:.9rem">Render pages → base64 images</button>
+      <div id="bil-render-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
       <div id="bil-state-readout" style="margin-top:1rem"></div>
     </div>`;
   document.body.appendChild(ov);
@@ -2205,11 +2354,13 @@ function _bilRefreshReadout(){
   head.textContent='bilState';
   el.appendChild(head);
   var rows=[
-    ['status',    bilState.status],
-    ['filename',  bilState.filename||'—'],
-    ['size',      bilState.fileSize?(bilState.fileSize/1024/1024).toFixed(2)+'MB':'—'],
-    ['file held', bilState.file?'yes':'no'],
-    ['timestamp', bilState.timestamp||'—'],
+    ['status',     bilState.status],
+    ['filename',   bilState.filename||'—'],
+    ['size',       bilState.fileSize?(bilState.fileSize/1024/1024).toFixed(2)+'MB':'—'],
+    ['file held',  bilState.file?'yes':'no'],
+    ['page count', bilState.pageCount?String(bilState.pageCount):'—'],
+    ['images',     (bilState.pageImages&&bilState.pageImages.length)?String(bilState.pageImages.length):'—'],
+    ['timestamp',  bilState.timestamp||'—'],
   ];
   rows.forEach(function(r){
     var row=document.createElement('div');
