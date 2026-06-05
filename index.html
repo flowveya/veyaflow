@@ -2755,13 +2755,96 @@ function renderBilReviewForm(){
     ciCard.appendChild(_bilField(f.label,f.type,draft.commercialIntelligence[f.key],missing,function(v){ draft.commercialIntelligence[f.key]=v; }));
   });
 
-  // Scope note — C2/C3 actions deliberately absent.
+  // ── C2: confirm action — commit the edited draft into the brand object ────
+  var confirmBtn=document.createElement('button');
+  confirmBtn.className='btn-primary';
+  confirmBtn.style.cssText='width:100%;margin-top:.5rem;padding:.8rem';
+  confirmBtn.textContent='Confirm & use this draft →';
+  confirmBtn.onclick=_bilConfirmDraft;
+  wrap.appendChild(confirmBtn);
+
+  // Scope note — C3 (dismiss/fallback) + C4 (brand-edit surfacing) still out of scope.
   var note=document.createElement('div');
   note.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.5rem;line-height:1.5';
-  note.textContent='C1 only — edits are held in bilState.draft. Confirm/activate (C2) and dismiss/fallback (C3) are not wired yet.';
+  note.textContent='Confirm writes these fields into your brand profile and clears draftStatus. Dismiss/fallback (C3) and brand-edit surfacing (C4) are not wired yet.';
   wrap.appendChild(note);
 
   document.body.appendChild(ov);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL activation (C2) — Supplement §5.2
+// ════════════════════════════════════════════════════════════════════════════
+// Commits the edited C1 draft into the persistent brand object (F7.2/F7.3 field
+// mapping), clears draftStatus, records server-side activation via the EXISTING
+// bilUpdateExtraction wrapper, then hands off to the normal brand flow. Mirrors
+// applyAutofillToProfile's write conventions + completeSetupStep's persist/handoff
+// (saveBrandState → buildNav → showSuccess → renderPage). This is the first code
+// that WRITES to the persistent brand object.
+async function _bilConfirmDraft(){
+  // (a) C1's form binds edits live into bilState.draft (each _bilField oninput),
+  // so draft already holds the user's CURRENT input values — distinct from the
+  // original bilState.extraction. No separate read-back step is needed.
+  var draft = bilState.draft;
+  if(!draft) return;   // Rule #19: nothing to commit
+
+  // Rule #19: guard on brand — create a default if none, mirroring applyAutofillToProfile.
+  if(typeof brand === 'undefined' || !brand){
+    brand = {name:'',category:'',currentMarket:'Sweden',stage:'trading',targetMarkets:[],skus:''};
+  }
+
+  var bp = draft.brandProfile || {};
+  var ci = draft.commercialIntelligence || {};
+
+  // (b) F7.2/F7.3 mapping. Mirror applyAutofillToProfile: write only non-empty
+  // values via direct assignment.
+  if(bp.name)            brand.name           = bp.name;
+  // net-new brand fields (F7.2 + F7.3)
+  if(bp.founderName)     brand.founderName    = bp.founderName;
+  if(bp.foundingYear)    brand.foundingYear   = bp.foundingYear;
+  if(bp.originStory)     brand.originStory    = bp.originStory;
+  if(bp.targetCustomer)  brand.targetCustomer = bp.targetCustomer;
+  if(Array.isArray(bp.values) && bp.values.length)                brand.values        = bp.values.slice();
+  // aliases (F7.2)
+  if(bp.positioning)      brand.usp           = bp.positioning;        // positioning → brand.usp
+  if(bp.geographicOrigin) brand.currentMarket = bp.geographicOrigin;   // geographicOrigin → brand.currentMarket
+  if(Array.isArray(bp.primaryMarkets) && bp.primaryMarkets.length) brand.targetMarkets = bp.primaryMarkets.slice(); // primaryMarkets → brand.targetMarkets
+  // BIL-extension structures
+  if(Array.isArray(draft.productPortfolio)) brand.productPortfolio = draft.productPortfolio.slice();
+  if(ci && typeof ci === 'object')          brand.commercialIntelligence = ci;
+
+  // (c) Clear the draft-review flag.
+  brand.draftStatus = '';
+
+  // (d) Persist via the existing save pattern.
+  saveBrandState();
+
+  // (e) Record server activation via the EXISTING wrapper (portalCall shape,
+  // Rule #22). Own try/catch + non-blocking: a server failure must NOT undo the
+  // local write above. NOTE: bilState.extractionId is only set once the extraction
+  // is logged (bilLogExtraction) — which the current B1–B6 flow does NOT do — so
+  // today this safely no-ops (id-guarded). See report.
+  var serverNote = '';
+  try {
+    if(typeof bilUpdateExtraction === 'function' && bilState.extractionId){
+      var r = await bilUpdateExtraction(bilState.extractionId, { activated: true });
+      if(!r) serverNote = ' (activation will sync later)';   // wrapper returned null
+    } else {
+      serverNote = ' (activation not recorded server-side)';
+      console.warn('[BIL C2] no bilState.extractionId (extraction not logged) — server activation skipped; local brand write applied.');
+    }
+  } catch(err){
+    serverNote = ' (activation will sync later)';
+    console.warn('[BIL C2] bilUpdateExtraction failed:', err && err.message);
+  }
+
+  // (f) Hand off to the normal brand flow (mirror completeSetupStep's tail).
+  if(typeof closeBilDevPanel === 'function') closeBilDevPanel();
+  var ov = document.getElementById('bil-review-screen'); if(ov) ov.remove();
+  if(typeof buildNav === 'function') buildNav();
+  // Static message only — no model/field values echoed (textContent-safe regardless).
+  if(typeof showSuccess === 'function') showSuccess('Brand profile updated from your deck.' + serverNote);
+  if(typeof renderPage === 'function') renderPage('home');
 }
 
 // Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
