@@ -2318,6 +2318,11 @@ async function renderBilPages(){
 // corrects the stale 35s figure — do NOT use 35s.
 const BIL_CLIENT_ABORT_MS = 39000;
 
+// B6: 1 initial + 2 retries = 3 total attempts, but ONLY on transient failure
+// (timeout / network / 504). Each attempt carries its own 39s abort and clears
+// its own timer before the next starts — no stacked timers / leaked controllers.
+const BIL_MAX_ATTEMPTS = 3;
+
 async function runBilExtraction(){
   var progEl = document.getElementById('bil-extract-progress');
   function setProg(txt, color){
@@ -2329,9 +2334,10 @@ async function runBilExtraction(){
   function fail(stage, msg){
     bilState.status = 'failed';
     bilState.extractError = { stage: stage, message: msg };
-    setProg('✗ '+stage+': '+msg, '#991B1B');
+    setProg('✗ '+msg, '#991B1B');
     _bilRefreshReadout();
     _bilRenderExtraction();
+    _bilRenderFallbackCTA(true);   // B6: graceful exit — explicit manual-entry CTA
   }
 
   // ── Guard: B3 must have produced page images first ────────────────────────
@@ -2354,53 +2360,93 @@ async function runBilExtraction(){
     return;
   }
 
-  // ── POST to the proxy (mirrors runAutofill) with a 39s client abort ───────
-  bilState.status = 'extracting';
+  // ── B6: clear any UI left by a prior run, then run the retry loop ─────────
   bilState.extractError = null;
-  setProg('Extracting via Vision… (waiting up to '+(BIL_CLIENT_ABORT_MS/1000)+'s)');
-  _bilRefreshReadout();
+  _bilRenderFallbackCTA(false);
+  _bilRenderLowQualityNote(null);
 
-  var controller = new AbortController();
-  var timedOut = false;
-  var timer = setTimeout(function(){ timedOut = true; controller.abort(); }, BIL_CLIENT_ABORT_MS);
-
-  var res;
-  try {
-    res = await fetch('/.netlify/functions/anthropic-proxy', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch(err){
-    clearTimeout(timer);
-    if(timedOut || (err && err.name === 'AbortError')){
-      fail('timeout', 'No response within '+(BIL_CLIENT_ABORT_MS/1000)+'s (function ceiling is 30s). The deck may be too dense — try fewer pages.');
-    } else {
-      fail('network', 'Could not reach the extraction service: '+(err&&err.message?err.message:'unknown')+'.');
+  // One POST attempt with its own 39s abort. Returns a classification and ALWAYS
+  // clears its own timer (finally) before returning — so retries never stack
+  // timers or leak AbortControllers. Classification:
+  //   ok       → got a response (validate it)
+  //   transient→ timeout / network / 504 (retry-eligible)
+  //   fatal    → non-504 HTTP / non-JSON (NOT transient — do not retry)
+  async function attemptOnce(){
+    var controller = new AbortController();
+    var timedOut = false;
+    var timer = setTimeout(function(){ timedOut = true; controller.abort(); }, BIL_CLIENT_ABORT_MS);
+    try {
+      var res = await fetch('/.netlify/functions/anthropic-proxy', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if(!res.ok){
+        var bodyText = '';
+        try { bodyText = (await res.text()).slice(0,200); } catch(e){}
+        // 504 = server-side timeout → transient (same class as a client timeout).
+        if(res.status === 504){
+          return { kind:'transient', stage:'timeout', message:'Service timed out (HTTP 504).' };
+        }
+        // Any other non-OK status is NOT transient — fail fast, no retry.
+        return { kind:'fatal', stage:'http', message:'Service returned HTTP '+res.status+(bodyText?(' — '+bodyText):'')+'.' };
+      }
+      var data;
+      try { data = await res.json(); }
+      catch(e){ return { kind:'fatal', stage:'http', message:'Service returned a non-JSON response.' }; }
+      return { kind:'ok', data: data };
+    } catch(err){
+      if(timedOut || (err && err.name === 'AbortError')){
+        return { kind:'transient', stage:'timeout', message:'No response within '+(BIL_CLIENT_ABORT_MS/1000)+'s.' };
+      }
+      return { kind:'transient', stage:'network', message:'Could not reach the extraction service'+((err&&err.message)?(': '+err.message):'')+'.' };
+    } finally {
+      clearTimeout(timer);   // ALWAYS clear before the next attempt can start.
     }
-    return;
-  }
-  clearTimeout(timer);
-
-  // ── HTTP-level error (runAutofill skips this; B4 needs it) ────────────────
-  if(!res.ok){
-    var bodyText = '';
-    try { bodyText = (await res.text()).slice(0,200); } catch(e){}
-    fail('http', 'Service returned HTTP '+res.status+(bodyText?(' — '+bodyText):'')+'.');
-    return;
   }
 
-  // ── Parse the proxy's JSON envelope (same shape runAutofill reads) ────────
-  var data;
-  try {
-    data = await res.json();
-  } catch(err){
-    fail('http', 'Service returned a non-JSON response.');
+  // ── Retry loop — transient failures retry up to BIL_MAX_ATTEMPTS total ────
+  var attempt = 0;
+  var outcome = null;
+  while(attempt < BIL_MAX_ATTEMPTS){
+    attempt++;
+    if(attempt === 1){
+      bilState.status = 'extracting';
+      setProg('Extracting via Vision… (up to '+(BIL_CLIENT_ABORT_MS/1000)+'s)');
+    } else {
+      bilState.status = 'retrying';
+      setProg('Extraction is taking a while — retrying (attempt '+attempt+' of '+BIL_MAX_ATTEMPTS+')…', '#92400E');
+    }
+    _bilRefreshReadout();
+
+    outcome = await attemptOnce();   // fully awaited; its timer is cleared on return
+
+    if(outcome.kind === 'ok') break;       // got a response → validate below
+    if(outcome.kind === 'fatal') break;    // non-transient → stop, do not retry
+    // transient → loop again if an attempt remains; otherwise handled below
+  }
+
+  // ── Terminal failure: non-transient HTTP / parse error (no retry) ─────────
+  if(outcome.kind === 'fatal'){
+    fail(outcome.stage, outcome.message);
     return;
   }
 
-  // ── Validate via B5 ───────────────────────────────────────────────────────
+  // ── Terminal failure: transient, retries exhausted ────────────────────────
+  // B6 corrected message: does NOT blame page count for a transient timeout.
+  // Reflects repeated failure (usually temporary) and points to the fallback.
+  if(outcome.kind === 'transient'){
+    var nPages = (bilState.pageImages && bilState.pageImages.length) || 0;
+    fail(outcome.stage,
+      'Extraction failed after '+BIL_MAX_ATTEMPTS+' attempts. This is often temporary — please try again in a moment.'
+      + (nPages > 8 ? ' Large decks ('+nPages+' pages) can also take longer to process.' : '')
+      + ' Or enter your brand details manually below.');
+    return;
+  }
+
+  // ── Got a response (outcome.kind === 'ok') → validate via B5 (B4 logic) ───
+  var data = outcome.data;
   var result;
   try {
     result = validateBilExtraction(data);
@@ -2409,21 +2455,69 @@ async function runBilExtraction(){
     return;
   }
 
-  // parse_error = Vision text couldn't be parsed into the schema → failure.
+  // parse_error = Vision text couldn't be parsed into the schema → not transient.
   if(result.outcome === 'parse_error'){
     bilState.extraction = result;
     fail('validation', 'Vision output could not be parsed: '+(result.parseError||'unknown parse error')+'.');
     return;
   }
 
-  // success / partial / low_quality / empty all carry a usable result object.
+  // ── Success path — UNCHANGED behavior from B4 ─────────────────────────────
   bilState.extraction = result;
   bilState.status = 'extracted';
   bilState.extractError = null;
+  _bilRenderFallbackCTA(false);   // clear any stale CTA from a prior failed run
   setProg('✓ Extracted — outcome: '+result.outcome+' · '+result.fieldsExtractedCount+' field(s) populated.',
     (result.outcome==='success'||result.outcome==='partial') ? '#065F46' : '#92400E');
   _bilRefreshReadout();
   _bilRenderExtraction();
+
+  // ── B6: non-blocking low-quality note (F1 = trust+monitor, never gate).
+  //   Reuses B5's own thresholds — outcome ∈ {empty, low_quality}. ──────────
+  if(result.outcome === 'empty' || result.outcome === 'low_quality'){
+    _bilRenderLowQualityNote(result.fieldsExtractedCount);
+  }
+}
+
+// B6: explicit manual-entry fallback CTA (§5.1 graceful exit — never a dead end).
+// Built via DOM; shown on any failed extraction, cleared on success.
+function _bilRenderFallbackCTA(show){
+  var el = document.getElementById('bil-fallback-cta');
+  if(!el) return;
+  el.textContent = '';
+  if(!show) return;
+  var btn = document.createElement('button');
+  btn.className = 'btn-outline';
+  btn.style.cssText = 'width:100%;margin-top:.6rem';
+  btn.textContent = 'Enter manually instead →';
+  btn.onclick = _bilStartManualEntry;
+  el.appendChild(btn);
+}
+
+// Hand off to the existing manual brand-entry / onboarding flow (openSetupModal —
+// the same entry the "Complete setup →" button uses). Skips the URL-autofill step
+// to land on manual fields (mirrors "Skip, I'll fill manually"). Closes the BIL
+// overlays first. Defensive: no-op if the setup flow isn't present.
+function _bilStartManualEntry(){
+  if(typeof closeBilDevPanel === 'function') closeBilDevPanel();
+  var rev = document.getElementById('bil-review-screen'); if(rev) rev.remove();
+  if(typeof openSetupModal === 'function'){
+    openSetupModal('home');
+    try { _setupModalStep = 1; if(typeof renderSetupModal === 'function') renderSetupModal(); } catch(e){}
+  }
+}
+
+// B6: gentle, non-blocking low-quality note (F1 trust+monitor). count is a number
+// (fieldsExtractedCount); pass null to clear. textContent only.
+function _bilRenderLowQualityNote(count){
+  var el = document.getElementById('bil-lowq-note');
+  if(!el) return;
+  el.textContent = '';
+  if(count === null || count === undefined) return;
+  var note = document.createElement('div');
+  note.style.cssText = 'background:#FFFBEB;border:1px solid #FCD34D;padding:.5rem .7rem;font-family:var(--sans);font-size:.7rem;color:#92400E;line-height:1.5;margin-top:.6rem';
+  note.textContent = 'We only caught '+count+' field'+(count===1?'':'s')+' from this deck. Review carefully before using it — or re-upload a clearer, more detailed deck.';
+  el.appendChild(note);
 }
 
 // Render the validated extraction into the dev panel. Every model-returned value
@@ -2679,7 +2773,7 @@ function renderBilDevPanel(){
   ov.id='bil-dev-panel';
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:1rem';
   ov.innerHTML=`
-    <div style="background:#fff;border:1px solid var(--border);max-width:520px;width:100%;padding:1.5rem;font-family:var(--sans)">
+    <div style="background:#fff;border:1px solid var(--border);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;font-family:var(--sans)">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem">
         <div>
           <div style="font-family:var(--sans);font-size:.95rem;font-weight:700;color:var(--navy)">BIL upload — dev panel</div>
@@ -2698,9 +2792,12 @@ function renderBilDevPanel(){
       <button class="btn-primary" onclick="renderBilPages()" style="width:100%;margin-top:.9rem">Render pages → base64 images</button>
       <div id="bil-render-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
       <button class="btn-primary" onclick="runBilExtraction()" style="width:100%;margin-top:.9rem">EXTRACT → Vision</button>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.35rem">Vision extractions are monitored, not capped (F1 — trust + monitor).</div>
       <div id="bil-extract-progress" style="font-family:var(--mono);font-size:.65rem;margin-top:.5rem"></div>
       <div id="bil-state-readout" style="margin-top:1rem"></div>
       <div id="bil-extract-result" style="margin-top:1rem"></div>
+      <div id="bil-lowq-note"></div>
+      <div id="bil-fallback-cta"></div>
       <button class="btn-primary" onclick="renderBilReviewForm()" style="width:100%;margin-top:.9rem">REVIEW DRAFT → (C1)</button>
     </div>`;
   document.body.appendChild(ov);
