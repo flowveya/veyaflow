@@ -2362,6 +2362,7 @@ async function runBilExtraction(){
 
   // ── B6: clear any UI left by a prior run, then run the retry loop ─────────
   bilState.extractError = null;
+  bilState.extractionId = null;   // C2 activation target — set only on a fresh successful log below
   _bilRenderFallbackCTA(false);
   _bilRenderLowQualityNote(null);
 
@@ -2476,6 +2477,26 @@ async function runBilExtraction(){
   //   Reuses B5's own thresholds — outcome ∈ {empty, low_quality}. ──────────
   if(result.outcome === 'empty' || result.outcome === 'low_quality'){
     _bilRenderLowQualityNote(result.fieldsExtractedCount);
+  }
+
+  // ── F1 monitoring: log this successful extraction server-side and capture the
+  //   row id so C2's activation (bilUpdateExtraction) has a target. Mirrors the
+  //   existing dedupe_key convention (sessionId::type::stable-ids, no timestamp →
+  //   idempotent). bilLogExtraction → portalCall('bil.log') is graceful (null on
+  //   unavailable) and never throws; the try/catch is belt-and-braces (Rule #19).
+  //   Non-blocking — the success UI above has already rendered. ──────────────
+  try {
+    if(typeof bilLogExtraction === 'function' && typeof getSessionId === 'function'){
+      var _bilDedupeKey = getSessionId() + '::bil_extraction::' + (bilState.filename||'') + '::' + (bilState.fileSize||0) + '::' + (bilState.pageCount||0);
+      var _bilRow = await bilLogExtraction({
+        dedupe_key: _bilDedupeKey,
+        status: result.outcome,
+        fields_extracted_count: result.fieldsExtractedCount,
+      });
+      if(_bilRow && _bilRow.id) bilState.extractionId = _bilRow.id;
+    }
+  } catch(err){
+    console.warn('[BIL] bilLogExtraction failed:', err && err.message);   // non-blocking
   }
 }
 
