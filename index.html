@@ -2313,15 +2313,13 @@ async function renderBilPages(){
 // and a client AbortController. Stops at validated data shown in the dev panel —
 // no Sequence C form, no full B6 retry logic.
 
-// Function ceiling is 30s (netlify.toml [functions."anthropic-proxy"]). Client
-// waits ceiling + ~9s network slack = 39s. Per continuation brief §1.1 this
-// corrects the stale 35s figure — do NOT use 35s.
-const BIL_CLIENT_ABORT_MS = 39000;
-
-// B6: 1 initial + 2 retries = 3 total attempts, but ONLY on transient failure
-// (timeout / network / 504). Each attempt carries its own 39s abort and clears
-// its own timer before the next starts — no stacked timers / leaked controllers.
-const BIL_MAX_ATTEMPTS = 3;
+// F2b (async): the extraction runs in a Netlify Background Function with no 30s
+// ceiling, so there is NO client abort and NO sync-call retry. The client queues
+// the job and polls the bil_extractions row until status ∈ {done, failed}.
+// (B6's BIL_CLIENT_ABORT_MS + BIL_MAX_ATTEMPTS retry constants were removed here,
+// superseded by the poll loop below.)
+const BIL_POLL_INTERVAL_MS = 2500;     // poll cadence
+const BIL_POLL_MAX_MS      = 180000;   // ~3 min total wait cap
 
 async function runBilExtraction(){
   var progEl = document.getElementById('bil-extract-progress');
@@ -2360,94 +2358,99 @@ async function runBilExtraction(){
     return;
   }
 
-  // ── B6: clear any UI left by a prior run, then run the retry loop ─────────
+  // ── F2b transport: clear any UI / state left by a prior run ───────────────
   bilState.extractError = null;
-  bilState.extractionId = null;   // C2 activation target — set only on a fresh successful log below
+  bilState.extraction = null;
+  bilState.extractionId = null;
   _bilRenderFallbackCTA(false);
   _bilRenderLowQualityNote(null);
+  _bilRenderExtraction();
 
-  // One POST attempt with its own 39s abort. Returns a classification and ALWAYS
-  // clears its own timer (finally) before returning — so retries never stack
-  // timers or leak AbortControllers. Classification:
-  //   ok       → got a response (validate it)
-  //   transient→ timeout / network / 504 (retry-eligible)
-  //   fatal    → non-504 HTTP / non-JSON (NOT transient — do not retry)
-  async function attemptOnce(){
-    var controller = new AbortController();
-    var timedOut = false;
-    var timer = setTimeout(function(){ timedOut = true; controller.abort(); }, BIL_CLIENT_ABORT_MS);
+  bilState.status = 'extracting';
+  setProg('Extracting… (larger decks can take a minute)');
+  _bilRefreshReadout();
+
+  // ── Step 1: create (or reuse) the bil_extractions row with status='processing'
+  //   and capture its id. The background function PATCHes THIS row; we poll it.
+  //   bilLogExtraction → portalCall('bil.log') flattens to root (Rule #22). The
+  //   row may come back directly or under .extraction/.event (bil.* clones the
+  //   loop.* {ok,isNew,event} shape) — read defensively.
+  var extractionId = null, loggedIsNew = true;
+  try {
+    if(typeof bilLogExtraction === 'function' && typeof getSessionId === 'function'){
+      var dedupeKey = getSessionId() + '::bil_extraction::' + (bilState.filename||'') + '::' + (bilState.fileSize||0) + '::' + (bilState.pageCount||0);
+      var logged = await bilLogExtraction({ dedupe_key: dedupeKey, status: 'processing' });
+      var loggedRow = logged && (logged.extraction || logged.event || logged);
+      extractionId = loggedRow && loggedRow.id;
+      loggedIsNew  = !(logged && logged.isNew === false);
+    }
+  } catch(err){
+    console.warn('[BIL] could not create processing row:', err && err.message);
+  }
+  if(!extractionId){
+    fail('queue', 'Could not start the extraction — the service is unavailable. Please try again in a moment, or enter your brand details manually below.');
+    return;
+  }
+  bilState.extractionId = extractionId;
+  _bilRefreshReadout();
+
+  // Idempotent dedupe_key may have returned an EXISTING row (a prior done/failed
+  // run of the same deck). Reset it to 'processing' so the poll below doesn't
+  // read a stale result. (status is a whitelisted update field; non-blocking.)
+  if(!loggedIsNew){
+    try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status: 'processing' }); }
+    catch(err){ /* non-blocking */ }
+  }
+
+  // ── Step 2: queue the job to the background function (expect 202). It calls
+  //   Anthropic off-ceiling and PATCHes result + status into the row.
+  try {
+    var qRes = await fetch('/.netlify/functions/anthropic-proxy-background', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ extractionId: extractionId, body: body }),
+    });
+    // Background functions return 202 (a 2xx). Anything else is a queue failure.
+    if(!qRes.ok){
+      fail('queue', 'Could not queue the extraction (HTTP '+qRes.status+'). Please try again, or enter your brand details manually below.');
+      return;
+    }
+  } catch(err){
+    fail('network', 'Could not reach the extraction service'+((err&&err.message)?(': '+err.message):'')+'. Please try again, or enter your brand details manually below.');
+    return;
+  }
+
+  // ── Step 3: poll the row until status ∈ {done, failed}, capped at BIL_POLL_MAX_MS.
+  var pollStart = Date.now();
+  var row = null;
+  while(true){
+    await new Promise(function(r){ setTimeout(r, BIL_POLL_INTERVAL_MS); });
+
+    var found = null;
     try {
-      var res = await fetch('/.netlify/functions/anthropic-proxy', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if(!res.ok){
-        var bodyText = '';
-        try { bodyText = (await res.text()).slice(0,200); } catch(e){}
-        // 504 = server-side timeout → transient (same class as a client timeout).
-        if(res.status === 504){
-          return { kind:'transient', stage:'timeout', message:'Service timed out (HTTP 504).' };
-        }
-        // Any other non-OK status is NOT transient — fail fast, no retry.
-        return { kind:'fatal', stage:'http', message:'Service returned HTTP '+res.status+(bodyText?(' — '+bodyText):'')+'.' };
-      }
-      var data;
-      try { data = await res.json(); }
-      catch(e){ return { kind:'fatal', stage:'http', message:'Service returned a non-JSON response.' }; }
-      return { kind:'ok', data: data };
-    } catch(err){
-      if(timedOut || (err && err.name === 'AbortError')){
-        return { kind:'transient', stage:'timeout', message:'No response within '+(BIL_CLIENT_ABORT_MS/1000)+'s.' };
-      }
-      return { kind:'transient', stage:'network', message:'Could not reach the extraction service'+((err&&err.message)?(': '+err.message):'')+'.' };
-    } finally {
-      clearTimeout(timer);   // ALWAYS clear before the next attempt can start.
+      var listed = await bilListExtractions(100);   // portalCall → root (Rule #22)
+      var rows = (listed && (listed.extractions || listed.events || listed.rows)) || (Array.isArray(listed) ? listed : []);
+      for(var i=0;i<rows.length;i++){ if(rows[i] && rows[i].id === extractionId){ found = rows[i]; break; } }
+    } catch(err){ /* transient poll error — keep polling until the cap */ }
+
+    if(found && found.status === 'done'){ row = found; break; }
+    if(found && found.status === 'failed'){
+      // error_type is set by the background function (controlled strings); fail()
+      // renders via setProg/textContent — safe for server-derived text.
+      fail('extraction', 'Extraction failed on the server ('+(found.error_type||'unknown')+'). This is often temporary — please try again, or enter your brand details manually below.');
+      return;
     }
-  }
-
-  // ── Retry loop — transient failures retry up to BIL_MAX_ATTEMPTS total ────
-  var attempt = 0;
-  var outcome = null;
-  while(attempt < BIL_MAX_ATTEMPTS){
-    attempt++;
-    if(attempt === 1){
-      bilState.status = 'extracting';
-      setProg('Extracting via Vision… (up to '+(BIL_CLIENT_ABORT_MS/1000)+'s)');
-    } else {
-      bilState.status = 'retrying';
-      setProg('Extraction is taking a while — retrying (attempt '+attempt+' of '+BIL_MAX_ATTEMPTS+')…', '#92400E');
+    if(Date.now() - pollStart > BIL_POLL_MAX_MS){
+      fail('timeout', 'Extraction is taking longer than expected (over '+Math.round(BIL_POLL_MAX_MS/60000)+' min). It may still finish — check back shortly, or enter your brand details manually below.');
+      return;
     }
-    _bilRefreshReadout();
-
-    outcome = await attemptOnce();   // fully awaited; its timer is cleared on return
-
-    if(outcome.kind === 'ok') break;       // got a response → validate below
-    if(outcome.kind === 'fatal') break;    // non-transient → stop, do not retry
-    // transient → loop again if an attempt remains; otherwise handled below
+    setProg('Extracting… (larger decks can take a minute) · '+Math.round((Date.now()-pollStart)/1000)+'s', '#92400E');
   }
 
-  // ── Terminal failure: non-transient HTTP / parse error (no retry) ─────────
-  if(outcome.kind === 'fatal'){
-    fail(outcome.stage, outcome.message);
-    return;
-  }
-
-  // ── Terminal failure: transient, retries exhausted ────────────────────────
-  // B6 corrected message: does NOT blame page count for a transient timeout.
-  // Reflects repeated failure (usually temporary) and points to the fallback.
-  if(outcome.kind === 'transient'){
-    var nPages = (bilState.pageImages && bilState.pageImages.length) || 0;
-    fail(outcome.stage,
-      'Extraction failed after '+BIL_MAX_ATTEMPTS+' attempts. This is often temporary — please try again in a moment.'
-      + (nPages > 8 ? ' Large decks ('+nPages+' pages) can also take longer to process.' : '')
-      + ' Or enter your brand details manually below.');
-    return;
-  }
-
-  // ── Got a response (outcome.kind === 'ok') → validate via B5 (B4 logic) ───
-  var data = outcome.data;
+  // ── Step 4: validate the row's result with the EXISTING validator (UNCHANGED).
+  //   The background function stored the raw Anthropic JSON envelope in result —
+  //   exactly what validateBilExtraction consumes (rawApiResponse.content).
+  var data = row.result;
   var result;
   try {
     result = validateBilExtraction(data);
@@ -2456,47 +2459,27 @@ async function runBilExtraction(){
     return;
   }
 
-  // parse_error = Vision text couldn't be parsed into the schema → not transient.
+  // parse_error = Vision text couldn't be parsed into the schema.
   if(result.outcome === 'parse_error'){
     bilState.extraction = result;
     fail('validation', 'Vision output could not be parsed: '+(result.parseError||'unknown parse error')+'.');
     return;
   }
 
-  // ── Success path — UNCHANGED behavior from B4 ─────────────────────────────
+  // ── Success path — UNCHANGED contract: the SAME validated object into
+  //   bilState.extraction that C1/C2 already consume, same status + renders. ──
   bilState.extraction = result;
   bilState.status = 'extracted';
   bilState.extractError = null;
-  _bilRenderFallbackCTA(false);   // clear any stale CTA from a prior failed run
+  _bilRenderFallbackCTA(false);
   setProg('✓ Extracted — outcome: '+result.outcome+' · '+result.fieldsExtractedCount+' field(s) populated.',
     (result.outcome==='success'||result.outcome==='partial') ? '#065F46' : '#92400E');
   _bilRefreshReadout();
   _bilRenderExtraction();
 
-  // ── B6: non-blocking low-quality note (F1 = trust+monitor, never gate).
-  //   Reuses B5's own thresholds — outcome ∈ {empty, low_quality}. ──────────
+  // ── B6 (kept): non-blocking low-quality note. Reuses B5's empty/low_quality. ─
   if(result.outcome === 'empty' || result.outcome === 'low_quality'){
     _bilRenderLowQualityNote(result.fieldsExtractedCount);
-  }
-
-  // ── F1 monitoring: log this successful extraction server-side and capture the
-  //   row id so C2's activation (bilUpdateExtraction) has a target. Mirrors the
-  //   existing dedupe_key convention (sessionId::type::stable-ids, no timestamp →
-  //   idempotent). bilLogExtraction → portalCall('bil.log') is graceful (null on
-  //   unavailable) and never throws; the try/catch is belt-and-braces (Rule #19).
-  //   Non-blocking — the success UI above has already rendered. ──────────────
-  try {
-    if(typeof bilLogExtraction === 'function' && typeof getSessionId === 'function'){
-      var _bilDedupeKey = getSessionId() + '::bil_extraction::' + (bilState.filename||'') + '::' + (bilState.fileSize||0) + '::' + (bilState.pageCount||0);
-      var _bilRow = await bilLogExtraction({
-        dedupe_key: _bilDedupeKey,
-        status: result.outcome,
-        fields_extracted_count: result.fieldsExtractedCount,
-      });
-      if(_bilRow && _bilRow.id) bilState.extractionId = _bilRow.id;
-    }
-  } catch(err){
-    console.warn('[BIL] bilLogExtraction failed:', err && err.message);   // non-blocking
   }
 }
 
