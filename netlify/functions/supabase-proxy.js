@@ -670,6 +670,51 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, entry: inserted[0] || null }) };
     }
 
+    // ── BIL Storage: mint a single-use signed upload URL ──────────────────
+    // Lets the browser PUT base64 page images straight to the private bil-images
+    // bucket, bypassing the Netlify function size wall. Service key (full access),
+    // same auth the REST helper uses — but this is a /storage/v1/ call, not
+    // /rest/v1/, so we fetch it directly.
+    if (action === 'bil.uploadUrl') {
+      const path = (payload.path || '').trim();
+      if (!path) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'path required' }) };
+      }
+      // Keep uploads inside the bucket — reject traversal / absolute paths.
+      if (path.indexOf('..') !== -1 || path.charAt(0) === '/') {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid path' }) };
+      }
+      const signRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/upload/sign/bil-images/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const signText = await signRes.text();
+      if (!signRes.ok) {
+        return { statusCode: signRes.status, headers, body: JSON.stringify({ error: 'Storage sign failed', detail: signText.slice(0, 300) }) };
+      }
+      let signed;
+      try { signed = JSON.parse(signText); }
+      catch (e) { return { statusCode: 502, headers, body: JSON.stringify({ error: 'Storage returned non-JSON', detail: signText.slice(0, 300) }) }; }
+      // Supabase returns { url: "/object/upload/sign/bil-images/<path>?token=<jwt>" }.
+      // Return that raw url plus an absolute signedUrl the client can PUT to, and
+      // the token — all root-level (Rule #22: portalCall flattens to root).
+      const relUrl   = (signed && signed.url) || '';
+      const signedUrl = relUrl ? `${SUPABASE_URL}/storage/v1${relUrl}` : '';
+      const token    = (relUrl.split('token=')[1] || '') || (signed && signed.token) || '';
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, bucket: 'bil-images', path, url: relUrl, signedUrl, token }),
+      };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
