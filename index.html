@@ -6,6 +6,8 @@
 <title>VeyaFlow — Brand Growth Intelligence</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  /* v4 re-skin fonts — loaded additively; existing fonts above stay until the per-page sweep flips --serif/--sans/--mono */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Newsreader:wght@400;500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,6 +27,21 @@
     --serif: 'Playfair Display', Georgia, serif;
     --sans: 'DM Sans', system-ui, sans-serif;
     --mono: 'DM Mono', monospace;
+
+    /* ─── v4 re-skin tokens — ADDITIVE; existing tokens above retained until the per-page sweep ─── */
+    /* NOTE: v4 ink target is #1C1A17. Existing --ink (#0E0E0E) is intentionally LEFT UNCHANGED here —
+       pages depend on it; the v4 ink is applied per-page during the sweep, then globally at the end. */
+    /* NOTE: --serif/--sans/--mono are NOT flipped yet. The final sweep flips them to
+       Fraunces / Geist / Geist Mono so the whole app isn't restyled prematurely. */
+    --accent:#C0613A; --accent-deep:#9E4A28; --accent-soft:#F3E3DA;
+    --ink-soft:#4A463F; --ink-mute:#8A857B;
+    --paper:#FFFFFF; --surface:#FAF8F4; --paper-deep:#F0ECE4;
+    --line:#E7E2D8; --line-strong:#D8D1C4; --on-accent:#FFFFFF;
+    --green-bg:#DCEBE0; --green-text:#2F6B45;
+    --amber-bg:#F6E7CC; --amber-text:#8A6516;
+    --red-bg:#F3D6D0;   --red-text:#B23A2A;
+    --blue-bg:#DBE3F4;  --blue-text:#3A4F8A;
+    --brand-name:'Newsreader', Georgia, serif;
   }
 
   html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
