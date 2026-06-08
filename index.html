@@ -2804,10 +2804,18 @@ function renderBilReviewForm(){
   confirmBtn.onclick=_bilConfirmDraft;
   wrap.appendChild(confirmBtn);
 
-  // Scope note — C3 (dismiss/fallback) + C4 (brand-edit surfacing) still out of scope.
+  // ── C3: dismiss action — record the dismissal, clear the draft, go manual ──
+  var dismissBtn=document.createElement('button');
+  dismissBtn.className='btn-outline';
+  dismissBtn.style.cssText='width:100%;margin-top:.5rem;padding:.8rem';
+  dismissBtn.textContent='Dismiss & enter manually';
+  dismissBtn.onclick=_bilDismissDraft;
+  wrap.appendChild(dismissBtn);
+
+  // Scope note — C4 (brand-edit surfacing) still out of scope.
   var note=document.createElement('div');
   note.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.5rem;line-height:1.5';
-  note.textContent='Confirm writes these fields into your brand profile and clears draftStatus. Dismiss/fallback (C3) and brand-edit surfacing (C4) are not wired yet.';
+  note.textContent='Confirm writes these fields into your brand profile and clears draftStatus. Dismiss records the dismissal and routes you to manual entry. Brand-edit surfacing (C4) is not wired yet.';
   wrap.appendChild(note);
 
   document.body.appendChild(ov);
@@ -2886,6 +2894,51 @@ async function _bilConfirmDraft(){
   // Static message only — no model/field values echoed (textContent-safe regardless).
   if(typeof showSuccess === 'function') showSuccess('Brand profile updated from your deck.' + serverNote);
   if(typeof renderPage === 'function') renderPage('home');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL dismiss (C3) — "this extraction wasn't useful; I'll enter details manually"
+// ════════════════════════════════════════════════════════════════════════════
+// Records the dismissal server-side, clears the draft flag, and routes into the
+// existing manual setup modal. Writes NO extracted values into brand. Mirrors
+// C2's server try/catch + tail-handoff conventions.
+async function _bilDismissDraft(){
+  // Rule #19: guard bilState defensively — never throw on a missing state object.
+  if(typeof bilState === 'undefined' || !bilState) return;
+
+  // Clear the draft-review flag (no brand creation — this is a dismissal).
+  if(typeof brand !== 'undefined' && brand) brand.draftStatus = '';
+
+  // Persist via the existing save pattern (mirror C2).
+  saveBrandState();
+
+  // Record dismissal via the EXISTING wrapper (portalCall shape, Rule #22). Own
+  // try/catch + non-blocking: a server failure must NOT block the local flow.
+  // Same id-guard + console.warn style as C2, with { dismissed: true }.
+  try {
+    if(typeof bilUpdateExtraction === 'function' && bilState.extractionId){
+      await bilUpdateExtraction(bilState.extractionId, { dismissed: true });
+    } else {
+      console.warn('[BIL C3] no bilState.extractionId (extraction not logged) — server dismissal skipped; local flow continues.');
+    }
+  } catch(err){
+    console.warn('[BIL C3] bilUpdateExtraction failed:', err && err.message);
+  }
+
+  // Tail handoff: close the BIL overlays, then route into the existing manual
+  // setup modal. NOTE: renderSetupModal no-ops without the modal element, so we
+  // open it first — mirroring _bilStartManualEntry / the full L~2547 route. The
+  // bare `_setupModalStep=1; renderSetupModal()` alone would silently no-op.
+  // The dismissed row is kept viewable in the dev panel by design (not filtered).
+  var ov = document.getElementById('bil-review-screen'); if(ov) ov.remove();
+  if(typeof closeBilDevPanel === 'function') closeBilDevPanel();
+  // Static message only — no extracted field values echoed.
+  if(typeof showSuccess === 'function') showSuccess('No problem — enter your brand details manually.');
+  try {
+    if(typeof openSetupModal === 'function') openSetupModal('home');
+    _setupModalStep = 1;
+    if(typeof renderSetupModal === 'function') renderSetupModal();
+  } catch(e){}
 }
 
 // Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
