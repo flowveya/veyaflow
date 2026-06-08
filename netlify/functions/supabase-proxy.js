@@ -693,6 +693,7 @@ exports.handler = async (event) => {
             'Authorization': `Bearer ${SUPABASE_KEY}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({}),
         }
       );
       const signText = await signRes.text();
