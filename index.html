@@ -32315,7 +32315,7 @@ function renderCSRD(el){
               <span style="background:${catBg};border:1px solid ${catColor};padding:.15rem .5rem">${cat}</span>
             </div>
             ${catQs.map(q=>{
-              const val = answers[q.id]||'';
+              const val = String(answers[q.id] ?? '');
               const filled = val.trim()!=='';
               return `
                 <div style="background:#fff;border:1px solid ${filled?'#A7F3D0':'#FCD34D'};border-left:3px solid ${filled?'var(--green)':'var(--amber)'};padding:.65rem .85rem;margin-bottom:.4rem">
@@ -32324,7 +32324,7 @@ function renderCSRD(el){
                     <span style="font-family:var(--mono);font-size:.5rem;padding:.1rem .35rem;background:${filled?'#ECFDF5':'#FFFBEB'};color:${filled?'#065F46':'#92400E'};white-space:nowrap;flex-shrink:0">${filled?'✓ filled':'needs input'}</span>
                   </div>
                   <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.3rem">Unit: ${q.unit} · Source: ${q.hint}</div>
-                  <input type="text" value="${(val||'').replace(/"/g,'&quot;')}"
+                  <input type="text" value="${val.replace(/"/g,'&quot;')}"
                     placeholder="${q.unit==='yes/no'?'yes / no':q.unit==='yes/no/partial'?'yes / no / partial':q.unit==='yes/no + cert'?'yes — [certificate name]':q.unit==='yes/no/unknown'?'yes / no / unknown':'Enter value…'}"
                     oninput="csrdSaveAnswer('${q.id}',this.value);this.closest('div[style]').style.borderColor=this.value.trim()?'#A7F3D0':'#FCD34D';this.closest('div[style]').style.borderLeftColor=this.value.trim()?'var(--green)':'var(--amber)'"
                     onchange="renderPage('csrd')"
