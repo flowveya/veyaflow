@@ -2402,13 +2402,50 @@ async function runBilExtraction(){
     catch(err){ /* non-blocking */ }
   }
 
-  // ── Step 2: queue the job to the background function (expect 202). It calls
-  //   Anthropic off-ceiling and PATCHes result + status into the row.
+  // ── Step 1b: upload the Anthropic request body to Supabase Storage via a
+  //   signed URL. The base64 page images (~569KB) can't pass through a Netlify
+  //   function, so the browser PUTs the body straight to Storage; the background
+  //   function reads it from there. bil.uploadUrl returns root-level {signedUrl}
+  //   (Rule #22). Object path = <extractionId>.json.
+  var storagePath = extractionId + '.json';
+  try {
+    var urlRes = await fetch('/.netlify/functions/supabase-proxy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'bil.uploadUrl', path: storagePath }),
+    });
+    var urlData = urlRes.ok ? await urlRes.json() : null;
+    var signedUrl = urlData && urlData.signedUrl;
+    if(!signedUrl){
+      try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_url_failed' }); } catch(e){}
+      fail('queue', 'Could not prepare the deck upload. Please try again, or enter your brand details manually below.');
+      return;
+    }
+    var putRes = await fetch(signedUrl, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if(!putRes.ok){
+      // Mark the row failed so it isn't left stuck on 'processing'.
+      try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_failed' }); } catch(e){}
+      fail('queue', 'Could not upload the deck images (HTTP '+putRes.status+'). Please try again, or enter your brand details manually below.');
+      return;
+    }
+  } catch(err){
+    try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_failed' }); } catch(e){}
+    fail('network', 'Could not upload the deck images'+((err&&err.message)?(': '+err.message):'')+'. Please try again, or enter your brand details manually below.');
+    return;
+  }
+
+  // ── Step 2: queue the job to the background function (expect 202). It reads the
+  //   body from Storage (storagePath), calls Anthropic off-ceiling, and PATCHes
+  //   result + status into the row. Tiny POST now — only ids, no images.
   try {
     var qRes = await fetch('/.netlify/functions/anthropic-proxy-background', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ extractionId: extractionId, body: body }),
+      body: JSON.stringify({ extractionId: extractionId, storagePath: storagePath }),
     });
     // Background functions return 202 (a 2xx). Anything else is a queue failure.
     if(!qRes.ok){
