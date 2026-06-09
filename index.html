@@ -41,6 +41,7 @@
     --amber-bg:#F6E7CC; --amber-text:#8A6516;
     --red-bg:#F3D6D0;   --red-text:#B23A2A;
     --blue-bg:#DBE3F4;  --blue-text:#3A4F8A;
+    --green-soft:#EEF5EF; --amber-soft:#FBF3E2; --blue-soft:#EDF1F9; /* 5-group nav flag/parked soft fills */
     --brand-name:'Newsreader', Georgia, serif;
   }
 
@@ -52,8 +53,8 @@
   /* v4 SHELL — TOP BAR (global, persistent). NOTE: distinct from the per-page .topbar class. */
   #topbar { background: var(--paper); border-bottom: 1px solid var(--line); padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   #topbar .tb-left { display: flex; align-items: center; gap: 18px; }
-  #topbar .tb-toggle { background: transparent; border: 1px solid var(--line); border-radius: 9px; width: 40px; height: 40px; cursor: pointer; color: var(--ink-soft); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  #topbar .tb-toggle:hover { border-color: var(--line-strong); color: var(--ink); }
+  #topbar .tb-menu { background: transparent; border: 1px solid var(--line); border-radius: 9px; width: 40px; height: 40px; cursor: pointer; color: var(--ink-soft); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #topbar .tb-menu:hover { border-color: var(--line-strong); color: var(--ink); }
   #topbar .tb-brand { font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); white-space: nowrap; }
   #topbar .tb-brand span { color: var(--accent); }
   #topbar .tb-search { background: var(--surface); border: 1px solid var(--line); border-radius: 9999px; padding: 11px 22px; font-family: var(--sans); font-size: 14px; width: 540px; max-width: 36vw; color: var(--ink); }
@@ -81,9 +82,11 @@
     width: 256px; min-width: 256px; background: var(--surface);
     border-right: 1px solid var(--line);
     display: flex; flex-direction: column; overflow: hidden;
-    transition: width .2s ease;
   }
-  body.nav-collapsed #sidebar { width: 64px; min-width: 64px; }
+  /* Desktop sidebar hide/show toggle — clean binary (NOT the removed icon-rail
+     collapse). When hidden the sidebar is fully gone and #main (flex:1) reflows
+     to full width. Mobile hides #sidebar via @media ≤680px regardless. */
+  body.sidebar-hidden #sidebar { display: none; }
 
   /* brand workspace card (was navy .brand-pill — IDs #brand-pill/#pill-name/#pill-sub preserved) */
   .brand-pill {
@@ -94,18 +97,12 @@
   .brand-pill.visible { display: block; }
   .brand-pill-name { font-size: .85rem; color: var(--accent-deep); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .brand-pill-sub { font-family: var(--sans); font-size: .7rem; color: var(--ink-mute); margin-top: .18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.nav-collapsed .brand-pill { margin: .6rem .5rem; padding: .55rem .3rem; text-align: center; }
-  body.nav-collapsed .brand-pill-name { font-size: 0; }
-  body.nav-collapsed .brand-pill-name::after { content: '\25C6'; font-size: .8rem; color: var(--accent); }
-  body.nav-collapsed .brand-pill-sub { display: none; }
 
   .s-nav { padding: .25rem 0 1rem; flex: 1; overflow-y: auto; }
 
   /* stage label (sb-sector) — emitted by buildNav into #sidebar-nav */
   .sb-sector { padding: 0 1.25rem .65rem; font-family: var(--mono); font-size: .6rem; color: var(--green-text); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
   .sb-sector .g { color: #5C9C72; }
-  body.nav-collapsed .sb-sector { font-size: 0; padding: 0 0 .6rem; text-align: center; }
-  body.nav-collapsed .sb-sector .g { font-size: .7rem; }
 
   .nav-item {
     display: flex; align-items: center; gap: .8rem;
@@ -123,10 +120,16 @@
   .nav-sub { display: block; font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); margin-top: .05rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-badge { font-family: var(--mono); font-size: .55rem; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; margin-left: auto; flex-shrink: 0; font-weight: 700; }
   .nav-badge.alert { background: var(--red-text); }
-  body.nav-collapsed .nav-item { justify-content: center; padding: .55rem 0; }
-  body.nav-collapsed .nav-text { display: none; }
-  body.nav-collapsed .nav-badge { display: none; }
-  body.nav-collapsed .nav-ico { width: auto; }
+
+  /* 5-group desktop nav (approved IA) — group headers + inline flags + parked.
+     Items remain .nav-item (.link in the mockup); .ic/.nm map to .nav-ico/.nav-name. */
+  .grp { margin-top: 6px; }
+  .grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 9px 18px 4px; display: flex; align-items: baseline; gap: 7px; }
+  .grp-q { font-size: 9px; color: var(--ink-mute); font-family: var(--sans); font-weight: 400; letter-spacing: 0; font-style: italic; opacity: .8; text-transform: none; }
+  .nav-item.parked .nav-name { color: var(--ink-mute); font-style: italic; }
+  .flag { margin-left: auto; font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
+  .flag.watch { background: var(--amber-soft); color: var(--amber-text); border: 1px solid #E8D3A8; }
+  .flag.pend { background: var(--paper-deep); color: var(--ink-mute); border: 1px solid var(--line-strong); }
 
   /* Nav section tabs (keys brand/source/retail; switchNavSection preserved) */
   .nav-section-tabs { display: flex; padding: 0 1rem; border-bottom: 1px solid var(--line); margin-bottom: .75rem; flex-shrink: 0; }
@@ -140,14 +143,6 @@
   .nav-section-tab.active { color: var(--accent-deep); border-bottom-color: var(--accent); }
   .nav-section-tab.locked { color: var(--ink-mute); opacity: .4; cursor: default; }
   .nav-section-tab.locked:hover { color: var(--ink-mute); }
-  /* collapsed icon-rail: B / S / R via ::after (static labels OK per spec) */
-  body.nav-collapsed .nav-section-tabs { padding: 0 .5rem; gap: 2px; }
-  body.nav-collapsed .nav-section-tab { font-size: 0; padding: .5rem 0; }
-  body.nav-collapsed .nav-section-tab::after { font-size: .68rem; font-weight: 700; color: var(--ink-mute); }
-  body.nav-collapsed .nav-section-tab.active::after { color: var(--accent-deep); }
-  body.nav-collapsed .nav-section-tab:nth-child(1)::after { content: 'B'; }
-  body.nav-collapsed .nav-section-tab:nth-child(2)::after { content: 'S'; }
-  body.nav-collapsed .nav-section-tab:nth-child(3)::after { content: 'R'; }
 
   /* Nav section group label (re-themed; no current emitter) */
   .nav-group-label {
@@ -163,9 +158,6 @@
 
   .s-footer { padding: .85rem 1.25rem; border-top: 1px solid var(--line); }
   .s-footer-text { font-family: var(--mono); font-size: .68rem; color: var(--ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.nav-collapsed .s-footer { text-align: center; padding: .85rem 0; }
-  body.nav-collapsed .s-footer-text { font-size: 0; }
-  body.nav-collapsed .s-footer-text::after { content: '\203B'; font-size: .7rem; color: var(--ink-mute); }
 
   /* MAIN */
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -538,67 +530,51 @@
   }
 
   /* MOBILE BOTTOM NAV */
+  /* ── MOBILE chrome (v4 light/clay) — search-led one-scroll grouped menu ──
+     Retires the per-section drawer; renders the same 5 groups as desktop. */
+  #mobile-header {
+    display: none;
+    background: var(--paper); border-bottom: 1px solid var(--line); padding: .75rem 1rem;
+    flex-shrink: 0; align-items: center; justify-content: space-between;
+  }
+  .mob-header-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+  .mob-header-title span { color: var(--accent); }
+  .mob-header-sub { font-family: var(--mono); font-size: .52rem; color: var(--ink-mute); margin-top: .1rem; }
+  .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--accent-deep); text-align: right; cursor: pointer; }
+
+  /* Bottom bar — Menu / Search / Recent / Me (light, active = clay) */
   #mobile-nav {
     display: none;
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--navy); border-top: 1px solid rgba(255,255,255,.1);
-    z-index: 100; padding-bottom: env(safe-area-inset-bottom);
-    flex-direction: column;
+    background: var(--paper); border-top: 1px solid var(--line);
+    z-index: 1001; padding: 7px 0 calc(9px + env(safe-area-inset-bottom));
   }
-  #mobile-nav-inner {
-    display: flex; width: 100%;
-    scrollbar-width: none;
-  }
-  #mobile-nav-inner::-webkit-scrollbar { display: none; }
-  .mob-nav-item {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: .5rem .25rem .4rem; cursor: pointer; flex: 1;
-    min-height: 54px; position: relative; transition: background .15s;
-  }
-  /* Mobile drawer — slides up from above nav bar */
-  #mob-drawer {
-    display: none; position: fixed; bottom: 54px; left: 0; right: 0;
-    background: var(--navy); border-top: 2px solid var(--gold);
-    z-index: 99; padding: .5rem 0;
-    box-shadow: 0 -4px 24px rgba(0,0,0,.35);
-    max-height: 60vh; overflow-y: auto;
-  }
-  #mob-drawer.open { display: block; }
-  .mob-drawer-item {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .75rem 1.25rem; cursor: pointer; min-height: 48px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    transition: background .1s;
-  }
-  .mob-drawer-item:active { background: rgba(196,168,130,.15); }
-  .mob-drawer-item.active { background: rgba(196,168,130,.12); }
-  .mob-drawer-icon { font-size: .9rem; color: rgba(255,255,255,.4); width: 20px; text-align: center; flex-shrink: 0; }
-  .mob-drawer-item.active .mob-drawer-icon { color: var(--gold); }
-  .mob-drawer-label { font-family: var(--sans); font-size: .85rem; color: rgba(255,255,255,.75); }
-  .mob-drawer-item.active .mob-drawer-label { color: var(--gold); font-weight: 600; }
-  .mob-drawer-badge { font-family: var(--mono); font-size: .48rem; background: var(--gold); color: var(--navy); padding: .1rem .35rem; margin-left: auto; font-weight: 700; }
-  /* Overlay behind drawer */
-  #mob-drawer-overlay {
-    display: none; position: fixed; inset: 0; z-index: 98;
-    background: rgba(0,0,0,.4);
-  }
-  #mob-drawer-overlay.open { display: block; }
-  .mob-nav-item.active { background: rgba(196,168,130,.15); }
-  .mob-nav-icon { font-size: 1.1rem; color: rgba(255,255,255,.4); line-height: 1; }
-  .mob-nav-item.active .mob-nav-icon { color: var(--gold); }
-  .mob-nav-label { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.4); margin-top: .15rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
-  .mob-nav-item.active .mob-nav-label { color: var(--gold); }
-  .mob-badge { position: absolute; top: .35rem; right: .6rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 4px; font-family: var(--mono); font-size: .42rem; }
+  .m-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--ink-mute); cursor: pointer; }
+  .m-tab .ti { font-size: 15px; font-family: var(--mono); line-height: 1; }
+  .m-tab .tl { font-family: var(--mono); font-size: 7.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+  .m-tab.on { color: var(--accent-deep); }
+  .m-tab.on .ti { color: var(--accent); }
 
-  /* Mobile header */
-  #mobile-header {
-    display: none;
-    background: var(--navy); padding: .75rem 1rem;
-    flex-shrink: 0; align-items: center; justify-content: space-between;
+  /* Grouped menu panel — toggled by the Menu tab; full-screen, one scroll.
+     z-index below the bottom bar so the Menu tab stays tappable to close. */
+  #mob-menu {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: var(--surface);
+    padding: 1rem .9rem calc(66px + env(safe-area-inset-bottom));
+    overflow-y: auto;
   }
-  .mob-header-title { font-family: var(--serif); font-size: 1rem; color: #fff; }
-  .mob-header-sub { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.35); margin-top: .1rem; }
-  .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--gold); text-align: right; cursor: pointer; }
+  #mob-menu.open { display: block; }
+  .m-search { background: var(--paper); border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 13px; font-size: 13px; color: var(--ink-mute); display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .m-grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 14px 4px 6px; }
+  .m-li { background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .m-li.on { background: var(--accent-soft); border-color: var(--accent); }
+  .m-li .ic { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); width: 15px; text-align: center; flex-shrink: 0; }
+  .m-li.on .ic { color: var(--accent-deep); }
+  .m-li .nm { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .m-li.on .nm { color: var(--accent-deep); font-weight: 600; }
+  .m-li.parked .nm { color: var(--ink-mute); font-style: italic; }
+  .m-badge { margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; flex-shrink: 0; }
+  .m-badge.alert { background: var(--red-text); }
 
   @media (max-width: 680px) {
     #mobile-nav { display: flex; }
@@ -680,8 +656,8 @@
     #sidebar, #sidebar-nav, .s-nav, .s-footer,
     #brand-pill, .brand-pill, #reg-strip, .reg-strip,
     #topbar, #deadline-bar,
-    #mobile-nav, #mob-drawer, #mob-drawer-overlay,
-    .mob-nav-icon, .mob-nav-label, .mob-header-title, .mob-header-brand, .mob-header-sub,
+    #mobile-nav, #mob-menu,
+    .m-tab, .mob-header-title, .mob-header-brand, .mob-header-sub,
     .topbar, .nav-section-tabs, #sidebar-trial-badge,
     .vf-sticky-actions,
     button, .btn-primary, .btn-outline, .btn-gold,
@@ -802,7 +778,7 @@
   <!-- MOBILE HEADER -->
   <div id="mobile-header">
     <div>
-      <div class="mob-header-title">VeyaFlow</div>
+      <div class="mob-header-title">Veya<span>Flow</span></div>
       <div class="mob-header-sub">Brand Growth Intelligence</div>
     </div>
     <div class="mob-header-brand" id="mob-brand-label" onclick="showPage('home')">Set up →</div>
@@ -811,7 +787,7 @@
   <!-- v4 TOP BAR (global, persistent) — wordmark lives here now -->
   <header id="topbar">
     <div class="tb-left">
-      <button class="tb-toggle" onclick="toggleNavCollapse()" aria-label="Toggle navigation">&#9776;</button>
+      <button class="tb-menu" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
       <div class="tb-brand" onclick="showPage('home')" style="cursor:pointer">Veya<span>Flow</span></div>
       <input class="tb-search" placeholder="Search&hellip;">
     </div>
@@ -875,11 +851,16 @@
   </div>
   </div><!-- /#body -->
 
-  <!-- MOBILE BOTTOM NAV -->
-  <div id="mob-drawer-overlay" onclick="closeMobDrawer()"></div>
-  <div id="mob-drawer"></div>
+  <!-- MOBILE: grouped one-scroll menu (toggled by the Menu tab) + bottom bar -->
+  <div id="mob-menu">
+    <div class="m-search" title="Search — coming soon">⌕ Search or jump to…</div>
+    <div id="mob-menu-body"></div>
+  </div>
   <div id="mobile-nav">
-    <div id="mobile-nav-inner"></div>
+    <div class="m-tab" id="mtab-menu" onclick="toggleMobMenu()"><span class="ti">&#9776;</span><span class="tl">Menu</span></div>
+    <div class="m-tab" title="Search — coming soon"><span class="ti">⌕</span><span class="tl">Search</span></div>
+    <div class="m-tab" title="Recent — coming soon"><span class="ti">▤</span><span class="tl">Recent</span></div>
+    <div class="m-tab" title="Me — coming soon"><span class="ti">◆</span><span class="tl">Me</span></div>
   </div>
 </div>
 
@@ -3621,34 +3602,59 @@ function getCatLabel(id){
   return labels[id]||defaults[id];
 }
 
+// NAV: `sec` (brand/source/retail) is RETAINED — the mobile drawer reads it.
+// `group` (plan/comply/source/sell/mybrand) drives the desktop 5-group rail.
+// The group/sec disagreement is INTENTIONAL (a page can sit in a different
+// desktop group than its mobile section) — do not reconcile them.
 const NAV=[
-  // ── BRAND section ──────────────────────────────
-  {id:"home",     sec:"brand", icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"skus",     sec:"brand", icon:"▦", label:"My Products",          stages:["product","trading","expanding","scaling"],        cats:null},
-  {id:"report",   sec:"brand", icon:"◎", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"compare",  sec:"brand", icon:"⇄", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"claims",   sec:"brand", icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"pitch",    sec:"brand", icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"brandpack",sec:"brand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"rp-marketplace",sec:"brand", icon:"⚖", label:"EU Responsible Person",stages:["trading","expanding","scaling"],          cats:RETAIL_CATS},
-  {id:"bizcase",  sec:"brand", icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
-  // ── SOURCE section ─────────────────────────────
-  {id:"find",     sec:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"suppliers",sec:"source", icon:"◈", label:"Supplier Audit",      stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
-  {id:"sourcing",  sec:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
-  {id:"circular", sec:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
-  // ── RETAILER RELATIONS section ──────────────────
-  {id:"crm",               sec:"retail", icon:"⊞", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
-  {id:"retail-tracker",    sec:"retail", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-templates",  sec:"retail", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-checklist",  sec:"retail", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-performance",sec:"retail", icon:"◉", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-comms",      sec:"retail", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
+  // ── BRAND section (sec) ─────────────────────────
+  {id:"home",     sec:"brand", group:"plan",    icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"skus",     sec:"brand", group:"mybrand", flag:"watch", icon:"▦", label:"My Products",  stages:["product","trading","expanding","scaling"],        cats:null},
+  {id:"report",   sec:"brand", group:"plan",    icon:"◎", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"compare",  sec:"brand", group:"plan",    icon:"⇄", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"claims",   sec:"brand", group:"comply",  icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"pitch",    sec:"brand", group:"sell",    icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"brandpack",sec:"brand", group:"mybrand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"rp-marketplace",sec:"brand", group:"comply", icon:"⚖", label:"EU Responsible Person",stages:["trading","expanding","scaling"],          cats:RETAIL_CATS},
+  {id:"bizcase",  sec:"brand", group:"plan",    icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"cfo",      sec:"brand", group:"plan",    icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
+  // ── SOURCE section (sec) ────────────────────────
+  {id:"find",     sec:"source", group:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"suppliers",sec:"source", group:"comply", flag:"watch", icon:"◈", label:"Supplier Audit",  stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"sourcing",  sec:"source", group:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
+  {id:"circular", sec:"source", group:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"dpp",      sec:"source", group:"comply", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  {id:"csrd",      sec:"source", group:"comply", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  {id:"reg_monitor",sec:"brand",  group:"comply", icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
+  // ── RETAILER RELATIONS section (sec) ────────────
+  {id:"crm",               sec:"retail", group:"sell", icon:"⊞", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
+  {id:"retail-tracker",    sec:"retail", group:"sell", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-templates",  sec:"retail", group:"sell", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-checklist",  sec:"retail", group:"sell", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-performance",sec:"retail", group:"sell", icon:"◉", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-comms",      sec:"retail", group:"sell", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
 ];
+
+// 5-group desktop IA (approved June 9). Ordered; labels + italic subtitle per group.
+const NAV_GROUPS=[
+  {key:"plan",    label:"Plan",     q:"where to expand",      ids:["home","report","compare","bizcase","cfo"]},
+  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","rp-marketplace","dpp","csrd","suppliers"]},
+  {key:"source",  label:"Source",   q:"who makes it",         ids:["find","sourcing","circular"]},
+  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["crm","pitch","retail-tracker","retail-checklist","retail-templates","retail-comms","retail-performance"]},
+  {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack","atm-admin"]},
+];
+
+// Order a visible-items list by a group's explicit id list (single source of
+// truth for desktop + mobile). Ids not in the list keep their relative order
+// after the listed ones (stable sort).
+function orderNavByIds(items, ids){
+  if(!ids || !ids.length) return items;
+  var pos={}; ids.forEach(function(id,i){ pos[id]=i; });
+  return items.slice().sort(function(a,b){
+    var ai=(a.id in pos)?pos[a.id]:9999, bi=(b.id in pos)?pos[b.id]:9999;
+    return ai-bi;
+  });
+}
 
 // Returns nav items visible for current brand stage
 function getVisibleNav(){
@@ -3671,9 +3677,12 @@ function getVisibleNav(){
     if(localStorage.getItem('ns_atm_show_admin') === 'true'){
       visible.push({
         id:    'atm-admin',
-        sec:   'retail',
+        sec:   'retail',          // mobile drawer still reads sec
+        group: 'mybrand',         // desktop 5-group rail; parked + "pending" (unplaced, inert)
+        flag:  'pending',
+        parked: true,
         icon:  '⚙',
-        label: 'ATM Admin',
+        label: 'Template Admin',  // relabelled from "ATM Admin" (localStorage-gated; no functional change)
         stages: [stage], // always pass stage filter
         cats:   null,
       });
@@ -3689,10 +3698,12 @@ function switchNavSection(sec){
   buildNav();
 }
 
-// v4 shell: collapse the sidebar to a 64px icon rail; persist the choice across pages.
-function toggleNavCollapse(){
-  var collapsed = document.body.classList.toggle('nav-collapsed');
-  try { localStorage.setItem('ns_nav_collapsed', collapsed ? '1' : '0'); } catch(e){}
+// Desktop sidebar hide/show toggle (binary — fully shown or fully hidden; NOT the
+// removed icon-rail collapse). Persists in localStorage. Mobile is unaffected (it
+// hides #sidebar via @media ≤680px regardless). Defensive on localStorage (Rule #19).
+function toggleSidebar(){
+  var hidden = document.body.classList.toggle('sidebar-hidden');
+  try { localStorage.setItem('ns_sidebar_hidden', hidden ? 'true' : 'false'); } catch(e){}
 }
 
 
@@ -3808,8 +3819,6 @@ function buildNav(){
   var stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
   var stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
 
-  var sectionItems = allVisible.filter(function(n){ return n.sec===navSection; });
-
   var html='';
 
   // Stage label (sb-sector). v4: green sector dot + category · stage (color via CSS).
@@ -3818,124 +3827,96 @@ function buildNav(){
     html+='<div class="sb-sector"><span class="g">●</span> '+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
 
-  // Section tabs
-  html+='<div class="nav-section-tabs">';
-  html+='<div class="nav-section-tab'+(navSection==='brand'?' active':'')+'" data-sec="brand" onclick="switchNavSection(this.dataset.sec)">Brand</div>';
-  html+='<div class="nav-section-tab'+(navSection==='source'?' active':'')+'" data-sec="source" onclick="switchNavSection(this.dataset.sec)">Source</div>';
-  html+='<div class="nav-section-tab'+(navSection==='retail'?' active':'')+'" data-sec="retail" onclick="switchNavSection(this.dataset.sec)">Retailer Relations</div>';
-  html+='</div>';
-
-  sectionItems.forEach(function(n){
-    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
-    html+='<span class="nav-ico">'+n.icon+'</span>';
-    html+='<div class="nav-text"><span class="nav-name">'+n.label+'</span>';
-    if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
-    html+='</div>';
-    if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
-    if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
-    if(n.id==='retail-tracker'){
-      try{
-        var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
-        var stale=subs.filter(function(s){
-          if(s.status!=='under_review') return false;
-          var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
-          return (Date.now()-new Date(ref).getTime())/86400000 > 21;
-        }).length;
-        if(stale>0) html+='<span class="nav-badge alert">'+stale+'</span>';
-      }catch(e){}
-    }
+  // ── DESKTOP: 5-group one-scroll rail (approved IA). Iterate groups in order;
+  //   render each group's stage/category-visible items (filtered by getVisibleNav)
+  //   under a .grp header. A group with no visible items emits no header. The 3
+  //   section tabs are gone; `sec` is retained for the (untouched) mobile drawer.
+  //   Each item KEEPS class="nav-item" id="nav-<id>" data-id onclick=showPage —
+  //   routing/active-state contract intact; +.parked +.flag per the approved IA.
+  NAV_GROUPS.forEach(function(grp){
+    var groupItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
+    if(groupItems.length===0) return;
+    html+='<div class="grp"><div class="grp-h">'+grp.label+' <span class="grp-q">'+grp.q+'</span></div>';
+    groupItems.forEach(function(n){
+      html+='<div class="nav-item'+(n.parked?' parked':'')+'" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
+      html+='<span class="nav-ico">'+n.icon+'</span>';
+      html+='<div class="nav-text"><span class="nav-name">'+n.label+'</span>';
+      if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
+      html+='</div>';
+      if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
+      if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+      if(n.id==='retail-tracker'){
+        try{
+          var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+          var stale=subs.filter(function(s){
+            if(s.status!=='under_review') return false;
+            var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+            return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+          }).length;
+          if(stale>0) html+='<span class="nav-badge alert">'+stale+'</span>';
+        }catch(e){}
+      }
+      if(n.flag) html+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
+      html+='</div>';
+    });
     html+='</div>';
   });
 
   nav.innerHTML=html;
 
-  // Mobile nav — show current section items + section switcher
-  var mobnav=document.getElementById('mobile-nav-inner');
-  if(mobnav){
-    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','rp-marketplace','bizcase','cfo'];
-    var sourcePages=['find','suppliers','sourcing','circular','dpp','csrd'];
-    var retailPages=['crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
-    var inBrand=brandPages.includes(currentPage);
-    var inSource=sourcePages.includes(currentPage);
-    var inRetail=retailPages.includes(currentPage);
-    var mobTabs=[
-      {id:'home',   icon:'\u2302', label:'Home',     direct:true},
-      {id:'brand',  icon:'\u25ce', label:'Brand',    direct:false, section:'brand'},
-      {id:'source', icon:'\u25cc', label:'Source',   direct:false, section:'source'},
-      {id:'retail', icon:'\u25a4', label:'Retailer', direct:false, section:'retail'},
-    ];
-    // Count stale retail submissions for tab badge (same rule as desktop sidebar)
-    var staleRetail=0;
-    try{
-      var _subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
-      staleRetail=_subs.filter(function(s){
-        if(s.status!=='under_review') return false;
-        var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
-        return (Date.now()-new Date(ref).getTime())/86400000 > 21;
-      }).length;
-    }catch(e){}
+  // ── MOBILE: the SAME 5 groups as desktop, one scroll, into #mob-menu-body.
+  //   Ordered by NAV_GROUPS ids; filtered by getVisibleNav (stage/category);
+  //   items route via showPage (closing the menu first). Desktop badge set
+  //   (saved-reports / suppliers / retail-tracker stale) + flags/parked. The
+  //   bottom bar (Menu/Search/Recent/Me) is static HTML — not rebuilt here.
+  var mobMenu=document.getElementById('mob-menu-body');
+  if(mobMenu){
     var mobHtml='';
-    mobTabs.forEach(function(n){
-      // CRM is now a sub-item of the Retailer section, so any time we're on
-      // currentPage 'crm' the Retailer tab is the active one.
-      var active=(n.id==='home'&&currentPage==='home')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource)||(n.id==='retail'&&inRetail);
-      mobHtml+='<div class="mob-nav-item'+(active?' active':'')+'" onclick="'+( n.direct ? 'closeMobDrawer();showPage(\''+n.id+'\')' : 'toggleMobDrawer(\''+n.section+'\')' )+'">';
-      if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
-      var pendingSource=sourcingCRM.filter(function(x){return x.status==='enquiry_sent'||x.status==='awaiting';}).length;
-      if(n.id==='find'&&pendingSource>0) mobHtml+='<span class="mob-badge">'+pendingSource+'</span>';
-      if(n.id==='retail'&&staleRetail>0) mobHtml+='<span class="mob-badge" style="background:#F59E0B">'+staleRetail+'</span>';
-      mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
-      mobHtml+='<span class="mob-nav-label">'+n.label+'</span>';
-      mobHtml+='</div>';
+    NAV_GROUPS.forEach(function(grp){
+      var gItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
+      if(gItems.length===0) return;
+      mobHtml+='<div class="m-grp-h">'+grp.label+' · '+grp.q+'</div>';
+      gItems.forEach(function(n){
+        mobHtml+='<div class="m-li'+(n.parked?' parked':'')+(currentPage===n.id?' on':'')+'" onclick="closeMobMenu();showPage(\''+n.id+'\')">';
+        mobHtml+='<span class="ic">'+n.icon+'</span><span class="nm">'+n.label+'</span>';
+        if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="m-badge">'+savedReports.length+'</span>';
+        if(n.id==='suppliers') mobHtml+='<span class="m-badge">2</span>';
+        if(n.id==='retail-tracker'){
+          try{
+            var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+            var stale=subs.filter(function(s){
+              if(s.status!=='under_review') return false;
+              var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+              return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+            }).length;
+            if(stale>0) mobHtml+='<span class="m-badge alert">'+stale+'</span>';
+          }catch(e){}
+        }
+        if(n.flag) mobHtml+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
+        mobHtml+='</div>';
+      });
     });
-    mobnav.innerHTML=mobHtml;
+    mobMenu.innerHTML=mobHtml;
   }
 }
 
-var mobDrawerOpen = null; // 'brand' | 'source' | 'retail' | null
+// Mobile grouped-menu open/close — replaces the retired per-section drawer
+// (toggleMobDrawer/closeMobDrawer/#mob-drawer). The menu content is rendered by
+// buildNav into #mob-menu-body; this only toggles visibility + the Menu tab state.
+var mobMenuOpen = false;
 
-function toggleMobDrawer(section){
-  if(mobDrawerOpen===section){ closeMobDrawer(); return; }
-  mobDrawerOpen = section;
-  var drawer = document.getElementById('mob-drawer');
-  var overlay = document.getElementById('mob-drawer-overlay');
-  if(!drawer) return;
-
-  var stage = brand&&brand.stage ? brand.stage : 'trading';
-  var cat   = brand&&brand.category ? brand.category : null;
-  var items = NAV.filter(function(n){
-    if(n.sec!==section) return false;
-    if(!n.stages.includes(stage)) return false;
-    if(n.cats&&cat&&!n.cats.includes(cat)) return false;
-    return true;
-  });
-
-  var sectionLabel = section==='brand' ? 'Brand'
-                   : section==='source' ? 'Source'
-                   : section==='retail' ? 'Retailer Relations'
-                   : '';
-  var html = '<div style="padding:.5rem 1.25rem .35rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);opacity:.7">'+sectionLabel+'</div>';
-  items.forEach(function(n){
-    var active = currentPage===n.id;
-    var label  = getCatLabel(n.id)||n.label;
-    html += '<div class="mob-drawer-item'+(active?' active':'')+'" data-pid="'+n.id+'" onclick="closeMobDrawer();showPage(this.dataset.pid)">';
-    html += '<span class="mob-drawer-icon">'+n.icon+'</span>';
-    html += '<span class="mob-drawer-label">'+label+'</span>';
-    if(n.badge) html += '<span class="mob-drawer-badge">'+n.badge+'</span>';
-    html += '</div>';
-  });
-
-  drawer.innerHTML = html;
-  drawer.classList.add('open');
-  overlay.classList.add('open');
+function toggleMobMenu(){
+  mobMenuOpen = !mobMenuOpen;
+  var menu=document.getElementById('mob-menu');
+  var tab=document.getElementById('mtab-menu');
+  if(menu) menu.classList.toggle('open', mobMenuOpen);
+  if(tab) tab.classList.toggle('on', mobMenuOpen);
 }
 
-function closeMobDrawer(){
-  mobDrawerOpen = null;
-  var d=document.getElementById('mob-drawer');
-  var o=document.getElementById('mob-drawer-overlay');
-  if(d) d.classList.remove('open');
-  if(o) o.classList.remove('open');
+function closeMobMenu(){
+  mobMenuOpen = false;
+  var menu=document.getElementById('mob-menu'); if(menu) menu.classList.remove('open');
+  var tab=document.getElementById('mtab-menu'); if(tab) tab.classList.remove('on');
 }
 
 let currentPage='home';
@@ -3945,14 +3926,14 @@ function showPage(id){
   // Verified Directory merged into "Find Manufacturers" (id 'find').
   // Redirect any legacy callers / deep links to the new module.
   if(id === 'agent' || id === 'verified') id = 'find';
-  closeMobDrawer();
+  closeMobMenu();   // close the mobile grouped menu on navigate (was closeMobDrawer)
   currentPage=id;
   // Auto-switch section tab to match the page being shown
   var navItem = NAV.find(function(n){ return n.id===id; });
   if(navItem&&navItem.sec) navSection=navItem.sec;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.m-li').forEach(n=>n.classList.remove('on'));   // mobile menu active (buildNav re-renders it)
   document.getElementById('page-'+id)?.classList.add('active');
   buildNav(); // rebuild so active tab + item are in sync
   document.getElementById('nav-'+id)?.classList.add('active');
@@ -34310,14 +34291,9 @@ function renderRequestListedModal(){
 }
 
 function init(){
-  // v4 shell: restore persisted sidebar-collapse state. Auto-collapse on first load
-  // at narrow (tablet) widths when the user has no saved preference. (≤680px is the
-  // mobile breakpoint where the sidebar is hidden entirely, so this targets ~681–1100px.)
-  try {
-    var _nc = localStorage.getItem('ns_nav_collapsed');
-    if(_nc === '1' || (_nc === null && window.innerWidth <= 1100)) document.body.classList.add('nav-collapsed');
-  } catch(e){}
   loadState();
+  // Desktop sidebar hide/show: restore persisted state on load (defensive, Rule #19).
+  try { if(localStorage.getItem('ns_sidebar_hidden') === 'true') document.body.classList.add('sidebar-hidden'); } catch(e){}
   loadDPP();
   loadManualSuppliers();
   loadSourcingCRM();
@@ -37200,22 +37176,7 @@ function downloadRetailCommsCsv(){
    MOBILE NAV — enable retail section drawer
 ═══════════════════════════════════════════════════ */
 
-// Patch mobile drawer title after initial render to include retail
-(function(){
-  if(typeof toggleMobDrawer === 'function'){
-    var _orig = toggleMobDrawer;
-    toggleMobDrawer = function(section){
-      _orig(section);
-      if(section === 'retail'){
-        var drawer = document.getElementById('mob-drawer');
-        if(drawer){
-          var title = drawer.querySelector('div');
-          if(title) title.textContent = 'Retail';
-        }
-      }
-    };
-  }
-})();
+// (Mobile drawer-title monkey-patch removed with the drawer — Piece 2.)
 init();
 </script>
 <script>
