@@ -47,72 +47,125 @@
   html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
 
   /* SHELL */
-  #app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* v4 SHELL — TOP BAR (global, persistent). NOTE: distinct from the per-page .topbar class. */
+  #topbar { background: var(--paper); border-bottom: 1px solid var(--line); padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  #topbar .tb-left { display: flex; align-items: center; gap: 18px; }
+  #topbar .tb-toggle { background: transparent; border: 1px solid var(--line); border-radius: 9px; width: 40px; height: 40px; cursor: pointer; color: var(--ink-soft); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #topbar .tb-toggle:hover { border-color: var(--line-strong); color: var(--ink); }
+  #topbar .tb-brand { font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); white-space: nowrap; }
+  #topbar .tb-brand span { color: var(--accent); }
+  #topbar .tb-search { background: var(--surface); border: 1px solid var(--line); border-radius: 9999px; padding: 11px 22px; font-family: var(--sans); font-size: 14px; width: 540px; max-width: 36vw; color: var(--ink); }
+  #topbar .tb-search::placeholder { color: var(--ink-mute); }
+  #topbar .tb-search:focus { outline: none; border-color: var(--line-strong); }
+  #topbar .tb-right { display: flex; align-items: center; gap: 22px; }
+  #topbar .tb-link { color: var(--ink); font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  #topbar .tb-link:hover { color: var(--accent-deep); }
+  #topbar .tb-acct { background: var(--accent); color: #fff; border-radius: 9999px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+
+  /* v4 SHELL — DEADLINE BAR (global, persistent; populated by renderRegStrip → #deadline-bar) */
+  #deadline-bar { background: var(--amber-bg); border-bottom: 1px solid #E8D3A8; padding: 11px 28px; display: flex; align-items: center; gap: 26px; font-size: 13px; flex-shrink: 0; flex-wrap: wrap; }
+  #deadline-bar:empty { display: none; }
+  .dl-title { display: flex; align-items: center; gap: 7px; color: var(--amber-text); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 11.5px; white-space: nowrap; }
+  .dl-item { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+  .dl-days { font-family: var(--mono); font-weight: 700; color: var(--ink); font-size: 12.5px; }
+  .dl-name { color: var(--ink-soft); font-weight: 500; }
+  .dl-arrow { border: 1px solid var(--amber-text); color: var(--amber-text); border-radius: 6px; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; background: transparent; }
+
+  /* v4 SHELL — body row wrapping sidebar + main */
+  #body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
   /* SIDEBAR */
   #sidebar {
-    width: 220px; min-width: 220px; background: var(--navy);
+    width: 256px; min-width: 256px; background: var(--surface);
+    border-right: 1px solid var(--line);
     display: flex; flex-direction: column; overflow: hidden;
-    transition: width .25s;
+    transition: width .2s ease;
   }
-  .s-logo { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
-  .s-logo-text { font-family: var(--serif); font-size: 1.25rem; color: #fff; font-weight: 400; }
-  .s-logo-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.3); letter-spacing: .12em; text-transform: uppercase; margin-top: .2rem; }
+  body.nav-collapsed #sidebar { width: 64px; min-width: 64px; }
 
+  /* brand workspace card (was navy .brand-pill — IDs #brand-pill/#pill-name/#pill-sub preserved) */
   .brand-pill {
-    margin: .75rem; padding: .6rem .75rem;
-    background: rgba(196,168,130,.1); border: 1px solid rgba(196,168,130,.2);
+    margin: 1.1rem 1rem 1rem; padding: .85rem .9rem;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 11px;
     cursor: pointer; display: none;
   }
   .brand-pill.visible { display: block; }
-  .brand-pill-name { font-size: .72rem; color: var(--gold); font-weight: 500; }
-  .brand-pill-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.35); margin-top: .15rem; }
+  .brand-pill-name { font-size: .85rem; color: var(--accent-deep); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-pill-sub { font-family: var(--sans); font-size: .7rem; color: var(--ink-mute); margin-top: .18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.nav-collapsed .brand-pill { margin: .6rem .5rem; padding: .55rem .3rem; text-align: center; }
+  body.nav-collapsed .brand-pill-name { font-size: 0; }
+  body.nav-collapsed .brand-pill-name::after { content: '\25C6'; font-size: .8rem; color: var(--accent); }
+  body.nav-collapsed .brand-pill-sub { display: none; }
 
-  .s-nav { padding: .75rem 0; flex: 1; overflow-y: auto; }
+  .s-nav { padding: .25rem 0 1rem; flex: 1; overflow-y: auto; }
+
+  /* stage label (sb-sector) — emitted by buildNav into #sidebar-nav */
+  .sb-sector { padding: 0 1.25rem .65rem; font-family: var(--mono); font-size: .6rem; color: var(--green-text); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+  .sb-sector .g { color: #5C9C72; }
+  body.nav-collapsed .sb-sector { font-size: 0; padding: 0 0 .6rem; text-align: center; }
+  body.nav-collapsed .sb-sector .g { font-size: .7rem; }
+
   .nav-item {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .65rem 1.25rem; cursor: pointer;
-    border-left: 2px solid transparent;
-    transition: all .15s;
+    display: flex; align-items: center; gap: .8rem;
+    padding: .55rem 1.25rem; cursor: pointer; position: relative;
+    transition: background .15s;
   }
-  .nav-item:hover { background: rgba(196,168,130,.08); }
-  .nav-item.active { background: rgba(196,168,130,.15); border-left-color: var(--gold); }
-  .nav-icon { font-size: .85rem; width: 18px; text-align: center; color: rgba(255,255,255,.4); flex-shrink: 0; }
-  .nav-item.active .nav-icon { color: var(--gold); }
-  .nav-label { display: block; font-size: .72rem; color: rgba(255,255,255,.45); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nav-item.active .nav-label { color: var(--gold); }
-  .nav-sub { display: block; font-family: var(--sans); font-size: .53rem; color: rgba(255,255,255,.2); margin-top: .08rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nav-item.active .nav-sub { color: rgba(196,168,130,.45); }
-  .nav-item:hover .nav-sub { color: rgba(255,255,255,.32); }
-  .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; flex-shrink: 0; }
+  .nav-item:hover { background: var(--paper-deep); }
+  .nav-item.active { background: var(--accent-soft); }
+  .nav-item.active::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; background: var(--accent); border-radius: 0 3px 3px 0; }
+  .nav-ico { width: 20px; text-align: center; font-family: var(--mono); font-size: .8rem; color: var(--ink-mute); flex-shrink: 0; }
+  .nav-item.active .nav-ico { color: var(--accent-deep); }
+  .nav-text { flex: 1; min-width: 0; }
+  .nav-name { display: block; font-size: .82rem; font-weight: 600; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-item.active .nav-name { color: var(--accent-deep); font-weight: 700; }
+  .nav-sub { display: block; font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); margin-top: .05rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-badge { font-family: var(--mono); font-size: .55rem; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; margin-left: auto; flex-shrink: 0; font-weight: 700; }
+  .nav-badge.alert { background: var(--red-text); }
+  body.nav-collapsed .nav-item { justify-content: center; padding: .55rem 0; }
+  body.nav-collapsed .nav-text { display: none; }
+  body.nav-collapsed .nav-badge { display: none; }
+  body.nav-collapsed .nav-ico { width: auto; }
 
-  /* Nav section tabs */
-  .nav-section-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; margin-top: .15rem; }
+  /* Nav section tabs (keys brand/source/retail; switchNavSection preserved) */
+  .nav-section-tabs { display: flex; padding: 0 1rem; border-bottom: 1px solid var(--line); margin-bottom: .75rem; flex-shrink: 0; }
   .nav-section-tab {
-    flex: 1; padding: .45rem .25rem; text-align: center;
-    font-family: var(--mono); font-size: .52rem; letter-spacing: .06em; text-transform: uppercase;
-    color: rgba(255,255,255,.3); cursor: pointer; border-bottom: 2px solid transparent;
-    transition: all .15s; white-space: nowrap;
+    flex: 1; padding: .6rem .25rem; text-align: center;
+    font-family: var(--sans); font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-mute); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s; white-space: nowrap;
   }
-  .nav-section-tab:hover { color: rgba(255,255,255,.55); background: rgba(255,255,255,.03); }
-  .nav-section-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(196,168,130,.07); }
-  .nav-section-tab.locked { color: rgba(255,255,255,.18); cursor: default; }
-  .nav-section-tab.locked:hover { background: none; color: rgba(255,255,255,.18); }
+  .nav-section-tab:hover { color: var(--ink-soft); }
+  .nav-section-tab.active { color: var(--accent-deep); border-bottom-color: var(--accent); }
+  .nav-section-tab.locked { color: var(--ink-mute); opacity: .4; cursor: default; }
+  .nav-section-tab.locked:hover { color: var(--ink-mute); }
+  /* collapsed icon-rail: B / S / R via ::after (static labels OK per spec) */
+  body.nav-collapsed .nav-section-tabs { padding: 0 .5rem; gap: 2px; }
+  body.nav-collapsed .nav-section-tab { font-size: 0; padding: .5rem 0; }
+  body.nav-collapsed .nav-section-tab::after { font-size: .68rem; font-weight: 700; color: var(--ink-mute); }
+  body.nav-collapsed .nav-section-tab.active::after { color: var(--accent-deep); }
+  body.nav-collapsed .nav-section-tab:nth-child(1)::after { content: 'B'; }
+  body.nav-collapsed .nav-section-tab:nth-child(2)::after { content: 'S'; }
+  body.nav-collapsed .nav-section-tab:nth-child(3)::after { content: 'R'; }
 
-  /* Nav section group label */
+  /* Nav section group label (re-themed; no current emitter) */
   .nav-group-label {
     padding: .6rem 1.25rem .25rem;
     font-family: var(--mono); font-size: .5rem; letter-spacing: .12em;
-    text-transform: uppercase; color: rgba(255,255,255,.22);
+    text-transform: uppercase; color: var(--ink-mute);
   }
 
-  /* Locked section placeholder */
+  /* Locked section placeholder (re-themed; no current emitter) */
   .nav-locked-section { padding: 1.25rem; text-align: center; }
-  .nav-locked-title { font-family: var(--mono); font-size: .62rem; color: rgba(255,255,255,.25); margin-bottom: .3rem; }
-  .nav-locked-sub { font-family: var(--sans); font-size: .65rem; color: rgba(255,255,255,.15); line-height: 1.5; }
+  .nav-locked-title { font-family: var(--mono); font-size: .62rem; color: var(--ink-mute); margin-bottom: .3rem; }
+  .nav-locked-sub { font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); line-height: 1.5; }
 
-  .s-footer { padding: .85rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
-  .s-footer-text { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.25); }
+  .s-footer { padding: .85rem 1.25rem; border-top: 1px solid var(--line); }
+  .s-footer-text { font-family: var(--mono); font-size: .68rem; color: var(--ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.nav-collapsed .s-footer { text-align: center; padding: .85rem 0; }
+  body.nav-collapsed .s-footer-text { font-size: 0; }
+  body.nav-collapsed .s-footer-text::after { content: '\203B'; font-size: .7rem; color: var(--ink-mute); }
 
   /* MAIN */
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -378,7 +431,11 @@
   @media (max-width: 680px) {
     /* Layout */
     #sidebar { display: none; }
+    /* v4 shell chrome is desktop-only — the navy #mobile-header + bottom #mobile-nav take over (unchanged) */
+    #topbar { display: none; }
+    #deadline-bar { display: none; }
     #app { flex-direction: column; }
+    #body { flex: 1; min-height: 0; overflow: hidden; }
     #main { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
     .content { padding: .85rem; padding-bottom: 5.5rem; overflow-x: hidden; }
     .topbar { padding: .75rem .85rem; flex-wrap: wrap; gap: .4rem; }
@@ -622,6 +679,7 @@
     .vf-no-print,
     #sidebar, #sidebar-nav, .s-nav, .s-footer,
     #brand-pill, .brand-pill, #reg-strip, .reg-strip,
+    #topbar, #deadline-bar,
     #mobile-nav, #mob-drawer, #mob-drawer-overlay,
     .mob-nav-icon, .mob-nav-label, .mob-header-title, .mob-header-brand, .mob-header-sub,
     .topbar, .nav-section-tabs, #sidebar-trial-badge,
@@ -750,12 +808,28 @@
     <div class="mob-header-brand" id="mob-brand-label" onclick="showPage('home')">Set up →</div>
   </div>
 
+  <!-- v4 TOP BAR (global, persistent) — wordmark lives here now -->
+  <header id="topbar">
+    <div class="tb-left">
+      <button class="tb-toggle" onclick="toggleNavCollapse()" aria-label="Toggle navigation">&#9776;</button>
+      <div class="tb-brand" onclick="showPage('home')" style="cursor:pointer">Veya<span>Flow</span></div>
+      <input class="tb-search" placeholder="Search&hellip;">
+    </div>
+    <div class="tb-right">
+      <a class="tb-link" title="Inbox — coming soon">Inbox</a>
+      <a class="tb-link" title="Help — coming soon">Help</a>
+      <div class="tb-acct" title="Account">CH</div>
+    </div>
+  </header>
+
+  <!-- v4 DEADLINE BAR (global, persistent; populated by renderRegStrip → #deadline-bar) -->
+  <div id="deadline-bar"></div>
+
+  <!-- BODY: sidebar + main -->
+  <div id="body">
+
   <!-- SIDEBAR -->
   <div id="sidebar">
-    <div class="s-logo">
-      <div class="s-logo-text">VeyaFlow</div>
-      <div class="s-logo-sub">Brand Growth Intelligence</div>
-    </div>
     <div class="brand-pill" id="brand-pill" onclick="showPage('home')">
       <div class="brand-pill-name" id="pill-name">—</div>
       <div class="brand-pill-sub" id="pill-sub">—</div>
@@ -769,8 +843,7 @@
 
   <!-- MAIN -->
   <div id="main">
-    <!-- REG STRIP -->
-    <div class="reg-strip" id="reg-strip" style="display:none"></div>
+    <!-- (reg-strip retired — the global #deadline-bar above replaces it) -->
 
     <!-- PAGES -->
     <div class="page active" id="page-home"></div>
@@ -800,6 +873,7 @@
     <div class="page" id="page-retail-comms"></div>
     <div class="page" id="page-atm-admin"></div>
   </div>
+  </div><!-- /#body -->
 
   <!-- MOBILE BOTTOM NAV -->
   <div id="mob-drawer-overlay" onclick="closeMobDrawer()"></div>
@@ -3615,6 +3689,12 @@ function switchNavSection(sec){
   buildNav();
 }
 
+// v4 shell: collapse the sidebar to a 64px icon rail; persist the choice across pages.
+function toggleNavCollapse(){
+  var collapsed = document.body.classList.toggle('nav-collapsed');
+  try { localStorage.setItem('ns_nav_collapsed', collapsed ? '1' : '0'); } catch(e){}
+}
+
 
 
 /* ─── Tooltip helper ────────────────────────────── */
@@ -3732,10 +3812,10 @@ function buildNav(){
 
   var html='';
 
-  // Stage label
+  // Stage label (sb-sector). v4: green sector dot + category · stage (color via CSS).
   if(brand){
     var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion');
-    html+='<div style="padding:.4rem 1rem .3rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.15rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
+    html+='<div class="sb-sector"><span class="g">●</span> '+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
 
   // Section tabs
@@ -3747,8 +3827,8 @@ function buildNav(){
 
   sectionItems.forEach(function(n){
     html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
-    html+='<span class="nav-icon">'+n.icon+'</span>';
-    html+='<div style="flex:1;min-width:0"><span class="nav-label">'+n.label+'</span>';
+    html+='<span class="nav-ico">'+n.icon+'</span>';
+    html+='<div class="nav-text"><span class="nav-name">'+n.label+'</span>';
     if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
     html+='</div>';
     if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
@@ -3761,7 +3841,7 @@ function buildNav(){
           var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
           return (Date.now()-new Date(ref).getTime())/86400000 > 21;
         }).length;
-        if(stale>0) html+='<span class="nav-badge" style="background:#F59E0B">'+stale+'</span>';
+        if(stale>0) html+='<span class="nav-badge alert">'+stale+'</span>';
       }catch(e){}
     }
     html+='</div>';
@@ -3877,7 +3957,7 @@ function showPage(id){
   buildNav(); // rebuild so active tab + item are in sync
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('mobnav-'+id)?.classList.add('active');
-  document.getElementById('reg-strip').style.display=(brand&&id!=='home')?'flex':'none';
+  var _rs=document.getElementById('reg-strip'); if(_rs) _rs.style.display=(brand&&id!=='home')?'flex':'none'; // #reg-strip retired → global #deadline-bar; guard so this no-ops
   setDeepLink(id);
   renderPage(id);
 }
@@ -4186,17 +4266,23 @@ function updateSidebarBrand(){
    REG STRIP
 ═══════════════════════════════════════════════════ */
 function daysUntil(d){return Math.max(0,Math.round((new Date(d)-new Date())/(1000*60*60*24)));}
+// v4: populates the global #deadline-bar (the per-page #reg-strip was retired).
+// Reuses the SAME category filter + daysUntil (no parallel date truth, Rule #22/#23);
+// sorts ascending by daysUntil (soonest first) and shows the soonest 2.
 function renderRegStrip(){
-  const strip=document.getElementById('reg-strip');
-  if(!brand){strip.style.display='none';return;}
-  const relevant=REG_DEADLINES.filter(r=>!r.cat||(getBrandCategories()||[brand?.category||'']).some(cat=>r.cat.includes(cat))).slice(0,3);
-  if(!relevant.length){strip.style.display='none';return;}
+  const strip=document.getElementById('deadline-bar');
+  if(!strip) return;
+  if(!brand){strip.style.display='none';strip.innerHTML='';return;}
+  const relevant=REG_DEADLINES
+    .filter(r=>!r.cat||(getBrandCategories()||[brand?.category||'']).some(cat=>r.cat.includes(cat)))
+    .sort((a,b)=>daysUntil(a.deadline)-daysUntil(b.deadline))
+    .slice(0,2);
+  if(!relevant.length){strip.style.display='none';strip.innerHTML='';return;}
   strip.style.display='flex';
-  strip.innerHTML=`<span class="reg-strip-label">⚠ Upcoming deadlines</span>`+
+  strip.innerHTML=`<span class="dl-title">⚠ Upcoming deadlines</span>`+
     relevant.map(r=>{
       const d=daysUntil(r.deadline);
-      const color=d<90?'#EF4444':d<180?'#F59E0B':'#1E3A5F';
-      return `<div class="reg-item"><span class="reg-days" style="color:${color}">${d}d</span><span class="reg-name">${r.title}</span><button class="reg-btn" onclick="showPage('${r.link}')">→</button></div>`;
+      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span><button class="dl-arrow" onclick="showPage('${r.link}')">→</button></span>`;
     }).join('');
 }
 
@@ -34224,6 +34310,13 @@ function renderRequestListedModal(){
 }
 
 function init(){
+  // v4 shell: restore persisted sidebar-collapse state. Auto-collapse on first load
+  // at narrow (tablet) widths when the user has no saved preference. (≤680px is the
+  // mobile breakpoint where the sidebar is hidden entirely, so this targets ~681–1100px.)
+  try {
+    var _nc = localStorage.getItem('ns_nav_collapsed');
+    if(_nc === '1' || (_nc === null && window.innerWidth <= 1100)) document.body.classList.add('nav-collapsed');
+  } catch(e){}
   loadState();
   loadDPP();
   loadManualSuppliers();
