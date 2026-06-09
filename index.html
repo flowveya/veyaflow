@@ -6,6 +6,8 @@
 <title>VeyaFlow — Brand Growth Intelligence</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  /* v4 re-skin fonts — loaded additively; existing fonts above stay until the per-page sweep flips --serif/--sans/--mono */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Newsreader:wght@400;500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,77 +27,137 @@
     --serif: 'Playfair Display', Georgia, serif;
     --sans: 'DM Sans', system-ui, sans-serif;
     --mono: 'DM Mono', monospace;
+
+    /* ─── v4 re-skin tokens — ADDITIVE; existing tokens above retained until the per-page sweep ─── */
+    /* NOTE: v4 ink target is #1C1A17. Existing --ink (#0E0E0E) is intentionally LEFT UNCHANGED here —
+       pages depend on it; the v4 ink is applied per-page during the sweep, then globally at the end. */
+    /* NOTE: --serif/--sans/--mono are NOT flipped yet. The final sweep flips them to
+       Fraunces / Geist / Geist Mono so the whole app isn't restyled prematurely. */
+    --accent:#C0613A; --accent-deep:#9E4A28; --accent-soft:#F3E3DA;
+    --ink-soft:#4A463F; --ink-mute:#8A857B;
+    --paper:#FFFFFF; --surface:#FAF8F4; --paper-deep:#F0ECE4;
+    --line:#E7E2D8; --line-strong:#D8D1C4; --on-accent:#FFFFFF;
+    --green-bg:#DCEBE0; --green-text:#2F6B45;
+    --amber-bg:#F6E7CC; --amber-text:#8A6516;
+    --red-bg:#F3D6D0;   --red-text:#B23A2A;
+    --blue-bg:#DBE3F4;  --blue-text:#3A4F8A;
+    --green-soft:#EEF5EF; --amber-soft:#FBF3E2; --blue-soft:#EDF1F9; /* 5-group nav flag/parked soft fills */
+    --brand-name:'Newsreader', Georgia, serif;
   }
 
   html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
 
   /* SHELL */
-  #app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* v4 SHELL — TOP BAR (global, persistent). NOTE: distinct from the per-page .topbar class. */
+  #topbar { background: var(--paper); border-bottom: 1px solid var(--line); padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  #topbar .tb-left { display: flex; align-items: center; gap: 18px; }
+  #topbar .tb-menu { background: transparent; border: 1px solid var(--line); border-radius: 9px; width: 40px; height: 40px; cursor: pointer; color: var(--ink-soft); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #topbar .tb-menu:hover { border-color: var(--line-strong); color: var(--ink); }
+  #topbar .tb-brand { font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); white-space: nowrap; }
+  #topbar .tb-brand span { color: var(--accent); }
+  #topbar .tb-search { background: var(--surface); border: 1px solid var(--line); border-radius: 9999px; padding: 11px 22px; font-family: var(--sans); font-size: 14px; width: 540px; max-width: 36vw; color: var(--ink); }
+  #topbar .tb-search::placeholder { color: var(--ink-mute); }
+  #topbar .tb-search:focus { outline: none; border-color: var(--line-strong); }
+  #topbar .tb-right { display: flex; align-items: center; gap: 22px; }
+  #topbar .tb-link { color: var(--ink); font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; }
+  #topbar .tb-link:hover { color: var(--accent-deep); }
+  #topbar .tb-acct { background: var(--accent); color: #fff; border-radius: 9999px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+
+  /* v4 SHELL — DEADLINE BAR (global, persistent; populated by renderRegStrip → #deadline-bar) */
+  #deadline-bar { background: var(--amber-bg); border-bottom: 1px solid #E8D3A8; padding: 11px 28px; display: flex; align-items: center; gap: 26px; font-size: 13px; flex-shrink: 0; flex-wrap: wrap; }
+  #deadline-bar:empty { display: none; }
+  .dl-title { display: flex; align-items: center; gap: 7px; color: var(--amber-text); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 11.5px; white-space: nowrap; }
+  .dl-item { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+  .dl-days { font-family: var(--mono); font-weight: 700; color: var(--ink); font-size: 12.5px; }
+  .dl-name { color: var(--ink-soft); font-weight: 500; }
+  .dl-arrow { border: 1px solid var(--amber-text); color: var(--amber-text); border-radius: 6px; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; background: transparent; }
+
+  /* v4 SHELL — body row wrapping sidebar + main */
+  #body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
   /* SIDEBAR */
   #sidebar {
-    width: 220px; min-width: 220px; background: var(--navy);
+    width: 256px; min-width: 256px; background: var(--surface);
+    border-right: 1px solid var(--line);
     display: flex; flex-direction: column; overflow: hidden;
-    transition: width .25s;
   }
-  .s-logo { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
-  .s-logo-text { font-family: var(--serif); font-size: 1.25rem; color: #fff; font-weight: 400; }
-  .s-logo-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.3); letter-spacing: .12em; text-transform: uppercase; margin-top: .2rem; }
+  /* Desktop sidebar hide/show toggle — clean binary (NOT the removed icon-rail
+     collapse). When hidden the sidebar is fully gone and #main (flex:1) reflows
+     to full width. Mobile hides #sidebar via @media ≤680px regardless. */
+  body.sidebar-hidden #sidebar { display: none; }
 
+  /* brand workspace card (was navy .brand-pill — IDs #brand-pill/#pill-name/#pill-sub preserved) */
   .brand-pill {
-    margin: .75rem; padding: .6rem .75rem;
-    background: rgba(196,168,130,.1); border: 1px solid rgba(196,168,130,.2);
+    margin: 1.1rem 1rem 1rem; padding: .85rem .9rem;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 11px;
     cursor: pointer; display: none;
   }
   .brand-pill.visible { display: block; }
-  .brand-pill-name { font-size: .72rem; color: var(--gold); font-weight: 500; }
-  .brand-pill-sub { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.35); margin-top: .15rem; }
+  .brand-pill-name { font-size: .85rem; color: var(--accent-deep); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-pill-sub { font-family: var(--sans); font-size: .7rem; color: var(--ink-mute); margin-top: .18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .s-nav { padding: .75rem 0; flex: 1; overflow-y: auto; }
+  .s-nav { padding: .25rem 0 1rem; flex: 1; overflow-y: auto; }
+
+  /* stage label (sb-sector) — emitted by buildNav into #sidebar-nav */
+  .sb-sector { padding: 0 1.25rem .65rem; font-family: var(--mono); font-size: .6rem; color: var(--green-text); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+  .sb-sector .g { color: #5C9C72; }
+
   .nav-item {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .65rem 1.25rem; cursor: pointer;
-    border-left: 2px solid transparent;
-    transition: all .15s;
+    display: flex; align-items: center; gap: .8rem;
+    padding: .55rem 1.25rem; cursor: pointer; position: relative;
+    transition: background .15s;
   }
-  .nav-item:hover { background: rgba(196,168,130,.08); }
-  .nav-item.active { background: rgba(196,168,130,.15); border-left-color: var(--gold); }
-  .nav-icon { font-size: .85rem; width: 18px; text-align: center; color: rgba(255,255,255,.4); flex-shrink: 0; }
-  .nav-item.active .nav-icon { color: var(--gold); }
-  .nav-label { display: block; font-size: .72rem; color: rgba(255,255,255,.45); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nav-item.active .nav-label { color: var(--gold); }
-  .nav-sub { display: block; font-family: var(--sans); font-size: .53rem; color: rgba(255,255,255,.2); margin-top: .08rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nav-item.active .nav-sub { color: rgba(196,168,130,.45); }
-  .nav-item:hover .nav-sub { color: rgba(255,255,255,.32); }
-  .nav-badge { font-family: var(--mono); font-size: .5rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 5px; margin-left: auto; flex-shrink: 0; }
+  .nav-item:hover { background: var(--paper-deep); }
+  .nav-item.active { background: var(--accent-soft); }
+  .nav-item.active::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; background: var(--accent); border-radius: 0 3px 3px 0; }
+  .nav-ico { width: 20px; text-align: center; font-family: var(--mono); font-size: .8rem; color: var(--ink-mute); flex-shrink: 0; }
+  .nav-item.active .nav-ico { color: var(--accent-deep); }
+  .nav-text { flex: 1; min-width: 0; }
+  .nav-name { display: block; font-size: .82rem; font-weight: 600; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-item.active .nav-name { color: var(--accent-deep); font-weight: 700; }
+  .nav-sub { display: block; font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); margin-top: .05rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-badge { font-family: var(--mono); font-size: .55rem; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; margin-left: auto; flex-shrink: 0; font-weight: 700; }
+  .nav-badge.alert { background: var(--red-text); }
 
-  /* Nav section tabs */
-  .nav-section-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; margin-top: .15rem; }
+  /* 5-group desktop nav (approved IA) — group headers + inline flags + parked.
+     Items remain .nav-item (.link in the mockup); .ic/.nm map to .nav-ico/.nav-name. */
+  .grp { margin-top: 6px; }
+  .grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 9px 18px 4px; display: flex; align-items: baseline; gap: 7px; }
+  .grp-q { font-size: 9px; color: var(--ink-mute); font-family: var(--sans); font-weight: 400; letter-spacing: 0; font-style: italic; opacity: .8; text-transform: none; }
+  .nav-item.parked .nav-name { color: var(--ink-mute); font-style: italic; }
+  .flag { margin-left: auto; font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
+  .flag.watch { background: var(--amber-soft); color: var(--amber-text); border: 1px solid #E8D3A8; }
+  .flag.pend { background: var(--paper-deep); color: var(--ink-mute); border: 1px solid var(--line-strong); }
+
+  /* Nav section tabs (keys brand/source/retail; switchNavSection preserved) */
+  .nav-section-tabs { display: flex; padding: 0 1rem; border-bottom: 1px solid var(--line); margin-bottom: .75rem; flex-shrink: 0; }
   .nav-section-tab {
-    flex: 1; padding: .45rem .25rem; text-align: center;
-    font-family: var(--mono); font-size: .52rem; letter-spacing: .06em; text-transform: uppercase;
-    color: rgba(255,255,255,.3); cursor: pointer; border-bottom: 2px solid transparent;
-    transition: all .15s; white-space: nowrap;
+    flex: 1; padding: .6rem .25rem; text-align: center;
+    font-family: var(--sans); font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-mute); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s; white-space: nowrap;
   }
-  .nav-section-tab:hover { color: rgba(255,255,255,.55); background: rgba(255,255,255,.03); }
-  .nav-section-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(196,168,130,.07); }
-  .nav-section-tab.locked { color: rgba(255,255,255,.18); cursor: default; }
-  .nav-section-tab.locked:hover { background: none; color: rgba(255,255,255,.18); }
+  .nav-section-tab:hover { color: var(--ink-soft); }
+  .nav-section-tab.active { color: var(--accent-deep); border-bottom-color: var(--accent); }
+  .nav-section-tab.locked { color: var(--ink-mute); opacity: .4; cursor: default; }
+  .nav-section-tab.locked:hover { color: var(--ink-mute); }
 
-  /* Nav section group label */
+  /* Nav section group label (re-themed; no current emitter) */
   .nav-group-label {
     padding: .6rem 1.25rem .25rem;
     font-family: var(--mono); font-size: .5rem; letter-spacing: .12em;
-    text-transform: uppercase; color: rgba(255,255,255,.22);
+    text-transform: uppercase; color: var(--ink-mute);
   }
 
-  /* Locked section placeholder */
+  /* Locked section placeholder (re-themed; no current emitter) */
   .nav-locked-section { padding: 1.25rem; text-align: center; }
-  .nav-locked-title { font-family: var(--mono); font-size: .62rem; color: rgba(255,255,255,.25); margin-bottom: .3rem; }
-  .nav-locked-sub { font-family: var(--sans); font-size: .65rem; color: rgba(255,255,255,.15); line-height: 1.5; }
+  .nav-locked-title { font-family: var(--mono); font-size: .62rem; color: var(--ink-mute); margin-bottom: .3rem; }
+  .nav-locked-sub { font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); line-height: 1.5; }
 
-  .s-footer { padding: .85rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
-  .s-footer-text { font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.25); }
+  .s-footer { padding: .85rem 1.25rem; border-top: 1px solid var(--line); }
+  .s-footer-text { font-family: var(--mono); font-size: .68rem; color: var(--ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* MAIN */
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -361,7 +423,11 @@
   @media (max-width: 680px) {
     /* Layout */
     #sidebar { display: none; }
+    /* v4 shell chrome is desktop-only — the navy #mobile-header + bottom #mobile-nav take over (unchanged) */
+    #topbar { display: none; }
+    #deadline-bar { display: none; }
     #app { flex-direction: column; }
+    #body { flex: 1; min-height: 0; overflow: hidden; }
     #main { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
     .content { padding: .85rem; padding-bottom: 5.5rem; overflow-x: hidden; }
     .topbar { padding: .75rem .85rem; flex-wrap: wrap; gap: .4rem; }
@@ -464,67 +530,51 @@
   }
 
   /* MOBILE BOTTOM NAV */
+  /* ── MOBILE chrome (v4 light/clay) — search-led one-scroll grouped menu ──
+     Retires the per-section drawer; renders the same 5 groups as desktop. */
+  #mobile-header {
+    display: none;
+    background: var(--paper); border-bottom: 1px solid var(--line); padding: .75rem 1rem;
+    flex-shrink: 0; align-items: center; justify-content: space-between;
+  }
+  .mob-header-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+  .mob-header-title span { color: var(--accent); }
+  .mob-header-sub { font-family: var(--mono); font-size: .52rem; color: var(--ink-mute); margin-top: .1rem; }
+  .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--accent-deep); text-align: right; cursor: pointer; }
+
+  /* Bottom bar — Menu / Search / Recent / Me (light, active = clay) */
   #mobile-nav {
     display: none;
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--navy); border-top: 1px solid rgba(255,255,255,.1);
-    z-index: 100; padding-bottom: env(safe-area-inset-bottom);
-    flex-direction: column;
+    background: var(--paper); border-top: 1px solid var(--line);
+    z-index: 1001; padding: 7px 0 calc(9px + env(safe-area-inset-bottom));
   }
-  #mobile-nav-inner {
-    display: flex; width: 100%;
-    scrollbar-width: none;
-  }
-  #mobile-nav-inner::-webkit-scrollbar { display: none; }
-  .mob-nav-item {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: .5rem .25rem .4rem; cursor: pointer; flex: 1;
-    min-height: 54px; position: relative; transition: background .15s;
-  }
-  /* Mobile drawer — slides up from above nav bar */
-  #mob-drawer {
-    display: none; position: fixed; bottom: 54px; left: 0; right: 0;
-    background: var(--navy); border-top: 2px solid var(--gold);
-    z-index: 99; padding: .5rem 0;
-    box-shadow: 0 -4px 24px rgba(0,0,0,.35);
-    max-height: 60vh; overflow-y: auto;
-  }
-  #mob-drawer.open { display: block; }
-  .mob-drawer-item {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .75rem 1.25rem; cursor: pointer; min-height: 48px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    transition: background .1s;
-  }
-  .mob-drawer-item:active { background: rgba(196,168,130,.15); }
-  .mob-drawer-item.active { background: rgba(196,168,130,.12); }
-  .mob-drawer-icon { font-size: .9rem; color: rgba(255,255,255,.4); width: 20px; text-align: center; flex-shrink: 0; }
-  .mob-drawer-item.active .mob-drawer-icon { color: var(--gold); }
-  .mob-drawer-label { font-family: var(--sans); font-size: .85rem; color: rgba(255,255,255,.75); }
-  .mob-drawer-item.active .mob-drawer-label { color: var(--gold); font-weight: 600; }
-  .mob-drawer-badge { font-family: var(--mono); font-size: .48rem; background: var(--gold); color: var(--navy); padding: .1rem .35rem; margin-left: auto; font-weight: 700; }
-  /* Overlay behind drawer */
-  #mob-drawer-overlay {
-    display: none; position: fixed; inset: 0; z-index: 98;
-    background: rgba(0,0,0,.4);
-  }
-  #mob-drawer-overlay.open { display: block; }
-  .mob-nav-item.active { background: rgba(196,168,130,.15); }
-  .mob-nav-icon { font-size: 1.1rem; color: rgba(255,255,255,.4); line-height: 1; }
-  .mob-nav-item.active .mob-nav-icon { color: var(--gold); }
-  .mob-nav-label { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.4); margin-top: .15rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
-  .mob-nav-item.active .mob-nav-label { color: var(--gold); }
-  .mob-badge { position: absolute; top: .35rem; right: .6rem; background: var(--red); color: #fff; border-radius: 8px; padding: 1px 4px; font-family: var(--mono); font-size: .42rem; }
+  .m-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--ink-mute); cursor: pointer; }
+  .m-tab .ti { font-size: 15px; font-family: var(--mono); line-height: 1; }
+  .m-tab .tl { font-family: var(--mono); font-size: 7.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+  .m-tab.on { color: var(--accent-deep); }
+  .m-tab.on .ti { color: var(--accent); }
 
-  /* Mobile header */
-  #mobile-header {
-    display: none;
-    background: var(--navy); padding: .75rem 1rem;
-    flex-shrink: 0; align-items: center; justify-content: space-between;
+  /* Grouped menu panel — toggled by the Menu tab; full-screen, one scroll.
+     z-index below the bottom bar so the Menu tab stays tappable to close. */
+  #mob-menu {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: var(--surface);
+    padding: 1rem .9rem calc(66px + env(safe-area-inset-bottom));
+    overflow-y: auto;
   }
-  .mob-header-title { font-family: var(--serif); font-size: 1rem; color: #fff; }
-  .mob-header-sub { font-family: var(--mono); font-size: .52rem; color: rgba(255,255,255,.35); margin-top: .1rem; }
-  .mob-header-brand { font-family: var(--mono); font-size: .58rem; color: var(--gold); text-align: right; cursor: pointer; }
+  #mob-menu.open { display: block; }
+  .m-search { background: var(--paper); border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 13px; font-size: 13px; color: var(--ink-mute); display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .m-grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 14px 4px 6px; }
+  .m-li { background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .m-li.on { background: var(--accent-soft); border-color: var(--accent); }
+  .m-li .ic { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); width: 15px; text-align: center; flex-shrink: 0; }
+  .m-li.on .ic { color: var(--accent-deep); }
+  .m-li .nm { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .m-li.on .nm { color: var(--accent-deep); font-weight: 600; }
+  .m-li.parked .nm { color: var(--ink-mute); font-style: italic; }
+  .m-badge { margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 700; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; flex-shrink: 0; }
+  .m-badge.alert { background: var(--red-text); }
 
   @media (max-width: 680px) {
     #mobile-nav { display: flex; }
@@ -605,8 +655,9 @@
     .vf-no-print,
     #sidebar, #sidebar-nav, .s-nav, .s-footer,
     #brand-pill, .brand-pill, #reg-strip, .reg-strip,
-    #mobile-nav, #mob-drawer, #mob-drawer-overlay,
-    .mob-nav-icon, .mob-nav-label, .mob-header-title, .mob-header-brand, .mob-header-sub,
+    #topbar, #deadline-bar,
+    #mobile-nav, #mob-menu,
+    .m-tab, .mob-header-title, .mob-header-brand, .mob-header-sub,
     .topbar, .nav-section-tabs, #sidebar-trial-badge,
     .vf-sticky-actions,
     button, .btn-primary, .btn-outline, .btn-gold,
@@ -727,18 +778,34 @@
   <!-- MOBILE HEADER -->
   <div id="mobile-header">
     <div>
-      <div class="mob-header-title">VeyaFlow</div>
+      <div class="mob-header-title">Veya<span>Flow</span></div>
       <div class="mob-header-sub">Brand Growth Intelligence</div>
     </div>
     <div class="mob-header-brand" id="mob-brand-label" onclick="showPage('home')">Set up →</div>
   </div>
 
+  <!-- v4 TOP BAR (global, persistent) — wordmark lives here now -->
+  <header id="topbar">
+    <div class="tb-left">
+      <button class="tb-menu" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
+      <div class="tb-brand" onclick="showPage('home')" style="cursor:pointer">Veya<span>Flow</span></div>
+      <input class="tb-search" placeholder="Search&hellip;">
+    </div>
+    <div class="tb-right">
+      <a class="tb-link" title="Inbox — coming soon">Inbox</a>
+      <a class="tb-link" title="Help — coming soon">Help</a>
+      <div class="tb-acct" title="Account">CH</div>
+    </div>
+  </header>
+
+  <!-- v4 DEADLINE BAR (global, persistent; populated by renderRegStrip → #deadline-bar) -->
+  <div id="deadline-bar"></div>
+
+  <!-- BODY: sidebar + main -->
+  <div id="body">
+
   <!-- SIDEBAR -->
   <div id="sidebar">
-    <div class="s-logo">
-      <div class="s-logo-text">VeyaFlow</div>
-      <div class="s-logo-sub">Brand Growth Intelligence</div>
-    </div>
     <div class="brand-pill" id="brand-pill" onclick="showPage('home')">
       <div class="brand-pill-name" id="pill-name">—</div>
       <div class="brand-pill-sub" id="pill-sub">—</div>
@@ -752,8 +819,7 @@
 
   <!-- MAIN -->
   <div id="main">
-    <!-- REG STRIP -->
-    <div class="reg-strip" id="reg-strip" style="display:none"></div>
+    <!-- (reg-strip retired — the global #deadline-bar above replaces it) -->
 
     <!-- PAGES -->
     <div class="page active" id="page-home"></div>
@@ -783,12 +849,18 @@
     <div class="page" id="page-retail-comms"></div>
     <div class="page" id="page-atm-admin"></div>
   </div>
+  </div><!-- /#body -->
 
-  <!-- MOBILE BOTTOM NAV -->
-  <div id="mob-drawer-overlay" onclick="closeMobDrawer()"></div>
-  <div id="mob-drawer"></div>
+  <!-- MOBILE: grouped one-scroll menu (toggled by the Menu tab) + bottom bar -->
+  <div id="mob-menu">
+    <div class="m-search" title="Search — coming soon">⌕ Search or jump to…</div>
+    <div id="mob-menu-body"></div>
+  </div>
   <div id="mobile-nav">
-    <div id="mobile-nav-inner"></div>
+    <div class="m-tab" id="mtab-menu" onclick="toggleMobMenu()"><span class="ti">&#9776;</span><span class="tl">Menu</span></div>
+    <div class="m-tab" title="Search — coming soon"><span class="ti">⌕</span><span class="tl">Search</span></div>
+    <div class="m-tab" title="Recent — coming soon"><span class="ti">▤</span><span class="tl">Recent</span></div>
+    <div class="m-tab" title="Me — coming soon"><span class="ti">◆</span><span class="tl">Me</span></div>
   </div>
 </div>
 
@@ -2402,13 +2474,50 @@ async function runBilExtraction(){
     catch(err){ /* non-blocking */ }
   }
 
-  // ── Step 2: queue the job to the background function (expect 202). It calls
-  //   Anthropic off-ceiling and PATCHes result + status into the row.
+  // ── Step 1b: upload the Anthropic request body to Supabase Storage via a
+  //   signed URL. The base64 page images (~569KB) can't pass through a Netlify
+  //   function, so the browser PUTs the body straight to Storage; the background
+  //   function reads it from there. bil.uploadUrl returns root-level {signedUrl}
+  //   (Rule #22). Object path = <extractionId>.json.
+  var storagePath = extractionId + '.json';
+  try {
+    var urlRes = await fetch('/.netlify/functions/supabase-proxy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'bil.uploadUrl', path: storagePath }),
+    });
+    var urlData = urlRes.ok ? await urlRes.json() : null;
+    var signedUrl = urlData && urlData.signedUrl;
+    if(!signedUrl){
+      try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_url_failed' }); } catch(e){}
+      fail('queue', 'Could not prepare the deck upload. Please try again, or enter your brand details manually below.');
+      return;
+    }
+    var putRes = await fetch(signedUrl, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if(!putRes.ok){
+      // Mark the row failed so it isn't left stuck on 'processing'.
+      try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_failed' }); } catch(e){}
+      fail('queue', 'Could not upload the deck images (HTTP '+putRes.status+'). Please try again, or enter your brand details manually below.');
+      return;
+    }
+  } catch(err){
+    try { if(typeof bilUpdateExtraction === 'function') await bilUpdateExtraction(extractionId, { status:'failed', error_type:'upload_failed' }); } catch(e){}
+    fail('network', 'Could not upload the deck images'+((err&&err.message)?(': '+err.message):'')+'. Please try again, or enter your brand details manually below.');
+    return;
+  }
+
+  // ── Step 2: queue the job to the background function (expect 202). It reads the
+  //   body from Storage (storagePath), calls Anthropic off-ceiling, and PATCHes
+  //   result + status into the row. Tiny POST now — only ids, no images.
   try {
     var qRes = await fetch('/.netlify/functions/anthropic-proxy-background', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ extractionId: extractionId, body: body }),
+      body: JSON.stringify({ extractionId: extractionId, storagePath: storagePath }),
     });
     // Background functions return 202 (a 2xx). Anything else is a queue failure.
     if(!qRes.ok){
@@ -2767,10 +2876,18 @@ function renderBilReviewForm(){
   confirmBtn.onclick=_bilConfirmDraft;
   wrap.appendChild(confirmBtn);
 
-  // Scope note — C3 (dismiss/fallback) + C4 (brand-edit surfacing) still out of scope.
+  // ── C3: dismiss action — record the dismissal, clear the draft, go manual ──
+  var dismissBtn=document.createElement('button');
+  dismissBtn.className='btn-outline';
+  dismissBtn.style.cssText='width:100%;margin-top:.5rem;padding:.8rem';
+  dismissBtn.textContent='Dismiss & enter manually';
+  dismissBtn.onclick=_bilDismissDraft;
+  wrap.appendChild(dismissBtn);
+
+  // Scope note — C4 (brand-edit surfacing) still out of scope.
   var note=document.createElement('div');
   note.style.cssText='font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.5rem;line-height:1.5';
-  note.textContent='Confirm writes these fields into your brand profile and clears draftStatus. Dismiss/fallback (C3) and brand-edit surfacing (C4) are not wired yet.';
+  note.textContent='Confirm writes these fields into your brand profile and clears draftStatus. Dismiss records the dismissal and routes you to manual entry. Brand-edit surfacing (C4) is not wired yet.';
   wrap.appendChild(note);
 
   document.body.appendChild(ov);
@@ -2849,6 +2966,51 @@ async function _bilConfirmDraft(){
   // Static message only — no model/field values echoed (textContent-safe regardless).
   if(typeof showSuccess === 'function') showSuccess('Brand profile updated from your deck.' + serverNote);
   if(typeof renderPage === 'function') renderPage('home');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIL dismiss (C3) — "this extraction wasn't useful; I'll enter details manually"
+// ════════════════════════════════════════════════════════════════════════════
+// Records the dismissal server-side, clears the draft flag, and routes into the
+// existing manual setup modal. Writes NO extracted values into brand. Mirrors
+// C2's server try/catch + tail-handoff conventions.
+async function _bilDismissDraft(){
+  // Rule #19: guard bilState defensively — never throw on a missing state object.
+  if(typeof bilState === 'undefined' || !bilState) return;
+
+  // Clear the draft-review flag (no brand creation — this is a dismissal).
+  if(typeof brand !== 'undefined' && brand) brand.draftStatus = '';
+
+  // Persist via the existing save pattern (mirror C2).
+  saveBrandState();
+
+  // Record dismissal via the EXISTING wrapper (portalCall shape, Rule #22). Own
+  // try/catch + non-blocking: a server failure must NOT block the local flow.
+  // Same id-guard + console.warn style as C2, with { dismissed: true }.
+  try {
+    if(typeof bilUpdateExtraction === 'function' && bilState.extractionId){
+      await bilUpdateExtraction(bilState.extractionId, { dismissed: true });
+    } else {
+      console.warn('[BIL C3] no bilState.extractionId (extraction not logged) — server dismissal skipped; local flow continues.');
+    }
+  } catch(err){
+    console.warn('[BIL C3] bilUpdateExtraction failed:', err && err.message);
+  }
+
+  // Tail handoff: close the BIL overlays, then route into the existing manual
+  // setup modal. NOTE: renderSetupModal no-ops without the modal element, so we
+  // open it first — mirroring _bilStartManualEntry / the full L~2547 route. The
+  // bare `_setupModalStep=1; renderSetupModal()` alone would silently no-op.
+  // The dismissed row is kept viewable in the dev panel by design (not filtered).
+  var ov = document.getElementById('bil-review-screen'); if(ov) ov.remove();
+  if(typeof closeBilDevPanel === 'function') closeBilDevPanel();
+  // Static message only — no extracted field values echoed.
+  if(typeof showSuccess === 'function') showSuccess('No problem — enter your brand details manually.');
+  try {
+    if(typeof openSetupModal === 'function') openSetupModal('home');
+    _setupModalStep = 1;
+    if(typeof renderSetupModal === 'function') renderSetupModal();
+  } catch(e){}
 }
 
 // Minimal dev/test surface for B1. Console-invokable: renderBilDevPanel().
@@ -3440,34 +3602,59 @@ function getCatLabel(id){
   return labels[id]||defaults[id];
 }
 
+// NAV: `sec` (brand/source/retail) is RETAINED — the mobile drawer reads it.
+// `group` (plan/comply/source/sell/mybrand) drives the desktop 5-group rail.
+// The group/sec disagreement is INTENTIONAL (a page can sit in a different
+// desktop group than its mobile section) — do not reconcile them.
 const NAV=[
-  // ── BRAND section ──────────────────────────────
-  {id:"home",     sec:"brand", icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"skus",     sec:"brand", icon:"▦", label:"My Products",          stages:["product","trading","expanding","scaling"],        cats:null},
-  {id:"report",   sec:"brand", icon:"◎", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"compare",  sec:"brand", icon:"⇄", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"claims",   sec:"brand", icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"pitch",    sec:"brand", icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"brandpack",sec:"brand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"rp-marketplace",sec:"brand", icon:"⚖", label:"EU Responsible Person",stages:["trading","expanding","scaling"],          cats:RETAIL_CATS},
-  {id:"bizcase",  sec:"brand", icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
-  {id:"cfo",      sec:"brand", icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
-  // ── SOURCE section ─────────────────────────────
-  {id:"find",     sec:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
-  {id:"suppliers",sec:"source", icon:"◈", label:"Supplier Audit",      stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
-  {id:"sourcing",  sec:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
-  {id:"circular", sec:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
-  {id:"dpp",      sec:"source", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"csrd",      sec:"source", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"reg_monitor",sec:"brand",  icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
-  // ── RETAILER RELATIONS section ──────────────────
-  {id:"crm",               sec:"retail", icon:"⊞", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
-  {id:"retail-tracker",    sec:"retail", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-templates",  sec:"retail", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-checklist",  sec:"retail", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-performance",sec:"retail", icon:"◉", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
-  {id:"retail-comms",      sec:"retail", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
+  // ── BRAND section (sec) ─────────────────────────
+  {id:"home",     sec:"brand", group:"plan",    icon:"⌂", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"skus",     sec:"brand", group:"mybrand", flag:"watch", icon:"▦", label:"My Products",  stages:["product","trading","expanding","scaling"],        cats:null},
+  {id:"report",   sec:"brand", group:"plan",    icon:"◎", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"compare",  sec:"brand", group:"plan",    icon:"⇄", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"claims",   sec:"brand", group:"comply",  icon:"⚑", label:"Claim Localizer",      stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"pitch",    sec:"brand", group:"sell",    icon:"✉", label:"Retailer Pitch",       stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"brandpack",sec:"brand", group:"mybrand", icon:"◫", label:"Brand Pack",           stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"rp-marketplace",sec:"brand", group:"comply", icon:"⚖", label:"EU Responsible Person",stages:["trading","expanding","scaling"],          cats:RETAIL_CATS},
+  {id:"bizcase",  sec:"brand", group:"plan",    icon:"◉", label:"Business Case",        stages:["trading","expanding","scaling"],                  cats:RETAIL_CATS},
+  {id:"cfo",      sec:"brand", group:"plan",    icon:"◈", label:"CFO View",             stages:["trading","expanding","scaling"],                  cats:null},
+  // ── SOURCE section (sec) ────────────────────────
+  {id:"find",     sec:"source", group:"source", icon:"◌", label:"Find Manufacturers", stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"suppliers",sec:"source", group:"comply", flag:"watch", icon:"◈", label:"Supplier Audit",  stages:["product","trading","expanding","scaling"],        cats:COMPLIANCE_CATS},
+  {id:"sourcing",  sec:"source", group:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
+  {id:"circular", sec:"source", group:"source", icon:"◉", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
+  {id:"dpp",      sec:"source", group:"comply", icon:"▣", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  {id:"csrd",      sec:"source", group:"comply", icon:"◫", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  {id:"reg_monitor",sec:"brand",  group:"comply", icon:"◎", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
+  // ── RETAILER RELATIONS section (sec) ────────────
+  {id:"crm",               sec:"retail", group:"sell", icon:"⊞", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
+  {id:"retail-tracker",    sec:"retail", group:"sell", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-templates",  sec:"retail", group:"sell", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-checklist",  sec:"retail", group:"sell", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-performance",sec:"retail", group:"sell", icon:"◉", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
+  {id:"retail-comms",      sec:"retail", group:"sell", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
 ];
+
+// 5-group desktop IA (approved June 9). Ordered; labels + italic subtitle per group.
+const NAV_GROUPS=[
+  {key:"plan",    label:"Plan",     q:"where to expand",      ids:["home","report","compare","bizcase","cfo"]},
+  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","rp-marketplace","dpp","csrd","suppliers"]},
+  {key:"source",  label:"Source",   q:"who makes it",         ids:["find","sourcing","circular"]},
+  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["crm","pitch","retail-tracker","retail-checklist","retail-templates","retail-comms","retail-performance"]},
+  {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack","atm-admin"]},
+];
+
+// Order a visible-items list by a group's explicit id list (single source of
+// truth for desktop + mobile). Ids not in the list keep their relative order
+// after the listed ones (stable sort).
+function orderNavByIds(items, ids){
+  if(!ids || !ids.length) return items;
+  var pos={}; ids.forEach(function(id,i){ pos[id]=i; });
+  return items.slice().sort(function(a,b){
+    var ai=(a.id in pos)?pos[a.id]:9999, bi=(b.id in pos)?pos[b.id]:9999;
+    return ai-bi;
+  });
+}
 
 // Returns nav items visible for current brand stage
 function getVisibleNav(){
@@ -3490,9 +3677,12 @@ function getVisibleNav(){
     if(localStorage.getItem('ns_atm_show_admin') === 'true'){
       visible.push({
         id:    'atm-admin',
-        sec:   'retail',
+        sec:   'retail',          // mobile drawer still reads sec
+        group: 'mybrand',         // desktop 5-group rail; parked + "pending" (unplaced, inert)
+        flag:  'pending',
+        parked: true,
         icon:  '⚙',
-        label: 'ATM Admin',
+        label: 'Template Admin',  // relabelled from "ATM Admin" (localStorage-gated; no functional change)
         stages: [stage], // always pass stage filter
         cats:   null,
       });
@@ -3506,6 +3696,14 @@ const MOB_NAV_LABELS={home:"Home",find:"Source",report:"Report",compare:"Compare
 function switchNavSection(sec){
   navSection=sec;
   buildNav();
+}
+
+// Desktop sidebar hide/show toggle (binary — fully shown or fully hidden; NOT the
+// removed icon-rail collapse). Persists in localStorage. Mobile is unaffected (it
+// hides #sidebar via @media ≤680px regardless). Defensive on localStorage (Rule #19).
+function toggleSidebar(){
+  var hidden = document.body.classList.toggle('sidebar-hidden');
+  try { localStorage.setItem('ns_sidebar_hidden', hidden ? 'true' : 'false'); } catch(e){}
 }
 
 
@@ -3621,134 +3819,104 @@ function buildNav(){
   var stageColors={idea:'#6B6358',product:'#1E40AF',trading:'#0D6E4A',expanding:'#C4A882',scaling:'#C4A882'};
   var stageLabels={idea:'Early Stage',product:'Product Stage',trading:'Trading',expanding:'Expanding',scaling:'Scaling'};
 
-  var sectionItems = allVisible.filter(function(n){ return n.sec===navSection; });
-
   var html='';
 
-  // Stage label
+  // Stage label (sb-sector). v4: green sector dot + category · stage (color via CSS).
   if(brand){
     var catShort=(brand.category||'').replace('Skincare & Beauty','Beauty').replace('Food & Beverage','Food').replace('Wellness & Supplements','Wellness').replace('Fashion & Apparel','Fashion');
-    html+='<div style="padding:.4rem 1rem .3rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;color:'+(stageColors[currentStage]||'var(--muted)')+';border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.15rem">'+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
+    html+='<div class="sb-sector"><span class="g">●</span> '+catShort+' · '+(stageLabels[currentStage]||'Trading')+'</div>';
   }
 
-  // Section tabs
-  html+='<div class="nav-section-tabs">';
-  html+='<div class="nav-section-tab'+(navSection==='brand'?' active':'')+'" data-sec="brand" onclick="switchNavSection(this.dataset.sec)">Brand</div>';
-  html+='<div class="nav-section-tab'+(navSection==='source'?' active':'')+'" data-sec="source" onclick="switchNavSection(this.dataset.sec)">Source</div>';
-  html+='<div class="nav-section-tab'+(navSection==='retail'?' active':'')+'" data-sec="retail" onclick="switchNavSection(this.dataset.sec)">Retailer Relations</div>';
-  html+='</div>';
-
-  sectionItems.forEach(function(n){
-    html+='<div class="nav-item" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
-    html+='<span class="nav-icon">'+n.icon+'</span>';
-    html+='<div style="flex:1;min-width:0"><span class="nav-label">'+n.label+'</span>';
-    if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
-    html+='</div>';
-    if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
-    if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
-    if(n.id==='retail-tracker'){
-      try{
-        var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
-        var stale=subs.filter(function(s){
-          if(s.status!=='under_review') return false;
-          var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
-          return (Date.now()-new Date(ref).getTime())/86400000 > 21;
-        }).length;
-        if(stale>0) html+='<span class="nav-badge" style="background:#F59E0B">'+stale+'</span>';
-      }catch(e){}
-    }
+  // ── DESKTOP: 5-group one-scroll rail (approved IA). Iterate groups in order;
+  //   render each group's stage/category-visible items (filtered by getVisibleNav)
+  //   under a .grp header. A group with no visible items emits no header. The 3
+  //   section tabs are gone; `sec` is retained for the (untouched) mobile drawer.
+  //   Each item KEEPS class="nav-item" id="nav-<id>" data-id onclick=showPage —
+  //   routing/active-state contract intact; +.parked +.flag per the approved IA.
+  NAV_GROUPS.forEach(function(grp){
+    var groupItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
+    if(groupItems.length===0) return;
+    html+='<div class="grp"><div class="grp-h">'+grp.label+' <span class="grp-q">'+grp.q+'</span></div>';
+    groupItems.forEach(function(n){
+      html+='<div class="nav-item'+(n.parked?' parked':'')+'" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
+      html+='<span class="nav-ico">'+n.icon+'</span>';
+      html+='<div class="nav-text"><span class="nav-name">'+n.label+'</span>';
+      if(NAV_SUBTITLES[n.id]) html+='<span class="nav-sub">'+NAV_SUBTITLES[n.id]+'</span>';
+      html+='</div>';
+      if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
+      if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+      if(n.id==='retail-tracker'){
+        try{
+          var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+          var stale=subs.filter(function(s){
+            if(s.status!=='under_review') return false;
+            var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+            return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+          }).length;
+          if(stale>0) html+='<span class="nav-badge alert">'+stale+'</span>';
+        }catch(e){}
+      }
+      if(n.flag) html+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
+      html+='</div>';
+    });
     html+='</div>';
   });
 
   nav.innerHTML=html;
 
-  // Mobile nav — show current section items + section switcher
-  var mobnav=document.getElementById('mobile-nav-inner');
-  if(mobnav){
-    var brandPages=['home','skus','report','compare','claims','pitch','brandpack','rp-marketplace','bizcase','cfo'];
-    var sourcePages=['find','suppliers','sourcing','circular','dpp','csrd'];
-    var retailPages=['crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms'];
-    var inBrand=brandPages.includes(currentPage);
-    var inSource=sourcePages.includes(currentPage);
-    var inRetail=retailPages.includes(currentPage);
-    var mobTabs=[
-      {id:'home',   icon:'\u2302', label:'Home',     direct:true},
-      {id:'brand',  icon:'\u25ce', label:'Brand',    direct:false, section:'brand'},
-      {id:'source', icon:'\u25cc', label:'Source',   direct:false, section:'source'},
-      {id:'retail', icon:'\u25a4', label:'Retailer', direct:false, section:'retail'},
-    ];
-    // Count stale retail submissions for tab badge (same rule as desktop sidebar)
-    var staleRetail=0;
-    try{
-      var _subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
-      staleRetail=_subs.filter(function(s){
-        if(s.status!=='under_review') return false;
-        var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
-        return (Date.now()-new Date(ref).getTime())/86400000 > 21;
-      }).length;
-    }catch(e){}
+  // ── MOBILE: the SAME 5 groups as desktop, one scroll, into #mob-menu-body.
+  //   Ordered by NAV_GROUPS ids; filtered by getVisibleNav (stage/category);
+  //   items route via showPage (closing the menu first). Desktop badge set
+  //   (saved-reports / suppliers / retail-tracker stale) + flags/parked. The
+  //   bottom bar (Menu/Search/Recent/Me) is static HTML — not rebuilt here.
+  var mobMenu=document.getElementById('mob-menu-body');
+  if(mobMenu){
     var mobHtml='';
-    mobTabs.forEach(function(n){
-      // CRM is now a sub-item of the Retailer section, so any time we're on
-      // currentPage 'crm' the Retailer tab is the active one.
-      var active=(n.id==='home'&&currentPage==='home')||(n.id==='brand'&&inBrand&&currentPage!=='home')||(n.id==='source'&&inSource)||(n.id==='retail'&&inRetail);
-      mobHtml+='<div class="mob-nav-item'+(active?' active':'')+'" onclick="'+( n.direct ? 'closeMobDrawer();showPage(\''+n.id+'\')' : 'toggleMobDrawer(\''+n.section+'\')' )+'">';
-      if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="mob-badge">'+savedReports.length+'</span>';
-      var pendingSource=sourcingCRM.filter(function(x){return x.status==='enquiry_sent'||x.status==='awaiting';}).length;
-      if(n.id==='find'&&pendingSource>0) mobHtml+='<span class="mob-badge">'+pendingSource+'</span>';
-      if(n.id==='retail'&&staleRetail>0) mobHtml+='<span class="mob-badge" style="background:#F59E0B">'+staleRetail+'</span>';
-      mobHtml+='<span class="mob-nav-icon">'+n.icon+'</span>';
-      mobHtml+='<span class="mob-nav-label">'+n.label+'</span>';
-      mobHtml+='</div>';
+    NAV_GROUPS.forEach(function(grp){
+      var gItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
+      if(gItems.length===0) return;
+      mobHtml+='<div class="m-grp-h">'+grp.label+' · '+grp.q+'</div>';
+      gItems.forEach(function(n){
+        mobHtml+='<div class="m-li'+(n.parked?' parked':'')+(currentPage===n.id?' on':'')+'" onclick="closeMobMenu();showPage(\''+n.id+'\')">';
+        mobHtml+='<span class="ic">'+n.icon+'</span><span class="nm">'+n.label+'</span>';
+        if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="m-badge">'+savedReports.length+'</span>';
+        if(n.id==='suppliers') mobHtml+='<span class="m-badge">2</span>';
+        if(n.id==='retail-tracker'){
+          try{
+            var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
+            var stale=subs.filter(function(s){
+              if(s.status!=='under_review') return false;
+              var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
+              return (Date.now()-new Date(ref).getTime())/86400000 > 21;
+            }).length;
+            if(stale>0) mobHtml+='<span class="m-badge alert">'+stale+'</span>';
+          }catch(e){}
+        }
+        if(n.flag) mobHtml+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
+        mobHtml+='</div>';
+      });
     });
-    mobnav.innerHTML=mobHtml;
+    mobMenu.innerHTML=mobHtml;
   }
 }
 
-var mobDrawerOpen = null; // 'brand' | 'source' | 'retail' | null
+// Mobile grouped-menu open/close — replaces the retired per-section drawer
+// (toggleMobDrawer/closeMobDrawer/#mob-drawer). The menu content is rendered by
+// buildNav into #mob-menu-body; this only toggles visibility + the Menu tab state.
+var mobMenuOpen = false;
 
-function toggleMobDrawer(section){
-  if(mobDrawerOpen===section){ closeMobDrawer(); return; }
-  mobDrawerOpen = section;
-  var drawer = document.getElementById('mob-drawer');
-  var overlay = document.getElementById('mob-drawer-overlay');
-  if(!drawer) return;
-
-  var stage = brand&&brand.stage ? brand.stage : 'trading';
-  var cat   = brand&&brand.category ? brand.category : null;
-  var items = NAV.filter(function(n){
-    if(n.sec!==section) return false;
-    if(!n.stages.includes(stage)) return false;
-    if(n.cats&&cat&&!n.cats.includes(cat)) return false;
-    return true;
-  });
-
-  var sectionLabel = section==='brand' ? 'Brand'
-                   : section==='source' ? 'Source'
-                   : section==='retail' ? 'Retailer Relations'
-                   : '';
-  var html = '<div style="padding:.5rem 1.25rem .35rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);opacity:.7">'+sectionLabel+'</div>';
-  items.forEach(function(n){
-    var active = currentPage===n.id;
-    var label  = getCatLabel(n.id)||n.label;
-    html += '<div class="mob-drawer-item'+(active?' active':'')+'" data-pid="'+n.id+'" onclick="closeMobDrawer();showPage(this.dataset.pid)">';
-    html += '<span class="mob-drawer-icon">'+n.icon+'</span>';
-    html += '<span class="mob-drawer-label">'+label+'</span>';
-    if(n.badge) html += '<span class="mob-drawer-badge">'+n.badge+'</span>';
-    html += '</div>';
-  });
-
-  drawer.innerHTML = html;
-  drawer.classList.add('open');
-  overlay.classList.add('open');
+function toggleMobMenu(){
+  mobMenuOpen = !mobMenuOpen;
+  var menu=document.getElementById('mob-menu');
+  var tab=document.getElementById('mtab-menu');
+  if(menu) menu.classList.toggle('open', mobMenuOpen);
+  if(tab) tab.classList.toggle('on', mobMenuOpen);
 }
 
-function closeMobDrawer(){
-  mobDrawerOpen = null;
-  var d=document.getElementById('mob-drawer');
-  var o=document.getElementById('mob-drawer-overlay');
-  if(d) d.classList.remove('open');
-  if(o) o.classList.remove('open');
+function closeMobMenu(){
+  mobMenuOpen = false;
+  var menu=document.getElementById('mob-menu'); if(menu) menu.classList.remove('open');
+  var tab=document.getElementById('mtab-menu'); if(tab) tab.classList.remove('on');
 }
 
 let currentPage='home';
@@ -3758,19 +3926,19 @@ function showPage(id){
   // Verified Directory merged into "Find Manufacturers" (id 'find').
   // Redirect any legacy callers / deep links to the new module.
   if(id === 'agent' || id === 'verified') id = 'find';
-  closeMobDrawer();
+  closeMobMenu();   // close the mobile grouped menu on navigate (was closeMobDrawer)
   currentPage=id;
   // Auto-switch section tab to match the page being shown
   var navItem = NAV.find(function(n){ return n.id===id; });
   if(navItem&&navItem.sec) navSection=navItem.sec;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.querySelectorAll('.mob-nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.m-li').forEach(n=>n.classList.remove('on'));   // mobile menu active (buildNav re-renders it)
   document.getElementById('page-'+id)?.classList.add('active');
   buildNav(); // rebuild so active tab + item are in sync
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('mobnav-'+id)?.classList.add('active');
-  document.getElementById('reg-strip').style.display=(brand&&id!=='home')?'flex':'none';
+  var _rs=document.getElementById('reg-strip'); if(_rs) _rs.style.display=(brand&&id!=='home')?'flex':'none'; // #reg-strip retired → global #deadline-bar; guard so this no-ops
   setDeepLink(id);
   renderPage(id);
 }
@@ -4079,17 +4247,23 @@ function updateSidebarBrand(){
    REG STRIP
 ═══════════════════════════════════════════════════ */
 function daysUntil(d){return Math.max(0,Math.round((new Date(d)-new Date())/(1000*60*60*24)));}
+// v4: populates the global #deadline-bar (the per-page #reg-strip was retired).
+// Reuses the SAME category filter + daysUntil (no parallel date truth, Rule #22/#23);
+// sorts ascending by daysUntil (soonest first) and shows the soonest 2.
 function renderRegStrip(){
-  const strip=document.getElementById('reg-strip');
-  if(!brand){strip.style.display='none';return;}
-  const relevant=REG_DEADLINES.filter(r=>!r.cat||(getBrandCategories()||[brand?.category||'']).some(cat=>r.cat.includes(cat))).slice(0,3);
-  if(!relevant.length){strip.style.display='none';return;}
+  const strip=document.getElementById('deadline-bar');
+  if(!strip) return;
+  if(!brand){strip.style.display='none';strip.innerHTML='';return;}
+  const relevant=REG_DEADLINES
+    .filter(r=>!r.cat||(getBrandCategories()||[brand?.category||'']).some(cat=>r.cat.includes(cat)))
+    .sort((a,b)=>daysUntil(a.deadline)-daysUntil(b.deadline))
+    .slice(0,2);
+  if(!relevant.length){strip.style.display='none';strip.innerHTML='';return;}
   strip.style.display='flex';
-  strip.innerHTML=`<span class="reg-strip-label">⚠ Upcoming deadlines</span>`+
+  strip.innerHTML=`<span class="dl-title">⚠ Upcoming deadlines</span>`+
     relevant.map(r=>{
       const d=daysUntil(r.deadline);
-      const color=d<90?'#EF4444':d<180?'#F59E0B':'#1E3A5F';
-      return `<div class="reg-item"><span class="reg-days" style="color:${color}">${d}d</span><span class="reg-name">${r.title}</span><button class="reg-btn" onclick="showPage('${r.link}')">→</button></div>`;
+      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span><button class="dl-arrow" onclick="showPage('${r.link}')">→</button></span>`;
     }).join('');
 }
 
@@ -32225,7 +32399,7 @@ function renderCSRD(el){
               <span style="background:${catBg};border:1px solid ${catColor};padding:.15rem .5rem">${cat}</span>
             </div>
             ${catQs.map(q=>{
-              const val = answers[q.id]||'';
+              const val = String(answers[q.id] ?? '');
               const filled = val.trim()!=='';
               return `
                 <div style="background:#fff;border:1px solid ${filled?'#A7F3D0':'#FCD34D'};border-left:3px solid ${filled?'var(--green)':'var(--amber)'};padding:.65rem .85rem;margin-bottom:.4rem">
@@ -32234,7 +32408,7 @@ function renderCSRD(el){
                     <span style="font-family:var(--mono);font-size:.5rem;padding:.1rem .35rem;background:${filled?'#ECFDF5':'#FFFBEB'};color:${filled?'#065F46':'#92400E'};white-space:nowrap;flex-shrink:0">${filled?'✓ filled':'needs input'}</span>
                   </div>
                   <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.3rem">Unit: ${q.unit} · Source: ${q.hint}</div>
-                  <input type="text" value="${(val||'').replace(/"/g,'&quot;')}"
+                  <input type="text" value="${val.replace(/"/g,'&quot;')}"
                     placeholder="${q.unit==='yes/no'?'yes / no':q.unit==='yes/no/partial'?'yes / no / partial':q.unit==='yes/no + cert'?'yes — [certificate name]':q.unit==='yes/no/unknown'?'yes / no / unknown':'Enter value…'}"
                     oninput="csrdSaveAnswer('${q.id}',this.value);this.closest('div[style]').style.borderColor=this.value.trim()?'#A7F3D0':'#FCD34D';this.closest('div[style]').style.borderLeftColor=this.value.trim()?'var(--green)':'var(--amber)'"
                     onchange="renderPage('csrd')"
@@ -34118,6 +34292,8 @@ function renderRequestListedModal(){
 
 function init(){
   loadState();
+  // Desktop sidebar hide/show: restore persisted state on load (defensive, Rule #19).
+  try { if(localStorage.getItem('ns_sidebar_hidden') === 'true') document.body.classList.add('sidebar-hidden'); } catch(e){}
   loadDPP();
   loadManualSuppliers();
   loadSourcingCRM();
@@ -37000,22 +37176,7 @@ function downloadRetailCommsCsv(){
    MOBILE NAV — enable retail section drawer
 ═══════════════════════════════════════════════════ */
 
-// Patch mobile drawer title after initial render to include retail
-(function(){
-  if(typeof toggleMobDrawer === 'function'){
-    var _orig = toggleMobDrawer;
-    toggleMobDrawer = function(section){
-      _orig(section);
-      if(section === 'retail'){
-        var drawer = document.getElementById('mob-drawer');
-        if(drawer){
-          var title = drawer.querySelector('div');
-          if(title) title.textContent = 'Retail';
-        }
-      }
-    };
-  }
-})();
+// (Mobile drawer-title monkey-patch removed with the drawer — Piece 2.)
 init();
 </script>
 <script>

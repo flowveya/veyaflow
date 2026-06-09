@@ -65,6 +65,22 @@ async function patchRow(extractionId, patch) {
   }
 }
 
+// Best-effort delete of a Storage object after extraction. Never fails the run.
+async function deleteStorageObject(storagePath) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/bil-images/${storagePath}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+  } catch (e) {
+    console.error('[bg] storage delete error ' + (e && e.message));
+  }
+}
+
 exports.handler = async (event) => {
   const t0 = Date.now();
 
@@ -81,22 +97,49 @@ exports.handler = async (event) => {
   }
 
   const extractionId = payload && payload.extractionId;
-  const body = payload && payload.body;
+  const storagePath  = payload && payload.storagePath;
 
   // No extractionId → nowhere to write the result; nothing we can mark failed.
   if (!extractionId) {
     console.error('[bg] no extractionId — aborting');
     return { statusCode: 400, body: 'extractionId required' };
   }
-  // Malformed body → mark the row failed so the client poll doesn't hang.
-  if (!body || !Array.isArray(body.messages)) {
-    console.error('[bg] missing body.messages for ' + extractionId);
-    await patchRow(extractionId, { status: 'failed', error_type: 'bad_request', latency_ms: Date.now() - t0 });
-    return { statusCode: 400, body: 'body.messages required' };
+  if (!storagePath) {
+    console.error('[bg] no storagePath for ' + extractionId);
+    await patchRow(extractionId, { status: 'failed', error_type: 'no_body', latency_ms: Date.now() - t0 });
+    return { statusCode: 400, body: 'storagePath required' };
   }
   if (!ANTHROPIC_API_KEY) {
     await patchRow(extractionId, { status: 'failed', error_type: 'no_api_key', latency_ms: Date.now() - t0 });
     return { statusCode: 500, body: 'ANTHROPIC_API_KEY not set' };
+  }
+
+  // ── Download the request body from Storage (service key, same auth as PATCH).
+  //   The client uploaded it to bil-images/<storagePath> because the base64 page
+  //   images can't pass through this function's POST. ─────────────────────────
+  let body;
+  try {
+    const dlRes = await fetch(`${SUPABASE_URL}/storage/v1/object/bil-images/${storagePath}`, {
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    if (!dlRes.ok) {
+      console.error('[bg] storage download failed HTTP ' + dlRes.status + ' for ' + storagePath);
+      await patchRow(extractionId, { status: 'failed', error_type: 'no_body', latency_ms: Date.now() - t0 });
+      return { statusCode: 200, body: 'no body in storage' };
+    }
+    body = await dlRes.json();
+  } catch (e) {
+    console.error('[bg] storage download error ' + (e && e.message));
+    await patchRow(extractionId, { status: 'failed', error_type: 'no_body', latency_ms: Date.now() - t0 });
+    return { statusCode: 200, body: 'storage error' };
+  }
+  if (!body || !Array.isArray(body.messages)) {
+    console.error('[bg] downloaded body missing messages for ' + extractionId);
+    await patchRow(extractionId, { status: 'failed', error_type: 'no_body', latency_ms: Date.now() - t0 });
+    return { statusCode: 200, body: 'bad body' };
   }
 
   // ── Call Anthropic (mirror anthropic-proxy.js) — no 30s ceiling here. ──────
@@ -128,6 +171,7 @@ exports.handler = async (event) => {
         error_type: 'anthropic_http_' + res.status,
         latency_ms: Date.now() - t0,
       });
+      await deleteStorageObject(storagePath);   // best-effort cleanup
       return { statusCode: 200, body: 'logged anthropic error' };
     }
 
@@ -143,6 +187,7 @@ exports.handler = async (event) => {
       // client's poll surfaces a failure rather than hanging on 'processing'.
       await patchRow(extractionId, { status: 'failed', error_type: 'result_write_failed', latency_ms: Date.now() - t0 });
     }
+    await deleteStorageObject(storagePath);   // best-effort cleanup
     console.log('[bg] done ' + extractionId + ' latency_ms=' + (Date.now() - t0) + ' wrote=' + wrote);
     return { statusCode: 200, body: 'done' };
 
@@ -153,6 +198,7 @@ exports.handler = async (event) => {
       error_type: 'exception',
       latency_ms: Date.now() - t0,
     });
+    await deleteStorageObject(storagePath);   // best-effort cleanup
     return { statusCode: 200, body: 'logged exception' };
   }
 };
