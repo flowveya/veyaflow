@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VeyaFlow — Brand Growth Intelligence</title>
+<!-- Daylight + Cormorant foundation (Cycle 1, Build Brief §4) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
   /* v4 re-skin fonts — loaded additively; existing fonts above stay until the per-page sweep flips --serif/--sans/--mono */
@@ -12,37 +16,55 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --ink: #0E0E0E;
-    --navy: #1E3A5F;
-    --gold: #C4A882;
-    --cream: #F7F5F0;
-    --border: #EDE9E1;
-    --muted: #9A9489;
-    --green: #10B981;
-    --amber: #F59E0B;
-    --red: #EF4444;
-    --blue: #1E40AF;
-    --sage: #7A9B7E;        /* forward-aligned with Brand Identity Refresh */
-    --terracotta: #D97757;  /* forward-aligned with Brand Identity Refresh */
-    --serif: 'Playfair Display', Georgia, serif;
-    --sans: 'DM Sans', system-ui, sans-serif;
-    --mono: 'DM Mono', monospace;
+    /* ═══════════════════════════════════════════════════════════════════
+       DAYLIGHT + CORMORANT foundation (Cycle 1 — Build Brief §3/§4).
+       Atomic value-swap of the clay/Fraunces system. Old token NAMES are
+       kept as aliases below so zero references dangle.
+       ═══════════════════════════════════════════════════════════════════ */
 
-    /* ─── v4 re-skin tokens — ADDITIVE; existing tokens above retained until the per-page sweep ─── */
-    /* NOTE: v4 ink target is #1C1A17. Existing --ink (#0E0E0E) is intentionally LEFT UNCHANGED here —
-       pages depend on it; the v4 ink is applied per-page during the sweep, then globally at the end. */
-    /* NOTE: --serif/--sans/--mono are NOT flipped yet. The final sweep flips them to
-       Fraunces / Geist / Geist Mono so the whole app isn't restyled prematurely. */
-    --accent:#C0613A; --accent-deep:#9E4A28; --accent-soft:#F3E3DA;
-    --ink-soft:#4A463F; --ink-mute:#8A857B;
-    --paper:#FFFFFF; --surface:#FAF8F4; --paper-deep:#F0ECE4;
-    --line:#E7E2D8; --line-strong:#D8D1C4; --on-accent:#FFFFFF;
-    --green-bg:#DCEBE0; --green-text:#2F6B45;
-    --amber-bg:#F6E7CC; --amber-text:#8A6516;
-    --red-bg:#F3D6D0;   --red-text:#B23A2A;
-    --blue-bg:#DBE3F4;  --blue-text:#3A4F8A;
-    --green-soft:#EEF5EF; --amber-soft:#FBF3E2; --blue-soft:#EDF1F9; /* 5-group nav flag/parked soft fills */
-    --brand-name:'Newsreader', Georgia, serif;
+    /* GROUNDS — light, soft-sky tinted */
+    --paper:#FFFFFF; --surface:#F4F9FB; --paper-deep:#E4F0F0;
+
+    /* INK — deep teal-black, not pure black */
+    --ink:#0C2A2E; --ink-soft:#3D5559; --ink-mute:#7FA0A2;
+
+    /* BRAND ACCENT — teal (primary: nav active, links, score, primary buttons) */
+    --accent:#0E8C8C; --accent-deep:#0A6E6E; --accent-soft:#DCF0F0;
+    --on-accent:#FFFFFF;
+
+    /* BRAND SECONDARY — tangerine (warm accent, sparing) */
+    --tang:#FF7A3D; --tang-deep:#D85E26; --tang-soft:#FFEADD;
+
+    /* LINES */
+    --line:#DCEDED; --line-strong:#C4E0E0;
+
+    /* SEMANTIC STATUS — compliance/status ONLY, never brand decoration */
+    --green-bg:#D6F0E2; --green-text:#15795A; --green-soft:#E6F6EE; --green-bar:#27A06E;
+    --amber-bg:#FBEBCB; --amber-text:#9A6B0E; --amber-soft:#FDF4E0; --amber-bar:#E0A526;
+    --red-bg:#FAD9D6;   --red-text:#C5392E;   --red-soft:#FDEEEC;
+    /* blue — not in brief §3, but referenced by compare runner-up bars + nav flags;
+       kept (non-dangling), tuned cool-neutral to coexist with the teal system */
+    --blue-bg:#DBE3F4;  --blue-text:#3A4F8A;  --blue-soft:#EDF1F9; --blue-bar:#5570B8;
+
+    /* FONTS (§4) */
+    --display:'Cormorant Garamond', Georgia, serif;  /* wordmark, titles, headings, score */
+    --sans:'Outfit', system-ui, sans-serif;          /* body, UI, tables, forms, nav */
+    --mono:'Geist Mono', monospace;                  /* eyebrows, labels, counts, codes */
+    --brand-name:'Cormorant Garamond', Georgia, serif;
+
+    /* ─── Legacy aliases: old names → new values (dominant-use mapping; zero dangling refs) ─── */
+    --navy: var(--ink);          /* navy text/borders → ink. Navy BACKGROUNDS were migrated to --accent in markup. */
+    --gold: var(--accent);       /* gold (links/accents) → teal */
+    --cream: var(--surface);     /* page ground */
+    --border: var(--line);
+    --muted: var(--ink-mute);
+    --serif: var(--display);     /* old serif → Cormorant display */
+    --green: var(--green-text);  /* dominant use is text */
+    --amber: var(--amber-text);
+    --red: var(--red-text);
+    --blue: var(--blue-text);
+    --sage: var(--green-text);       /* listing/positive bars (3 refs) → status green-text */
+    --terracotta: var(--red-text);   /* rejection/negative bars (3 refs) → status red-text (NOT tang: insider-note is the only tangerine) */
   }
 
   html, body { height: 100%; background: var(--cream); font-family: var(--sans); color: var(--ink); }
@@ -217,7 +239,7 @@
 
   /* BUTTONS */
   .btn-primary {
-    padding: .8rem 1.5rem; background: var(--navy); border: none; color: #fff;
+    padding: .8rem 1.5rem; background: var(--accent); border: none; color: #fff;
     font-family: var(--mono); font-size: .7rem; font-weight: 600;
     letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
     width: 100%; transition: opacity .15s;
@@ -262,7 +284,7 @@
 
   /* Tooltip system */
   .vf-tip { position:relative;display:inline-flex;align-items:center;cursor:help; }
-  .vf-tip::after { content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-family:var(--sans);font-size:.65rem;line-height:1.5;padding:.45rem .65rem;white-space:normal;text-align:left;opacity:0;pointer-events:none;transition:opacity .15s;z-index:9990;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:220px;min-width:140px;border-radius:2px; }
+  .vf-tip::after { content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-family:var(--sans);font-size:.65rem;line-height:1.5;padding:.45rem .65rem;white-space:normal;text-align:left;opacity:0;pointer-events:none;transition:opacity .15s;z-index:9990;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:220px;min-width:140px;border-radius:2px; }
   .vf-tip:hover::after { opacity:1; }
 
   /* PROSE */
@@ -292,7 +314,7 @@
     font-family: var(--mono); font-size: .62rem; color: var(--muted);
     cursor: pointer; transition: all .15s; display: inline-block; margin: .2rem;
   }
-  .market-chip.selected { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .market-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
   .goal-chip {
     padding: .55rem .75rem; border: 1px solid var(--border); background: var(--cream);
     font-family: var(--sans); font-size: .72rem; color: #555;
@@ -319,18 +341,89 @@
   .next-step-name { font-family: var(--sans); font-size: .82rem; color: var(--navy); font-weight: 500; }
   .next-step-desc { font-family: var(--sans); font-size: .68rem; color: var(--muted); margin-top: .1rem; }
 
-  /* REPORT */
-  .report-header { background: var(--navy); padding: 1.5rem 2rem; }
-  .report-badge { font-family: var(--mono); font-size: .55rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
-  .report-brand { font-family: var(--serif); font-size: 1.6rem; color: #fff; font-weight: 400; margin-bottom: .2rem; }
-  .report-meta { font-family: var(--sans); font-size: .7rem; color: rgba(255,255,255,.45); margin-bottom: 1rem; }
-  .report-meta-row { display: flex; gap: 2rem; border-top: 1px solid rgba(255,255,255,.12); padding-top: .85rem; flex-wrap: wrap; }
-  .report-meta-lbl { font-family: var(--mono); font-size: .52rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: .2rem; }
-  .report-meta-val { font-size: .82rem; color: #fff; }
+  /* REPORT — v4 result-view reskin: LIGHT cover (screen styling; print overrides live in @media print) */
+  .report-header { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; padding: 1.75rem 2rem; margin: 1.4rem 0 1.1rem; }
+  .report-badge { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: .85rem; }
+  .report-brand { font-family: var(--brand-name); font-size: 2.1rem; color: var(--ink); font-weight: 500; margin-bottom: .1rem; }
+  .report-meta { font-family: var(--mono); font-size: .68rem; color: var(--ink-mute); margin: .15rem 0 1.15rem; }
+  .report-meta-row { display: flex; gap: 2.2rem; border-top: 1px solid var(--line); padding-top: 1.05rem; flex-wrap: wrap; }
+  .report-meta-lbl { font-family: var(--mono); font-size: .55rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: .3rem; }
+  .report-meta-val { font-size: .95rem; font-weight: 600; color: var(--ink); }
   .report-section { border-bottom: 1px solid var(--border); padding: 1.5rem 1.5rem 1.5rem 1.25rem; }
   .report-section:last-child { border-bottom: none; }
   .report-section-num { font-family: var(--mono); font-size: .55rem; color: var(--gold); }
   .report-section-title { font-family: var(--serif); font-size: 1.05rem; color: var(--navy); margin: .2rem 0 .65rem; }
+
+  /* v4 result-view reskin — Market Report + Compare Markets (screen only) */
+  .vf-stat-strip { display: grid; grid-template-columns: repeat(4,1fr); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--paper); margin-bottom: 1.4rem; }
+  .vf-ss-cell { padding: 1.15rem 1rem; border-right: 1px solid var(--line); text-align: center; }
+  .vf-ss-cell:last-child { border-right: none; }
+  .vf-ss-val { font-family: var(--serif); font-size: 1.85rem; font-weight: 500; line-height: 1; color: var(--ink); }
+  .vf-ss-lab { font-family: var(--mono); font-size: .56rem; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; margin-top: .5rem; }
+  .vf-ss-saved { color: var(--green-text); font-weight: 600; font-size: .9rem; }
+  .vf-jump { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: .8rem 1.05rem; margin-bottom: 1.5rem; background: var(--paper); }
+  .vf-jump-lab { font-family: var(--mono); font-size: .6rem; color: var(--ink-mute); }
+  .vf-jump-chip { font-family: var(--mono); font-size: .6rem; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 7px; padding: .3rem .65rem; cursor: pointer; background: none; white-space: nowrap; }
+  .vf-jump-chip:hover { border-color: var(--accent); color: var(--accent-deep); }
+  .vf-rsections { background: transparent; }
+  .vf-rsection { border-left: 3px solid var(--accent); border-bottom: none; padding: .25rem 0 1.3rem 1.5rem; margin-bottom: 1.1rem; position: relative; }
+  .vf-rsection.green { border-left-color: var(--green-text); }
+  .vf-rsection.amber { border-left-color: var(--amber-text); }
+  .vf-rsec-num { font-family: var(--mono); font-size: .8rem; color: var(--accent); font-weight: 500; }
+  .vf-rsection.green .vf-rsec-num { color: var(--green-text); }
+  .vf-rsection.amber .vf-rsec-num { color: var(--amber-text); }
+  .vf-conf { font-family: var(--mono); font-size: .56rem; font-weight: 700; padding: .25rem .55rem; border-radius: 7px; letter-spacing: .04em; white-space: nowrap; }
+  .vf-conf.high { background: var(--green-bg); color: var(--green-text); }
+  .vf-conf.med  { background: var(--amber-bg); color: var(--amber-text); }
+  .vf-conf.est  { background: transparent; border: 1px solid var(--red-text); color: var(--red-text); }
+
+  .vf-reco { background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; padding: 1.4rem 1.6rem; margin-bottom: 1.1rem; }
+  .vf-reco-tag { font-family: var(--mono); font-size: .58rem; color: var(--accent-deep); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .6rem; }
+  .vf-reco-head { font-family: var(--serif); font-size: 1.45rem; font-weight: 500; color: var(--ink); line-height: 1.25; }
+  .vf-reco-head strong { font-weight: 600; color: var(--green-text); }
+  .vf-reco-head .runner { color: var(--ink-mute); }
+  .vf-reco-sub { font-family: var(--mono); font-size: .62rem; color: var(--ink-mute); margin-top: .5rem; }
+  .vf-cmp { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 1.4rem 1.6rem; margin-bottom: 1.1rem; overflow-x: auto; }
+  .vf-cmp-grid { display: grid; gap: 1.1rem; align-items: center; }
+  .vf-cmp-head { padding-bottom: 1rem; border-bottom: 1px solid var(--line); margin-bottom: .3rem; align-items: end; }
+  .vf-cmp-col { text-align: center; cursor: default; }
+  .vf-cmp-col .nm { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; color: var(--ink); }
+  .vf-cmp-col .sc { font-family: var(--serif); font-size: 2.1rem; font-weight: 500; line-height: 1; margin-top: .25rem; color: var(--ink); }
+  .vf-cmp-col.win .sc { color: var(--green-text); }
+  .vf-cmp-col.run .sc { color: var(--blue-text); }
+  .vf-cmp-col .bdg { font-family: var(--mono); font-size: .56rem; letter-spacing: .06em; text-transform: uppercase; margin-top: .25rem; color: var(--ink-mute); }
+  .vf-cmp-col.win .bdg { color: var(--green-text); }
+  .vf-cmp-col.run .bdg { color: var(--blue-text); }
+  .vf-cmp-row { padding: .7rem 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .vf-cmp-row.open { border-bottom-color: var(--accent); }
+  .vf-cmp-dim .d { font-family: var(--mono); font-size: .72rem; color: var(--ink); font-weight: 500; }
+  .vf-cmp-dim .w { font-family: var(--mono); font-size: .58rem; color: var(--ink-mute); margin-top: .15rem; }
+  .vf-bar-cell { position: relative; }
+  .vf-bar-track { background: var(--paper-deep); height: 26px; border-radius: 7px; overflow: hidden; }
+  .vf-bar-fill { height: 100%; border-radius: 7px; transition: width .4s ease; }
+  .vf-bar-fill.green { background: var(--green-bar); }
+  .vf-bar-fill.blue  { background: var(--blue-bar); }
+  .vf-bar-fill.amber { background: var(--amber-text); }
+  .vf-bar-fill.neutral { background: var(--ink-mute); }
+  .vf-bar-val { position: absolute; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: .65rem; font-weight: 700; color: var(--ink); }
+  .vf-cmp-detail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .7rem 1rem; margin: .35rem 0 .1rem; }
+  .vf-cmp-detail-q { font-family: var(--mono); font-size: .56rem; color: var(--ink-mute); margin-bottom: .4rem; text-transform: uppercase; letter-spacing: .08em; }
+  .vf-cmp-detail-cell .mn { font-family: var(--mono); font-size: .6rem; font-weight: 700; color: var(--ink); margin-bottom: .2rem; }
+  .vf-cmp-detail-cell .tx { font-size: .68rem; color: var(--ink-soft); line-height: 1.55; }
+  .vf-cmp-total { padding-top: 1rem; margin-top: .3rem; border-top: 2px solid var(--line-strong); }
+  .vf-cmp-total .lab { font-family: var(--mono); font-size: .6rem; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; align-self: center; }
+  .vf-cmp-total .ts { text-align: center; font-family: var(--serif); font-size: 1.6rem; font-weight: 500; color: var(--ink); }
+  .vf-cmp-total .ts.win { color: var(--green-text); }
+  .vf-cmp-total .ts.run { color: var(--blue-text); }
+  .vf-followup { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: .85rem; background: var(--paper); }
+  .vf-fu-q { font-family: var(--mono); font-size: .6rem; color: var(--accent-deep); letter-spacing: .04em; margin-bottom: .45rem; }
+  .vf-fu-a { font-size: .76rem; color: var(--ink-soft); line-height: 1.6; white-space: pre-line; }
+  .vf-fu-delta { display: flex; align-items: center; justify-content: space-between; padding: .35rem 0; }
+  .vf-fu-delta .nm { font-size: .76rem; color: var(--ink); }
+  .vf-fu-delta .vals { display: flex; gap: .75rem; font-family: var(--mono); font-size: .6rem; color: var(--ink-mute); }
+  .vf-parallel { background: var(--blue-soft); border: 1px solid var(--blue-bg); border-radius: 12px; padding: .9rem 1.1rem; margin-bottom: 1rem; }
+  .vf-parallel-h { font-family: var(--mono); font-size: .6rem; font-weight: 700; color: var(--blue-text); margin-bottom: .35rem; }
+  .vf-parallel-row { font-size: .72rem; color: var(--ink-soft); line-height: 1.55; margin-bottom: .3rem; }
 
   /* SUPPLIERS */
   .supplier-row { border-bottom: 1px solid var(--border); padding: .85rem 0; }
@@ -347,7 +440,7 @@
   /* FIND */
   .mfr-card { background: #fff; border: 1px solid var(--border); border-left-width: 3px; padding: 1.1rem 1.25rem; margin-bottom: .75rem; }
   .compare-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
-  .compare-table th { padding: .75rem 1rem; text-align: left; background: var(--navy); color: rgba(255,255,255,.5); font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; font-weight: normal; }
+  .compare-table th { padding: .75rem 1rem; text-align: left; background: var(--accent); color: rgba(255,255,255,.5); font-family: var(--mono); font-size: .58rem; letter-spacing: .08em; font-weight: normal; }
   .compare-table th.mfr-name { color: #fff; font-size: .78rem; font-family: var(--sans); font-weight: 500; }
   .compare-table td { padding: .6rem 1rem; vertical-align: top; border-bottom: 1px solid var(--border); }
   .compare-table tr:nth-child(even) td { background: var(--cream); }
@@ -383,7 +476,7 @@
     border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer;
     transition: all .15s;
   }
-  .compare-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .compare-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* CHIPS */
   .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
@@ -407,7 +500,7 @@
 
   /* NAV BANNER */
   .nav-banner {
-    background: var(--navy); padding: 1rem 1.5rem;
+    background: var(--accent); padding: 1rem 1.5rem;
     margin-bottom: 1.5rem; display: flex; justify-content: space-between;
     align-items: center; flex-wrap: wrap; gap: .75rem;
   }
@@ -732,15 +825,16 @@
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; break-inside: avoid; }
 
-    /* Report header — preserve brand navy on print */
+    /* Report header — light cover on print (matches the v4 light screen cover) */
     .report-header {
-      background: #1B2D4F !important;
-      color: #fff !important;
-      padding: 8mm 6mm !important;
+      background: #fff !important;
+      color: #1C1A17 !important;
+      border: .3pt solid #E7E2D8 !important;
+      border-left: 3pt solid #C0613A !important;
+      padding: 6mm 6mm !important;
       margin: 0 0 6mm 0 !important;
     }
-    .report-header * { color: rgba(255,255,255,.92) !important; }
-    .report-brand { font-size: 18pt !important; }
+    .report-brand { font-size: 18pt !important; color: #1C1A17 !important; }
 
     /* Section title typography */
     .report-section-title {
@@ -1616,7 +1710,7 @@ function filterByCategories(items, catGetter, activeCatFilter){
 function renderSetupNudgeBanner(pageId){
   if(profileHasCategories()) return '';
   return `
-    <div id="setup-nudge-banner" style="background:var(--navy);color:#fff;padding:.55rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+    <div id="setup-nudge-banner" style="background:var(--accent);color:#fff;padding:.55rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
       <div style="font-family:var(--sans);font-size:.75rem">Set up your brand profile to personalise this view with your categories and market.</div>
       <button onclick="openSetupModal('${pageId}')" style="background:var(--gold);color:var(--navy);border:none;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.3rem .75rem;cursor:pointer;white-space:nowrap">Complete setup →</button>
     </div>
@@ -3321,7 +3415,7 @@ function renderSetupModal(){
           return `
             <div onclick="_setupDraft.stage='${s.id}';renderSetupModal()"
               style="display:flex;align-items:flex-start;gap:.75rem;padding:.65rem .85rem;border:2px solid ${sel?'var(--navy)':'var(--border)'};background:${sel?'rgba(27,45,79,.04)':'#fff'};cursor:pointer">
-              <div style="width:1rem;height:1rem;border:2px solid ${sel?'var(--navy)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--navy)':'#fff'};margin-top:.1rem;flex-shrink:0"></div>
+              <div style="width:1rem;height:1rem;border:2px solid ${sel?'var(--accent)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--accent)':'#fff'};margin-top:.1rem;flex-shrink:0"></div>
               <div>
                 <div style="font-family:var(--sans);font-size:.8rem;font-weight:${sel?'600':'400'};color:${sel?'var(--navy)':'var(--ink)'}">${s.icon} ${s.label}</div>
                 <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted)">${s.desc}</div>
@@ -3344,7 +3438,7 @@ function renderSetupModal(){
           return `
             <div onclick="_setupDraft.primaryMarket='${m}';renderSetupModal()"
               style="display:flex;align-items:center;gap:.65rem;padding:.5rem .75rem;border:2px solid ${sel?'var(--navy)':'var(--border)'};background:${sel?'rgba(27,45,79,.04)':'#fff'};cursor:pointer">
-              <div style="width:.85rem;height:.85rem;border:2px solid ${sel?'var(--navy)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--navy)':'#fff'};flex-shrink:0"></div>
+              <div style="width:.85rem;height:.85rem;border:2px solid ${sel?'var(--accent)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--accent)':'#fff'};flex-shrink:0"></div>
               <span style="font-family:var(--sans);font-size:.78rem;color:${sel?'var(--navy)':'var(--ink)'};font-weight:${sel?'600':'400'}">${m}</span>
             </div>
           `;
@@ -3378,7 +3472,7 @@ function renderSetupModal(){
           </div>
           ${isNumeric?`
           <div style="background:var(--border);height:3px;border-radius:2px;margin-top:.65rem">
-            <div style="background:var(--navy);height:3px;border-radius:2px;width:${progressPct}%;transition:width .3s ease"></div>
+            <div style="background:var(--accent);height:3px;border-radius:2px;width:${progressPct}%;transition:width .3s ease"></div>
           </div>`:''}
         </div>
         <!-- Body -->
@@ -3390,7 +3484,7 @@ function renderSetupModal(){
         <div style="padding:.85rem 1.25rem calc(.85rem + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--border);position:sticky;bottom:0;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;z-index:50">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
           <button onclick="completeSetupStep()"
-            style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
+            style="background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
             ${_setupModalStep<totalSteps?'Next →':'Save & personalise →'}
           </button>
         </div>`:''}
@@ -3452,7 +3546,7 @@ function renderSetupModal(){
           return `
             <div onclick="_setupDraft.stage='${s.id}';renderSetupModal()"
               style="display:flex;align-items:flex-start;gap:.75rem;padding:.65rem .85rem;border:2px solid ${sel?'var(--navy)':'var(--border)'};background:${sel?'rgba(27,45,79,.04)':'#fff'};cursor:pointer">
-              <div style="width:1rem;height:1rem;border:2px solid ${sel?'var(--navy)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--navy)':'#fff'};margin-top:.1rem;flex-shrink:0"></div>
+              <div style="width:1rem;height:1rem;border:2px solid ${sel?'var(--accent)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--accent)':'#fff'};margin-top:.1rem;flex-shrink:0"></div>
               <div>
                 <div style="font-family:var(--sans);font-size:.8rem;font-weight:${sel?'600':'400'};color:${sel?'var(--navy)':'var(--ink)'}">${s.icon} ${s.label}</div>
                 <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted)">${s.desc}</div>
@@ -3475,7 +3569,7 @@ function renderSetupModal(){
           return `
             <div onclick="_setupDraft.primaryMarket='${m}';renderSetupModal()"
               style="display:flex;align-items:center;gap:.65rem;padding:.5rem .75rem;border:2px solid ${sel?'var(--navy)':'var(--border)'};background:${sel?'rgba(27,45,79,.04)':'#fff'};cursor:pointer">
-              <div style="width:.85rem;height:.85rem;border:2px solid ${sel?'var(--navy)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--navy)':'#fff'};flex-shrink:0"></div>
+              <div style="width:.85rem;height:.85rem;border:2px solid ${sel?'var(--accent)':'#D1D5DB'};border-radius:50%;background:${sel?'var(--accent)':'#fff'};flex-shrink:0"></div>
               <span style="font-family:var(--sans);font-size:.78rem;color:${sel?'var(--navy)':'var(--ink)'};font-weight:${sel?'600':'400'}">${m}</span>
             </div>
           `;
@@ -3499,7 +3593,7 @@ function renderSetupModal(){
           </div>
           <!-- Progress bar -->
           <div style="background:var(--border);height:3px;border-radius:2px;margin-top:.65rem">
-            <div style="background:var(--navy);height:3px;border-radius:2px;width:${Math.round((_setupModalStep/totalSteps)*100)}%;transition:width .3s ease"></div>
+            <div style="background:var(--accent);height:3px;border-radius:2px;width:${Math.round((_setupModalStep/totalSteps)*100)}%;transition:width .3s ease"></div>
           </div>
         </div>
         <!-- Body (scrolls) -->
@@ -3512,7 +3606,7 @@ function renderSetupModal(){
         <div style="padding:.85rem 1.25rem calc(.85rem + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-shrink:0">
           ${_setupModalStep>1?`<button onclick="_setupModalStep--;renderSetupModal()" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.4rem .85rem;cursor:pointer">← Back</button>`:'<div></div>'}
           <button onclick="completeSetupStep()"
-            style="background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
+            style="background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;font-weight:700;padding:.6rem 1.1rem;cursor:pointer;letter-spacing:.05em;min-height:44px">
             ${_setupModalStep<totalSteps?'Next →':'Save & personalise →'}
           </button>
         </div>
@@ -3740,7 +3834,7 @@ function renderGenerationProgress(steps, currentStep, moduleName){
     <div style="padding:1.5rem;background:#fff;border:1px solid var(--border)">
       <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.75rem">Generating ${moduleName}</div>
       <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.85rem">
-        <div style="background:var(--navy);height:6px;border-radius:3px;width:${pct}%;transition:width .4s ease"></div>
+        <div style="background:var(--accent);height:6px;border-radius:3px;width:${pct}%;transition:width .4s ease"></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.4rem">
         ${steps.map((s,i)=>`
@@ -4086,7 +4180,7 @@ function renderPricingModal(activeTierId){
         </div>
 
         <!-- Cost-of-inaction -->
-        <div style="background:var(--navy);padding:.85rem 1.5rem;text-align:center">
+        <div style="background:var(--accent);padding:.85rem 1.5rem;text-align:center">
           <div style="font-family:var(--sans);font-size:.8rem;color:rgba(255,255,255,.8);line-height:1.7">
             Every month not in <strong style="color:var(--gold)">${targetMarket}</strong> = estimated
             <strong style="color:var(--gold)">${monthlyMissed.toLocaleString('sv-SE')} SEK</strong> in missed revenue.
@@ -4104,7 +4198,7 @@ function renderPricingModal(activeTierId){
               <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.45rem">${tier.annualPrice.toLocaleString('sv-SE')} SEK/year</div>
               <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.5;margin-bottom:.65rem">${tier.tagline}</div>
               <button onclick="event.stopPropagation();openUpgradeContact('${tier.id}')"
-                style="width:100%;font-family:var(--mono);font-size:.6rem;padding:.4rem;background:${tier.highlight?'var(--navy)':'none'};color:${tier.highlight?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer">
+                style="width:100%;font-family:var(--mono);font-size:.6rem;padding:.4rem;background:${tier.highlight?'var(--accent)':'none'};color:${tier.highlight?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer">
                 ${tier.cta} →
               </button>
             </div>
@@ -4184,7 +4278,7 @@ function renderTrialExpiredScreen(targetMarket, category){
         <div style="font-family:var(--serif);font-size:1.3rem;font-weight:700;color:var(--navy);margin-bottom:1rem">Your 14-day free trial has ended</div>
 
         <!-- Cost-of-inaction block -->
-        <div style="background:var(--navy);padding:1.1rem 1.25rem;margin-bottom:1.25rem">
+        <div style="background:var(--accent);padding:1.1rem 1.25rem;margin-bottom:1.25rem">
           <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);margin-bottom:.35rem">Cost of waiting</div>
           <div style="font-family:var(--sans);font-size:.82rem;color:#fff;line-height:1.7;margin-bottom:.5rem">
             Every month not in <strong style="color:var(--gold)">${targetMarket||'your target market'}</strong> =
@@ -4209,7 +4303,7 @@ function renderTrialExpiredScreen(targetMarket, category){
               <div style="text-align:right;flex-shrink:0;margin-left:.75rem">
                 <div style="font-family:var(--serif);font-size:1rem;font-weight:700;color:var(--navy)">${tier.monthlyPrice.toLocaleString('sv-SE')}<span style="font-size:.6rem;font-weight:400"> SEK/mo</span></div>
                 <button onclick="openUpgradeContact('${tier.id}')"
-                  style="font-family:var(--mono);font-size:.55rem;padding:.2rem .55rem;background:${tier.highlight?'var(--navy)':'none'};color:${tier.highlight?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer;margin-top:.2rem">
+                  style="font-family:var(--mono);font-size:.55rem;padding:.2rem .55rem;background:${tier.highlight?'var(--accent)':'none'};color:${tier.highlight?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer;margin-top:.2rem">
                   ${tier.cta} →
                 </button>
               </div>
@@ -6154,7 +6248,7 @@ function renderReadinessScore(){
               <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:#7F1D1D">${b.label}</div>
               <div style="font-family:var(--sans);font-size:.65rem;color:#991B1B;margin-top:.1rem">${tipifyRegTerms(b.impact)}</div>
               ${res.fix?`<div style="font-family:var(--mono);font-size:.58rem;color:#7F1D1D;margin-top:.2rem">Fix: ${res.fix}${res.days?` · ~${res.days} days`:''}</div>`:''}
-              ${res.partner?`<div style="margin-top:.4rem"><span style="font-family:var(--mono);font-size:.58rem;background:#1E3A5F;color:var(--gold);padding:.15rem .5rem;cursor:pointer">◈ VeyaFlow Verified Partner — ${res.partner} →</span></div>`:''}
+              ${res.partner?`<div style="margin-top:.4rem"><span style="font-family:var(--mono);font-size:.58rem;background:var(--accent-soft);color:var(--accent-deep);padding:.15rem .5rem;cursor:pointer">◈ VeyaFlow Verified Partner — ${res.partner} →</span></div>`:''}
             </div>
           </div>`;
         }).join('')}
@@ -6645,7 +6739,7 @@ function renderVerifiedDirectory(el){
                 <!-- Actions -->
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;padding-top:.5rem;border-top:1px solid var(--border)">
                   <button onclick="compareListIds=compareListIds.includes(${m.id})?compareListIds.filter(x=>x!==${m.id}):[...compareListIds,${m.id}];renderVerifiedDirectory(document.getElementById('page-verified'))"
-                    style="font-family:var(--mono);font-size:.55rem;padding:.25rem .6rem;background:${compareListIds.includes(m.id)?'var(--navy)':'none'};color:${compareListIds.includes(m.id)?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer">
+                    style="font-family:var(--mono);font-size:.55rem;padding:.25rem .6rem;background:${compareListIds.includes(m.id)?'var(--accent)':'none'};color:${compareListIds.includes(m.id)?'#fff':'var(--navy)'};border:1px solid var(--navy);cursor:pointer">
                     ${compareListIds.includes(m.id)?'✓ Compare list':'+ Compare'}
                   </button>                  <button onclick="showPage('find');setTimeout(()=>{const el=document.getElementById('agent-query');if(el){el.value='${(m.name||'').replace(/'/g,"\\'")}';el.focus();}},200)"
                     style="font-family:var(--mono);font-size:.55rem;padding:.25rem .6rem;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer">
@@ -6772,7 +6866,7 @@ function renderVerificationCard(){
         </div>
         ${tier<2?`
           <a href="mailto:charlotte@veyaflow.com?subject=Tier%202%20Verification%20Request%20—%20${encodeURIComponent(brand?.name||'Brand')}&body=${t2Summary}"
-            style="display:inline-block;padding:.35rem .85rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">
+            style="display:inline-block;padding:.35rem .85rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">
             Request Verification →
           </a>
         `:tier===2?`<div style="font-family:var(--mono);font-size:.6rem;color:var(--navy)">✓ Verified — Tier 3 Certified requires in-person VeyaFlow audit</div>`:''}
@@ -14253,7 +14347,7 @@ function parseMarkdown(text){
   t = t.replace(/\bCRITICAL\b/g,'<span style="display:inline-block;background:#FEF2F2;color:#991B1B;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">CRITICAL</span>');
   t = t.replace(/\bIMPORTANT\b/g,'<span style="display:inline-block;background:#FFFBEB;color:#92400E;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.1rem .4rem">IMPORTANT</span>');
   // Score badges
-  t = t.replace(/([\d.]+)\/10/g,'<span style="display:inline-block;background:var(--navy);color:var(--gold);font-family:var(--mono);font-size:.85rem;font-weight:700;padding:.1rem .4rem">$1/10</span>');
+  t = t.replace(/([\d.]+)\/10/g,'<span style="display:inline-block;background:var(--accent-soft);color:var(--accent-deep);font-family:var(--mono);font-size:.85rem;font-weight:700;padding:.1rem .4rem">$1/10</span>');
   // Bullet points
   t = t.replace(/^[-*] (.+)$/gm,'<div style="display:flex;gap:.5rem;padding:.2rem 0"><span style="color:var(--gold);flex-shrink:0;font-weight:700">&#8211;</span><span>$1</span></div>');
   // Numbered list items
@@ -14284,10 +14378,7 @@ function renderReportResult(){
   const execSection=r.sections.find(s=>s.title?.toUpperCase().includes('EXECUTIVE')||s.title?.toUpperCase().includes('SUMMARY'));
   const scoreMatch=execSection?.content?.match(/([\d.]+)\/10|score[:\s]+([\d.]+)/i);
   const opportunityScore=scoreMatch?(scoreMatch[1]||scoreMatch[2]):'—';
-  const scoreColor=parseFloat(opportunityScore)>=7?'#10B981':parseFloat(opportunityScore)>=5?'#F59E0B':'#EF4444';
-
-  // Section accent colors for visual hierarchy
-  const sectionAccents=["#1E3A5F","#10B981","#F59E0B","#EF4444","#8B5CF6","#0EA5E9","#C4A882","#1E3A5F"];
+  const scoreColor=parseFloat(opportunityScore)>=7?'var(--green-text)':parseFloat(opportunityScore)>=5?'var(--amber-text)':'var(--red-text)';
 
   return `
     <!-- Print-only header + footer (Apr 2026 — PDF export) -->
@@ -14302,9 +14393,9 @@ function renderReportResult(){
 
     <div class="report-header">
       <div class="report-badge">Market Entry Intelligence Report · VeyaFlow</div>
-      <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.3);letter-spacing:.08em;margin-bottom:.2rem">GENERATED FOR</div>
+      <div style="font-family:var(--mono);font-size:.55rem;color:var(--ink-mute);letter-spacing:.08em;margin-bottom:.2rem">GENERATED FOR</div>
       <div class="report-brand">${r.brandName}</div>
-      <div style="font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.35);margin-top:.15rem">Entering ${r.targetMarket} · ${r.category} · ${r.pricePoint||'Premium'} positioning</div>
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);margin-top:.15rem">Entering ${r.targetMarket} · ${r.category} · ${r.pricePoint||'Premium'} positioning</div>
       <div class="report-meta">${r.category} → ${r.targetMarket} · ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</div>
       <div class="report-meta-row">
         <div><div class="report-meta-lbl">Home market</div><div class="report-meta-val">${r.currentMarket||'Sweden'}</div></div>
@@ -14315,23 +14406,23 @@ function renderReportResult(){
       </div>
     </div>
 
-    <!-- Summary metrics bar -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-top:none;background:#fff;margin-bottom:1.25rem">
-      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
-        <div style="font-family:var(--serif);font-size:1.8rem;color:${scoreColor};line-height:1">${opportunityScore}<span style="font-size:.9rem;color:var(--muted)">/10</span></div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Opportunity score</div>
+    <!-- Summary metrics bar (v4 stat-strip) -->
+    <div class="vf-stat-strip">
+      <div class="vf-ss-cell">
+        <div class="vf-ss-val" style="color:${scoreColor}">${opportunityScore}<span style="font-size:.9rem;color:var(--ink-mute)">/10</span></div>
+        <div class="vf-ss-lab">Opportunity score</div>
       </div>
-      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
-        <div style="font-family:var(--serif);font-size:1.8rem;color:var(--navy);line-height:1">${r.sections.length}</div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Report sections</div>
+      <div class="vf-ss-cell">
+        <div class="vf-ss-val">${r.sections.length}</div>
+        <div class="vf-ss-lab">Report sections</div>
       </div>
-      <div style="padding:.85rem 1rem;border-right:1px solid var(--border);text-align:center">
-        <div style="font-family:var(--serif);font-size:1.8rem;color:var(--navy);line-height:1">${cur}</div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">Market currency</div>
+      <div class="vf-ss-cell">
+        <div class="vf-ss-val">${cur}</div>
+        <div class="vf-ss-lab">Market currency</div>
       </div>
-      <div style="padding:.85rem 1rem;text-align:center">
-        <div style="font-family:var(--sans);font-size:.75rem;color:var(--green);font-weight:500;line-height:1.3;margin-top:.3rem">✓ Saved</div>
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem">To dashboard</div>
+      <div class="vf-ss-cell">
+        <div class="vf-ss-saved">✓ Saved</div>
+        <div class="vf-ss-lab">To dashboard</div>
       </div>
     </div>
 
@@ -14344,23 +14435,25 @@ function renderReportResult(){
       <button class="btn-outline" onclick="generateMarketEntryReportPDF()" title="Save as PDF" style="margin-left:auto">⤓ Save as PDF</button>
     </div>
 
-    <!-- Section navigation -->
-    <div id="section-jump" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.25rem;padding:.75rem 1rem;background:#fff;border:1px solid var(--border)">
-      <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);align-self:center;margin-right:.25rem">Jump to:</span>
-      ${r.sections.map((s,i)=>`<button onclick="document.getElementById('rs-${i}').scrollIntoView({behavior:'smooth'})" style="padding:.25rem .6rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;white-space:nowrap">${String(i+1).padStart(2,'0')} ${s.title?.split(/[—–\s]/)[0]||'Section'}</button>`).join('')}
+    <!-- Section navigation (v4 jump chips) -->
+    <div id="section-jump" class="vf-jump">
+      <span class="vf-jump-lab">Jump to:</span>
+      ${r.sections.map((s,i)=>`<button class="vf-jump-chip" onclick="document.getElementById('rs-${i}').scrollIntoView({behavior:'smooth'})">${String(i+1).padStart(2,'0')} ${s.title?.split(/[—–\s]/)[0]||'Section'}</button>`).join('')}
     </div>
 
-    <!-- Report sections -->
-    <div style="background:#fff;border:1px solid var(--border)">
-      ${r.targetMarket==='Norway'?`<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">${renderNorwayCustomsChecklist()}</div>`:''}
-      ${r.sections.map((s,i)=>`
-        <div id="rs-${i}" class="report-section" style="border-left:3px solid ${sectionAccents[i]||'#1E3A5F'}">
+    <!-- Report sections (v4 floating spine sections) -->
+    <div class="vf-rsections">
+      ${r.targetMarket==='Norway'?`<div style="padding:0 0 1rem 1.5rem;margin-bottom:1.1rem;border-left:3px solid var(--accent)">${renderNorwayCustomsChecklist()}</div>`:''}
+      ${r.sections.map((s,i)=>{
+        const confClass = s.confidence?.startsWith('HIGH')?'green':s.confidence?.startsWith('MEDIUM')?'amber':'';
+        return `
+        <div id="rs-${i}" class="report-section vf-rsection ${confClass}">
           <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem;flex-wrap:wrap">
-            <div style="font-family:var(--mono);font-size:.8rem;color:${sectionAccents[i]||'#1E3A5F'};font-weight:600;opacity:.5">${String(i+1).padStart(2,'0')}</div>
+            <div class="vf-rsec-num">${String(i+1).padStart(2,'0')}</div>
             <div class="report-section-title" style="margin-bottom:0;flex:1">${s.title}</div>
-            ${s.confidence?`<div style="font-family:var(--mono);font-size:.52rem;padding:.1rem .45rem;border:1px solid ${s.confidence.startsWith('HIGH')?'#A7F3D0':s.confidence.startsWith('MEDIUM')?'#FCD34D':'#FCA5A5'};color:${s.confidence.startsWith('HIGH')?'#065F46':s.confidence.startsWith('MEDIUM')?'#92400E':'#991B1B'};background:${s.confidence.startsWith('HIGH')?'#ECFDF5':s.confidence.startsWith('MEDIUM')?'#FFFBEB':'#FEF2F2'}">${s.confidence.startsWith('HIGH')?'● High confidence':s.confidence.startsWith('MEDIUM')?'◐ Medium confidence':'○ Estimate'}</div>`:''}
+            ${s.confidence?`<div class="vf-conf ${s.confidence.startsWith('HIGH')?'high':s.confidence.startsWith('MEDIUM')?'med':'est'}">${s.confidence.startsWith('HIGH')?'● High confidence':s.confidence.startsWith('MEDIUM')?'◐ Medium confidence':'○ Estimate'}</div>`:''}
           </div>
-          <div style="font-family:var(--sans);font-size:.82rem;color:#333;line-height:1.85">${(()=>{
+          <div style="font-family:var(--sans);font-size:.82rem;color:var(--ink-soft);line-height:1.85">${(()=>{
             if(s.title==='Competitive Landscape'){
               // Parse pipe-delimited table rows + keyword sections
               const lines = s.content.split('\n');
@@ -14385,16 +14478,16 @@ function renderReportResult(){
                 ${header||dataRows.length?`
                   <div style="overflow-x:auto;margin-bottom:.85rem">
                     <table style="width:100%;border-collapse:collapse;font-family:var(--sans);font-size:.72rem">
-                      ${header?`<thead><tr style="background:#F9F8F6;border-bottom:2px solid var(--border)">${header.map(h=>`<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap">${h}</th>`).join('')}</tr></thead>`:''}
-                      <tbody>${dataRows.map((row,ri)=>`<tr style="border-bottom:1px solid var(--border);background:${ri%2?'#FAFAFA':'#fff'}">${row.map(cell=>`<td style="padding:.45rem .65rem;color:#333;vertical-align:top;line-height:1.5">${cell}</td>`).join('')}</tr>`).join('')}</tbody>
+                      ${header?`<thead><tr style="background:var(--surface);border-bottom:2px solid var(--line)">${header.map(h=>`<th style="padding:.4rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-mute);white-space:nowrap">${h}</th>`).join('')}</tr></thead>`:''}
+                      <tbody>${dataRows.map((row,ri)=>`<tr style="border-bottom:1px solid var(--line);background:${ri%2?'var(--surface)':'var(--paper)'}">${row.map(cell=>`<td style="padding:.45rem .65rem;color:var(--ink-soft);vertical-align:top;line-height:1.5">${cell}</td>`).join('')}</tr>`).join('')}</tbody>
                     </table>
                   </div>
                 `:''}
-                ${gapBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:#065F46">Gap opportunity: </span><span style="font-family:var(--sans);font-size:.75rem;color:#065F46">${gapBlock}</span></div>`:''}
-                ${posBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--navy)">Recommended positioning: </span><span style="font-family:var(--sans);font-size:.75rem;color:var(--navy)">${posBlock}</span></div>`:''}
-                ${rspBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--navy)">Recommended RSP range: </span><span style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy)">${rspBlock}</span></div>`:''}
+                ${gapBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--green-text)">Gap opportunity: </span><span style="font-family:var(--sans);font-size:.75rem;color:var(--green-text)">${gapBlock}</span></div>`:''}
+                ${posBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-deep)">Recommended positioning: </span><span style="font-family:var(--sans);font-size:.75rem;color:var(--accent-deep)">${posBlock}</span></div>`:''}
+                ${rspBlock?`<div style="margin-bottom:.5rem"><span style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-deep)">Recommended RSP range: </span><span style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--accent-deep)">${rspBlock}</span></div>`:''}
                 ${!tableRows.length&&!gapBlock?`<p style="margin:.5rem 0">${parseMarkdown(s.content)}</p>`:''}
-                <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.5rem">
+                <div style="font-family:var(--mono);font-size:.5rem;color:var(--ink-mute);margin-top:.5rem">
                   ${renderConfidence('research_verified',{size:'small'})} Web search · ${s.cachedDate||'today'}${s.cached?' (cached 30 days)':''}
                 </div>
               `;
@@ -14402,12 +14495,12 @@ function renderReportResult(){
             return `<p style="margin:.5rem 0">${parseMarkdown(s.content)}</p>`;
           })()}</div>
         </div>
-      `).join('')}
+      `;}).join('')}
     </div>
 
     <!-- Action bar -->
-    <div class="vf-no-print" style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1.25rem;margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-      <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Generated ${new Date(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})||r.date} · Data current April 2026</div>
+    <div class="vf-no-print" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.75rem 1.25rem;margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--ink-mute)">Generated ${new Date(r.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})||r.date} · Data current April 2026</div>
       <button class="btn-outline" onclick="reportForm.competitorsVerified=false;generateReport()" style="font-size:.65rem">↻ Update report</button>
     </div>
     <div class="vf-no-print" style="display:flex;gap:.75rem;margin-top:.75rem;padding-bottom:1.5rem;flex-wrap:wrap">
@@ -14693,27 +14786,32 @@ function renderCompareResult(){
   const colW = Math.floor(100/mCount);
   const sku = skus[0]||null;
 
+  const gtc = `1.3fr ${scores.map(()=>'1fr').join(' ')}`;
+  const colClass = i => i===0?'win':i===1?'run':'';
+  const barClass = i => i===0?'green':i===1?'blue':i===2?'amber':'neutral';
+  const badgeFor = i => i===0?'★ Enter first':i===1?(scores[1]&&scores[1].total>=75?'Year 1–2':'Year 2'):'Year 3+';
+
   return `
-    <!-- Recommendation banner -->
-    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1rem">
-      <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">VeyaFlow Recommendation</div>
-      <div style="font-family:var(--serif);font-size:1.05rem;color:#fff;margin-bottom:.25rem">
+    <!-- Recommendation cover (v4) -->
+    <div class="vf-reco">
+      <div class="vf-reco-tag">VeyaFlow recommendation</div>
+      <div class="vf-reco-head">
         Enter <strong>${winner.market?.name||winner.marketCode}</strong> first — ${winner.total}/100
-        ${scores[1]?`· <span style="opacity:.6">${scores[1].market?.name||scores[1].marketCode} in Year ${scores[1].total>=75?'1-2':'2'} (${scores[1].total}/100)</span>`:''}
+        ${scores[1]?`· <span class="runner">${scores[1].market?.name||scores[1].marketCode} in Year ${scores[1].total>=75?'1–2':'2'} (${scores[1].total}/100)</span>`:''}
       </div>
-      <div style="font-family:var(--sans);font-size:.7rem;color:rgba(255,255,255,.65)">${r.brand} · ${r.category} · ${mCount} markets compared</div>
+      <div class="vf-reco-sub">${r.brand} · ${r.category} · ${mCount} markets compared</div>
     </div>
 
-    <!-- Score table -->
-    <div class="card" style="margin-bottom:1rem;overflow-x:auto">
+    <!-- Score table (v4 scoring grid) -->
+    <div class="vf-cmp">
       <!-- Market headers -->
-      <div style="display:grid;grid-template-columns:160px ${scores.map(()=>`1fr`).join(' ')};gap:.5rem;margin-bottom:.75rem;padding-bottom:.6rem;border-bottom:2px solid var(--border)">
+      <div class="vf-cmp-grid vf-cmp-head" style="grid-template-columns:${gtc}">
         <div></div>
         ${scores.map((s,i)=>`
-          <div style="text-align:center">
-            <div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${s.market?.name||s.marketCode}</div>
-            <div style="font-family:var(--serif);font-size:1.4rem;font-weight:400;color:${i===0?'#065F46':i===1?'#1E40AF':'#92400E'}">${s.total}</div>
-            <div style="font-family:var(--mono);font-size:.52rem;color:${i===0?'#065F46':i===1?'#1E40AF':'#9A9489'}">${i===0?'★ ENTER FIRST':i===1?'YEAR 2':'YEAR 3+'}</div>
+          <div class="vf-cmp-col ${colClass(i)}">
+            <div class="nm">${s.market?.name||s.marketCode}</div>
+            <div class="sc">${s.total}</div>
+            <div class="bdg">${badgeFor(i)}</div>
           </div>
         `).join('')}
       </div>
@@ -14722,33 +14820,30 @@ function renderCompareResult(){
       ${COMPARISON_DIMENSIONS.map(dim=>{
         const isExpanded = compareExpandedDim===dim.id;
         return `
-          <div style="margin-bottom:.1rem">
-            <div style="display:grid;grid-template-columns:160px ${scores.map(()=>'1fr').join(' ')};gap:.5rem;align-items:center;padding:.4rem 0;cursor:pointer;border-bottom:1px solid ${isExpanded?'var(--navy)':'var(--border)'}"
+          <div>
+            <div class="vf-cmp-grid vf-cmp-row${isExpanded?' open':''}" style="grid-template-columns:${gtc}"
               onclick="compareExpandedDim=compareExpandedDim==='${dim.id}'?null:'${dim.id}';document.getElementById('compare-results').innerHTML=renderCompareResult()">
-              <div>
-                <div style="font-family:var(--mono);font-size:.6rem;color:var(--navy);font-weight:600">${dim.label}</div>
-                <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${dim.weight}% weight</div>
+              <div class="vf-cmp-dim">
+                <div class="d">${dim.label}</div>
+                <div class="w">${dim.weight}% weight</div>
               </div>
               ${scores.map((s,si)=>{
                 const d = s.dims[dim.id];
                 const barW = d?.score||0;
-                const barCol = barW>=80?'#10B981':barW>=55?'#1E40AF':barW>=35?'#F59E0B':'#EF4444';
-                return `<div style="text-align:center">
-                  <div style="background:#F5F3EE;height:5px;border-radius:2px;margin-bottom:.25rem;overflow:hidden">
-                    <div style="background:${barCol};height:5px;width:${barW}%;transition:width .4s ease"></div>
-                  </div>
-                  <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${si===0?'var(--navy)':'#555'}">${d?.display||'—'}</div>
+                return `<div class="vf-bar-cell">
+                  <div class="vf-bar-track"><div class="vf-bar-fill ${barClass(si)}" style="width:${barW}%"></div></div>
+                  <div class="vf-bar-val">${d?.display||'—'}</div>
                 </div>`;
               }).join('')}
             </div>
             ${isExpanded?`
-              <div style="background:#F9F8F6;border:1px solid var(--border);border-top:none;padding:.7rem 1rem;margin-bottom:.35rem">
-                <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.08em">${dim.desc}</div>
+              <div class="vf-cmp-detail">
+                <div class="vf-cmp-detail-q">${dim.desc}</div>
                 <div style="display:grid;grid-template-columns:${scores.map(()=>'1fr').join(' ')};gap:.75rem">
                   ${scores.map(s=>`
-                    <div>
-                      <div style="font-family:var(--mono);font-size:.57rem;font-weight:700;color:var(--navy);margin-bottom:.2rem">${s.market?.name||s.marketCode}</div>
-                      <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.55">${s.dims[dim.id]?.detail||'—'}</div>
+                    <div class="vf-cmp-detail-cell">
+                      <div class="mn">${s.market?.name||s.marketCode}</div>
+                      <div class="tx">${s.dims[dim.id]?.detail||'—'}</div>
                     </div>
                   `).join('')}
                 </div>
@@ -14759,49 +14854,39 @@ function renderCompareResult(){
       }).join('')}
 
       <!-- Total row -->
-      <div style="display:grid;grid-template-columns:160px ${scores.map(()=>'1fr').join(' ')};gap:.5rem;padding-top:.6rem;border-top:2px solid var(--border);margin-top:.25rem">
-        <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--navy);align-self:center">TOTAL SCORE</div>
-        ${scores.map((s,i)=>`
-          <div style="text-align:center">
-            <div style="background:var(--border);height:6px;border-radius:3px;margin-bottom:.3rem;overflow:hidden">
-              <div style="background:${i===0?'#10B981':i===1?'#1E40AF':'#9A9489'};height:6px;width:${s.total}%;transition:width .5s ease"></div>
-            </div>
-            <div style="font-family:var(--serif);font-size:1.1rem;color:${i===0?'#065F46':i===1?'#1E40AF':'#9A9489'}">${s.total}</div>
-          </div>
-        `).join('')}
+      <div class="vf-cmp-grid vf-cmp-total" style="grid-template-columns:${gtc}">
+        <div class="lab">Total score</div>
+        ${scores.map((s,i)=>`<div class="ts ${colClass(i)}">${s.total}</div>`).join('')}
       </div>
     </div>
 
     <!-- Parallel entry panel -->
     ${r.parallel?.length?`
-    <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.85rem 1rem;margin-bottom:1rem">
-      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:#1E40AF;margin-bottom:.3rem">💡 Parallel Entry Opportunity</div>
+    <div class="vf-parallel">
+      <div class="vf-parallel-h">💡 Parallel entry opportunity</div>
       ${r.parallel.map(p=>`
-        <div style="font-family:var(--sans);font-size:.72rem;color:#1E3A5F;line-height:1.55;margin-bottom:.3rem">
+        <div class="vf-parallel-row">
           <strong>${p.market1} + ${p.market2}</strong> can be entered simultaneously — saves ~${p.saving.toLocaleString()} SEK.
-          <span style="font-family:var(--sans);font-size:.68rem;color:#3B82F6"> ${p.reason}</span>
+          <span style="color:var(--blue-text)"> ${p.reason}</span>
         </div>
       `).join('')}
     </div>`:''}
 
     <!-- What would it take -->
     ${r.aiWhatItTakes&&scores[1]?`
-    <div class="card" style="margin-bottom:1rem;border-left:3px solid var(--gold)">
-      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--gold);margin-bottom:.4rem">What would it take to enter ${scores[1].market?.name||scores[1].marketCode} now?</div>
-      <div style="font-family:var(--sans);font-size:.72rem;color:#555;line-height:1.65;white-space:pre-line">${r.aiWhatItTakes}</div>
+    <div class="vf-followup">
+      <div class="vf-fu-q">What would it take to enter ${scores[1].market?.name||scores[1].marketCode} now?</div>
+      <div class="vf-fu-a">${r.aiWhatItTakes}</div>
     </div>`:''}
 
     <!-- Compliance delta -->
     ${r.delta?.length?`
-    <div class="card" style="margin-bottom:1rem">
-      <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--navy);margin-bottom:.5rem">Compliance delta — if already compliant for ${scores[0].market?.name||scores[0].marketCode}</div>
+    <div class="vf-followup">
+      <div class="vf-fu-q">Compliance delta — if already compliant for ${scores[0].market?.name||scores[0].marketCode}</div>
       ${r.delta.map(d=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border)">
-          <div style="font-family:var(--sans);font-size:.72rem;color:var(--navy)">Adding ${d.market}</div>
-          <div style="display:flex;gap:.75rem">
-            <span style="font-family:var(--mono);font-size:.58rem;color:#555">+~${d.marginal.toLocaleString()} SEK</span>
-            <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">~${d.days} days</span>
-          </div>
+        <div class="vf-fu-delta">
+          <span class="nm">Adding ${d.market}</span>
+          <span class="vals"><span>+~${d.marginal.toLocaleString()} SEK</span><span>~${d.days} days</span></span>
         </div>
       `).join('')}
     </div>`:''}
@@ -15307,7 +15392,7 @@ function renderBizCaseResult(el){
       </div>
 
       <!-- Document header -->
-      <div style="background:var(--navy);padding:1.5rem 1.75rem;margin-bottom:1rem">
+      <div style="background:var(--accent);padding:1.5rem 1.75rem;margin-bottom:1rem">
         <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.35);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem">
           ${mode==='catman'?'Internal listing approval document — Category Manager':'Buyer business case'}
         </div>
@@ -15460,7 +15545,7 @@ function renderRpMarketplace(el){
                 </div>
                 <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.5rem">${p.country} · ${(p.coverageMarkets||[]).join(', ')}</div>
                 <div style="font-family:var(--sans);font-size:.78rem;color:#333;line-height:1.4;margin-bottom:.75rem">${(p.capabilities||[]).join(' · ')}</div>
-                <button onclick="${canIntro?`requestRpIntro(${p.id})`:''}" ${canIntro?'':'disabled'} style="width:100%;padding:.5rem;font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:${canIntro?'var(--navy)':'var(--border)'};color:${canIntro?'#fff':'var(--muted)'};border:none;cursor:${canIntro?'pointer':'not-allowed'}">${canIntro?'Request introduction':'Pending vetting'}</button>
+                <button onclick="${canIntro?`requestRpIntro(${p.id})`:''}" ${canIntro?'':'disabled'} style="width:100%;padding:.5rem;font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:${canIntro?'var(--accent)':'var(--border)'};color:${canIntro?'#fff':'var(--muted)'};border:none;cursor:${canIntro?'pointer':'not-allowed'}">${canIntro?'Request introduction':'Pending vetting'}</button>
               </div>`;
           }).join('')}
         </div>` : ''}
@@ -15470,7 +15555,7 @@ function renderRpMarketplace(el){
         <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem">Marketplace launches Q3 2026</div>
         <p style="font-family:var(--sans);font-size:.88rem;color:#333;line-height:1.55;margin:0 0 1rem">${partnerCount === 0 ? 'EU Responsible Person marketplace launches Q3 2026 — vetted partners coming soon. Manual RP entry available if you already have an existing RP relationship.' : `${partnerCount} vetted partner${partnerCount===1?'':'s'} onboarded. More partners onboarding through Q3 2026.`}</p>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-          <button onclick="openManualRpEntry()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">${hasExistingRp ? 'Update existing RP' : 'Enter your existing RP'}</button>
+          <button onclick="openManualRpEntry()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">${hasExistingRp ? 'Update existing RP' : 'Enter your existing RP'}</button>
           <button onclick="showRpRequirementsInfo()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--navy);border:1px solid var(--navy);cursor:pointer">Learn about EU RP requirements</button>
         </div>
       </div>
@@ -15531,7 +15616,7 @@ function renderManualRpEntryForm(container){
         <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-top:.25rem">Tracked in your compliance calendar so the appointment doesn't lapse.</div>
       </div>
       <div style="display:flex;gap:.6rem">
-        <button onclick="saveManualRp()" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">Save RP</button>
+        <button onclick="saveManualRp()" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">Save RP</button>
         <button onclick="document.getElementById('rp-manual-entry-form').style.display='none'" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--muted);border:1px solid var(--border);cursor:pointer">Cancel</button>
       </div>
     </div>`;
@@ -15600,7 +15685,7 @@ function renderComplianceGapBanner(){
           <strong>EU Responsible Person not yet designated.</strong> EU retailers require an appointed RP for cosmetic listings. You can publish this Brand Pack now — the gap will be visible to retailers — or designate an RP first.
         </div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <button onclick="showPage('rp-marketplace')" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">View RP marketplace</button>
+          <button onclick="showPage('rp-marketplace')" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">View RP marketplace</button>
           <button onclick="openManualRpEntryFromGap()" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:#fff;color:var(--navy);border:1px solid var(--navy);cursor:pointer">I already have an RP</button>
           <button onclick="dismissRpGapBanner()" style="padding:.35rem .75rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;background:none;color:#92400E;border:none;cursor:pointer;text-decoration:underline">Dismiss</button>
         </div>
@@ -15675,7 +15760,7 @@ function renderRpIntroModal(partner){
       </div>
 
       <div style="display:flex;gap:.6rem;margin-top:1.5rem">
-        <button onclick="confirmRpIntro()" style="flex:1;padding:.6rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--navy);color:#fff;border:none;cursor:pointer">Prepare introduction email</button>
+        <button onclick="confirmRpIntro()" style="flex:1;padding:.6rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">Prepare introduction email</button>
         <button onclick="closeRpIntroModal()" style="padding:.6rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--muted);border:1px solid var(--border);cursor:pointer">Cancel</button>
       </div>
     </div>
@@ -16166,7 +16251,7 @@ function renderBrandPackResult(el){
       `).join('')}
 
       <!-- Footer -->
-      <div style="background:var(--navy);padding:.85rem 1.5rem;margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <div style="background:var(--accent);padding:.85rem 1.5rem;margin-top:.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,.35)">
           Generated ${new Date(brandPackState.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · Data reflects current brand profile · VeyaFlow
         </div>
@@ -18104,7 +18189,7 @@ function renderCPNPModal(skuId, view){
     </div>
     <div style="padding:.65rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap">
       <button onclick="renderCPNPModal('${skuId}','package')"
-        style="font-family:var(--mono);font-size:.62rem;padding:.4rem 1rem;background:var(--navy);color:#fff;border:none;cursor:pointer">
+        style="font-family:var(--mono);font-size:.62rem;padding:.4rem 1rem;background:var(--accent);color:#fff;border:none;cursor:pointer">
         Generate submission package →
       </button>
       <button onclick="document.getElementById('vf-cpnp-modal').remove()"
@@ -18164,7 +18249,7 @@ function renderCPNPModal(skuId, view){
       <button onclick="window.print()"
         style="font-family:var(--mono);font-size:.62rem;padding:.4rem .9rem;background:none;border:1px solid var(--border);color:var(--navy);cursor:pointer">Print / Save PDF</button>
       <a href="https://portal.cpnp.eu" target="_blank"
-        style="font-family:var(--mono);font-size:.62rem;padding:.4rem .9rem;background:var(--navy);color:#fff;border:none;cursor:pointer;text-decoration:none">Open CPNP portal →</a>
+        style="font-family:var(--mono);font-size:.62rem;padding:.4rem .9rem;background:var(--accent);color:#fff;border:none;cursor:pointer;text-decoration:none">Open CPNP portal →</a>
       <button onclick="renderCPNPModal('${skuId}','overview')"
         style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">← Back</button>
     </div>
@@ -18664,7 +18749,7 @@ function renderSkuMapping(el){
         <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">File preview (first 3 rows)</div>
         <div style="overflow-x:auto;max-width:100%">
           <table style="border-collapse:collapse;font-family:var(--sans);font-size:.68rem;min-width:100%">
-            <thead><tr>${headers.map(function(h){return `<th style="padding:.3rem .5rem;background:var(--navy);color:#fff;text-align:left;font-weight:600;white-space:nowrap">${h}</th>`;}).join('')}</tr></thead>
+            <thead><tr>${headers.map(function(h){return `<th style="padding:.3rem .5rem;background:var(--accent);color:#fff;text-align:left;font-weight:600;white-space:nowrap">${h}</th>`;}).join('')}</tr></thead>
             <tbody>${preview.map(function(row,i){return `<tr style="background:${i%2===0?'#fff':'#F9F8F6'}">${headers.map(function(h){return `<td style="padding:.3rem .5rem;border-bottom:1px solid var(--border);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row[h]||''}</td>`;}).join('')}</tr>`;}).join('')}</tbody>
           </table>
         </div>
@@ -19281,7 +19366,7 @@ function showSkuTypeFeedback(){
       <div id="sku-type-feedback-error" style="display:none;font-family:var(--sans);font-size:.65rem;color:#991B1B;background:#FEF2F2;border:1px solid #FECACA;padding:.3rem .5rem"></div>
       <div style="display:flex;gap:.4rem">
         <button onclick="submitSkuTypeFeedback()" id="sku-type-submit-btn"
-          style="padding:.35rem .8rem;background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer">
+          style="padding:.35rem .8rem;background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer">
           Submit
         </button>
         <button onclick="document.getElementById('sku-type-feedback-wrap').innerHTML=skuTypeFeedbackState()"
@@ -21317,7 +21402,7 @@ function renderLabelScanner(){
           <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.3rem">
             ${LABEL_MARKETS.map(m=>`
               <button onclick="(function(){var idx=claimsState.labelScan.markets.indexOf('${m.id}');if(idx>=0)claimsState.labelScan.markets.splice(idx,1);else claimsState.labelScan.markets.push('${m.id}');renderClaims(document.getElementById('page-claims'));})()"
-                style="padding:.3rem .7rem;font-family:var(--mono);font-size:.6rem;border:1px solid ${ls.markets.includes(m.id)?'var(--navy)':'var(--border)'};background:${ls.markets.includes(m.id)?'var(--navy)':'#fff'};color:${ls.markets.includes(m.id)?'#fff':'var(--ink)'};cursor:pointer">
+                style="padding:.3rem .7rem;font-family:var(--mono);font-size:.6rem;border:1px solid ${ls.markets.includes(m.id)?'var(--accent)':'var(--border)'};background:${ls.markets.includes(m.id)?'var(--accent)':'#fff'};color:${ls.markets.includes(m.id)?'#fff':'var(--ink)'};cursor:pointer">
                 ${m.flag} ${m.label}
               </button>
             `).join('')}
@@ -23246,7 +23331,7 @@ function renderPrePitchBrief(retailerEntry, market){
   return `
     <div style="border:1px solid var(--border);margin-bottom:.85rem;overflow:hidden">
       <!-- Header -->
-      <div style="padding:.5rem .85rem;background:var(--navy);display:flex;align-items:center;justify-content:space-between">
+      <div style="padding:.5rem .85rem;background:var(--accent);display:flex;align-items:center;justify-content:space-between">
         <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold)">Pre-pitch brief — ${rname}</div>
         <div style="font-family:var(--mono);font-size:.5rem;color:rgba(255,255,255,.4)">${rows.length} signals · 60 sec read</div>
       </div>
@@ -24085,7 +24170,7 @@ function renderPitchResult(){
 
   return `
     <!-- Header -->
-    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1rem">
+    <div style="background:var(--accent);padding:1rem 1.25rem;margin-bottom:1rem">
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem">Generated for</div>
       <div style="font-family:var(--serif);font-size:1.1rem;color:#fff">${pitchResult.retailer} · ${pitchResult.market}</div>
       <div style="display:flex;gap:1rem;margin-top:.3rem;flex-wrap:wrap">
@@ -24098,7 +24183,7 @@ function renderPitchResult(){
     <div style="display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap">
       ${parsed.map((p,i)=>`
         <div onclick="pitchActiveVariant=${i};renderPitch(document.getElementById('page-pitch'))"
-          style="flex:1;min-width:140px;padding:.6rem .85rem;border:1px solid ${pitchActiveVariant===i?'var(--navy)':'var(--border)'};background:${pitchActiveVariant===i?'var(--navy)':'#fff'};cursor:pointer;transition:all .15s">
+          style="flex:1;min-width:140px;padding:.6rem .85rem;border:1px solid ${pitchActiveVariant===i?'var(--accent)':'var(--border)'};background:${pitchActiveVariant===i?'var(--accent)':'#fff'};cursor:pointer;transition:all .15s">
           <div style="font-family:var(--mono);font-size:.75rem;color:${pitchActiveVariant===i?'var(--gold)':'var(--muted)'};">${variantIcons[p.variant]||'◌'}</div>
           <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${pitchActiveVariant===i?'#fff':'var(--navy)'};margin-top:.1rem">${p.variant}</div>
           <div style="font-family:var(--sans);font-size:.62rem;color:${pitchActiveVariant===i?'rgba(255,255,255,.55)':'var(--muted)'};margin-top:.1rem;line-height:1.4">${variantDesc[p.variant]||''}</div>
@@ -25200,7 +25285,7 @@ function renderIngredientTraceabilityTab(skuForm){
 
     <!-- Ingredient table -->
     <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:.75rem 1rem;background:var(--navy);display:grid;grid-template-columns:2fr 1.2fr 1.5fr 1fr 0.8fr 0.7fr;gap:.5rem;align-items:center">
+      <div style="padding:.75rem 1rem;background:var(--accent);display:grid;grid-template-columns:2fr 1.2fr 1.5fr 1fr 0.8fr 0.7fr;gap:.5rem;align-items:center">
         ${['Ingredient','Origin country','Supplier','Tier','EUDR','Carbon est.'].map(h=>`<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.6)">${h}</div>`).join('')}
       </div>
       ${ingredients.map((ing,i)=>{
@@ -25449,7 +25534,7 @@ function renderNudgePanel(s){
     <div style="font-family:var(--mono);font-size:.58rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem">★ Nudge email</div>
     <div class="email-box" style="font-size:.78rem;margin-bottom:.75rem">${nudgeResult==='__ERROR__'?'<span style="color:#991B1B;font-family:var(--mono);font-size:.65rem">Could not generate — check connection and try again.</span>':nudgeResult}</div>
     <div style="display:flex;gap:.65rem;flex-wrap:wrap">
-      <a href="mailto:${s.contact}?subject=Compliance+data+request&body=${encodeURIComponent(nudgeResult)}" style="padding:.45rem .9rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">Open in email →</a>
+      <a href="mailto:${s.contact}?subject=Compliance+data+request&body=${encodeURIComponent(nudgeResult)}" style="padding:.45rem .9rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">Open in email →</a>
       <button onclick="generateNudge(SUPPLIERS.find(x=>x.id===${s.id}))" style="padding:.45rem .9rem;background:none;border:1px solid var(--border);color:var(--navy);font-family:var(--mono);font-size:.6rem;cursor:pointer">Regenerate</button>
       ${s.isManual?`<button onclick="deleteManualSupplier(${s.id})" style="padding:.45rem .9rem;background:none;border:1px solid #FCA5A5;color:#991B1B;font-family:var(--mono);font-size:.6rem;cursor:pointer">Remove</button>`:''}
     </div>
@@ -25747,7 +25832,7 @@ function renderCircularResults(){
     ${r.topAIAnalysis?`
     <div class="card" style="margin-bottom:1rem;border-left:3px solid var(--navy)">
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.35rem">LEAD ROUTE ANALYSIS</div>
-      <div style="font-family:var(--sans);font-size:.73rem;color:var(--text);line-height:1.65">${r.topAIAnalysis}</div>
+      <div style="font-family:var(--sans);font-size:.73rem;color:var(--ink-soft);line-height:1.65">${r.topAIAnalysis}</div>
     </div>`:''}
 
     ${r.routes.map((route,ri)=>{
@@ -25777,7 +25862,7 @@ function renderCircularResults(){
                   </div>
                 </div>
                 <div style="font-size:.68rem;color:#555;line-height:1.55;margin-bottom:.3rem">${p.description}</div>
-                ${p.insiderNote?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--gold);margin-bottom:.3rem">\ud83d\udca1 ${p.insiderNote}</div>`:''}
+                ${p.insiderNote?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--tang);margin-bottom:.3rem">\ud83d\udca1 ${p.insiderNote}</div>`:''}
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem;align-items:center">
                   ${!isConf?`<button class="btn-outline" style="font-size:.63rem;padding:.22rem .55rem" onclick="confirmCircularPartner(${p.id})">Select this partner \u2192</button>`:`<button class="btn-primary" style="font-size:.63rem;padding:.22rem .55rem" onclick="generateESPRDeclaration()">\u2193 Download ESPR Declaration</button>`}
                   ${p.contact?`<a href="mailto:${p.contact}" style="font-family:var(--mono);font-size:.57rem;color:var(--navy)">${p.contact}</a>`:''}
@@ -26182,7 +26267,7 @@ function renderCRM(el){
           ${['','...brandCatsArr'].map(v=>v).join('')}
           ${[['','All'],  ...brandCatsArr.map(cat=>[cat,cat])].map(([val,label])=>`
             <button onclick="crmFilter.categoryFilter='${val}';renderPage('crm')"
-              style="font-family:var(--mono);font-size:.52rem;padding:.15rem .5rem;border:1px solid ${activeCatFilter===val?'var(--navy)':'var(--border)'};background:${activeCatFilter===val?'var(--navy)':'#fff'};color:${activeCatFilter===val?'#fff':'var(--muted)'};cursor:pointer">
+              style="font-family:var(--mono);font-size:.52rem;padding:.15rem .5rem;border:1px solid ${activeCatFilter===val?'var(--accent)':'var(--border)'};background:${activeCatFilter===val?'var(--accent)':'#fff'};color:${activeCatFilter===val?'#fff':'var(--muted)'};cursor:pointer">
               ${val?renderCategoryBadge(label,{small:true})+'&nbsp;'+label.split(' ')[0]:label}
             </button>
           `).join('')}
@@ -26209,7 +26294,7 @@ function renderCRM(el){
             onkeydown="if(event.key==='Enter')runCRMNLSearch()"
             style="flex:1;padding:.5rem .85rem;border:2px solid ${crmNLSearch.results?'var(--navy)':'var(--border)'};font-family:var(--sans);font-size:.72rem;color:var(--navy)">
           <button onclick="runCRMNLSearch()"
-            style="padding:.5rem 1rem;background:var(--navy);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap;${crmNLSearch.loading?'opacity:.6':''}">
+            style="padding:.5rem 1rem;background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap;${crmNLSearch.loading?'opacity:.6':''}">
             ${crmNLSearch.loading?'Searching…':'Search →'}
           </button>
           ${crmNLSearch.results||crmNLSearch.error?`<button onclick="clearCRMNLSearch()" style="padding:.5rem .75rem;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--muted);cursor:pointer">Clear ✕</button>`:''}
@@ -26867,7 +26952,7 @@ function renderAgent(el){
                       ${bs.loading?'⟳ Generating AI brief…':bs.done?'✓ AI brief ready':'Static brief (AI generation failed)'}
                     </div>
                     ${mailtoUrl&&!bs.loading?`
-                      <a href="${mailtoUrl}" style="display:inline-block;padding:.35rem .75rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">
+                      <a href="${mailtoUrl}" style="display:inline-block;padding:.35rem .75rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">
                         Open in email →
                       </a>
                     `:''}
@@ -27454,7 +27539,7 @@ function renderFind(el){
       html +=   '<div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;flex-wrap:wrap;margin-bottom:.35rem">';
       html +=     '<div style="font-family:var(--mono);font-size:.55rem;color:' + (briefState.done ? '#10B981' : '#92400E') + '">' + (briefState.done ? '✓ AI brief ready' : '◌ Static fallback brief') + '</div>';
       html +=     '<div style="display:flex;gap:.35rem">';
-      html +=       '<a href="' + mailtoUrl + '" style="display:inline-block;padding:.3rem .65rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.55rem;text-decoration:none">✉ Open in email →</a>';
+      html +=       '<a href="' + mailtoUrl + '" style="display:inline-block;padding:.3rem .65rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.55rem;text-decoration:none">✉ Open in email →</a>';
       html +=       '<button onclick="addMfrToPipeline(' + mfr.id + ')" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .65rem;background:none;border:1px solid var(--border);cursor:pointer">+ Pipeline</button>';
       html +=     '</div>';
       html +=   '</div>';
@@ -27788,7 +27873,7 @@ function renderCompareBriefsTab(items){
               <div style="display:flex;gap:.5rem;align-items:center">
                 ${bs.loading?`<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">⟳ Generating…</div>`:''}
                 ${bs.done?`<span style="font-family:var(--mono);font-size:.55rem;color:#10B981">✓ AI brief ready</span>`:`<span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">Static brief</span>`}
-                <a href="${mailtoUrl}" style="display:inline-block;padding:.35rem .75rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none;flex-shrink:0">
+                <a href="${mailtoUrl}" style="display:inline-block;padding:.35rem .75rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none;flex-shrink:0">
                   Open in email →
                 </a>
               </div>
@@ -29258,7 +29343,7 @@ function renderExpansionOverview(){
   return `
     <div style="border:1px solid var(--border);background:#fff;margin-bottom:1.1rem;display:flex;overflow:hidden">
       <!-- Label strip -->
-      <div style="background:var(--navy);writing-mode:vertical-rl;text-orientation:mixed;padding:.55rem .3rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <div style="background:var(--accent);writing-mode:vertical-rl;text-orientation:mixed;padding:.55rem .3rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <span style="font-family:var(--mono);font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);transform:rotate(180deg);white-space:nowrap">Expansion overview</span>
       </div>
       <!-- Three columns -->
@@ -30287,8 +30372,8 @@ function renderESGModal(retailerId){
 
           <!-- Special tiers -->
           ${(esg.greenShelfTier?.exists||esg.sustainabilityScore?.exists||esg.cleanTier?.exists||esg.naturkosmetikAdvantage?.exists)?`
-            <div style="border:1px solid var(--gold);background:#FFFBF0;padding:.65rem .85rem;margin-bottom:.85rem">
-              <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);margin-bottom:.3rem">Commercial upside — ESG premium</div>
+            <div style="border:1px solid var(--amber-text);background:var(--amber-soft);padding:.65rem .85rem;margin-bottom:.85rem">
+              <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--amber-text);margin-bottom:.3rem">Commercial upside — ESG premium</div>
               ${esg.greenShelfTier?.exists?`<div style="font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.2rem">🟢 Green Shelf tier: +${esg.greenShelfTier.marginBonus} margin bonus. Requirements: ${esg.greenShelfTier.requirements.join(', ')}</div>`:''}
               ${esg.sustainabilityScore?.exists?`<div style="font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.2rem">⭐ Sustainability star rating (public, max ${esg.sustainabilityScore.scaleMax} stars): ${esg.sustainabilityScore.note}</div>`:''}
               ${esg.cleanTier?.exists?`<div style="font-family:var(--sans);font-size:.72rem;color:#92400E;margin-bottom:.2rem">◈ ${esg.cleanTier.tierName}: ${esg.cleanTier.note}</div>`:''}
@@ -30585,7 +30670,7 @@ function renderRegulatoryAlertBanner(){
 
   if(regulatoryMonitorState.checking){
     return `<div id="reg-scan-banner" style="background:#F9F8F6;border:1px solid var(--border);border-left:4px solid var(--navy);padding:.45rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
-      <div style="width:8px;height:8px;border-radius:50%;background:var(--navy);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
       <div style="font-family:var(--mono);font-size:.58rem;color:var(--navy)">Regulatory scan running in background</div>
     </div><script>setTimeout(function(){var b=document.getElementById('reg-scan-banner');if(b)b.style.display='none';},10000);<\/script>`;
   }
@@ -30700,7 +30785,7 @@ function renderRegMonitorPage(el){
       <!-- Alerts -->
       ${regulatoryMonitorState.checking ? `
         <div id="reg-page-scan-banner" style="border:1px solid var(--border);padding:.85rem 1rem;display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-          <div style="width:10px;height:10px;border-radius:50%;background:var(--navy);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite"></div>
           <div>
             <div style="font-family:var(--sans);font-size:.78rem;color:var(--navy)">Regulatory scan running in background</div>
             <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Results appear here when complete — you can navigate away</div>
@@ -30725,7 +30810,7 @@ function renderRegMonitorPage(el){
                       <span style="font-family:var(--mono);font-size:.65rem;color:${s.color}">${s.icon}</span>
                       <span style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:${s.color}">${alert.title}</span>
                       <span style="font-family:var(--mono);font-size:.48rem;background:${s.bg};color:${s.color};padding:.05rem .3rem;border:1px solid ${s.border}">${s.label}</span>
-                      ${!alert.read?`<span style="font-family:var(--mono);font-size:.48rem;background:var(--navy);color:#fff;padding:.05rem .3rem">NEW</span>`:''}
+                      ${!alert.read?`<span style="font-family:var(--mono);font-size:.48rem;background:var(--accent);color:#fff;padding:.05rem .3rem">NEW</span>`:''}
                     </div>
                     <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.6;margin-bottom:.3rem">${alert.summary}</div>
                     <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
@@ -31366,7 +31451,7 @@ function renderActionPlanModal(card){
               ${overdueCount?`<div style="font-family:var(--mono);font-size:.52rem;color:#92400E">${overdueCount} overdue</div>`:''}
             </div>
             <div style="background:var(--border);height:5px;border-radius:3px">
-              <div style="background:var(--navy);height:5px;border-radius:3px;width:${pct}%;transition:width .4s ease"></div>
+              <div style="background:var(--accent);height:5px;border-radius:3px;width:${pct}%;transition:width .4s ease"></div>
             </div>
           </div>
         </div>
@@ -31381,7 +31466,7 @@ function renderActionPlanModal(card){
               return `
                 <div style="position:relative;padding-bottom:${isLast?'0':'1.1rem'}">
                   <!-- Timeline dot -->
-                  <div style="position:absolute;left:-1.25rem;top:.15rem;width:.9rem;height:.9rem;border-radius:50%;background:${ms.complete?'var(--navy)':s.bg};border:2px solid ${ms.complete?'var(--navy)':s.border};display:flex;align-items:center;justify-content:center">
+                  <div style="position:absolute;left:-1.25rem;top:.15rem;width:.9rem;height:.9rem;border-radius:50%;background:${ms.complete?'var(--accent)':s.bg};border:2px solid ${ms.complete?'var(--accent)':s.border};display:flex;align-items:center;justify-content:center">
                     ${ms.complete?'<span style="color:#fff;font-size:.45rem">✓</span>':''}
                   </div>
                   <div style="background:${s.bg};border:1px solid ${s.border};padding:.5rem .7rem">
@@ -31782,7 +31867,7 @@ function renderSetupTracker(){
   if(pct===100) return ''; // hide when complete
 
   return `
-    <div style="background:var(--navy);padding:1rem 1.25rem;margin-bottom:1.25rem">
+    <div style="background:var(--accent);padding:1rem 1.25rem;margin-bottom:1.25rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;flex-wrap:wrap;gap:.5rem">
         <div>
           <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.15rem">Getting started</div>
@@ -32591,7 +32676,7 @@ function renderDPP(el){
       <div class="content">
 
         <!-- ESPR Timeline banner -->
-        <div style="background:var(--navy);padding:.85rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center">
+        <div style="background:var(--accent);padding:.85rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center">
           <div style="flex:1;min-width:200px">
             <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.2rem">ESPR — Ecodesign for Sustainable Products</div>
             <div style="font-family:var(--sans);font-size:.78rem;color:rgba(255,255,255,.8);line-height:1.5">Every product sold in the EU will require a machine-readable DPP. The QR code on your packaging links to this record.</div>
@@ -33584,7 +33669,7 @@ function renderEscrowModal(mfrName, view){
         We'll email you as soon as VeyaFlow escrow is live. First users get priority access and reduced fees.
       </div>
       <button onclick="document.getElementById('vf-escrow-modal').remove()"
-        style="font-family:var(--mono);font-size:.62rem;padding:.4rem 1rem;background:var(--navy);color:#fff;border:none;cursor:pointer">Done →</button>
+        style="font-family:var(--mono);font-size:.62rem;padding:.4rem 1rem;background:var(--accent);color:#fff;border:none;cursor:pointer">Done →</button>
     </div>
   `;
 
@@ -33817,7 +33902,7 @@ function renderReferralModal(){
           <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.2rem">
             ${CAT_OPTIONS.map(cat=>`
               <button onclick="(function(){var a=referralState.form.categories.slice();var i=a.indexOf('${cat}');if(i>=0)a.splice(i,1);else a.push('${cat}');referralState.form.categories=a;renderReferralModal();})()"
-                style="font-family:var(--sans);font-size:.68rem;padding:.25rem .6rem;border:1px solid ${f.categories.includes(cat)?'var(--navy)':'var(--border)'};background:${f.categories.includes(cat)?'var(--navy)':'#fff'};color:${f.categories.includes(cat)?'#fff':'var(--ink)'};cursor:pointer">
+                style="font-family:var(--sans);font-size:.68rem;padding:.25rem .6rem;border:1px solid ${f.categories.includes(cat)?'var(--accent)':'var(--border)'};background:${f.categories.includes(cat)?'var(--accent)':'#fff'};color:${f.categories.includes(cat)?'#fff':'var(--ink)'};cursor:pointer">
                 ${cat}
               </button>
             `).join('')}
@@ -34086,7 +34171,7 @@ function renderInquiryModal(mfr){
         <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.4rem">${mfr.name} added to Supplier Pipeline</div>
         <div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);line-height:1.6;margin-bottom:1.25rem">Brief saved. Open email client to send directly. VeyaFlow will prompt you for feedback in 14 days.</div>
         <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap">
-          <a href="${mailtoUrl}" style="display:inline-block;padding:.65rem 1.25rem;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.68rem;text-decoration:none">Open in email client →</a>
+          <a href="${mailtoUrl}" style="display:inline-block;padding:.65rem 1.25rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.68rem;text-decoration:none">Open in email client →</a>
           <button class="btn-outline" onclick="showPage('sourcing')" style="font-size:.68rem">View Supplier Pipeline →</button>
           <button class="btn-outline" onclick="inquiryMfrId=null;renderFind(document.getElementById('page-find'))" style="font-size:.65rem">Close</button>
         </div>
@@ -36433,7 +36518,7 @@ function renderRetailTemplates(el){
 
     html += '<div style="background:#fff;border:1px solid var(--border);overflow-x:auto">';
     html += '<table style="width:100%;border-collapse:collapse">';
-    html += '<thead><tr style="background:var(--navy);color:#fff"><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Field</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Value</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Source</th></tr></thead>';
+    html += '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Field</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Value</th><th style="padding:.55rem .7rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Source</th></tr></thead>';
     html += '<tbody>'+rowsHtml+'</tbody>';
     html += '</table></div>';
 
@@ -36885,7 +36970,7 @@ function renderRetailPerfChart(current){
 function renderRetailPerfTable(current){
   var html = '<div style="margin-top:1rem;background:#fff;border:1px solid var(--border);overflow-x:auto">';
   html += '<table style="width:100%;border-collapse:collapse;font-family:var(--sans);font-size:.74rem">';
-  html += '<thead><tr style="background:var(--navy);color:#fff"><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Month</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sold</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Delivered</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sell-through</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Revenue</th><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Promo</th><th style="padding:.5rem .65rem"></th></tr></thead><tbody>';
+  html += '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Month</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sold</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Delivered</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Sell-through</th><th style="padding:.5rem .65rem;text-align:right;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Revenue</th><th style="padding:.5rem .65rem;text-align:left;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;font-weight:500">Promo</th><th style="padding:.5rem .65rem"></th></tr></thead><tbody>';
   current.slice().reverse().forEach(function(r){
     var stCol = (r.sellThroughPct||0)>=70 ? 'var(--green)' : (r.sellThroughPct||0)<40 ? 'var(--red)' : 'var(--amber)';
     html += '<tr style="border-bottom:1px solid var(--border)">';
