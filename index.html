@@ -142,8 +142,19 @@
   /* 5-group desktop nav (approved IA) — group headers + inline flags + parked.
      Items remain .nav-item (.link in the mockup); .ic/.nm map to .nav-ico/.nav-name. */
   .grp { margin-top: 6px; }
-  .grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 9px 18px 4px; display: flex; align-items: baseline; gap: 7px; }
+  .grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 9px 18px 4px; display: flex; align-items: baseline; gap: 7px; cursor: pointer; user-select: none; }
   .grp-q { font-size: 9px; color: var(--ink-mute); font-family: var(--sans); font-weight: 400; letter-spacing: 0; font-style: italic; opacity: .8; text-transform: none; }
+  /* Group collapse (in-memory, default = collapsed except active group) */
+  .grp .chev, .m-grp .chev { display: inline-block; font-size: 8px; color: var(--ink-mute); transition: transform .18s ease; }
+  .grp.collapsed .chev, .m-grp.collapsed .chev { transform: rotate(-90deg); }
+  .grp .items { overflow: hidden; max-height: 600px; transition: max-height .22s ease; }
+  .grp.collapsed .items { max-height: 0; }
+  .m-grp .items { overflow: hidden; max-height: 900px; transition: max-height .22s ease; }
+  .m-grp.collapsed .items { max-height: 0; }
+  .grp-cnt { margin-left: auto; font-family: var(--mono); font-size: 8.5px; font-weight: 600; color: var(--ink-mute); background: var(--paper-deep); border-radius: 9999px; padding: 1px 6px; }
+  .nav-tools { display: flex; gap: 6px; padding: 4px 18px 2px; }
+  .nav-tool { background: none; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 8.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-mute); padding: 2px 7px; cursor: pointer; }
+  .nav-tool:hover { color: var(--accent-deep); border-color: var(--accent); }
   .nav-item.parked .nav-name { color: var(--ink-mute); font-style: italic; }
   .flag { margin-left: auto; font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
   .flag.watch { background: var(--amber-soft); color: var(--amber-text); border: 1px solid #E8D3A8; }
@@ -666,7 +677,7 @@
   }
   #mob-menu.open { display: block; }
   .m-search { background: var(--paper); border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 13px; font-size: 13px; color: var(--ink-mute); display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .m-grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 14px 4px 6px; }
+  .m-grp-h { font-family: var(--mono); font-size: 9.5px; font-weight: 700; color: var(--ink-mute); letter-spacing: .08em; text-transform: uppercase; padding: 14px 4px 6px; cursor: pointer; user-select: none; display: flex; align-items: baseline; gap: 7px; }
   .m-li { background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
   .m-li.on { background: var(--accent-soft); border-color: var(--accent); }
   .m-li .ic { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); width: 15px; text-align: center; flex-shrink: 0; }
@@ -3914,6 +3925,31 @@ const NAV_SUBTITLES = {
   'retail-comms':'Log every buyer interaction',
 };
 
+// ── Nav group collapse state — in-memory ONLY, by design (resets to default on
+//    hard reload; do NOT move to localStorage). true=expanded, false=collapsed,
+//    absent=default. Default per group: collapsed, EXCEPT the group containing
+//    currentPage (ASSUMPTION: "collapsed by default" = collapsed-except-active;
+//    if strategy meant literally-all-closed, drop containsCurrent below).
+var navGroupState = {};
+
+function toggleNavGroup(key){
+  var els = document.querySelectorAll('[data-group="'+key+'"]');
+  if(!els.length) return;
+  var expandNow = els[0].classList.contains('collapsed');
+  navGroupState[key] = expandNow;
+  Array.prototype.forEach.call(els, function(el){ el.classList.toggle('collapsed', !expandNow); });
+}
+
+function collapseAllNavGroups(){
+  NAV_GROUPS.forEach(function(g){ navGroupState[g.key] = false; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-group]'), function(el){ el.classList.add('collapsed'); });
+}
+
+function expandAllNavGroups(){
+  NAV_GROUPS.forEach(function(g){ navGroupState[g.key] = true; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-group]'), function(el){ el.classList.remove('collapsed'); });
+}
+
 function buildNav(){
   var allVisible = getVisibleNav();
   var nav=document.getElementById('sidebar-nav');
@@ -3935,10 +3971,15 @@ function buildNav(){
   //   section tabs are gone; `sec` is retained for the (untouched) mobile drawer.
   //   Each item KEEPS class="nav-item" id="nav-<id>" data-id onclick=showPage —
   //   routing/active-state contract intact; +.parked +.flag per the approved IA.
+  html+='<div class="nav-tools"><button class="nav-tool" onclick="collapseAllNavGroups()">Collapse all</button><button class="nav-tool" onclick="expandAllNavGroups()">Expand all</button></div>';
+
   NAV_GROUPS.forEach(function(grp){
     var groupItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
     if(groupItems.length===0) return;
-    html+='<div class="grp"><div class="grp-h">'+grp.label+' <span class="grp-q">'+grp.q+'</span></div>';
+    var expanded = groupItems.some(function(n){ return n.id===currentPage; }) || navGroupState[grp.key]===true;
+    html+='<div class="grp'+(expanded?'':' collapsed')+'" data-group="'+grp.key+'">';
+    html+='<div class="grp-h" onclick="toggleNavGroup(\''+grp.key+'\')"><span class="chev">▾</span>'+grp.label+' <span class="grp-q">'+grp.q+'</span><span class="grp-cnt">'+groupItems.length+'</span></div>';
+    html+='<div class="items">';
     groupItems.forEach(function(n){
       html+='<div class="nav-item'+(n.parked?' parked':'')+'" id="nav-'+n.id+'" onclick="showPage(this.dataset.id)" data-id="'+n.id+'">';
       html+='<span class="nav-ico">'+n.icon+'</span>';
@@ -3961,7 +4002,7 @@ function buildNav(){
       if(n.flag) html+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
       html+='</div>';
     });
-    html+='</div>';
+    html+='</div></div>';
   });
 
   nav.innerHTML=html;
@@ -3977,7 +4018,10 @@ function buildNav(){
     NAV_GROUPS.forEach(function(grp){
       var gItems = orderNavByIds(allVisible.filter(function(n){ return n.group===grp.key; }), grp.ids);
       if(gItems.length===0) return;
-      mobHtml+='<div class="m-grp-h">'+grp.label+' · '+grp.q+'</div>';
+      var mExpanded = gItems.some(function(n){ return n.id===currentPage; }) || navGroupState[grp.key]===true;
+      mobHtml+='<div class="m-grp'+(mExpanded?'':' collapsed')+'" data-group="'+grp.key+'">';
+      mobHtml+='<div class="m-grp-h" onclick="toggleNavGroup(\''+grp.key+'\')"><span class="chev">▾</span>'+grp.label+' · '+grp.q+'<span class="grp-cnt">'+gItems.length+'</span></div>';
+      mobHtml+='<div class="items">';
       gItems.forEach(function(n){
         mobHtml+='<div class="m-li'+(n.parked?' parked':'')+(currentPage===n.id?' on':'')+'" onclick="closeMobMenu();showPage(\''+n.id+'\')">';
         mobHtml+='<span class="ic">'+n.icon+'</span><span class="nm">'+n.label+'</span>';
@@ -3997,6 +4041,7 @@ function buildNav(){
         if(n.flag) mobHtml+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
         mobHtml+='</div>';
       });
+      mobHtml+='</div></div>';
     });
     mobMenu.innerHTML=mobHtml;
   }
