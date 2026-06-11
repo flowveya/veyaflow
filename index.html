@@ -9,10 +9,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  /* v4 re-skin fonts — loaded additively; existing fonts above stay until the per-page sweep flips --serif/--sans/--mono */
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Newsreader:wght@400;500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
@@ -294,41 +290,53 @@
   .section-tag { font-family: var(--mono); font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
 
   /* ONBOARDING */
-  .onboard-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 2rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .onboard-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 2rem; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--paper); }
   .onboard-inner { width: 100%; max-width: 520px; padding-bottom: 2rem; }
   .onboard-title { font-family: var(--serif); font-size: 1.4rem; color: var(--navy); margin-bottom: .35rem; }
-  .onboard-sub { font-family: var(--sans); font-size: .8rem; color: var(--muted); margin-bottom: 1.25rem; }
+  .onboard-sub { font-family: var(--sans); font-size: .8rem; color: var(--ink-mute); margin-bottom: 1.25rem; }
+  /* Form-page ground fix — onboard-scoped (shared .field/input/btn rules untouched) */
+  .onboard-inner input[type=text], .onboard-inner input[type=number], .onboard-inner input[type=email],
+  .onboard-inner input[type=date], .onboard-inner select, .onboard-inner textarea {
+    background: var(--paper); border: 1px solid var(--line-strong); border-radius: 9px;
+  }
+  .onboard-inner input:focus, .onboard-inner select:focus, .onboard-inner textarea:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .onboard-inner .btn-primary { width: auto; color: var(--on-accent); border-radius: 10px; }
+  .onboard-inner .btn-primary:hover:not(:disabled) { background: var(--accent-deep); opacity: 1; }
   .stage-option {
-    padding: .9rem 1rem; border: 1px solid var(--border); background: var(--cream);
+    padding: .9rem 1rem; border: 1px solid var(--line-strong); background: var(--paper);
+    border-radius: 9px;
     cursor: pointer; display: flex; gap: .85rem; align-items: center;
     margin-bottom: .5rem; transition: all .15s;
   }
-  .stage-option.selected { border-color: var(--navy); background: #EFF6FF; }
-  .stage-option-icon { font-size: 1rem; color: var(--muted); }
-  .stage-option.selected .stage-option-icon { color: var(--navy); }
-  .stage-option-name { font-family: var(--sans); font-size: .85rem; font-weight: 500; color: #333; }
-  .stage-option.selected .stage-option-name { color: var(--navy); }
-  .stage-option-desc { font-family: var(--sans); font-size: .7rem; color: var(--muted); margin-top: .1rem; }
+  .stage-option.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
+  .stage-option-icon { font-size: 1rem; color: var(--ink-mute); }
+  .stage-option.selected .stage-option-icon { color: var(--accent-deep); }
+  .stage-option-name { font-family: var(--sans); font-size: .85rem; font-weight: 500; color: var(--ink-soft); }
+  .stage-option.selected .stage-option-name { color: var(--accent-deep); font-weight: 600; }
+  .stage-option-desc { font-family: var(--sans); font-size: .7rem; color: var(--ink-mute); margin-top: .1rem; }
   .market-chip {
-    padding: .3rem .7rem; border: 1px solid var(--border); background: none;
-    font-family: var(--mono); font-size: .62rem; color: var(--muted);
+    padding: .3rem .7rem; border: 1px solid var(--line-strong); background: none;
+    font-family: var(--mono); font-size: .62rem; color: var(--ink-mute);
     cursor: pointer; transition: all .15s; display: inline-block; margin: .2rem;
   }
-  .market-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .market-chip.selected { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .goal-chip {
-    padding: .55rem .75rem; border: 1px solid var(--border); background: var(--cream);
-    font-family: var(--sans); font-size: .72rem; color: #555;
+    padding: .55rem .75rem; border: 1px solid var(--line-strong); background: var(--paper);
+    font-family: var(--sans); font-size: .72rem; color: var(--ink-soft);
     cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: .5rem;
   }
-  .goal-chip.selected { border-color: var(--green); background: rgba(16,185,129,.07); color: #065F46; }
-  .goal-chip-check { color: var(--border); }
-  .goal-chip.selected .goal-chip-check { color: var(--green); }
+  .goal-chip.selected { border-color: var(--green-bar); background: var(--green-soft); color: var(--green-text); }
+  .goal-chip-check { color: var(--line-strong); }
+  .goal-chip.selected .goal-chip-check { color: var(--green-text); }
   .cat-option {
-    padding: .7rem .85rem; border: 1px solid var(--border); background: var(--cream);
-    font-family: var(--sans); font-size: .8rem; color: #333;
+    padding: .7rem .85rem; border: 1px solid var(--line-strong); background: var(--paper);
+    border-radius: 9px;
+    font-family: var(--sans); font-size: .8rem; color: var(--ink-soft);
     cursor: pointer; transition: all .15s;
   }
-  .cat-option.selected { border-color: var(--navy); background: #EFF6FF; color: var(--navy); }
+  .cat-option.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); box-shadow: inset 3px 0 0 var(--accent); }
 
   /* DASHBOARD */
   .next-step-card {
@@ -348,7 +356,7 @@
   .report-meta { font-family: var(--mono); font-size: .68rem; color: var(--ink-mute); margin: .15rem 0 1.15rem; }
   .report-meta-row { display: flex; gap: 2.2rem; border-top: 1px solid var(--line); padding-top: 1.05rem; flex-wrap: wrap; }
   .report-meta-lbl { font-family: var(--mono); font-size: .55rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: .3rem; }
-  .report-meta-val { font-size: .95rem; font-weight: 600; color: var(--ink); }
+  .report-meta-val { font-size: .95rem; font-weight: 400; color: var(--ink); }
   .report-section { border-bottom: 1px solid var(--border); padding: 1.5rem 1.5rem 1.5rem 1.25rem; }
   .report-section:last-child { border-bottom: none; }
   .report-section-num { font-family: var(--mono); font-size: .55rem; color: var(--gold); }
@@ -825,22 +833,22 @@
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; break-inside: avoid; }
 
-    /* Report header — light cover on print (matches the v4 light screen cover) */
+    /* Report header — light cover on print (matches the Daylight screen cover) */
     .report-header {
       background: #fff !important;
-      color: #1C1A17 !important;
-      border: .3pt solid #E7E2D8 !important;
-      border-left: 3pt solid #C0613A !important;
+      color: var(--ink) !important;
+      border: .3pt solid var(--line) !important;
+      border-left: 3pt solid var(--accent) !important;
       padding: 6mm 6mm !important;
       margin: 0 0 6mm 0 !important;
     }
-    .report-brand { font-size: 18pt !important; color: #1C1A17 !important; }
+    .report-brand { font-size: 18pt !important; color: var(--ink) !important; }
 
     /* Section title typography */
     .report-section-title {
-      font-family: 'Playfair Display', Georgia, serif;
+      font-family: var(--display);
       font-size: 13pt;
-      color: #1B2D4F !important;
+      color: var(--ink) !important;
       margin: 0 0 3mm 0;
     }
 
@@ -4454,7 +4462,7 @@ function renderOnboardStep(){
       </div>
       ${renderDualFlagQuestion()}
       <div class="field"><label class="lbl">Brand positioning / USP</label><textarea id="ob-usp" placeholder="e.g. Premium Swedish skincare tools and overnight beauty rituals. Clean ingredients, clinically tested." oninput="onboardForm.usp=this.value">${onboardForm.usp}</textarea></div>
-      <button id="ob-continue-1" class="btn-primary" style="width:100%;margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category||!isDualFlagAnswered()?'disabled':''}>Continue →</button>
+      <button id="ob-continue-1" class="btn-primary" style="margin-top:1.25rem;min-height:48px;font-size:.85rem" onclick="onboardStep=2;renderPage('home')" ${!onboardForm.name||!onboardForm.category||!isDualFlagAnswered()?'disabled':''}>Continue →</button>
     `;
   } else if(onboardStep===2){
     inner.innerHTML=`
@@ -4474,7 +4482,7 @@ function renderOnboardStep(){
       </div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=1;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=3;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:0 1 auto;min-height:48px;font-size:.85rem" onclick="onboardStep=3;renderPage('home')">Continue →</button>
       </div>
     `;
   } else if(onboardStep===3){
@@ -4492,7 +4500,7 @@ function renderOnboardStep(){
       <div class="field"><label class="lbl">Your name</label><input type="text" id="ob-username" value="${onboardForm.userName||''}" placeholder="e.g. Charlotte" oninput="onboardForm.userName=this.value"></div>
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=2;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=4;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:0 1 auto;min-height:48px;font-size:.85rem" onclick="onboardStep=4;renderPage('home')">Continue →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">Your workspace is saved in this browser — persists between sessions</div>
     `;
@@ -4543,7 +4551,7 @@ function renderOnboardStep(){
 
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=3;renderPage('home')">← Back</button>
-        <button class="btn-primary" style="flex:1;min-height:48px;font-size:.85rem" onclick="onboardStep=5;renderPage('home')">Continue →</button>
+        <button class="btn-primary" style="flex:0 1 auto;min-height:48px;font-size:.85rem" onclick="onboardStep=5;renderPage('home')">Continue →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">All proof point fields are optional — add what you have now, update anytime</div>
     `;
@@ -4573,14 +4581,14 @@ function renderOnboardStep(){
       <div class="field"><label class="lbl">CPNP / notification number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — add now if you have it)</span></label>
         <input type="text" placeholder="e.g. CPNP-2024-XXXXXXX" value="${onboardForm.heroSkuCpnp||''}" oninput="onboardForm.heroSkuCpnp=this.value"></div>
 
-      <div style="background:rgba(196,168,130,.08);border:1px solid rgba(196,168,130,.2);padding:.75rem;font-family:var(--mono);font-size:.58rem;color:var(--gold);line-height:1.6;margin-bottom:1rem">
+      <div style="background:var(--accent-soft);border:1px solid var(--line-strong);padding:.75rem;font-family:var(--mono);font-size:.58rem;color:var(--gold);line-height:1.6;margin-bottom:1rem">
         ✦ You can add full product data (INCI list, pricing, logistics, descriptions) in My Products after setup. This step just captures the basics.
       </div>
 
       <div style="display:flex;gap:.75rem">
         <button class="btn-outline" style="flex:0 0 auto" onclick="onboardStep=4;renderPage('home')">← Back</button>
         <button class="btn-outline" style="flex:0 0 auto" onclick="completeOnboard()">Skip for now</button>
-        <button class="btn-primary" style="flex:1" onclick="completeOnboardWithSku()">Set up ${onboardForm.name||'my brand'} workspace →</button>
+        <button class="btn-primary" style="flex:0 1 auto" onclick="completeOnboardWithSku()">Set up ${onboardForm.name||'my brand'} workspace →</button>
       </div>
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;margin-top:.6rem">Your workspace is saved in this browser — persists between sessions</div>
     `;
@@ -4621,7 +4629,7 @@ function renderProofSummary(){
       <span style="flex-shrink:0;font-size:.9rem">${i.icon}</span>
       <div>
         <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${i.label}</div>
-        <div style="font-family:var(--sans);font-size:.78rem;color:#333;margin-top:.1rem">${i.val}</div>
+        <div style="font-family:var(--sans);font-size:.78rem;color:var(--ink-soft);margin-top:.1rem">${i.val}</div>
       </div>
     </div>
   `).join('');
@@ -4640,7 +4648,7 @@ function showProofEdit(){
     document.getElementById('proof-modal-fields').innerHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem">
         ${proofTypes.map(pt=>`
-          <div onclick="document.getElementById('proof-type-${pt.id}').click()" style="border:1px solid ${currentType===pt.id?'var(--navy)':'var(--border)'};background:${currentType===pt.id?'#EFF6FF':'#fff'};padding:.6rem;cursor:pointer">
+          <div onclick="document.getElementById('proof-type-${pt.id}').click()" style="border:1px solid ${currentType===pt.id?'var(--accent)':'var(--border)'};background:${currentType===pt.id?'var(--accent-soft)':'var(--paper)'};padding:.6rem;cursor:pointer">
             <div style="font-size:.9rem">${pt.icon}</div>
             <div style="font-family:var(--sans);font-size:.72rem;font-weight:600;color:var(--navy)">${pt.label}</div>
             <input type="radio" id="proof-type-${pt.id}" name="proof-type" value="${pt.id}" ${currentType===pt.id?'checked':''} onchange="currentType=this.value;renderProofModal()" style="display:none">
@@ -4677,7 +4685,7 @@ function showProofEdit(){
   modal.id = 'proof-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem;overflow-y:auto';
   modal.innerHTML = `
-    <div style="background:#fff;width:100%;max-width:520px;padding:1.5rem;max-height:90vh;overflow-y:auto">
+    <div style="background:var(--paper);width:100%;max-width:520px;padding:1.5rem;max-height:90vh;overflow-y:auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
         <div style="font-family:var(--serif);font-size:1.1rem;color:var(--navy)">Commercial proof points</div>
         <span onclick="document.getElementById('proof-modal').remove()" style="cursor:pointer;font-size:1.2rem;color:var(--muted)">✕</span>
@@ -4775,7 +4783,7 @@ function renderDualFlagQuestion(){
   if(!pair) return '';
   const v = onboardForm.secondaryCategoryFlag;
   return `
-    <div class="field" style="background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.25);padding:.75rem .9rem;border-radius:0">
+    <div class="field" style="background:var(--accent-soft);border:1px solid var(--line-strong);padding:.75rem .9rem;border-radius:0">
       <label class="lbl" style="margin-bottom:.4rem">Do any of your products fall into ${pair.label}?</label>
       <div style="display:flex;gap:.5rem">
         <div class="cat-option${v===true?' selected':''}" style="flex:1;padding:.55rem .8rem;font-size:.78rem" onclick="onboardForm.secondaryCategoryFlag=true;renderOnboardStep()">Yes</div>
@@ -4872,15 +4880,15 @@ const MARKET_ENTRY_COSTS = {
 };
 
 /* ═══════════════════════════════════════════════════
-   CONFIDENCE SYSTEM
-   ★★★ VeyaFlow-verified  — #1B2D4F navy, no label
-   ★★  Research-verified  — #4A6FA5 mid-blue, no label
-   ★   AI-estimated       — #999999 grey, append "(estimated)"
+   CONFIDENCE SYSTEM — trust gradient on the ink ramp
+   ★★★ VeyaFlow-verified  — ink, no label
+   ★★  Research-verified  — ink-soft, no label
+   ★   AI-estimated       — ink-mute, append "(estimated)"
 ═══════════════════════════════════════════════════ */
 const CONFIDENCE_LEVELS = {
-  veyaflow_verified: { stars:'★★★', color:'#1B2D4F', label:'' },
-  research_verified: { stars:'★★',  color:'#4A6FA5', label:'' },
-  ai_estimated:      { stars:'★',   color:'#999999', label:' (estimated)' },
+  veyaflow_verified: { stars:'★★★', color:'var(--ink)',      label:'' },
+  research_verified: { stars:'★★',  color:'var(--ink-soft)', label:'' },
+  ai_estimated:      { stars:'★',   color:'var(--ink-mute)', label:' (estimated)' },
 };
 
 /* ─── Regulatory term tooltips ──────────────────── */
@@ -7423,7 +7431,7 @@ function renderDashboard(el){
             <span>Products (${skus.length})</span>
             <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">${skus.length>0?'View all →':'Add SKU →'}</span>
           </div>
-          ${skus.length===0?`<div style="padding:.6rem;background:rgba(196,168,130,.06);border:1px solid rgba(196,168,130,.15);font-size:.75rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)"><div style="flex:1;font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div><div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444'}">${r.pct}%</div></div>`;}).join('')}
+          ${skus.length===0?`<div style="padding:.6rem;background:var(--accent-soft);border:1px solid var(--line-strong);font-size:.75rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)"><div style="flex:1;font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div><div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'var(--green-text)':r.pct>=50?'var(--amber-text)':'var(--red-text)'}">${r.pct}%</div></div>`;}).join('')}
           ${renderSetupTracker()}
         </div>
       </div>
@@ -25862,7 +25870,7 @@ function renderCircularResults(){
                   </div>
                 </div>
                 <div style="font-size:.68rem;color:#555;line-height:1.55;margin-bottom:.3rem">${p.description}</div>
-                ${p.insiderNote?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--tang);margin-bottom:.3rem">\ud83d\udca1 ${p.insiderNote}</div>`:''}
+                ${p.insiderNote?`<div style="font-family:var(--mono);font-size:.57rem;color:var(--ink-soft);margin-bottom:.3rem">\ud83d\udca1 ${p.insiderNote}</div>`:''}
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem;align-items:center">
                   ${!isConf?`<button class="btn-outline" style="font-size:.63rem;padding:.22rem .55rem" onclick="confirmCircularPartner(${p.id})">Select this partner \u2192</button>`:`<button class="btn-primary" style="font-size:.63rem;padding:.22rem .55rem" onclick="generateESPRDeclaration()">\u2193 Download ESPR Declaration</button>`}
                   ${p.contact?`<a href="mailto:${p.contact}" style="font-family:var(--mono);font-size:.57rem;color:var(--navy)">${p.contact}</a>`:''}
@@ -30716,9 +30724,9 @@ function renderRegMonitorPage(el){
   const dimLabels = dims.map(d=>d.label);
 
   const SEV = {
-    high:   {color:'#991B1B', bg:'#FEF2F2', border:'#FCA5A5', icon:'⚑', label:'High priority'},
-    medium: {color:'#92400E', bg:'#FFFBEB', border:'#FCD34D', icon:'◐', label:'Watch'},
-    low:    {color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE', icon:'ℹ', label:'For awareness'},
+    high:   {color:'var(--red-text)',    bg:'var(--red-soft)',    border:'var(--red-bg)',      icon:'⚑', label:'High priority'},
+    medium: {color:'var(--amber-text)',  bg:'var(--amber-soft)',  border:'var(--amber-bar)',   icon:'◐', label:'Watch'},
+    low:    {color:'var(--accent-deep)', bg:'var(--accent-soft)', border:'var(--line-strong)', icon:'ℹ', label:'For awareness'},
   };
 
   el.innerHTML = `
@@ -30735,7 +30743,7 @@ function renderRegMonitorPage(el){
       </div>
 
       <!-- Status bar -->
-      <div style="background:#F9F8F6;border:1px solid var(--border);padding:.6rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <div style="background:var(--surface);border:1px solid var(--border);padding:.6rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <div style="display:flex;gap:1rem;flex-wrap:wrap">
           <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">
             Last checked: <strong style="color:var(--navy)">${last ? new Date(last).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : 'Never'}</strong>
@@ -30749,13 +30757,13 @@ function renderRegMonitorPage(el){
         </div>
         <div style="display:flex;gap:.35rem;flex-wrap:wrap">
           ${dims.map(d=>{
-            var bg = d.kind==='category' ? '#EFF6FF' : '#FFFBEB';
-            var col = d.kind==='category' ? '#1E40AF' : '#92400E';
-            var border = d.kind==='category' ? '#BFDBFE' : '#FCD34D';
+            var bg = d.kind==='category' ? 'var(--accent-soft)' : 'var(--amber-soft)';
+            var col = d.kind==='category' ? 'var(--accent-deep)' : 'var(--amber-text)';
+            var border = d.kind==='category' ? 'var(--line-strong)' : 'var(--amber-bar)';
             var prov = d.provisional ? ' opacity:.7;font-style:italic' : '';
             return `<span style="font-family:var(--mono);font-size:.5rem;background:${bg};color:${col};padding:.1rem .35rem;border:1px solid ${border};${prov}" title="${d.kind==='category'?'Brand category':'Product-type-driven'}${d.provisional?' · may apply when products added':''}">${d.label}</span>`;
           }).join('')}
-          ${(brand?.targetMarkets||[]).slice(0,3).map(m=>`<span style="font-family:var(--mono);font-size:.5rem;background:#F9F8F6;color:var(--muted);padding:.1rem .35rem;border:1px solid var(--border)">${m}</span>`).join('')}
+          ${(brand?.targetMarkets||[]).slice(0,3).map(m=>`<span style="font-family:var(--mono);font-size:.5rem;background:var(--surface);color:var(--muted);padding:.1rem .35rem;border:1px solid var(--border)">${m}</span>`).join('')}
         </div>
       </div>
 
@@ -30765,16 +30773,16 @@ function renderRegMonitorPage(el){
           <span>What VeyaFlow monitors for your brand</span>
           <span style="color:var(--muted)">▼</span>
         </summary>
-        <div style="padding:.65rem .85rem;border-top:1px solid var(--border);background:#F9F8F6">
+        <div style="padding:.65rem .85rem;border-top:1px solid var(--border);background:var(--surface)">
           ${dims.map(d=>{
             const src = d.source;
             if(!src) return '';
             var kindLabel = d.kind === 'product_type' ? 'Product-type' : 'Brand category';
-            var prov = d.provisional ? ' <span style="font-family:var(--mono);font-size:.45rem;background:#FEF3C7;color:#78350F;padding:.05rem .25rem;margin-left:.25rem">may apply when products added</span>' : '';
+            var prov = d.provisional ? ' <span style="font-family:var(--mono);font-size:.45rem;background:var(--amber-bg);color:var(--amber-text);padding:.05rem .25rem;margin-left:.25rem">may apply when products added</span>' : '';
             return `
               <div style="margin-bottom:.65rem">
                 <div style="font-family:var(--mono);font-size:.55rem;font-weight:700;color:var(--navy);margin-bottom:.3rem">${d.label} <span style="font-weight:400;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-left:.25rem">${kindLabel}</span>${prov}</div>
-                <div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.6">Watch terms: ${src.watchTerms.slice(0,5).join(' · ')}</div>
+                <div style="font-family:var(--sans);font-size:.65rem;color:var(--ink-soft);line-height:1.6">Watch terms: ${src.watchTerms.slice(0,5).join(' · ')}</div>
                 <div style="font-family:var(--sans);font-size:.62rem;color:var(--muted);margin-top:.15rem">Sources: ${src.regulators.join(', ')}</div>
               </div>
             `;
@@ -30803,16 +30811,16 @@ function renderRegMonitorPage(el){
           ${all.map(alert=>{
             const s = SEV[alert.severity]||SEV.medium;
             return `
-              <div style="border:1px solid ${alert.read?'var(--border)':s.border};background:${alert.read?'#fff':s.bg};padding:.7rem .9rem;margin-bottom:.5rem;${alert.read?'opacity:.65':''}">
+              <div style="border:1px solid ${alert.read?'var(--border)':s.border};background:${alert.read?'var(--paper)':s.bg};padding:.7rem .9rem;margin-bottom:.5rem;${alert.read?'opacity:.65':''}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
                   <div style="flex:1">
                     <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem;flex-wrap:wrap">
                       <span style="font-family:var(--mono);font-size:.65rem;color:${s.color}">${s.icon}</span>
                       <span style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:${s.color}">${alert.title}</span>
                       <span style="font-family:var(--mono);font-size:.48rem;background:${s.bg};color:${s.color};padding:.05rem .3rem;border:1px solid ${s.border}">${s.label}</span>
-                      ${!alert.read?`<span style="font-family:var(--mono);font-size:.48rem;background:var(--accent);color:#fff;padding:.05rem .3rem">NEW</span>`:''}
+                      ${!alert.read?`<span style="font-family:var(--mono);font-size:.48rem;background:var(--accent);color:var(--on-accent);padding:.05rem .3rem">NEW</span>`:''}
                     </div>
-                    <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.6;margin-bottom:.3rem">${alert.summary}</div>
+                    <div style="font-family:var(--sans);font-size:.7rem;color:var(--ink-soft);line-height:1.6;margin-bottom:.3rem">${alert.summary}</div>
                     <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                       <span style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${alert.market} · ${alert.category} · ${alert.date}</span>
                       ${alert.url?`<a href="${alert.url}" target="_blank" rel="noopener noreferrer" style="font-family:var(--mono);font-size:.5rem;color:var(--navy);text-decoration:underline">Source →</a>`:''}
