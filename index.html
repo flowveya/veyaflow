@@ -134,7 +134,7 @@
   .nav-ico svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .nav-item.active .nav-ico { color: var(--accent-deep); }
   .nav-text { flex: 1; min-width: 0; }
-  .nav-name { display: block; font-size: .82rem; font-weight: 600; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-name { display: block; font-size: .82rem; font-weight: 500; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-item.active .nav-name { color: var(--accent-deep); font-weight: 600; }
   .nav-sub { display: block; font-family: var(--sans); font-size: .65rem; color: var(--ink-mute); margin-top: .05rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-badge { font-family: var(--mono); font-size: .55rem; background: var(--accent); color: #fff; border-radius: 9999px; padding: 1px 7px; margin-left: auto; flex-shrink: 0; font-weight: 700; }
@@ -227,6 +227,22 @@
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
   .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; }
   .col-2 { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+  .bh-cols { display: flex; gap: 1.25rem; align-items: flex-start; }
+  .bh-cols .main { flex: 1; min-width: 0; }
+  .bh-cols .side { width: 300px; flex-shrink: 0; }
+  .scard { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: .85rem; }
+  .scard-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; }
+  .scard-t { font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+  .scard-a { color: var(--accent); font-size: .7rem; font-weight: 500; cursor: pointer; }
+  .scard .srow { display: flex; justify-content: space-between; font-size: .84rem; padding: .28rem 0; color: var(--ink-soft); font-weight: 500; }
+  .scard .srow b { color: var(--ink); font-weight: 500; }
+  .scard .prow { display: flex; justify-content: space-between; padding: .28rem 0; font-size: .84rem; }
+  .scard .prow .pn { font-weight: 500; color: var(--ink); }
+  .scard .prow .pp { color: var(--green-text); font-weight: 500; font-family: var(--mono); }
+  .bh-strip { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+  .bh-strip-bar { display: flex; justify-content: space-between; align-items: center; padding: .55rem .9rem; background: var(--surface); font-family: var(--mono); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); font-weight: 500; cursor: pointer; }
+  .bh-strip-body { padding: .6rem; }
+  @media (max-width: 900px) { .bh-cols { flex-direction: column; } .bh-cols .side { width: 100%; } }
   .col-filter { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
 
   /* STAT CARDS */
@@ -3931,7 +3947,7 @@ const NAV_SUBTITLES = {
 //    absent=default. Default per group: collapsed, EXCEPT the group containing
 //    currentPage (ASSUMPTION: "collapsed by default" = collapsed-except-active;
 //    if strategy meant literally-all-closed, drop containsCurrent below).
-var navGroupState = {};
+var navGroupState = {}; var bhAlertsOpen = false; function toggleBhAlerts(){ bhAlertsOpen=!bhAlertsOpen; renderPage("home"); }
 
 function toggleNavGroup(key){
   var els = document.querySelectorAll('[data-group="'+key+'"]');
@@ -7420,72 +7436,94 @@ function renderDashboard(el){
         <button class="btn-outline" onclick="resetBrand()">Edit workspace</button>
       </div>
     </div>
-    <div class="content">
+<div class="content">
+  <div class="bh-cols">
+   <div class="main">
 
-      <!-- ══ ZONE 1: READINESS HERO ══════════════════════ -->
-      ${renderReadinessHero()}
+  <!-- ══ ZONE 1: READINESS HERO ══════════════════════ -->
+  ${renderReadinessHero()}
 
-      <!-- ══ ZONE 2: NEXT ACTIONS ══════════════════════ -->
-      ${renderNextActions()}
+  <!-- ══ ZONE 2: NEXT ACTIONS ══════════════════════ -->
+  ${renderNextActions()}
 
-      <!-- ══ ALERTS ══════════════════════════════════ -->
-      ${renderExpansionOverview()}
-      ${renderRegulatoryAlertBanner()}
-      ${renderAllBrandHomeAlerts()}
-      ${renderSeasonalAlerts()}
-      ${renderReferralNudge()}
-      ${renderOverdueMilestoneAlert()}
-      ${renderTargetRetailersNudge()}
-      ${renderTargetRetailersPicker()}
+  <!-- ══ HIGH-PRIORITY ALERTS (full-size) ══════════ -->
+  ${renderRegulatoryAlertBanner()}
+  ${renderAllBrandHomeAlerts()}
+  ${renderOverdueMilestoneAlert()}
 
-      <!-- ══ COMPLIANCE RADAR ══════════════════════ -->
-      ${renderComplianceRadar()}
+  <!-- ══ MINOR ALERTS — collapsible strip ══════════ -->
+  ${(function(){
+    var minor = [
+      renderExpansionOverview(),
+      renderSeasonalAlerts(),
+      renderReferralNudge(),
+      renderTargetRetailersNudge()
+    ].filter(function(h){return h && h.trim();});
+    if(!minor.length) return '';
+    var open = bhAlertsOpen;
+    return '<div class="bh-strip">'+
+      '<div class="bh-strip-bar" onclick="toggleBhAlerts()">'+
+        '<span>'+minor.length+' more update'+(minor.length>1?'s':'')+'</span>'+
+        '<span>'+(open?'hide ▴':'show ▾')+'</span>'+
+      '</div>'+
+      (open?'<div class="bh-strip-body">'+minor.join('')+'</div>':'')+
+    '</div>';
+  })()}
 
-      ${renderComplianceCalendar()}
+  <!-- Target retailers picker — interactive, stays in main -->
+  ${renderTargetRetailersPicker()}
 
-      <!-- ══ ZONE 3: REPORTS + PROFILE ══════════════ -->
-      <div class="col-2">
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-            <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Saved reports (${savedReports.length})</div>
-            <button class="btn-outline" onclick="showPage('report')" style="font-size:.65rem;padding:.3rem .7rem">+ New report</button>
+  <!-- ══ SAVED REPORTS ══════════════════════════ -->
+  <div style="margin-top:1.25rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute)">Saved reports (${savedReports.length})</div>
+      <button class="btn-outline" onclick="showPage('report')" style="font-size:.65rem;padding:.3rem .7rem">+ New report</button>
+    </div>
+    ${reports.length===0?smartEmpty("report"):reports.map(r=>`
+      ${renderContextFixNotice(r.id)}
+      <div class="saved-report" onclick="expandReport('${r.id}')">
+        <div style="display:flex;justify-content:space-between">
+          <div>
+            <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
+            <div class="saved-report-name">${r.brandName}</div>
+            <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
           </div>
-          ${reports.length===0?smartEmpty("report"):reports.map(r=>`
-            ${renderContextFixNotice(r.id)}
-            <div class="saved-report" onclick="expandReport('${r.id}')">
-              <div style="display:flex;justify-content:space-between">
-                <div>
-                  <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
-                  <div class="saved-report-name">${r.brandName}</div>
-                  <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
-                </div>
-                <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-            <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Brand profile</div>
-            <button class="btn-outline" onclick="resetBrand()" style="font-size:.65rem;padding:.3rem .7rem">Edit →</button>
-          </div>
-          <div class="card" style="margin-bottom:.85rem">
-            ${[['Category',(getBrandCategories()||[brand.category||'—']).join(', ')],['Home market',brand.currentMarket],['Target markets',brand.targetMarkets?.length?brand.targetMarkets.join(', '):'Not set'],['Stage',stage.label]].map(([l,v])=>`<div class="profile-row"><div class="profile-label">${l}</div><div class="profile-val">${v}</div></div>`).join('')}
-          </div>
-          <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;display:flex;justify-content:space-between">
-            <span>Products (${skus.length})</span>
-            <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">${skus.length>0?'View all →':'Add SKU →'}</span>
-          </div>
-          ${skus.length===0?`<div style="padding:.6rem;background:var(--accent-soft);border:1px solid var(--line-strong);font-size:.75rem;color:var(--muted)">No products yet. <span onclick="showPage('skus')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div style="display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px solid var(--border)"><div style="flex:1;font-size:.78rem;color:var(--navy);font-weight:500">${sku.name||'Unnamed'}</div><div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${r.pct>=80?'var(--green-text)':r.pct>=50?'var(--amber-text)':'var(--red-text)'}">${r.pct}%</div></div>`;}).join('')}
-          ${renderSetupTracker()}
+          <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red-text);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
         </div>
       </div>
+    `).join('')}
+  </div>
 
-      <!-- Supplier risk + verification (secondary) -->
-      ${renderSupplierRiskAlerts()}
-      <div style="margin-bottom:1.25rem">${renderVerificationCard()}</div>
+  ${renderSupplierRiskAlerts()}
+
+   </div><!-- /.main -->
+
+   <div class="side">
+
+    <!-- Brand profile -->
+    <div class="scard">
+      <div class="scard-h"><span class="scard-t">Brand profile</span><a onclick="resetBrand()" class="scard-a">Edit →</a></div>
+      ${[['Category',(getBrandCategories()||[brand.category||'—']).join(', ')],['Home market',brand.currentMarket],['Target',brand.targetMarkets?.length?brand.targetMarkets.join(', '):'Not set'],['Stage',stage.label]].map(([l,v])=>`<div class="srow"><span>${l}</span><b>${v}</b></div>`).join('')}
     </div>
-  `;
+
+    <!-- Products -->
+    <div class="scard">
+      <div class="scard-h"><span class="scard-t">Products (${skus.length})</span><a onclick="showPage('skus')" class="scard-a">${skus.length>0?'View all →':'Add SKU →'}</a></div>
+      ${skus.length===0?`<div style="padding:.5rem .6rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:8px;font-size:.78rem;color:var(--ink-soft);font-weight:500">No products yet. <span onclick="showPage('skus')" style="color:var(--accent);cursor:pointer">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div class="prow"><span class="pn">${sku.name||'Unnamed'}</span><span class="pp"${r.pct<70?' style="color:var(--amber-text)"':''}>${r.pct}%</span></div>`;}).join('')}
+      ${renderSetupTracker()}
+    </div>
+
+    <!-- Verification (sketch skin, live logic) -->
+    ${renderVerificationCard()}
+
+    <!-- Compliance radar + calendar -->
+    ${renderComplianceRadar()}
+    ${renderComplianceCalendar()}
+
+   </div><!-- /.side -->
+  </div><!-- /.bh-cols -->
+</div>
+`;
 }
 
 function resetBrand(){
