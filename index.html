@@ -36,6 +36,8 @@
 
     /* SEMANTIC STATUS — compliance/status ONLY, never brand decoration */
     --green-bg:#D2EFDE; --green-text:#0F7A52; --green-soft:#E6F6EE; --green-bar:#27A06E;
+    --pend-bg:#DBE3F4; --pend-text:#3A4F8A; --pend-soft:#EDF1F9; --pend-bar:#5570B8; /* pending status — DECLARED only; no pending pill rendered (CVD gate open) */
+    --tag-radius:7px; /* unified region/category tag radius (Pass-2 sketch) */
     --amber-bg:#FBEAC9; --amber-text:#A85D14; --amber-soft:#FCF4E0; --amber-bar:#E8932A;
     --red-bg:#FAD9D6;   --red-text:#B32A1F;   --red-soft:#FDEEEC;
     /* blue — not in brief §3, but referenced by compare runner-up bars + nav flags;
@@ -243,6 +245,128 @@
   .bh-strip-bar { display: flex; justify-content: space-between; align-items: center; padding: .55rem .9rem; background: var(--surface); font-family: var(--mono); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); font-weight: 500; cursor: pointer; }
   .bh-strip-body { padding: .6rem; }
   @media (max-width: 900px) { .bh-cols { flex-direction: column; } .bh-cols .side { width: 100%; } }
+
+  /* ════ PASS-2 Brand-Home reskin (Daylight sketch) — SCOPED under .bh2 so the
+     sketch's generic class names (.card/.btn-primary/.main/.side/.actions) cannot
+     leak to other pages. Declaration values are byte-identical to the sketch. ════ */
+  .bh2 .main { padding: 26px 0 40px; display: grid; grid-template-columns: 1fr 310px; gap: 28px; max-width: 1280px; margin: 0 auto; }
+  @media (max-width: 1100px) { .bh2 .main { grid-template-columns: 1fr; } .bh2 .side { width: 100%; } }
+  .bh2 .col { min-width: 0; }
+  .bh2 .wshead { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; }
+  .bh2 .ws-eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 8px; }
+  .bh2 h1 { font-family: var(--display); font-weight: 600; font-size: 52px; line-height: 1; letter-spacing: -.005em; margin-bottom: 9px; }
+  .bh2 .route { font-size: 14.5px; color: var(--ink-soft); }
+  .bh2 .signed { text-align: right; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; } .bh2 .signed b { color: var(--ink); }
+  .bh2 .btn-edit { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 9px 16px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .bh2 .btn-edit svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+  .bh2 .sec-lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); margin: 26px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .bh2 .sec-lbl .ct { margin-left: auto; font-size: 9.5px; text-transform: none; letter-spacing: .02em; }
+  /* hero */
+  .bh2 .hero { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 14px; padding: 24px 26px; }
+  .bh2 .hero-row { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+  .bh2 .hero-num { font-family: var(--display); font-weight: 500; font-size: 64px; line-height: .9; color: var(--accent); }
+  .bh2 .hero-num small { font-family: var(--mono); font-size: 13px; color: var(--ink-mute); }
+  .bh2 .hero-mid { flex: 1; min-width: 210px; }
+  .bh2 .hero-label { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--green-text); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .bh2 .hero-label svg { width: 14px; height: 14px; stroke: var(--green-text); stroke-width: 2.4; fill: none; }
+  .bh2 .hero-head { font-family: var(--display); font-weight: 600; font-size: 25px; line-height: 1.1; }
+  .bh2 .hero-btns { display: flex; gap: 9px; }
+  .bh2 .btn-primary { background: var(--accent); color: #fff; border: 0; padding: 11px 18px; border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .bh2 .btn-primary:hover { background: var(--accent-deep); }
+  .bh2 .btn-primary svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.9; fill: none; }
+  .bh2 .btn-ghost { background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); padding: 11px 18px; border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .bh2 .btn-ghost:hover { border-color: var(--accent); color: var(--accent-deep); }
+  .bh2 .btn-ghost svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.9; fill: none; }
+  .bh2 .rbar { margin-top: 20px; }
+  .bh2 .rtrack { height: 9px; border-radius: 6px; background: var(--surface); overflow: hidden; position: relative; }
+  .bh2 .rfill { height: 100%; border-radius: 6px; background: linear-gradient(90deg,var(--tang) 0%,var(--tang) 22%,#C98A4E 48%,var(--accent) 100%); }
+  .bh2 .rscale { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-mute); margin-top: 7px; }
+  /* next actions */
+  .bh2 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .bh2 .acard { border: 1px solid var(--line); border-radius: 13px; padding: 18px; cursor: pointer; transition: border-color .12s; display: flex; flex-direction: column; min-height: 128px; }
+  .bh2 .acard:hover { border-color: var(--accent); }
+  .bh2 .acard .ahead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+  .bh2 .acard .ic { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; }
+  .bh2 .acard .ic svg { width: 17px; height: 17px; stroke: var(--accent-deep); stroke-width: 1.8; fill: none; }
+  .bh2 .acard .arr { width: 16px; height: 16px; stroke: var(--ink-mute); stroke-width: 1.9; fill: none; }
+  .bh2 .acard h3 { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1.15; margin-bottom: 5px; }
+  .bh2 .acard p { font-size: 12.5px; color: var(--ink-soft); flex: 1; }
+  .bh2 .acard .time { font-family: var(--mono); font-size: 10px; color: var(--green-text); margin-top: 10px; display: flex; align-items: center; gap: 5px; }
+  .bh2 .acard .time svg { width: 11px; height: 11px; stroke: var(--green-text); stroke-width: 2; fill: none; }
+  /* regulatory callouts */
+  .bh2 .callout { border-radius: 13px; padding: 15px 17px; margin-bottom: 11px; display: flex; gap: 13px; align-items: flex-start; }
+  .bh2 .callout .ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: 0 0 30px; }
+  .bh2 .callout .ic svg { width: 16px; height: 16px; stroke-width: 1.9; fill: none; }
+  .bh2 .callout .bd { flex: 1; min-width: 0; }
+  .bh2 .callout .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .bh2 .callout .tag svg { width: 12px; height: 12px; stroke-width: 2.2; fill: none; }
+  .bh2 .callout h3 { font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 1.2; margin-bottom: 4px; }
+  .bh2 .callout p { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 5px; }
+  .bh2 .callout p b { color: var(--ink); }
+  .bh2 .callout .meta { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
+  .bh2 .callout .act { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .bh2 .btn-sm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 9px; cursor: pointer; white-space: nowrap; border: 0; }
+  .bh2 .btn-sm svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; }
+  .bh2 .link-sm { font-size: 11px; color: var(--ink-mute); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .bh2 .link-sm svg { width: 11px; height: 11px; stroke: currentColor; stroke-width: 2; fill: none; }
+  .bh2 .callout.err { background: var(--red-soft); border: 1px solid var(--red-bg); }
+  .bh2 .callout.err .ic { background: var(--red-bg); } .bh2 .callout.err .ic svg { stroke: var(--red-text); }
+  .bh2 .callout.err .tag { color: var(--red-text); } .bh2 .callout.err .tag svg { stroke: var(--red-text); }
+  .bh2 .callout.err .btn-sm { background: var(--red-text); color: #fff; }
+  .bh2 .callout.warn { background: var(--amber-soft); border: 1px solid var(--amber-bg); }
+  .bh2 .callout.warn .ic { background: var(--amber-bg); } .bh2 .callout.warn .ic svg { stroke: var(--amber-text); }
+  .bh2 .callout.warn .tag { color: var(--amber-text); } .bh2 .callout.warn .tag svg { stroke: var(--amber-text); }
+  .bh2 .callout.warn .btn-sm { background: var(--amber-bar); color: #fff; }
+  .bh2 .showmore { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 11px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink-soft); font-size: 12px; font-weight: 500; cursor: pointer; }
+  .bh2 .showmore:hover { border-color: var(--accent); color: var(--accent-deep); }
+  .bh2 .showmore svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
+  /* sidebar */
+  .bh2 .side { display: flex; flex-direction: column; gap: 18px; }
+  .bh2 .card { border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .bh2 .card-h { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); display: flex; align-items: center; margin-bottom: 13px; }
+  .bh2 .card-h a { margin-left: auto; font-family: var(--sans); font-size: 11.5px; font-weight: 600; color: var(--accent-deep); text-decoration: none; text-transform: none; letter-spacing: 0; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .bh2 .card-h a svg { width: 11px; height: 11px; stroke: currentColor; stroke-width: 2; fill: none; }
+  .bh2 .prof { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .bh2 .prof:last-child { border-bottom: 0; }
+  .bh2 .prof .k { color: var(--ink-soft); } .bh2 .prof .v { font-weight: 600; text-align: right; }
+  .bh2 .pmini { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .bh2 .pmini:last-child { border-bottom: 0; }
+  .bh2 .pmini .pn { flex: 1; font-weight: 600; font-size: 13px; }
+  .bh2 .pmini .pp { font-family: var(--display); font-weight: 600; font-size: 17px; }
+  .bh2 .pmini .pp.g { color: var(--green-text); } .bh2 .pmini .pp.a { color: var(--amber-text); } .bh2 .pmini .pp.r { color: var(--red-text); }
+  /* compliance summary + rows */
+  .bh2 .csum { background: var(--red-soft); border: 1px solid var(--red-bg); border-radius: 11px; padding: 13px 15px; margin-bottom: 12px; }
+  .bh2 .csum.amber { background: var(--amber-soft); border-color: var(--amber-bg); }
+  .bh2 .csum.green { background: var(--green-soft); border-color: var(--green-bg); }
+  .bh2 .csum .big { font-family: var(--display); font-weight: 600; font-size: 16px; color: var(--red-text); line-height: 1.25; margin-bottom: 3px; }
+  .bh2 .csum.amber .big { color: var(--amber-text); } .bh2 .csum.green .big { color: var(--green-text); }
+  .bh2 .csum .sub { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
+  .bh2 .crow { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .bh2 .crow:last-child { border-bottom: 0; }
+  .bh2 .crow .cic { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex: 0 0 22px; margin-top: 1px; }
+  .bh2 .crow .cic svg { width: 13px; height: 13px; stroke-width: 2.1; fill: none; }
+  .bh2 .crow.r .cic { background: var(--red-bg); } .bh2 .crow.r .cic svg { stroke: var(--red-text); }
+  .bh2 .crow.a .cic { background: var(--amber-bg); } .bh2 .crow.a .cic svg { stroke: var(--amber-text); }
+  .bh2 .crow .cbd { flex: 1; min-width: 0; }
+  .bh2 .crow .ctop { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+  .bh2 .crow .cname { font-weight: 600; font-size: 13px; }
+  .bh2 .tag-rg { font-family: var(--mono); font-size: 8.5px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--tag-radius); font-weight: 500; }
+  .bh2 .tag-rg.eu { background: var(--accent-soft); color: var(--accent-deep); }
+  .bh2 .tag-rg.reg { background: var(--paper-deep); color: var(--ink-soft); }
+  .bh2 .crow .cfine { font-family: var(--mono); font-size: 9.5px; color: var(--red-text); display: inline-block; background: var(--red-bg); padding: 1px 6px; border-radius: var(--tag-radius); margin-bottom: 3px; }
+  .bh2 .crow .cfix { font-size: 11.5px; color: var(--ink-soft); }
+  .bh2 .crow .cfix a { color: var(--accent-deep); font-weight: 600; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+  .bh2 .crow .cfix a svg { width: 10px; height: 10px; stroke: currentColor; stroke-width: 2; fill: none; }
+  /* verification */
+  .bh2 .vrow { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 12.5px; color: var(--ink-soft); }
+  .bh2 .vrow .vic { width: 17px; height: 17px; flex: 0 0 17px; }
+  .bh2 .vrow .vic svg { width: 17px; height: 17px; stroke-width: 2; fill: none; }
+  .bh2 .vrow.done .vic svg { stroke: var(--green-text); }
+  .bh2 .vrow.todo .vic svg { stroke: var(--ink-mute); }
+  .bh2 .vbadge { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }
+  .bh2 .vbadge .ring { width: 42px; height: 42px; border-radius: 50%; border: 3px solid var(--line-strong); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--ink-mute); flex: 0 0 42px; }
+  .bh2 .vbadge .vt { font-weight: 600; font-size: 13.5px; }
+  .bh2 .vbadge .vs { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
   .col-filter { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
 
   /* STAT CARDS */
@@ -6893,59 +7017,26 @@ function renderVerificationCard(){
   );
 
   return `
-    <div class="card" style="margin-bottom:1.25rem;border-left:3px solid ${t.border}">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.85rem">
+    <div class="card">
+      <div class="card-h">Verification status</div>
+      <div class="vbadge">
+        <div class="ring">${tier}/3</div>
         <div>
-          <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.25rem">Verification Status</div>
-          <div style="display:flex;align-items:center;gap:.65rem">
-            <div style="font-family:var(--serif);font-size:1.35rem;color:${t.color};line-height:1">${t.icon}</div>
-            <div>
-              <div style="font-family:var(--mono);font-size:.8rem;font-weight:700;color:${t.color}">VeyaFlow ${t.label}</div>
-              <div style="font-family:var(--sans);font-size:.68rem;color:var(--muted)">Tier ${tier} of 3</div>
-            </div>
-          </div>
+          <div class="vt">VeyaFlow ${t.label}</div>
+          <div class="vs">Tier ${tier} of 3 · Tier 1 ready ${t1Done}/4</div>
         </div>
-        ${getVerificationBadgeHTML(tier,'normal')}
       </div>
-
-      <!-- Tier 1 checklist -->
-      <div style="margin-bottom:.75rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem">
-          Tier 1 — Ready (auto-calculated) · ${t1Done}/4
+      ${t1Reqs.map(r=>`
+        <div class="vrow ${r.done?'done':'todo'}">
+          <span class="vic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/>${r.done?'<path d="m8 12 3 3 5-6"/>':''}</svg></span>
+          <span>${r.label}${(!r.done&&r.detail)?` <span style="color:var(--amber-text)" onclick="${r.action}">— ${r.detail}</span>`:''}</span>
         </div>
-        ${t1Reqs.map(r=>`
-          <div style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--border)">
-            <span style="font-family:var(--mono);font-size:.65rem;color:${r.done?'#10B981':'#9CA3AF'};flex-shrink:0;margin-top:.05rem">${r.done?'✓':'○'}</span>
-            <div style="flex:1">
-              <div style="font-family:var(--sans);font-size:.73rem;color:${r.done?'var(--ink)':'#6B7280'}">${r.label}</div>
-              ${r.detail&&!r.done?`<div style="font-family:var(--mono);font-size:.55rem;color:#F59E0B;margin-top:.1rem">${r.detail} <span onclick="${r.action}" style="cursor:pointer;text-decoration:underline">Fix →</span></div>`:''}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-
-      <!-- Tier 2/3 -->
-      <div style="padding:.55rem .7rem;background:#F9F8F6;border:1px solid var(--border)">
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">
-          ${tier>=2?'✓✓ Verified (Tier 2) — granted':'Tier 2 — Verified · Manual review by VeyaFlow'}
-        </div>
-        <div style="font-family:var(--sans);font-size:.7rem;color:#555;line-height:1.5;margin-bottom:.4rem">
-          ${tier>=2?'Your brand has been manually verified by VeyaFlow. Badge appears on all brand documents.':'Submit for manual review. VeyaFlow checks retailer relationships, compliance documentation, and market traction. Typically 3–5 business days.'}
-        </div>
-        ${tier<2?`
-          <a href="mailto:charlotte@veyaflow.com?subject=Tier%202%20Verification%20Request%20—%20${encodeURIComponent(brand?.name||'Brand')}&body=${t2Summary}"
-            style="display:inline-block;padding:.35rem .85rem;background:var(--accent);color:#fff;font-family:var(--mono);font-size:.6rem;text-decoration:none">
-            Request Verification →
-          </a>
-        `:tier===2?`<div style="font-family:var(--mono);font-size:.6rem;color:var(--navy)">✓ Verified — Tier 3 Certified requires in-person VeyaFlow audit</div>`:''}
-      </div>
-
-      ${brand?.verificationTier>=1?`
-        <div style="margin-top:.6rem;font-family:var(--mono);font-size:.52rem;color:var(--muted);text-align:right">
-          <span onclick="if(confirm('Admin: enter verification tier (0-3):')){var v=prompt('Tier (0=none, 1=Ready, 2=Verified, 3=Certified):','${tier}');if(v!==null){brand.verificationTier=parseInt(v)||0;saveBrandState();renderDashboard(document.getElementById('page-home'));}}" style="cursor:pointer;text-decoration:underline">admin override</span>
-        </div>
-      `:''}`+`
-      <div style="margin-top:.45rem;font-family:var(--mono);font-size:.5rem;color:var(--muted);text-align:right">
+      `).join('')}
+      ${tier<2?`
+        <a href="mailto:charlotte@veyaflow.com?subject=Tier%202%20Verification%20Request%20—%20${encodeURIComponent(brand?.name||'Brand')}&body=${t2Summary}"
+          class="btn-sm" style="background:var(--accent);color:#fff;margin-top:12px;text-decoration:none">Request verification <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      `:tier===2?`<div style="font-family:var(--mono);font-size:10px;color:var(--ink-mute);margin-top:10px">✓ Verified — Tier 3 Certified requires in-person VeyaFlow audit</div>`:''}
+      <div style="margin-top:8px;text-align:right">
         <span onclick="var v=prompt('Admin: set verification tier (0-3):','${tier}');if(v!==null&&v!==''){brand.verificationTier=parseInt(v)||0;saveBrandState();renderDashboard(document.getElementById('page-home'));}" style="cursor:pointer;color:transparent;user-select:none" id="vf-admin-override">·</span>
       </div>
     </div>
@@ -6969,31 +7060,22 @@ function renderReadinessHero(){
   var numColor='var(--accent)'; /* hero numeral + spine + bar tip: teal ALL tiers (brand identity); tier label carries status signal */
   var label=pct>=85?'Listing ready':pct>=70?'Pitch ready':pct>=50?'Nearly ready':'Building';
   var topBlocker=bestBlockers.filter(function(b){return b.level==='red';})[0]||bestBlockers[0];
-  var pitchBtn=pct>=70?'<button class="btn-outline" onclick="showPage(&apos;pitch&apos;)" style="padding:.45rem .9rem;font-size:.7rem">Generate pitch →</button>':'';
-  return '<div class="card" style="margin-bottom:1.25rem;border-left:4px solid '+numColor+';padding:1.5rem">'+
-    '<div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">'+
-      '<div style="text-align:center;flex-shrink:0">'+
-        '<div style="font-family:var(--serif);font-size:3.4rem;font-weight:500;color:'+numColor+';line-height:1">'+pct+'</div>'+
-        '<div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">/100</div>'+
+  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;pitch&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
+  return '<div class="hero">'+
+    '<div class="hero-row">'+
+      '<div class="hero-num">'+pct+'<small>/100</small></div>'+
+      '<div class="hero-mid">'+
+        '<div class="hero-label"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>'+label+(bestMktName?' · '+bestMktName:'')+'</div>'+
+        '<div class="hero-head">'+(topBlocker?'Biggest gap: '+(topBlocker.label||''):pct>=85?'Ready to pitch retailers':'Keep improving your profile')+'</div>'+
       '</div>'+
-      '<div style="flex:1;min-width:180px">'+
-        '<div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--tang-deep);font-weight:600;margin-bottom:.15rem;display:flex;align-items:center;gap:.3rem"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'+label+(bestMktName?' · '+bestMktName:'')+'</div>'+
-        '<div style="font-family:var(--serif);font-size:1.5rem;color:var(--ink);font-weight:600;margin-bottom:.2rem;line-height:1.15">'+(topBlocker?'Biggest gap: '+(topBlocker.label||''):pct>=85?'Ready to pitch retailers':'Keep improving your profile')+'</div>'+
-        (topBlocker&&topBlocker.fix?'<div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">'+topBlocker.fix+'</div>':'')+
-      '</div>'+
-      '<div style="display:flex;gap:.5rem;flex-wrap:wrap;flex-shrink:0">'+
-        '<button class="btn-primary" onclick=\"showPage(&apos;skus&apos;)\" style="padding:.45rem .9rem;font-size:.7rem">View blockers →</button>'+
+      '<div class="hero-btns">'+
+        '<button class="btn-primary" onclick="showPage(&apos;skus&apos;)"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17h.01"/></svg>View blockers</button>'+
         pitchBtn+
       '</div>'+
     '</div>'+
-    '<div style="margin-top:1rem;background:var(--line);height:6px;border-radius:3px">'+
-      '<div style="background:linear-gradient(90deg, var(--tang), var(--accent));height:6px;border-radius:3px;width:'+pct+'%;transition:width .6s ease"></div>'+
-    '</div>'+
-    '<div style="display:flex;justify-content:space-between;margin-top:.3rem">'+
-      '<span style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">0</span>'+
-      '<span style="font-family:var(--mono);font-size:.5rem;color:var(--amber)">70 pitch ready</span>'+
-      '<span style="font-family:var(--mono);font-size:.5rem;color:var(--green)">85 listing ready</span>'+
-      '<span style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">100</span>'+
+    '<div class="rbar">'+
+      '<div class="rtrack"><div class="rfill" style="width:'+pct+'%"></div></div>'+
+      '<div class="rscale"><span>0</span><span>70 pitch ready</span><span>85 listing ready</span><span>100</span></div>'+
     '</div>'+
   '</div>';
 }
@@ -7058,27 +7140,31 @@ function renderNextActions(){
   const top = actions.slice(0,3);
   if(!top.length) return '';
 
-  const cards = top.map(a=>{
-    const borderCol = a.urgent ? '#F59E0B' : 'var(--border)';
-    return `<div onclick="showPage('${a.page}')" style="background:#fff;border:1px solid ${borderCol};padding:.85rem;cursor:pointer;transition:border-color .15s"
-      onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='${borderCol}'">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.4rem">
-        <div>
-          <div style="font-size:.95rem;margin-bottom:.3rem">${a.icon}</div>
-          <div style="font-family:var(--sans);font-size:.78rem;color:var(--navy);font-weight:500;line-height:1.4">${a.label}</div>
-          <div style="font-family:var(--sans);font-size:.65rem;color:var(--muted);margin-top:.15rem;line-height:1.4">${a.desc}</div>
-        </div>
-        <span style="color:var(--gold);font-family:var(--mono);font-size:.75rem;flex-shrink:0">→</span>
+  // Map each action to a line-SVG by destination page (Pass-2 sketch icon set).
+  const ACT_ICONS = {
+    pitch:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    report:'<path d="M3 3v18h18"/><path d="m7 15 3-4 3 2 4-6"/>',
+    compare:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    skus:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 8v8l9 5 9-5V8"/>',
+    crm:'<circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/>',
+    'retail-tracker':'<path d="M5 3v18M5 4h12l-2 4 2 4H5"/>',
+    'retail-checklist':'<path d="M4 6l1.4 1.4L8 5M4 12l1.4 1.4L8 11M4 18l1.4 1.4L8 17M11 6h9M11 12h9M11 18h9"/>',
+  };
+  const actIco = a => ACT_ICONS[a.page] || '<path d="M5 12h14M13 6l6 6-6 6"/>';
+
+  const cards = top.map(a=>`<div class="acard" onclick="showPage('${a.page}')">
+      <div class="ahead">
+        <div class="ic"><svg viewBox="0 0 24 24">${actIco(a)}</svg></div>
+        <svg class="arr" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </div>
-      <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.5rem;border-top:1px solid var(--border);padding-top:.35rem">${a.time}</div>
-    </div>`;
-  }).join('');
+      <h3>${a.label}</h3>
+      <p>${a.desc}</p>
+      <div class="time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>${a.time}</div>
+    </div>`).join('');
 
   return `
-    <div style="margin-bottom:1.25rem">
-      <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem">Your next actions</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.6rem">${cards}</div>
-    </div>
+    <div class="sec-lbl">Your next actions</div>
+    <div class="actions">${cards}</div>
   `;
 }
 
@@ -7271,45 +7357,33 @@ function renderComplianceRadar(){
     </div>`;
   }
 
-  const greenToggleId = 'radar-greens-'+Date.now();
+  // Pass-2 sketch row (.crow) — red ✗ / amber ⚠, region tag, optional fine, Fix link.
+  const crow = (item)=>{
+    const isEu = item.markets.includes('all_eu');
+    const rg = isEu ? 'EU' : item.markets.join(', ');
+    const cls = item.status==='red' ? 'r' : 'a';
+    const ic = item.status==='red'
+      ? '<path d="M18 6 6 18M6 6l12 12"/>'
+      : '<path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17h.01"/>';
+    return `<div class="crow ${cls}">
+        <div class="cic"><svg viewBox="0 0 24 24">${ic}</svg></div>
+        <div class="cbd">
+          <div class="ctop"><span class="cname">${item.label}</span><span class="tag-rg ${isEu?'eu':'reg'}">${rg}</span></div>
+          ${item.fineRisk?`<span class="cfine">Fine: ${item.fineRisk}</span>`:''}
+          <div class="cfix">${item.actionLabel||''}${item.actionPage?` · <a onclick="showPage('${item.actionPage}')">Fix now <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>`:''}</div>
+        </div>
+      </div>`;
+  };
+  const csumCls = reds.length ? '' : ambers.length ? ' amber' : ' green';
 
   return `
-    <div style="margin-bottom:1.25rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.35rem">
-        <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Compliance Radar</div>
-        <button onclick="showPage('report')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--gold);cursor:pointer;padding:0">Run full market report →</button>
+    <div class="card">
+      <div class="card-h">Compliance radar <a onclick="showPage('report')">Full report <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+      <div class="csum${csumCls}">
+        <div class="big">${criticalCount?`${criticalCount} critical gap${criticalCount>1?'s':''} · `:''}${reds.length} red · ${ambers.length} action${ambers.length!==1?'s':''}</div>
+        <div class="sub">${relevant.length} regulation${relevant.length!==1?'s':''} applicable · ${greens.length} covered${infos.length?` · ${infos.length} below threshold`:''}</div>
       </div>
-
-      <!-- Summary strip -->
-      <div style="background:${summaryBg};border:1px solid ${reds.length?'#FCA5A5':ambers.length?'#FCD34D':'#A7F3D0'};padding:.55rem .85rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
-        <div style="font-family:var(--sans);font-size:.75rem;color:${summaryColor};font-weight:500">
-          ${criticalCount?`<strong>${criticalCount} critical gap${criticalCount>1?'s':''}</strong> · `:''}${reds.length?`${reds.length} red · `:''}${ambers.length?`${ambers.length} action${ambers.length>1?'s':''} recommended · `:''}${infos.length?`${infos.length} below threshold · `:''}${greens.length} regulation${greens.length!==1?'s':''} covered
-        </div>
-        <span style="font-family:var(--mono);font-size:.52rem;color:${summaryColor}">${relevant.length} applicable to your profile</span>
-      </div>
-
-      <!-- Red items first -->
-      ${reds.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${reds.map(radarCard).join('')}</div>`:''}
-
-      <!-- Amber items -->
-      ${ambers.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${ambers.map(radarCard).join('')}</div>`:''}
-
-      <!-- Info items — below threshold, no action today -->
-      ${infos.length?`<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.45rem">${infos.map(radarCard).join('')}</div>`:''}
-
-      <!-- Green items — collapsed -->
-      ${greens.length?`
-        <div>
-          <div onclick="var d=document.getElementById('${greenToggleId}');d.style.display=d.style.display==='none'?'flex':'none'"
-            style="font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.3rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:.3rem">
-            <span style="color:var(--green)">✅</span> Show covered regulations (${greens.length}) <span style="opacity:.5;margin-left:.2rem">▾</span>
-          </div>
-          <div id="${greenToggleId}" style="display:none;flex-direction:column;gap:.3rem;margin-top:.35rem">
-            ${greens.map(radarCard).join('')}
-          </div>
-        </div>
-      `:''}
-
+      ${reds.concat(ambers).map(crow).join('')}
       ${renderComplianceThresholdsEditor()}
     </div>
   `;
@@ -7425,105 +7499,93 @@ function renderDashboard(el){
   const steps=NEXT_STEPS[brand.stage]||NEXT_STEPS.trading;
   const reports=savedReports.slice(0,5);
   el.innerHTML=`
-    <div class="topbar">
-      <div>
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem">Workspace</div>
-        <div class="page-title">${brand.name}</div>
-        <div class="page-sub">${brand.category} · ${brand.currentMarket}${brand.targetMarkets?.length?' → '+brand.targetMarkets.slice(0,3).join(', ')+(brand.targetMarkets.length>3?' +'+( brand.targetMarkets.length-3):''):''}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-        ${brand.userName?`<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Signed in as <strong style="color:var(--navy)">${brand.userName}</strong></div>`:''}
-        <button class="btn-outline" onclick="resetBrand()">Edit workspace</button>
-      </div>
-    </div>
-<div class="content">
-  <div class="bh-cols">
-   <div class="main">
+    <div class="bh2">
+    <div class="main">
+      <div class="col">
 
-  <!-- ══ ZONE 1: READINESS HERO ══════════════════════ -->
-  ${renderReadinessHero()}
-
-  <!-- ══ ZONE 2: NEXT ACTIONS ══════════════════════ -->
-  ${renderNextActions()}
-
-  <!-- ══ HIGH-PRIORITY ALERTS (full-size) ══════════ -->
-  ${renderRegulatoryAlertBanner()}
-  ${renderAllBrandHomeAlerts()}
-  ${renderOverdueMilestoneAlert()}
-
-  <!-- ══ MINOR ALERTS — collapsible strip ══════════ -->
-  ${(function(){
-    var minor = [
-      renderExpansionOverview(),
-      renderSeasonalAlerts(),
-      renderReferralNudge(),
-      renderTargetRetailersNudge()
-    ].filter(function(h){return h && h.trim();});
-    if(!minor.length) return '';
-    var open = bhAlertsOpen;
-    return '<div class="bh-strip">'+
-      '<div class="bh-strip-bar" onclick="toggleBhAlerts()">'+
-        '<span>'+minor.length+' more update'+(minor.length>1?'s':'')+'</span>'+
-        '<span>'+(open?'hide ▴':'show ▾')+'</span>'+
-      '</div>'+
-      (open?'<div class="bh-strip-body">'+minor.join('')+'</div>':'')+
-    '</div>';
-  })()}
-
-  <!-- Target retailers picker — interactive, stays in main -->
-  ${renderTargetRetailersPicker()}
-
-  <!-- ══ SAVED REPORTS ══════════════════════════ -->
-  <div style="margin-top:1.25rem">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <div style="font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute)">Saved reports (${savedReports.length})</div>
-      <button class="btn-outline" onclick="showPage('report')" style="font-size:.65rem;padding:.3rem .7rem">+ New report</button>
-    </div>
-    ${reports.length===0?smartEmpty("report"):reports.map(r=>`
-      ${renderContextFixNotice(r.id)}
-      <div class="saved-report" onclick="expandReport('${r.id}')">
-        <div style="display:flex;justify-content:space-between">
+        <div class="wshead">
           <div>
-            <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
-            <div class="saved-report-name">${r.brandName}</div>
-            <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
+            <div class="ws-eyebrow">Workspace</div>
+            <h1>${brand.name}</h1>
+            <div class="route">${brand.category} · ${brand.currentMarket}${brand.targetMarkets?.length?' → '+brand.targetMarkets.slice(0,3).join(', ')+(brand.targetMarkets.length>3?' +'+(brand.targetMarkets.length-3):''):''}</div>
           </div>
-          <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red-text);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
+          <div>
+            ${brand.userName?`<div class="signed">Signed in as <b>${brand.userName}</b></div>`:''}
+            <button class="btn-edit" onclick="resetBrand()"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit workspace</button>
+          </div>
         </div>
-      </div>
-    `).join('')}
-  </div>
 
-  ${renderSupplierRiskAlerts()}
+        ${renderReadinessHero()}
 
-   </div><!-- /.main -->
+        ${renderNextActions()}
 
-   <div class="side">
+        ${(function(){
+          var feed = renderRegulatoryAlertBanner()+renderAllBrandHomeAlerts()+renderOverdueMilestoneAlert();
+          return feed.trim() ? '<div class="sec-lbl">Regulatory updates</div>'+feed : '';
+        })()}
 
-    <!-- Brand profile -->
-    <div class="scard">
-      <div class="scard-h"><span class="scard-t">Brand profile</span><a onclick="resetBrand()" class="scard-a">Edit →</a></div>
-      ${[['Category',(getBrandCategories()||[brand.category||'—']).join(', ')],['Home market',brand.currentMarket],['Target',brand.targetMarkets?.length?brand.targetMarkets.join(', '):'Not set'],['Stage',stage.label]].map(([l,v])=>`<div class="srow"><span>${l}</span><b>${v}</b></div>`).join('')}
-    </div>
+        ${(function(){
+          var minor = [
+            renderExpansionOverview(),
+            renderSeasonalAlerts(),
+            renderReferralNudge(),
+            renderTargetRetailersNudge()
+          ].filter(function(h){return h && h.trim();});
+          if(!minor.length) return '';
+          var open = bhAlertsOpen;
+          return '<div class="showmore" onclick="toggleBhAlerts()"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>'+(open?'Hide updates':minor.length+' more update'+(minor.length>1?'s':''))+'</div>'+
+            (open?'<div style="margin-top:11px">'+minor.join('')+'</div>':'');
+        })()}
 
-    <!-- Products -->
-    <div class="scard">
-      <div class="scard-h"><span class="scard-t">Products (${skus.length})</span><a onclick="showPage('skus')" class="scard-a">${skus.length>0?'View all →':'Add SKU →'}</a></div>
-      ${skus.length===0?`<div style="padding:.5rem .6rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:8px;font-size:.78rem;color:var(--ink-soft);font-weight:500">No products yet. <span onclick="showPage('skus')" style="color:var(--accent);cursor:pointer">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);return `<div class="prow"><span class="pn">${sku.name||'Unnamed'}</span><span class="pp"${r.pct<70?' style="color:var(--amber-text)"':''}>${r.pct}%</span></div>`;}).join('')}
-      ${renderSetupTracker()}
-    </div>
+        ${renderTargetRetailersPicker()}
 
-    <!-- Verification (sketch skin, live logic) -->
-    ${renderVerificationCard()}
+        <div style="margin-top:24px">
+          <div class="sec-lbl">Saved reports <span class="ct">${savedReports.length}</span></div>
+          ${reports.length===0?smartEmpty("report"):reports.map(r=>`
+            ${renderContextFixNotice(r.id)}
+            <div class="saved-report" onclick="expandReport('${r.id}')">
+              <div style="display:flex;justify-content:space-between">
+                <div>
+                  <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
+                  <div class="saved-report-name">${r.brandName}</div>
+                  <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
+                </div>
+                <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red-text);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
 
-    <!-- Compliance radar + calendar -->
-    ${renderComplianceRadar()}
-    ${renderComplianceCalendar()}
+        ${renderSupplierRiskAlerts()}
 
-   </div><!-- /.side -->
-  </div><!-- /.bh-cols -->
-</div>
-`;
+      </div><!-- /.col -->
+
+      <div class="side">
+
+        <!-- Brand profile -->
+        <div class="card">
+          <div class="card-h">Brand profile <a onclick="resetBrand()">Edit <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+          ${[['Category',(getBrandCategories()||[brand.category||'—']).join(', ')],['Home market',brand.currentMarket],['Target',brand.targetMarkets?.length?brand.targetMarkets.join(', '):'Not set'],['Stage',stage.label]].map(([l,v])=>`<div class="prof"><span class="k">${l}</span><span class="v">${v}</span></div>`).join('')}
+        </div>
+
+        <!-- Products -->
+        <div class="card">
+          <div class="card-h">Products (${skus.length}) <a onclick="showPage('skus')">${skus.length>0?'View all':'Add SKU'} <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+          ${skus.length===0?`<div style="padding:.5rem .6rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:8px;font-size:.78rem;color:var(--ink-soft);font-weight:500">No products yet. <span onclick="showPage('skus')" style="color:var(--accent);cursor:pointer">Add your first product →</span></div>`:skus.slice(0,3).map(sku=>{const r=skuReadiness(sku);var cls=r.pct>=80?'g':r.pct>=50?'a':'r';return `<div class="pmini"><span class="pn">${sku.name||'Unnamed'}</span><span class="pp ${cls}">${r.pct}%</span></div>`;}).join('')}
+          ${renderSetupTracker()}
+        </div>
+
+        <!-- Verification (sketch skin, live logic) -->
+        ${renderVerificationCard()}
+
+        <!-- Compliance radar + calendar -->
+        ${renderComplianceRadar()}
+        ${renderComplianceCalendar()}
+
+      </div><!-- /.side -->
+    </div><!-- /.main -->
+    </div><!-- /.bh2 -->
+  `;
 }
 
 function resetBrand(){
@@ -30773,20 +30835,17 @@ function renderRegulatoryAlertBanner(){
   const topAlert = unread[0];
 
   return `
-    <div style="background:${bg};border:1px solid ${border};border-left:4px solid ${accent};padding:.65rem 1rem;margin-bottom:.85rem;display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
-      <div style="flex:1;min-width:200px">
-        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:${color};margin-bottom:.15rem">
-          ◎ Regulatory update${unread.length>1?'s':''} — ${unread.length} new
-        </div>
-        <div style="font-family:var(--sans);font-size:.75rem;color:${color};font-weight:500;margin-bottom:.15rem">${topAlert.title}</div>
-        <div style="font-family:var(--sans);font-size:.67rem;color:${color};line-height:1.5">${topAlert.summary.slice(0,150)}${topAlert.summary.length>150?'…':''}</div>
-        <div style="font-family:var(--mono);font-size:.5rem;color:${color};opacity:.7;margin-top:.2rem">${topAlert.market} · ${topAlert.date}</div>
+    <div class="callout err">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17h.01"/></svg></div>
+      <div class="bd">
+        <div class="tag"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Regulatory update${unread.length>1?'s':''} — ${unread.length} new</div>
+        <h3>${topAlert.title}</h3>
+        <p>${topAlert.summary.slice(0,150)}${topAlert.summary.length>150?'…':''}</p>
+        <div class="meta">${topAlert.market} · ${topAlert.date}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
-        <button onclick="showPage('reg_monitor')" style="font-family:var(--mono);font-size:.6rem;padding:.3rem .7rem;background:${color};color:#fff;border:none;cursor:pointer">
-          View all (${unread.length}) →
-        </button>
-        <button onclick="markAlertRead('${topAlert.id}');renderPage('home')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:${color};cursor:pointer;opacity:.65">Dismiss</button>
+      <div class="act">
+        <button class="btn-sm" onclick="showPage('reg_monitor')">View all (${unread.length}) <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <span class="link-sm" onclick="markAlertRead('${topAlert.id}');renderPage('home')">Dismiss</span>
       </div>
     </div>
   `;
