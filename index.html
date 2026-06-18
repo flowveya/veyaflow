@@ -683,6 +683,8 @@
     #body { flex: 1; min-height: 0; overflow: hidden; }
     #main { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
     .content { padding: .85rem; padding-bottom: 5.5rem; overflow-x: hidden; }
+    /* Clear the fixed bottom tab bar so last fields + Next button aren't clipped */
+    .page { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
     .topbar { padding: .75rem .85rem; flex-wrap: wrap; gap: .4rem; }
     .page-title { font-size: 1.05rem; }
     .page-sub { font-size: .62rem; }
@@ -3862,7 +3864,7 @@ function getCatLabel(id){
 // desktop group than its mobile section) — do not reconcile them.
 const NAV=[
   // ── BRAND section (sec) ─────────────────────────
-  {id:"home",     sec:"brand", group:"plan",    icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z\"/></svg>", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
+  {id:"home",     sec:"brand", group:"home",    icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z\"/></svg>", label:"Brand Home",           stages:["idea","product","trading","expanding","scaling"], cats:null},
   {id:"skus",     sec:"brand", group:"mybrand", flag:"watch", icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 7l9-4 9 4-9 4Z\"/><path d=\"M3 7v10l9 4 9-4V7\"/></svg>", label:"My Products",  stages:["product","trading","expanding","scaling"],        cats:null},
   {id:"report",   sec:"brand", group:"plan",    icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 3v18h18\"/><path d=\"m7 15 3-4 3 2 4-6\"/></svg>", label:"Market Entry Report",  stages:["idea","product","trading","expanding","scaling"], cats:null},
   {id:"compare",  sec:"brand", group:"plan",    icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M4 5h7v14H4zM13 5h7v14h-7z\"/></svg>", label:"Compare Markets",      stages:["trading","expanding","scaling"],                  cats:null},
@@ -3891,11 +3893,10 @@ const NAV=[
 
 // 5-group desktop IA (approved June 9). Ordered; labels + italic subtitle per group.
 const NAV_GROUPS=[
-  {key:"plan",    label:"Plan",     q:"where to expand",      ids:["home","report","compare","bizcase","cfo"]},
-  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","rp-marketplace","dpp","csrd","suppliers"]},
-  {key:"source",  label:"Source",   q:"who makes it",         ids:["find","sourcing","circular"]},
-  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["crm","pitch","retail-tracker","retail-checklist","retail-templates","retail-comms","retail-performance"]},
-  {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack","atm-admin"]},
+  {key:"home",    label:"Home",     q:"your workspace",       ids:["home"]},
+  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","rp-marketplace","dpp","csrd"]},
+  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
+  {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack"]},
 ];
 
 // Order a visible-items list by a group's explicit id list (single source of
@@ -3914,7 +3915,7 @@ function orderNavByIds(items, ids){
 function getVisibleNav(){
   const stage = brand?.stage || 'trading';
   const cat = brand?.category || null;
-  const visible = NAV.filter(function(n){
+  let visible = NAV.filter(function(n){
     if(!n.stages.includes(stage)) return false;
     if(n.cats && cat && !n.cats.includes(cat)) return false;
     return true;
@@ -3942,6 +3943,14 @@ function getVisibleNav(){
       });
     }
   } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
+  // Launch IA: parked features hidden from nav by default. Flip back via
+  // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
+  var PARKED_IDS = ['report','compare','bizcase','cfo','pitch','find','sourcing','circular','suppliers'];
+  var showParked = false;
+  try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
+  if(!showParked){
+    visible = visible.filter(function(n){ return PARKED_IDS.indexOf(n.id) === -1; });
+  }
   return visible;
 }
 
