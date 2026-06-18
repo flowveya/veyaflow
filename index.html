@@ -17376,8 +17376,8 @@ const CLAIMS_RULES = {
     'clinically proven':     {status:'amber', note:'Requires RCT or validated clinical study'},
     'dermatologist tested':  {status:'green', note:'Widely accepted'},
     'dermatologist approved':{status:'amber', note:'Implies endorsement — rephrase to "tested"'},
-    'anti-aging':            {status:'amber', note:'Germany UWG: rephrase to "reduces the appearance of signs of aging" — "anti-aging" increasingly challenged by German courts. DE requires this change before any German retail listing.'},
-    'anti-ageing':           {status:'amber', note:'Germany UWG: same as anti-aging — rephrase required for DE market'},
+    'anti-aging':            {status:'amber', markets:{DE:'red'}, default:'amber', note:'Germany UWG: rephrase to "reduces the appearance of signs of aging" — "anti-aging" increasingly challenged by German courts. DE requires this change before any German retail listing.'},
+    'anti-ageing':           {status:'amber', markets:{DE:'red'}, default:'amber', note:'Germany UWG: same as anti-aging — rephrase required for DE market'},
     'anti-age':              {status:'amber', note:'Germany UWG: all anti-age phrasing requires rephrasing for DE market'},
     '100% natural':          {status:'amber', note:'Germany: requires % breakdown of natural ingredients — self-declared "100% natural" is actionable under UWG without substantiation. Specify e.g. "98% natural origin ingredients (ISO 16128)"'},
     'natural':               {status:'amber', note:'Germany: qualify with % or certification — self-declared natural is enforceable under UWG. Use "X% natural origin (ISO 16128)" or achieve COSMOS/BDIH certification.'},
@@ -17698,21 +17698,21 @@ function getClaimLight(claim){
   const key = claim.toLowerCase().trim();
   const rule = rules[key];
   if(!rule) return {light:'amber', note:'Unknown claim — verify per target market before use'};
-  // For cosmetics also check market-specific rules
-  if(productType==='cosmetic'){
-    const markets = brand?.targetMarkets||[];
-    const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
-    let worst = rule.status;
-    if(rule.status==='amber'){
-      markets.forEach(function(m){
-        const code = codes[m]||'SE';
-        if(code==='DE' && (key.includes('anti-aging')||key.includes('anti-ageing'))) worst='red';
-        if(code==='UK' && (key.includes('repairs')||key.includes('heals'))) worst='red';
-      });
-    }
-    return {light:worst, note:rule.note||''};
+  // Market logic is DATA now (rule.markets), not hardcoded branches. (Stage 1 reconciliation, 18 Jun.)
+  // codes table preserved verbatim incl. the Norway->SE / Netherlands->DE routing (CHECK 2b).
+  const codes = {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Sweden:'SE',Norway:'SE',Netherlands:'DE'};
+  const baseStatus = (rule.markets && rule.default) ? rule.default : rule.status;
+  const markets = brand?.targetMarkets||[];
+  const rank = {green:0, amber:1, red:2};
+  let worst = baseStatus;
+  if(rule.markets){
+    markets.forEach(function(m){
+      const code = codes[m]||'SE';
+      const lit = rule.markets[code];
+      if(lit && rank[lit] > rank[worst]) worst = lit;
+    });
   }
-  return {light:rule.status, note:rule.note||''};
+  return {light:worst, note:rule.note||''};
 }
 
 
@@ -35996,11 +35996,48 @@ function retailToggleAddSku(cb){
   else retailTrackerAddForm.skuIds.splice(i,1);
 }
 
+function buildSubmitSnapshot(retailerId, skuIds){
+  // Frozen state-at-submit. Honest: only fields we can compute now; absent = 'missing', never fabricated.
+  var sku0 = (typeof skus !== 'undefined' && skus.length)
+    ? (skus.find(function(s){ return (skuIds||[]).map(String).indexOf(String(s.id))>-1; }) || skus[0])
+    : null;
+  var marketCode = (function(){ try { return retailerMarketFromId(retailerId) || ''; } catch(e){ return ''; } })();
+  // readiness score at submit. NOTE: scoreReadiness returns {total,...} (verified live) —
+  // the brief said {score}; read total first, score as a defensive fallback. Honest null otherwise.
+  var score = null;
+  try { var r = scoreReadiness(brand, sku0, marketCode, retailerId); score = (r && r.total!=null) ? Number(r.total) : (r && r.score!=null ? Number(r.score) : null); } catch(e){ score = null; }
+  // per-market claim lights: run the SKU's declared claims (if any) through getClaimLight
+  var claimLights = [];
+  try {
+    var claims = (sku0 && Array.isArray(sku0.claims)) ? sku0.claims : [];
+    claimLights = claims.map(function(c){ var L = getClaimLight(c); return { claim:c, light:L.light }; });
+  } catch(e){ claimLights = []; }
+  // open category gaps for this retailer
+  var openGaps = [];
+  try {
+    var g = (typeof CATEGORY_GAPS_2026 !== 'undefined') ? CATEGORY_GAPS_2026[retailerId] : null;
+    openGaps = (g && Array.isArray(g.open)) ? g.open.slice(0,5) : [];
+  } catch(e){ openGaps = []; }
+  return {
+    readinessScore: score,
+    claimLights:    claimLights,
+    openGaps:       openGaps,
+    skuCpnpStatus:  (sku0 && (sku0.cpnpNumber || sku0.cpnp)) ? 'on_file' : 'missing',
+    skuLocalLabels: (sku0 && sku0.localLabels) ? 'on_file' : 'missing',
+    brandStage:     (brand && brand.stage) || '',
+    brandCategory:  (brand && brand.category) || '',
+    capturedAt:     new Date().toISOString(),
+    capturedAtSubmit: true   // distinguishes a true submit-time snapshot from a backfilled one
+  };
+}
+
 function createRetailSubmission(){
   var f = retailTrackerAddForm;
   if(!f.retailerId){ alert('Pick a retailer first.'); return; }
   var now = new Date().toISOString();
   var todayDate = now.slice(0,10);
+  // Capture the frozen state-at-submit ONCE, here at the true submit moment.
+  var _snap = buildSubmitSnapshot(f.retailerId, f.skuIds);
   var sub = {
     id: retailUuid(),
     retailerId: f.retailerId,
@@ -36027,8 +36064,8 @@ function createRetailSubmission(){
       try { var t = getCurrentTemplate(f.retailerId); return t ? t.templateVersion : ''; }
       catch(e){ return ''; }
     })(),
-    readinessScoreAtSubmission: null,
-    contextSnapshot: null,
+    readinessScoreAtSubmission: _snap.readinessScore,
+    contextSnapshot: _snap,
     createdAt: now,
   };
   loadRetailSubmissions();
@@ -36090,15 +36127,21 @@ function openOutcomeCaptureModal(submissionId, newStatus){
   if(!sub) return;
   const sku0 = (typeof skus !== 'undefined' && skus.length) ? skus[0] : null;
   const tpl = (typeof getCurrentTemplate === 'function') ? getCurrentTemplate(sub.retailerId) : null;
-  const contextSnapshot = {
-    brandStage:          brand?.stage || '',
-    brandCategory:       brand?.category || '',
-    brandRevenue:        brand?.annualRevenue || '',
-    brandSocialFollowers: brand?.socialFollowers || '',
-    skuCpnpStatus:       (sku0?.cpnpNumber || sku0?.cpnp) ? 'on_file' : 'missing',
-    skuLocalLabels:      sku0?.localLabels ? 'on_file' : 'missing',
-    capturedAt:          new Date().toISOString(),
-  };
+  // Prefer the FROZEN submit-time snapshot (state when it was submitted, which is
+  // what correlates with the outcome). Fall back to a live now-snapshot only for
+  // legacy submissions that predate submit-time capture — flagged honestly.
+  const contextSnapshot = (sub.contextSnapshot && sub.contextSnapshot.capturedAtSubmit)
+    ? sub.contextSnapshot
+    : {
+        brandStage:          brand?.stage || '',
+        brandCategory:       brand?.category || '',
+        brandRevenue:        brand?.annualRevenue || '',
+        brandSocialFollowers: brand?.socialFollowers || '',
+        skuCpnpStatus:       (sku0?.cpnpNumber || sku0?.cpnp) ? 'on_file' : 'missing',
+        skuLocalLabels:      sku0?.localLabels ? 'on_file' : 'missing',
+        capturedAt:          new Date().toISOString(),
+        capturedAtSubmit:    false, // legacy/backfilled — NOT a true submit-time snapshot
+      };
   outcomeCaptureState = {
     submissionId:        submissionId,
     retailerName:        sub.retailerName || '',
