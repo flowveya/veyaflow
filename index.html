@@ -386,6 +386,7 @@
   .cc .month::after { content: ""; flex: 1; height: 1px; background: var(--line); }
   .cc .row { display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 11px; padding: 14px 18px; margin-bottom: 9px; cursor: pointer; transition: border-color .12s; }
   .cc .row:hover { border-color: var(--line-strong); }
+  .cc .row.nolink { cursor: default; } .cc .row.nolink:hover { border-color: var(--line); }
   .cc .when { text-align: center; }
   .cc .when .d { font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
   .cc .when .u { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-top: 2px; }
@@ -1206,10 +1207,10 @@ const NEXT_STEPS = {
 // confidence: 'confirmed' = enacted date · 'proposed' = estimated/not-yet-adopted (cautious-honest default).
 // ⚠ Charlotte/Strategy to RATIFY each confidence value; cautious default is 'proposed'.
 const REG_DEADLINES = [
-  {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"circular",confidence:"confirmed",market:"EU",actionLabel:"Check in Circular GPS"},
-  {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"suppliers",confidence:"confirmed",market:"EU",actionLabel:"Complete in Ingredient Traceability"},
-  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"circular",confidence:"proposed",market:"EU",actionLabel:"Check in Circular GPS"},
-  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"report",confidence:"proposed",market:"EU",actionLabel:"Review in Market Report"},
+  {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"",confidence:"confirmed",market:"EU",actionLabel:"Check in Circular GPS"},
+  {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"",confidence:"confirmed",market:"EU",actionLabel:"Complete in Ingredient Traceability"},
+  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Check in Circular GPS"},
+  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"claims",confidence:"proposed",market:"EU",actionLabel:"Review in Market Report"},
 ];
 
 // SUPPLIERS
@@ -31482,13 +31483,14 @@ function renderComplianceCalendarPage(el){
       var m=fmtMonth(r.deadline);
       if(m!==lastMonth){ body+='<div class="month">'+m+'</div>'; lastMonth=m; }
       var u=urg(r.days), conf=(r.confidence==='confirmed'), rg=(r.market||'EU').toLowerCase();
-      body+='<div class="row" onclick="showPage(\''+r.link+'\')">'+
+      var hasLink = !!(r.link && r.link.length); // no live page → no onclick, no arrow (honest affordance)
+      body+='<div class="row'+(hasLink?'':' nolink')+'"'+(hasLink?' onclick="showPage(\''+r.link+'\')"':' style="cursor:default"')+'>'+
         '<div class="when '+u.k+'"><div class="d">'+(r.days<0?'—':r.days)+(r.days<0?'':'<span style="font-size:13px">d</span>')+'</div><div class="u">'+fmtDay(r.deadline)+'</div></div>'+
         '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(r.title)+'</span><span class="tag-rg '+rg+'">'+escapeHtml(r.market||'EU')+'</span></div>'+
           '<div class="meta"><span class="certainty '+(conf?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(conf?CHECK:QCLOCK)+'</svg>'+(conf?'Confirmed':'Proposed')+'</span>'+
           '<span class="dot"></span><span>'+escapeHtml(r.actionLabel||'')+'</span></div></div>'+
         '<div class="right"><span class="pill '+u.k+'"><svg viewBox="0 0 24 24">'+u.svg+'</svg>'+u.label+'</span>'+
-          '<span class="go"><svg viewBox="0 0 24 24">'+ARROW+'</svg></span></div>'+
+          (hasLink?'<span class="go"><svg viewBox="0 0 24 24">'+ARROW+'</svg></span>':'')+'</div>'+
       '</div>';
     });
   }
