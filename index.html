@@ -367,6 +367,55 @@
   .bh2 .vbadge .ring { width: 42px; height: 42px; border-radius: 50%; border: 3px solid var(--line-strong); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--ink-mute); flex: 0 0 42px; }
   .bh2 .vbadge .vt { font-weight: 600; font-size: 13.5px; }
   .bh2 .vbadge .vs { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
+
+  /* ════ Compliance Calendar v1 (Daylight mockup) — SCOPED under .cc so the sketch's
+     generic class names (.row/.head/.pill/.month/.right/h1) can't leak. Values verbatim. ════ */
+  .cc { max-width: 760px; }
+  .cc .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .cc h1 { font-family: var(--display); font-weight: 600; font-size: 34px; letter-spacing: -.01em; }
+  .cc .count { margin-left: auto; font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-mute); background: var(--paper); border: 1px solid var(--line); border-radius: var(--tag-radius); padding: 4px 9px; }
+  .cc .sub { font-size: 13.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .cc .legend { display: flex; gap: 26px; flex-wrap: wrap; padding: 13px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 11px; margin: 16px 0 22px; }
+  .cc .legend .grp { display: flex; flex-direction: column; gap: 7px; }
+  .cc .legend .gh { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); }
+  .cc .legend .items { display: flex; gap: 16px; flex-wrap: wrap; }
+  .cc .legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); }
+  .cc .legend .li svg { width: 13px; height: 13px; stroke-width: 2; fill: none; }
+  .cc .legend .div { width: 1px; background: var(--line); align-self: stretch; }
+  .cc .month { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); margin: 22px 0 10px; display: flex; align-items: center; gap: 10px; }
+  .cc .month::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .cc .row { display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 11px; padding: 14px 18px; margin-bottom: 9px; cursor: pointer; transition: border-color .12s; }
+  .cc .row:hover { border-color: var(--line-strong); }
+  .cc .when { text-align: center; }
+  .cc .when .d { font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .cc .when .u { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-top: 2px; }
+  .cc .when.r .d { color: var(--red-text); } .cc .when.a .d { color: var(--amber-text); } .cc .when.p .d { color: var(--pend-text); } .cc .when.g .d { color: var(--green-text); }
+  .cc .what { min-width: 0; }
+  .cc .what .titlerow { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 3px; }
+  .cc .what .ti { font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 1.15; }
+  .cc .tag-rg { font-family: var(--mono); font-size: 8.5px; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--tag-radius); font-weight: 500; white-space: nowrap; }
+  .cc .tag-rg.eu { background: var(--accent-soft); color: var(--accent-deep); }
+  .cc .tag-rg.uk, .cc .tag-rg.no, .cc .tag-rg.de, .cc .tag-rg.se { background: var(--paper-deep); color: var(--ink-soft); }
+  .cc .what .meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-family: var(--mono); font-size: 10.5px; color: var(--ink-mute); }
+  .cc .what .meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-mute); }
+  .cc .certainty { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: .02em; }
+  .cc .certainty svg { width: 12px; height: 12px; stroke-width: 2.1; fill: none; }
+  .cc .certainty.confirmed { color: var(--ink-soft); } .cc .certainty.confirmed svg { stroke: var(--ink-soft); }
+  .cc .certainty.proposed { color: var(--ink-mute); } .cc .certainty.proposed svg { stroke: var(--ink-mute); }
+  .cc .right { display: flex; align-items: center; gap: 12px; }
+  .cc .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .03em; padding: 5px 10px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .cc .pill svg { width: 12px; height: 12px; stroke-width: 2.4; fill: none; }
+  .cc .pill.r { background: var(--red-bg); color: var(--red-text); } .cc .pill.r svg { stroke: var(--red-text); }
+  .cc .pill.a { background: var(--amber-bg); color: var(--amber-text); } .cc .pill.a svg { stroke: var(--amber-text); }
+  .cc .pill.p { background: var(--pend-bg); color: var(--pend-text); } .cc .pill.p svg { stroke: var(--pend-text); }
+  .cc .pill.g { background: var(--green-bg); color: var(--green-text); } .cc .pill.g svg { stroke: var(--green-text); }
+  .cc .go { width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: 0 0 30px; }
+  .cc .go svg { width: 14px; height: 14px; stroke: var(--ink-soft); stroke-width: 1.9; fill: none; }
+  .cc .row:hover .go { border-color: var(--accent); } .cc .row:hover .go svg { stroke: var(--accent-deep); }
+  @media (max-width: 620px) {
+    .cc .row { grid-template-columns: 54px 1fr; gap: 12px; }
+    .cc .right { grid-column: 2; justify-content: flex-start; margin-top: 2px; }
+  }
   .col-filter { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
 
   /* STAT CARDS */
@@ -1100,6 +1149,7 @@
     <div class="page" id="page-reg_monitor"></div>
     <div class="page" id="page-retail-tracker"></div>
     <div class="page" id="page-retail-templates"></div>
+    <div class="page" id="page-compliance-cal"></div>
     <div class="page" id="page-retail-checklist"></div>
     <div class="page" id="page-retail-performance"></div>
     <div class="page" id="page-retail-comms"></div>
@@ -1151,11 +1201,15 @@ const NEXT_STEPS = {
   scaling:  [{icon:"◈",label:"Supply chain risk report",page:"suppliers",desc:"Identify and remediate high-risk suppliers — EUDR, audit status, data gaps"},{icon:"◉",label:"ESPR deadstock routing",page:"circular",desc:"Route unsold inventory to verified circular partners, generate Article 24 disclosure"}],
 };
 
+// confidence/market/actionLabel added 19 Jun 2026 (Compliance Calendar v1). ADDITIVE —
+// the Upcoming-Deadlines banner reads only cat/deadline/title/link, so it's unbroken.
+// confidence: 'confirmed' = enacted date · 'proposed' = estimated/not-yet-adopted (cautious-honest default).
+// ⚠ Charlotte/Strategy to RATIFY each confidence value; cautious default is 'proposed'.
 const REG_DEADLINES = [
-  {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"circular"},
-  {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"suppliers"},
-  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"circular"},
-  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"report"},
+  {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"circular",confidence:"confirmed",market:"EU",actionLabel:"Check in Circular GPS"},
+  {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"suppliers",confidence:"confirmed",market:"EU",actionLabel:"Complete in Ingredient Traceability"},
+  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"circular",confidence:"proposed",market:"EU",actionLabel:"Check in Circular GPS"},
+  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"report",confidence:"proposed",market:"EU",actionLabel:"Review in Market Report"},
 ];
 
 // SUPPLIERS
@@ -3882,6 +3936,7 @@ const NAV=[
   {id:"dpp",      sec:"source", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"5\" y=\"3\" width=\"14\" height=\"18\" rx=\"2\"/><path d=\"M9 8h6M9 12h6\"/></svg>", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"csrd",      sec:"source", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 9h8M8 13h5\"/></svg>", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
+  {id:"compliance-cal",sec:"brand", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18M8 2v4M16 2v4\"/></svg>", label:"Compliance Calendar", stages:["idea","product","trading","expanding","scaling"], cats:null},
   // ── RETAILER RELATIONS section (sec) ────────────
   {id:"crm",               sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20c0-3 3-5 6-5s6 2 6 5\"/><path d=\"M16 4l2 2 3-3\"/></svg>", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
   {id:"retail-tracker",    sec:"retail", group:"sell", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
@@ -3894,7 +3949,7 @@ const NAV=[
 // 5-group desktop IA (approved June 9). Ordered; labels + italic subtitle per group.
 const NAV_GROUPS=[
   {key:"home",    label:"Home",     q:"your workspace",       ids:["home"]},
-  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","rp-marketplace","dpp","csrd"]},
+  {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","compliance-cal","rp-marketplace","dpp","csrd"]},
   {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
   {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack"]},
 ];
@@ -4070,6 +4125,7 @@ const NAV_SUBTITLES = {
   csrd:'Generate your retailer sustainability pack',
   'retail-tracker':'Track my retailer submissions',
   'retail-templates':'Generate retailer masterdata',
+  'compliance-cal':'Upcoming regulatory deadlines',
   'retail-checklist':'Everything needed to go live',
   'retail-performance':'Track sell-through per retailer',
   'retail-comms':'Log every buyer interaction',
@@ -4610,6 +4666,7 @@ function renderPage(id){
   else if(id==='sourcing'){ loadSourcingCRM(); renderSourcingCRM(el); }
   else if(id==='retail-tracker'){ loadRetailSubmissions(); renderRetailTracker(el); }
   else if(id==='retail-templates'){ renderRetailTemplates(el); }
+  else if(id==='compliance-cal'){ renderComplianceCalendarPage(el); }
   else if(id==='retail-checklist'){ loadRetailChecklist(); renderRetailChecklist(el); }
   else if(id==='retail-performance'){ loadRetailPerformance(); renderRetailPerformance(el); }
   else if(id==='retail-comms'){ loadRetailComms(); renderRetailComms(el); }
@@ -31379,6 +31436,69 @@ function buildComplianceEvents(){
   return events;
 }
 
+
+// Compliance Calendar PAGE (COMPLY lane) — standalone view over REG_DEADLINES.
+// NOTE: named *Page to avoid colliding with renderComplianceCalendar() above, the
+// dashboard-rail widget (different data: buildComplianceEvents = cert/RP expiries).
+// Two-axis signal model from the Daylight mockup: urgency and date-certainty are
+// INDEPENDENT signals. Soonest-first, category-filtered, month-grouped.
+function renderComplianceCalendarPage(el){
+  if(!el) return;
+  var cats = (typeof getBrandCategories==='function' ? getBrandCategories() : []) || [];
+  var rows = REG_DEADLINES
+    .filter(function(r){ return !r.cat || cats.some(function(c){ return r.cat.indexOf(c) > -1; }); })
+    .map(function(r){ return Object.assign({}, r, {days: daysUntil(r.deadline)}); })
+    .sort(function(a,b){ return a.days - b.days; });
+
+  // urgency thresholds (90d split — matches the mockup's 71-amber / 102-pend; confirm w/ Design)
+  function urg(days){
+    if(days < 0)   return {k:'r', label:'Overdue',     svg:'<path d="M18 6 6 18M6 6l12 12"/>'};
+    if(days <= 90) return {k:'a', label:'Approaching',  svg:'<path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17h.01"/>'};
+    return                 {k:'p', label:'Scheduled',   svg:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
+  }
+  var MON_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var MON_L=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function fmtDay(s){ var d=new Date(s); return d.getDate()+' '+MON_S[d.getMonth()]; }
+  function fmtMonth(s){ var d=new Date(s); return MON_L[d.getMonth()]+' '+d.getFullYear(); }
+  var CHECK='<path d="M5 12l4 4L19 6"/>', QCLOCK='<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>', ARROW='<path d="M5 12h14M13 6l6 6-6 6"/>';
+
+  var legend='<div class="legend">'+
+    '<div class="grp"><span class="gh">Urgency</span><div class="items">'+
+      '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--red-text)" fill="none" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>Overdue / blocked</span>'+
+      '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--amber-text)" fill="none" stroke-width="2"><path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17h.01"/></svg>Approaching</span>'+
+      '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--pend-text)" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Scheduled</span>'+
+    '</div></div><div class="div"></div>'+
+    '<div class="grp"><span class="gh">Date certainty</span><div class="items">'+
+      '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--ink-soft)" fill="none" stroke-width="2">'+CHECK+'</svg>Confirmed — enacted date</span>'+
+      '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--ink-mute)" fill="none" stroke-width="2">'+QCLOCK+'</svg>Proposed — estimated date</span>'+
+    '</div></div></div>';
+
+  var body='';
+  if(!rows.length){
+    body='<div class="row" style="cursor:default"><div class="what"><div class="ti" style="font-size:15px">No upcoming deadlines for your categories in range.</div></div></div>';
+  } else {
+    var lastMonth='';
+    rows.forEach(function(r){
+      var m=fmtMonth(r.deadline);
+      if(m!==lastMonth){ body+='<div class="month">'+m+'</div>'; lastMonth=m; }
+      var u=urg(r.days), conf=(r.confidence==='confirmed'), rg=(r.market||'EU').toLowerCase();
+      body+='<div class="row" onclick="showPage(\''+r.link+'\')">'+
+        '<div class="when '+u.k+'"><div class="d">'+(r.days<0?'—':r.days)+(r.days<0?'':'<span style="font-size:13px">d</span>')+'</div><div class="u">'+fmtDay(r.deadline)+'</div></div>'+
+        '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(r.title)+'</span><span class="tag-rg '+rg+'">'+escapeHtml(r.market||'EU')+'</span></div>'+
+          '<div class="meta"><span class="certainty '+(conf?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(conf?CHECK:QCLOCK)+'</svg>'+(conf?'Confirmed':'Proposed')+'</span>'+
+          '<span class="dot"></span><span>'+escapeHtml(r.actionLabel||'')+'</span></div></div>'+
+        '<div class="right"><span class="pill '+u.k+'"><svg viewBox="0 0 24 24">'+u.svg+'</svg>'+u.label+'</span>'+
+          '<span class="go"><svg viewBox="0 0 24 24">'+ARROW+'</svg></span></div>'+
+      '</div>';
+    });
+  }
+
+  el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
+    '<div class="head"><h1>Compliance calendar</h1><span class="count">'+rows.length+' upcoming</span></div>'+
+    '<p class="sub">Deadlines that apply to '+escapeHtml((brand&&brand.name)||'your brand')+' across your target markets, soonest first.</p>'+
+    legend+body+
+  '</div>';
+}
 
 function renderComplianceCalendar(){
   if(!brand) return '';
