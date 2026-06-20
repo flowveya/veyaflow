@@ -32130,15 +32130,14 @@ function renderSeasonalCalendar(el){
       if(w.formatRequired) bits.push(escapeHtml(w.formatRequired));
       var price=fmtPrice(w.priceRange); if(price) bits.push(escapeHtml(price));
       var sub=fmtMD(w.submissionDeadline); if(sub) bits.push('Submit by '+escapeHtml(sub));
-      // No action arrow: openSeasonalPitch → 'pitch' is launch-parked. Honest-affordance rule
-      // (per spec) → read-only row. Re-add when pitch un-parks, or route to a live page.
-      body+='<div class="row nolink" style="cursor:default">'+
+      // Row action → Article Templates (live). openSeasonalPitch's 'pitch' target is launch-parked; revisit seasonal pre-fill post-launch.
+      body+='<div class="row" onclick="showPage(\'retail-templates\')">'+
         '<div class="when"><div class="d">'+w.daysToOpen+'<span style="font-size:13px">d</span></div><div class="u">'+fmtDate(w.openDate)+'</div></div>'+
         '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(w.retailerName||w.retailerId)+' — '+escapeHtml(w.name||'')+'</span></div>'+
           '<div class="meta"><span class="certainty '+(confirmed?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(confirmed?CHECK:QCLOCK)+'</svg>'+(confirmed?'Confirmed cadence':'Cadence not yet confirmed')+'</span>'+
           bits.map(function(b){ return '<span class="dot"></span><span>'+b+'</span>'; }).join('')+
         '</div></div>'+
-        '<div class="right"></div>'+
+        '<div class="right"><span class="go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>'+
       '</div>';
     });
   }
@@ -32188,8 +32187,8 @@ function renderSeasonalAlerts(){
             ${win.categoryFocus?.length ? `<div style="font-family:var(--mono);font-size:.55rem;color:${c.text};opacity:.75">Focus: ${win.categoryFocus.join(' · ')}</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;gap:.4rem;flex-shrink:0">
-            <button onclick="openSeasonalPitch('${win.retailerName.replace(/'/g,"\\'")}','${card.market}','${win.name.replace(/'/g,"\\'")}','${(win.pitchAngle||'').replace(/'/g,"\\'").replace(/\n/g,' ')}','${(win.formatRequired||'').replace(/'/g,"\\'")}',${JSON.stringify(win.priceRange||null)})"
-              class="btn-primary" style="font-size:.65rem">Prepare seasonal pitch →</button>
+            <button onclick="showPage('retail-templates')"
+              class="btn-primary" style="font-size:.65rem">Prepare article file →</button>
             <button onclick="localStorage.setItem('${dismissKey}','1');renderPage('home')"
               style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:${c.text};cursor:pointer;opacity:.6;text-align:center;display:none">Dismiss</button>
           </div>
