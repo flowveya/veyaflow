@@ -1151,6 +1151,7 @@
     <div class="page" id="page-retail-tracker"></div>
     <div class="page" id="page-retail-templates"></div>
     <div class="page" id="page-compliance-cal"></div>
+    <div class="page" id="page-seasonal"></div>
     <div class="page" id="page-retail-checklist"></div>
     <div class="page" id="page-retail-performance"></div>
     <div class="page" id="page-retail-comms"></div>
@@ -3942,6 +3943,7 @@ const NAV=[
   {id:"crm",               sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20c0-3 3-5 6-5s6 2 6 5\"/><path d=\"M16 4l2 2 3-3\"/></svg>", label:"Retailer CRM",       stages:["trading","expanding","scaling"], cats:RETAIL_CATS},
   {id:"retail-tracker",    sec:"retail", group:"sell", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-templates",  sec:"retail", group:"sell", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
+  {id:"seasonal",          sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18M8 2v4M16 2v4\"/></svg>", label:"Seasonal Calendar", stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-checklist",  sec:"retail", group:"sell", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-performance",sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 3v18h18\"/><path d=\"m7 14 3-3 3 2 5-6\"/></svg>", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-comms",      sec:"retail", group:"sell", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
@@ -3951,7 +3953,7 @@ const NAV=[
 const NAV_GROUPS=[
   {key:"home",    label:"Home",     q:"your workspace",       ids:["home"]},
   {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","compliance-cal","rp-marketplace","dpp","csrd"]},
-  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
+  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","seasonal","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
   {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack"]},
 ];
 
@@ -4127,6 +4129,7 @@ const NAV_SUBTITLES = {
   'retail-tracker':'Track my retailer submissions',
   'retail-templates':'Generate retailer masterdata',
   'compliance-cal':'Upcoming regulatory deadlines',
+  'seasonal':'Upcoming retailer seasonal windows',
   'retail-checklist':'Everything needed to go live',
   'retail-performance':'Track sell-through per retailer',
   'retail-comms':'Log every buyer interaction',
@@ -4668,6 +4671,7 @@ function renderPage(id){
   else if(id==='retail-tracker'){ loadRetailSubmissions(); renderRetailTracker(el); }
   else if(id==='retail-templates'){ renderRetailTemplates(el); }
   else if(id==='compliance-cal'){ renderComplianceCalendarPage(el); }
+  else if(id==='seasonal'){ renderSeasonalCalendar(el); }
   else if(id==='retail-checklist'){ loadRetailChecklist(); renderRetailChecklist(el); }
   else if(id==='retail-performance'){ loadRetailPerformance(); renderRetailPerformance(el); }
   else if(id==='retail-comms'){ loadRetailComms(); renderRetailComms(el); }
@@ -32075,6 +32079,77 @@ function openSeasonalPitch(retailerName, market, windowName, pitchAngle, formatR
 }
 
 // Render all seasonal alerts for retailers in brand's CRM
+// Seasonal Calendar PAGE (SELL lane) — discovery view over SEASONAL_INTELLIGENCE.
+// v1 = ALL retailers (not brand-retailer-filtered; that's a post-launch lens), 12-month
+// horizon, soonest-first. Uses DIRECT enumeration (not getUpcomingSeasonalWindows(rid,365)):
+// that fn's threshold is win.alertDaysBefore||daysBefore, so the window's own alert gate wins
+// and 365 would NOT surface the full year. Reuses the .cc (Compliance Calendar) visual scope.
+function renderSeasonalCalendar(el){
+  if(!el) return;
+  var now=new Date(); now.setHours(0,0,0,0);
+  var year=now.getFullYear();
+  var all=[];
+  Object.keys(SEASONAL_INTELLIGENCE).forEach(function(rid){
+    var intel=SEASONAL_INTELLIGENCE[rid];
+    if(!intel||!intel.seasonalWindows) return;
+    intel.seasonalWindows.forEach(function(win){
+      if(typeof seasonalWindowMatchesBrand==='function' && !seasonalWindowMatchesBrand(win)) return;
+      var p=String(win.buyingWindowOpen||'01-01').split('-').map(Number);
+      var openDate=new Date(year, (p[0]||1)-1, p[1]||1);
+      if(openDate<now) openDate=new Date(year+1, (p[0]||1)-1, p[1]||1);
+      var daysToOpen=Math.ceil((openDate-now)/86400000);
+      if(daysToOpen<0||daysToOpen>365) return; // 12-month horizon
+      all.push(Object.assign({}, win, {openDate:openDate, daysToOpen:daysToOpen, retailerId:rid, retailerName:intel.retailerName}));
+    });
+  });
+  all.sort(function(a,b){ return a.daysToOpen-b.daysToOpen; });
+
+  var MON_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var MON_L=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function fmtDate(d){ return d.getDate()+' '+MON_S[d.getMonth()]; }
+  function fmtMonth(d){ return MON_L[d.getMonth()]+' '+d.getFullYear(); }
+  function fmtMD(md){ var p=String(md||'').split('-').map(Number); if(!p[0]) return ''; return p[1]+' '+MON_S[p[0]-1]; }
+  function fmtPrice(pr){ if(!pr) return ''; return (pr.min!=null?pr.min:'')+(pr.max!=null?'–'+pr.max:'')+' '+(pr.currency||''); }
+  var CHECK='<path d="M5 12l4 4L19 6"/>', QCLOCK='<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>';
+
+  var legend='<div class="legend"><div class="grp"><span class="gh">Cadence confidence</span><div class="items">'+
+    '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--ink-soft)" fill="none" stroke-width="2">'+CHECK+'</svg>Confirmed cadence — verified window</span>'+
+    '<span class="li"><svg viewBox="0 0 24 24" stroke="var(--ink-mute)" fill="none" stroke-width="2">'+QCLOCK+'</svg>Cadence not yet confirmed — estimated</span>'+
+  '</div></div></div>';
+
+  var body='';
+  if(!all.length){
+    body='<div class="row" style="cursor:default"><div class="what"><div class="ti" style="font-size:15px">No upcoming seasonal windows in range for your categories.</div></div></div>';
+  } else {
+    var lastMonth='';
+    all.forEach(function(w){
+      var m=fmtMonth(w.openDate);
+      if(m!==lastMonth){ body+='<div class="month">'+m+'</div>'; lastMonth=m; }
+      var confirmed=(w.confidence==='research_verified'||w.confidence==='veyaflow_verified');
+      var bits=[];
+      if(w.formatRequired) bits.push(escapeHtml(w.formatRequired));
+      var price=fmtPrice(w.priceRange); if(price) bits.push(escapeHtml(price));
+      var sub=fmtMD(w.submissionDeadline); if(sub) bits.push('Submit by '+escapeHtml(sub));
+      // No action arrow: openSeasonalPitch → 'pitch' is launch-parked. Honest-affordance rule
+      // (per spec) → read-only row. Re-add when pitch un-parks, or route to a live page.
+      body+='<div class="row nolink" style="cursor:default">'+
+        '<div class="when"><div class="d">'+w.daysToOpen+'<span style="font-size:13px">d</span></div><div class="u">'+fmtDate(w.openDate)+'</div></div>'+
+        '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(w.retailerName||w.retailerId)+' — '+escapeHtml(w.name||'')+'</span></div>'+
+          '<div class="meta"><span class="certainty '+(confirmed?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(confirmed?CHECK:QCLOCK)+'</svg>'+(confirmed?'Confirmed cadence':'Cadence not yet confirmed')+'</span>'+
+          bits.map(function(b){ return '<span class="dot"></span><span>'+b+'</span>'; }).join('')+
+        '</div></div>'+
+        '<div class="right"></div>'+
+      '</div>';
+    });
+  }
+
+  el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
+    '<div class="head"><h1>Seasonal calendar</h1><span class="count">'+all.length+' upcoming · all retailers</span></div>'+
+    '<p class="sub">Upcoming retailer seasonal windows across all retailers, soonest first.</p>'+
+    legend+body+
+  '</div>';
+}
+
 function renderSeasonalAlerts(){
   if(!brand || !crmCards.length) return '';
   const alerts = [];
