@@ -1810,6 +1810,9 @@ function loadState(){
     if(ff){ const v=safeJsonParse(ff); Object.assign(findForm,v); }
     const sk=localStorage.getItem('ns_skus');
     if(sk) skus=safeJsonParse(sk)||[];
+    // Coded demo seed: populate canonical NORDLYS ONLY on a fresh/cleared browser
+    // (no stored brand AND no stored skus) — never clobbers real entered data.
+    if(!b && !sk){ seedDemoNordlys(); }
     if(sf){ const v=safeJsonParse(sf); Object.assign(supplierFilter,v); }
     // Brand Schema Rationalization Phase 1 — Watchpoint AB cleanup
     // (Decision 10 Trigger 7, G4 lock + J1-model-A object re-lock). V3
@@ -1889,6 +1892,62 @@ function getBrandCategories(){
   if(brand.categories&&brand.categories.length>0) return brand.categories;
   if(brand.category) return [brand.category];
   return [];
+}
+
+// Coded demo seed — canonical NORDLYS fixture (reproducible, byte-verifiable; not
+// localStorage-only). NORDLYS = ONE brand category 'Skincare & Beauty' (display name,
+// per the live model) that SELLS a device product. Device obligations derive at runtime
+// from the device SKU via isWEEEDevice → radar pushes 'beauty_device' (L7363) — NOT a
+// stored brand category. Fires only on a fresh/cleared browser (see the gated call in the
+// load chain); never clobbers entered data.
+function seedDemoNordlys(){
+  brand = {
+    name: 'NORDLYS',
+    category: 'Skincare & Beauty',                 // display name — drives cosmetic obligations via CAT_MAP
+    categories: ['Skincare & Beauty'],             // one real brand category; device is derived from the SKU, not here
+    stage: 'trading',
+    currentMarket: 'Sweden',
+    targetMarkets: ['Sweden','Norway','Denmark','Finland'],
+    ambitionMarkets: ['United Kingdom'],           // UK track (DE deliberately omitted → Lucid/DE rows dormant)
+    website: 'nordlys.se',
+    usp: 'Clinical Nordic skincare + at-home LED light therapy.',
+    euResponsible: { name:'Nordic Compliance AB', email:'rp@nordiccompliance.se', address:'Stockholm, Sweden', renewalDate:'2027-01-01' },
+    userName: 'Charlotte',
+  };
+  skus = [
+    {
+      id: 'seed-serum',
+      productType: 'cosmetic',
+      name: 'NORDLYS Renewal Serum',
+      ean: '7350000000017',
+      netContent: '30 ml',
+      shelfLifeMonths: 24,
+      countryOfMfr: 'Sweden',
+      // Conditional cosmetic rows fire HONESTLY — formula genuinely contains the triggers:
+      // a vitamin-A active (Retinyl Palmitate) AND listed fragrance allergens (Citral, Benzyl Salicylate).
+      inci: 'Aqua, Glycerin, Retinyl Palmitate, Niacinamide, Sodium Hyaluronate, Tocopherol, Citral, Benzyl Salicylate, Parfum',
+      cpnp: 'NORD-CPNP-2026-001',
+      safetyRef: 'SAR-NORD-2026-001',
+      claims: ['anti-aging','clinically tested'],
+      rspSEK: 1299, netPriceSEK: 520, moq: 50,
+      descEN: 'Overnight renewal serum with stabilised retinyl palmitate.',
+    },
+    {
+      id: 'seed-mask',
+      productType: 'device',                        // → isWEEEDevice → radar derives 'beauty_device' (CE/WEEE light)
+      name: 'RejuvenateLED Face Mask',              // 'led ' keyword + ceMarking are redundant isWEEEDevice triggers
+      ean: '7350000000024',
+      modelNo: 'NORD-LED-01',
+      ceMarking: true,
+      docOnFile: true,
+      voltageInput: '5V DC',
+      batteryType: 'Li-ion rechargeable',
+      countryOfMfr: 'Sweden',
+      rspSEK: 2599, netPriceSEK: 1040, moq: 25,
+      descEN: 'At-home LED light-therapy mask — red 633/660 nm, blue 465 nm, NIR 850 nm.',
+    },
+  ];
+  try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){}
 }
 
 // Category colour map for badges
