@@ -6605,7 +6605,7 @@ function renderReadinessScore(){
       })()}
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         <button class="btn-primary" onclick="brandPackState.retailer='${rs.retailer?.name||''}';brandPackState.market='${rs.market?.name||''}';showPage('brandpack')" style="font-size:.68rem;padding:.45rem .9rem">Generate Brand Pack →</button>
-        <button class="btn-outline" onclick="pitchForm.retailer='${rs.retailer?.name||''}';pitchForm.targetMarket='${rs.market?.name||''}';showPage('pitch')" style="font-size:.68rem;padding:.45rem .9rem">Start Retailer Pitch →</button>
+        <button class="btn-outline" onclick="showPage('retail-templates')" style="font-size:.68rem;padding:.45rem .9rem">Prepare retailer file →</button>
       </div>
     </div>
     </div>
@@ -16485,7 +16485,7 @@ function renderBrandPackResult(el){
 
       <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
         <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← New pack</button>
-        <button class="btn-gold" onclick="showPage('pitch')">Generate pitch email →</button>
+        <button class="btn-gold" onclick="showPage('retail-comms')">Draft buyer email →</button>
         <button class="btn-outline" onclick="showPage('bizcase')">Build business case →</button>
       </div>
     </div>
@@ -26672,8 +26672,8 @@ function renderCRM(el){
                         `:''}
                         <!-- Quick pitch link -->
                         <div style="margin-top:.35rem;padding-top:.35rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.3rem">
-                          <span onclick="pitchForm.retailer='${card.name}';pitchForm.targetMarket='${card.market}';showPage('pitch')"
-                            style="font-family:var(--mono);font-size:.55rem;color:var(--navy);cursor:pointer;text-decoration:underline">Generate pitch →</span>
+                          <span onclick="showPage('retail-templates')"
+                            style="font-family:var(--mono);font-size:.55rem;color:var(--navy);cursor:pointer;text-decoration:underline">Prepare file →</span>
                           ${FIRST_CONTACT[card.id]&&card.stage==='pitched'?`<span onclick="crmFirstContactId='${card.id}';crmEditId='${card.id}';renderPage('crm')"
                             style="font-family:var(--mono);font-size:.55rem;color:#1E40AF;cursor:pointer;text-decoration:underline">First contact tips →</span>`:''}
                           <span onclick="openAssetModal('${card.id}')"
@@ -30093,7 +30093,6 @@ function renderAssetModal(retailerId){
         `:''}
         <div style="padding:1rem 1.25rem">${specContent}</div>
         <div style="padding:.65rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem">
-          <button onclick="pitchForm.retailer='${name}';showPage('pitch')" class="btn-outline" style="font-size:.62rem">Open in Pitch →</button>
           <button onclick="document.getElementById('vf-asset-modal').remove();openImageResizer('${retailerId}')" class="btn-outline" style="font-size:.62rem">⬡ Resize image →</button>
           <button onclick="document.getElementById('vf-asset-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">Close</button>
         </div>
@@ -30608,7 +30607,6 @@ function renderESGModal(retailerId){
 
         <!-- Footer -->
         <div style="padding:.65rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap;position:sticky;bottom:0;background:#fff">
-          <button onclick="pitchForm.retailer='${name}';showPage('pitch')" class="btn-outline" style="font-size:.62rem">Generate ESG pitch →</button>
           <button onclick="document.getElementById('vf-esg-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">Close</button>
         </div>
       </div>
@@ -31761,7 +31759,7 @@ function renderActionPlanModal(card){
         </div>
         <!-- Footer -->
         <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap">
-          <button onclick="pitchForm.retailer='${card.name}';pitchForm.targetMarket='${card.market}';document.getElementById('vf-action-plan-modal').remove();showPage('pitch')" class="btn-primary" style="font-size:.65rem">Generate pitch →</button>
+          <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('retail-templates')" class="btn-primary" style="font-size:.65rem">Prepare retailer file →</button>
           <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('bizcase')" class="btn-outline" style="font-size:.65rem">Business Case →</button>
           <button onclick="document.getElementById('vf-action-plan-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">Close</button>
         </div>
@@ -32069,6 +32067,8 @@ function seasonalWindowMatchesBrand(win){
 }
 
 // Pre-fill pitch form with seasonal context and navigate
+// DEAD: no live callers since the seasonal calendar + alerts repointed to retail-templates (20 Jun).
+// Left defined (low risk) — its showPage('pitch') target is launch-parked. Remove when pitch un-parks or is deleted.
 function openSeasonalPitch(retailerName, market, windowName, pitchAngle, formatRequired, priceRange){
   pitchForm.retailer    = retailerName;
   pitchForm.targetMarket= market||'';
