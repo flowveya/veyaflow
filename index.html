@@ -1207,11 +1207,28 @@ const NEXT_STEPS = {
 // the Upcoming-Deadlines banner reads only cat/deadline/title/link, so it's unbroken.
 // confidence: 'confirmed' = enacted date · 'proposed' = estimated/not-yet-adopted (cautious-honest default).
 // ⚠ Charlotte/Strategy to RATIFY each confidence value; cautious default is 'proposed'.
+// CANONICAL dated-deadline list (single source). Reconciliation 21 Jun 2026: merged the
+// former REGULATORY_DEADLINES into this survivor (Calendar + banner + event-builder all read
+// it); resolved the live Green Claims date conflict to the sourced-true 2026-09-27 (the
+// deleted store had an earlier wrong date). Radar keeps COMPLIANCE_RADAR_ITEMS as the
+// applicability catalog (ongoing obligations live there, no date). Each row: {id,title,
+// deadline, cat:[displayNames]|null, link, confidence:'confirmed'|'proposed', market, actionLabel, source}.
 const REG_DEADLINES = [
   {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"",confidence:"confirmed",market:"EU",actionLabel:"Textile destruction reporting obligation"},
   {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"",confidence:"confirmed",market:"EU",actionLabel:"Ingredient traceability due diligence required"},
   {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Generate in DPP Generator"},
-  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,color:"#F59E0B",link:"claims",confidence:"proposed",market:"EU",actionLabel:"Check in Claim Localizer"},
+  {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,link:"claims",confidence:"confirmed",market:"EU",actionLabel:"Check in Claim Localizer",source:"Dir (EU) 2024/825 (ECGT / Green Claims)"},
+  // ── Merged + sourced rows (Strategy deadline research, 20 Jun 2026) ──
+  {id:"fragrance_allergen",title:"Fragrance allergen relabelling (newly listed allergens)",deadline:"2026-07-31",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Relabel SKUs for newly listed fragrance allergens",source:"EU 1223/2009 Annex III (fragrance allergen labelling)"},
+  {id:"inci_glossary",title:"INCI Common Ingredients Glossary update",deadline:"2026-07-30",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Update INCI to the revised Common Ingredients Glossary",source:"Strategy deadline research (20 Jun 2026)"},
+  {id:"retinol_limit_sellthrough",title:"Retinol / Vitamin-A face limit — sell-through ends",deadline:"2027-05-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"0.3% retinol face-product limit — existing-stock sell-through ends",source:"EU 1223/2009 Annex III (Vitamin-A restriction)"},
+  {id:"omnibus_ingredient_ii",title:"Omnibus II ingredient restrictions apply",deadline:"2027-01-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Apply Omnibus II ingredient restrictions",source:"Commission Reg (EU) 2026/909"},
+  {id:"cmr_omnibus_viii",title:"CMR Omnibus VIII — substance bans (verify formulae)",deadline:"2026-05-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Verify formulae against CMR Omnibus VIII bans",source:"Commission Reg (EU) 2026/78"},
+  {id:"ppwr",title:"PPWR packaging requirements apply",deadline:"2026-08-12",cat:null,link:"dpp",confidence:"confirmed",market:"EU",actionLabel:"Meet PPWR packaging requirements",source:"Reg (EU) 2025/40 (PPWR)"},
+  {id:"epr_dk",title:"Danish EPR packaging registration",deadline:"2025-10-01",cat:null,link:"home",confidence:"confirmed",market:"DK",actionLabel:"Register for Danish packaging EPR",source:"Strategy deadline research (20 Jun 2026)"},
+  {id:"uk_cmr_si_2026_23_labelling",title:"UK SI 2026/23 — labelling requirements in force",deadline:"2026-07-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Meet UK SI 2026/23 labelling requirements",source:"UK SI 2026/23"},
+  {id:"uk_cmr_si_2026_23_cmrban",title:"UK SI 2026/23 — CMR substance bans in force",deadline:"2026-08-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Verify formulae against UK SI 2026/23 CMR bans",source:"UK SI 2026/23"},
+  {id:"dpp_apparel",title:"EU Digital Product Passport mandatory for apparel",deadline:"2027-01-01",cat:["Fashion & Apparel"],link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Complete your DPP",source:"ESPR DPP delegated act (apparel)"},
 ];
 
 // SUPPLIERS
@@ -1892,6 +1909,33 @@ function getBrandCategories(){
   if(brand.categories&&brand.categories.length>0) return brand.categories;
   if(brand.category) return [brand.category];
   return [];
+}
+
+// Single-source filter for the canonical dated list (REG_DEADLINES). Used by BOTH the
+// deadline banner and the Compliance Calendar so they never disagree. Category gate =
+// display-name match; market gate = 'EU'/'EU/EEA' applies if the brand sells in any EU/EEA
+// market, else the row's market (code or name) must be in the brand's markets (incl. ambition).
+function regMarketApplies(r, mkts){
+  if(!r.market) return true;
+  if(r.market==='EU' || r.market==='EU/EEA'){
+    var EU_EEA=['Sweden','Denmark','Finland','Germany','Netherlands','France','Belgium','Austria','Italy','Spain','Portugal','Ireland','Norway','Iceland','Liechtenstein','Estonia','Latvia','Lithuania','Poland','Czechia','Slovakia','Hungary','Romania','Bulgaria','Greece','Croatia','Slovenia','Luxembourg','Cyprus','Malta'];
+    return mkts.some(function(m){ return EU_EEA.indexOf(m)>-1; });
+  }
+  var C2N={UK:'United Kingdom',DK:'Denmark',DE:'Germany',NO:'Norway',SE:'Sweden',FI:'Finland',NL:'Netherlands',FR:'France',BE:'Belgium'};
+  var nm=C2N[r.market]||r.market;
+  return mkts.indexOf(nm)>-1;
+}
+function regDeadlinesForBrand(){
+  var cats=getBrandCategories()||[];
+  var mkts=[].concat(
+    (brand&&brand.targetMarkets)||[],
+    (brand&&brand.currentMarket)?[brand.currentMarket]:[],
+    (brand&&brand.ambitionMarkets)||[]
+  );
+  return REG_DEADLINES.filter(function(r){
+    var catOk = !r.cat || cats.some(function(c){ return r.cat.indexOf(c)>-1; });
+    return catOk && regMarketApplies(r, mkts);
+  });
 }
 
 // Coded demo seed — canonical NORDLYS fixture (reproducible, byte-verifiable; not
@@ -4668,8 +4712,7 @@ function renderRegStrip(){
   const strip=document.getElementById('deadline-bar');
   if(!strip) return;
   if(!brand){strip.style.display='none';strip.innerHTML='';return;}
-  const relevant=REG_DEADLINES
-    .filter(r=>!r.cat||(getBrandCategories()||[brand?.category||'']).some(cat=>r.cat.includes(cat)))
+  const relevant=regDeadlinesForBrand()
     .sort((a,b)=>daysUntil(a.deadline)-daysUntil(b.deadline))
     .slice(0,2);
   if(!relevant.length){strip.style.display='none';strip.innerHTML='';return;}
@@ -31359,44 +31402,11 @@ function getWEEEMarkets(){
     .filter((m,i,a)=>a.indexOf(m)===i);
 }
 
-const REGULATORY_DEADLINES = [
-  // Cosmetics / skincare
-  {
-    date:'2026-08-01',
-    label:'UK CMR SI 2026/23 in force — retinol and preservative review',
-    action:'Check your UK claims',
-    market:'UK',
-    categories:['Skincare & Beauty'],
-    actionPage:'claims',
-  },
-  // Fashion
-  {
-    date:'2027-01-01',
-    label:'EU Digital Product Passport mandatory for apparel',
-    action:'Complete your DPP',
-    market:'EU',
-    categories:['Fashion & Apparel'],
-    actionPage:'dpp',
-  },
-  // Food / supplements
-  {
-    date:'2026-12-30',
-    label:'EUDR enforcement deadline (large + medium operators)',
-    action:'Check EUDR compliance',
-    market:'EU',
-    categories:['Food & Beverage','Wellness & Supplements','Fashion & Apparel'],
-    actionPage:'suppliers',
-  },
-  // All categories with EU presence
-  {
-    date:'2026-09-16',
-    label:'Green Claims Directive — substantiation requirements apply',
-    action:'Review your claims',
-    market:'EU',
-    categories:['Skincare & Beauty','Wellness & Supplements','Food & Beverage','Fashion & Apparel'],
-    actionPage:'claims',
-  },
-];
+// Reconciliation 21 Jun 2026: the former parallel dated list here was MERGED into the
+// canonical REG_DEADLINES (L1210). Its rows are now single-sourced there with sourced-true
+// dates — incl. the Green Claims fix (earlier wrong date → canonical 2026-09-27), the UK
+// SI split (07-15 + 08-15, replacing the approximate 08-01), and the EUDR dup removed.
+// buildComplianceEvents now reads REG_DEADLINES via regDeadlinesForBrand().
 
 function buildComplianceEvents(){
   const now  = new Date();
@@ -31413,11 +31423,9 @@ function buildComplianceEvents(){
       color: days<30?'red':days<90?'amber':'green'});
   };
 
-  // 1. Static regulatory deadlines (filtered by brand category)
-  REGULATORY_DEADLINES.forEach(rd=>{
-    if(!cats.length || rd.categories.some(c=>cats.includes(c))){
-      addEvent(rd.date, rd.label+' ('+rd.market+')', rd.action, rd.actionPage, 'regulatory', rd.date);
-    }
+  // 1. Static regulatory deadlines — canonical list (single source; category+market filtered).
+  regDeadlinesForBrand().forEach(r=>{
+    addEvent(r.deadline, r.title+' ('+r.market+')', r.actionLabel, r.link, 'regulatory', r.id);
   });
 
   // 2. Brand certifications with expiry dates
@@ -31506,9 +31514,8 @@ function buildComplianceEvents(){
 // INDEPENDENT signals. Soonest-first, category-filtered, month-grouped.
 function renderComplianceCalendarPage(el){
   if(!el) return;
-  var cats = (typeof getBrandCategories==='function' ? getBrandCategories() : []) || [];
-  var rows = REG_DEADLINES
-    .filter(function(r){ return !r.cat || cats.some(function(c){ return r.cat.indexOf(c) > -1; }); })
+  // Single canonical source, filtered by brand category + market (shared with the banner).
+  var rows = regDeadlinesForBrand()
     .map(function(r){ return Object.assign({}, r, {days: daysUntil(r.deadline)}); })
     .sort(function(a,b){ return a.days - b.days; });
 
