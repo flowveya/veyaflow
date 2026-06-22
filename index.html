@@ -28549,8 +28549,18 @@ function pdfHeader(doc, title, subtitle, accentHex, pageW, opts){
   // Optional brand logo — bounded box top-left; a bad image NEVER breaks the layout.
   let tx = 14;
   if(opts.logo){
-    try{ doc.addImage(opts.logo, 14, 5, 18, 18); tx = 36; }
-    catch(e){ try{ doc.addImage(opts.logo, 'PNG', 14, 5, 18, 18); tx = 36; }catch(e2){ tx = 14; } }
+    try{
+      // Aspect-preserving fit inside a bounded header zone (band is 28 tall).
+      var lp = doc.getImageProperties(opts.logo);
+      var maxH = 18, maxW = 50, HEADER_H = 28;
+      var s = Math.min(maxH / lp.height, maxW / lp.width);
+      var lw = lp.width * s, lh = lp.height * s, ly = (HEADER_H - lh) / 2;
+      doc.addImage(opts.logo, 14, ly, lw, lh);
+      tx = 14 + lw + 6;   // title clears the drawn logo width — no overlap
+    }catch(e){
+      try{ doc.addImage(opts.logo, 'PNG', 14, 5, 18, 18); tx = 36; }   // legacy fixed-square fallback
+      catch(e2){ tx = 14; }   // bad image → no logo, layout unbroken
+    }
   }
   // Title — heading FONT is brand-tokenisable from the curated type-pair (within jsPDF fonts)
   pdfSetFont(doc, 'heading');
