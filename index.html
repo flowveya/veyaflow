@@ -28806,9 +28806,10 @@ function renderBuyerDocs(el){
       '<div style="'+rowCss+'">'+
         '<button class="btn-primary" onclick="generateLineSheetPDF()" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
         '<button class="btn-outline" onclick="generateLineSheetPDF(true)" style="font-size:.7rem">Generate, branded →</button>'+
-        '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
+        '<button class="btn-outline" onclick="bdOpenUpload(\'line\')" style="font-size:.7rem">Bring your own (upload)</button>'+
       '</div>'+
-      '<div style="'+noteCss+'">Branded applies your logo/colours/typeface to the header only — structure, field order and data stay VeyaFlow-controlled. Upload (+ PDF claims check) arrives in a later release.</div>'+
+      '<div style="'+noteCss+'">Branded applies your logo/colours/typeface to the header only — structure, field order and data stay VeyaFlow-controlled. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record; nothing is submitted.</div>'+
+      bdVersionHistoryHtml('line')+
     '</div>'+
 
     // ── Spec sheet (stays VeyaFlow-standard — compliance artifact) ──
@@ -28821,13 +28822,15 @@ function renderBuyerDocs(el){
           '<div style="'+rowCss+'">'+
             '<button class="btn-primary" onclick="generateSpecSheetPDF(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
             '<button class="btn-outline" onclick="bdSpecBrandedNote(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, branded</button>'+
-            '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
+            '<button class="btn-outline" onclick="bdOpenUpload(\'spec\')" style="font-size:.7rem">Bring your own (upload)</button>'+
           '</div>'+
-          '<div style="'+noteCss+'">Spec sheets stay VeyaFlow-standard — a buyer scrutinising INCI / claims should see the trusted neutral look. Branding (and upload) do not skin the compliance artifact.</div>'
+          '<div style="'+noteCss+'">Spec sheets stay VeyaFlow-standard — a buyer scrutinising INCI / claims should see the trusted neutral look. Branding does not skin the compliance artifact. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record.</div>'+
+          bdVersionHistoryHtml('spec')
         : '<div style="margin-top:.7rem;padding:.6rem .8rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:9px;font-size:.78rem;color:var(--ink-soft)">No products yet — <span onclick="showPage(\'skus\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">add a product</span> to generate a spec sheet.</div>')+
     '</div>'+
 
-    '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdUploadComingSoon(this)">'+
+    bdScanResultHtml()+
+    '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdHandleUpload(this)">'+
   '</div>';
 }
 
@@ -28868,10 +28871,190 @@ function bdBrandedComingSoon(kind){
   if(kind!=='line'){ var sel=document.getElementById('bd-spec-sku'); skuId=sel?sel.value:null; }
   setTimeout(function(){ if(kind==='line') generateLineSheetPDF(); else generateSpecSheetPDF(skuId); }, 60);
 }
-// Upload (Part 4 pending): show the picker but store/check NOTHING — honest placeholder.
-function bdUploadComingSoon(input){
-  if(input) input.value='';
-  if(typeof showSuccess==='function') showSuccess('Upload handling + claims check arrives in a later release.');
+// ════════════════════════════════════════════════════════════════════════════
+// Buyer-Docs Part 4 — upload store/version + ADVISORY Rung-1 claims scan
+// ════════════════════════════════════════════════════════════════════════════
+// HONESTY CONSTRAINT (literal): getClaimLight() matches KNOWN claim ids only — there
+// is no free-text claim detector. So this scan is a fixed KNOWN-PHRASE scan: it flags
+// recognised risky phrases, and CANNOT catch every claim. The result is therefore
+// ADVISORY + NON-EXHAUSTIVE — never a certification. Absence of flags ≠ compliant.
+// Storage mirrors BIL's lighter approach (the blob lives in memory, not localStorage):
+// localStorage holds only a versioned METADATA + scan record — the 25MB file is never
+// persisted (would blow the ~5MB quota). Nothing is submitted anywhere — local only.
+const BD_DOCS_KEY = 'ns_buyer_docs';
+const BD_MAX_VERSIONS = 5;
+const BD_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;   // mirror BIL's 25MB ceiling
+let _bdPendingDocType = 'line';
+let _bdLastScan = null;                          // transient panel state; survives re-render via this var
+
+// ── picker plumbing: remember which doc-type slot the upload is for ──
+function bdOpenUpload(docType){
+  _bdPendingDocType = (docType==='spec') ? 'spec' : 'line';
+  var inp = document.getElementById('bd-upload-input');
+  if(inp){ inp.value=''; inp.click(); }
+}
+function _bdRerender(){ var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el); }
+function bdShowScanBusy(docType, filename){ _bdLastScan={docType:docType, filename:filename, busy:true}; _bdRerender(); }
+function bdShowScanError(docType, msg){ _bdLastScan={docType:docType, error:msg}; _bdRerender(); }
+
+// ── local store (metadata + scan only; keyed by brand → docType → version list) ──
+function bdBrandKey(){ return (brand && brand.name) ? String(brand.name) : '_default'; }
+function bdLoadDocStore(){ try{ return JSON.parse(localStorage.getItem(BD_DOCS_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function bdSaveDocStore(store){ try{ localStorage.setItem(BD_DOCS_KEY, JSON.stringify(store)); return true; }catch(e){ return false; } }
+function bdVersionsFor(docType){
+  var b = bdLoadDocStore()[bdBrandKey()];
+  return (b && b[docType]) ? b[docType].slice() : [];
+}
+function bdStoreVersion(docType, file, hits, textLen, noText){
+  var store=bdLoadDocStore(), bk=bdBrandKey();
+  if(!store[bk]) store[bk]={};
+  if(!store[bk][docType]) store[bk][docType]=[];
+  var arr=store[bk][docType];
+  var v=(arr.length ? (arr[arr.length-1].v||arr.length) : 0) + 1;
+  var rec={ v:v, ts:new Date().toISOString(), filename:String(file.name||''), size:file.size||0,
+            scanCount:(hits?hits.length:0), textLen:textLen||0, noText:!!noText };
+  arr.push(rec);
+  if(arr.length>BD_MAX_VERSIONS) store[bk][docType]=arr.slice(arr.length-BD_MAX_VERSIONS);
+  bdSaveDocStore(store);
+  return rec;
+}
+
+// ── text extraction: reuse the BIL pdf.js path (loadPdfJs + getDocument), read TEXT ──
+// BIL renders pages to images for Vision; here we want text, so we use the library's
+// getTextContent across pages. Same loader, same getDocument — no new dependency.
+async function bdExtractPdfText(file){
+  await loadPdfJs();
+  if(!window.pdfjsLib) throw new Error('PDF engine unavailable.');
+  var buf = await file.arrayBuffer();
+  var pdf = await window.pdfjsLib.getDocument({ data:new Uint8Array(buf) }).promise;
+  var cap = Math.min(pdf.numPages, 30);   // sanity cap — a line/spec sheet is a few pages
+  var parts=[];
+  for(var i=1;i<=cap;i++){
+    var page=await pdf.getPage(i);
+    var tc=await page.getTextContent();
+    parts.push(tc.items.map(function(it){ return (it && it.str)?it.str:''; }).join(' '));
+  }
+  return parts.join('\n');
+}
+
+// ── KNOWN-PHRASE scan: red/amber rule keys (+ obvious surface forms) for the brand's
+//    product types. Word-boundary match. Dedup by claim, keep the WORST verdict. ──
+function bdBrandProductTypes(){
+  var list=(typeof skus!=='undefined' && skus)?skus:[];
+  var set={}; list.forEach(function(s){ if(s && s.productType) set[s.productType]=1; });
+  var types=Object.keys(set);
+  return types.length ? types : ['cosmetic'];
+}
+function _bdEsc(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function _bdPhraseHit(hay, form){
+  try{ return new RegExp('\\b'+_bdEsc(form)+'\\b','i').test(hay); }
+  catch(e){ return hay.indexOf(String(form).toLowerCase())>=0; }
+}
+function bdRunClaimsScan(text){
+  var hay=(text||'').toLowerCase();
+  var types=bdBrandProductTypes();
+  var rank={green:0, amber:1, red:2};
+  var byKey={};
+  var saved=(typeof skuForm!=='undefined') ? skuForm.productType : undefined;
+  try{
+    types.forEach(function(t){
+      var rules=CLAIMS_RULES[t]; if(!rules) return;
+      Object.keys(rules).forEach(function(key){
+        var rule=rules[key];
+        var base=(rule.markets && rule.default) ? rule.default : rule.status;
+        if(base!=='amber' && base!=='red') return;   // only the risky ones are worth flagging
+        var forms=[key];
+        if(key.indexOf('-')>=0){ forms.push(key.replace(/-/g,' ')); forms.push(key.replace(/-/g,'')); }
+        if(!forms.some(function(f){ return _bdPhraseHit(hay, f); })) return;
+        if(typeof skuForm!=='undefined') skuForm.productType=t;
+        var v={light:'amber', note:''};
+        try{ v=getClaimLight(key); }catch(e){}
+        var cur=byKey[key];
+        if(!cur || rank[v.light]>rank[cur.light]) byKey[key]={claim:key, productType:t, light:v.light, note:v.note||''};
+      });
+    });
+  } finally { if(typeof skuForm!=='undefined') skuForm.productType=saved; }
+  return Object.keys(byKey).map(function(k){ return byKey[k]; });
+}
+
+// ── orchestrator: validate → extract → scan → store/version → render advisory panel ──
+async function bdHandleUpload(input){
+  var docType=_bdPendingDocType;
+  var file=input && input.files && input.files[0];
+  if(input) input.value='';   // capture file first, then clear so the same file can be re-picked
+  if(!file) return;           // dialog cancelled — leave state untouched
+  var ext=(String(file.name).split('.').pop()||'').toLowerCase();
+  var isPdf=file.type==='application/pdf' || (file.type===''&&ext==='pdf');
+  if(!isPdf){ bdShowScanError(docType, 'That isn’t a PDF. Upload a single PDF file.'); return; }
+  if(file.size>BD_MAX_UPLOAD_BYTES){
+    bdShowScanError(docType, 'File too large — '+(file.size/1024/1024).toFixed(1)+'MB. Maximum is 25MB.'); return;
+  }
+  bdShowScanBusy(docType, file.name);
+  var text='';
+  try{ text=await bdExtractPdfText(file); }
+  catch(e){ bdShowScanError(docType, 'Could not read this PDF — it may be corrupt or password-protected.'); return; }
+  var noText = !(text && text.replace(/\s/g,'').length);
+  var hits = noText ? [] : bdRunClaimsScan(text);
+  var rec = bdStoreVersion(docType, file, hits, (text||'').length, noText);
+  if(typeof showSuccess==='function'){
+    showSuccess('Stored '+(docType==='spec'?'spec sheet':'line sheet')+(rec?(' v'+rec.v):'')+' — local versioning only, nothing submitted.');
+  }
+  _bdLastScan={ docType:docType, filename:file.name, rec:rec, hits:hits, noText:noText };
+  _bdRerender();
+}
+
+// ── version-history block (per doc-type card); reads the local metadata store ──
+function bdVersionHistoryHtml(docType){
+  var arr=bdVersionsFor(docType);
+  if(!arr.length) return '';
+  var rows=arr.slice().reverse().map(function(r){
+    var d=''; try{ d=new Date(r.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ d=String(r.ts||''); }
+    var status = r.noText ? 'no text read' : (r.scanCount>0 ? (r.scanCount+' flagged') : 'none recognised');
+    return '<div style="display:flex;justify-content:space-between;gap:.6rem;font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);padding:.28rem 0;border-top:1px solid var(--line)">'+
+      '<span>v'+r.v+' · '+escapeHtml(r.filename||'')+'</span>'+
+      '<span style="color:var(--ink-mute)">'+escapeHtml(d)+' · '+status+'</span></div>';
+  }).join('');
+  return '<div style="margin-top:.8rem">'+
+    '<div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute)">Your uploads · stored locally on this device, nothing submitted</div>'+
+    rows+'</div>';
+}
+
+// ── advisory result panel (honesty-critical): NEVER a doc-level pass/clean/certified ──
+function bdScanResultHtml(){
+  var s=_bdLastScan;
+  if(!s) return '';
+  var SW={green:'#0F7A52', amber:'#A85D14', red:'#B32A1F'};
+  var WORD={green:'Generally OK', amber:'Caution', red:'High risk'};
+  var MARK={green:'●', amber:'▲', red:'■'};   // shape + word + colour — never colour alone
+  var hCss='font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.4rem';
+  var head='<div style="font-family:var(--display);font-size:1.15rem;color:var(--ink);margin-bottom:.2rem">Advisory claims scan — <span style="color:'+SW.red+'">not a certification</span></div>';
+  // ALWAYS shown — both when phrases are found and when none are.
+  var disclaimer='<div style="margin-top:.75rem;padding:.7rem .85rem;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;font-size:.73rem;color:var(--ink-soft);line-height:1.55">'+
+    '<b>Advisory, non-exhaustive scan.</b> It recognises a fixed list of known risky claim phrases — it is <b>not</b> free-text claim detection and cannot catch every claim. Absence of flags does <b>not</b> mean the document is compliant. Final claims review remains your responsibility and your Responsible Person’s. Nothing here is a certification, approval, or pass.</div>';
+  var body;
+  if(s.busy){
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft)">Reading the PDF and running the advisory scan…</div>';
+    return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+body+'</div>';
+  }
+  var src = s.error ? '' : '<div style="'+hCss+'">'+escapeHtml(s.docType==='spec'?'Spec sheet':'Line sheet')+(s.rec?(' · v'+s.rec.v):'')+' · '+escapeHtml(s.filename||'')+'</div>';
+  if(s.error){
+    body='<div style="margin-top:.6rem;padding:.7rem .85rem;background:#FBEAE7;border:1px solid '+SW.red+';border-radius:10px;font-size:.78rem;color:'+SW.red+'">'+escapeHtml(s.error)+'</div>';
+    return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+body+'</div>';
+  }
+  if(s.noText){
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">No extractable text was found — the PDF is likely image-only / scanned. The claims scan could <b>not</b> run on this file, so this is <b>not</b> a pass. Re-export the PDF with selectable text to scan it.</div>';
+  } else if(s.hits && s.hits.length){
+    var rows=s.hits.map(function(h){
+      return '<div style="display:flex;gap:.6rem;align-items:flex-start;padding:.55rem 0;border-top:1px solid var(--line)">'+
+        '<span style="color:'+SW[h.light]+';font-size:.85rem;line-height:1.3">'+MARK[h.light]+'</span>'+
+        '<div><div style="font-size:.82rem;color:var(--ink)"><b>“'+escapeHtml(h.claim)+'”</b> — <span style="color:'+SW[h.light]+';font-weight:600">'+WORD[h.light]+'</span></div>'+
+        '<div style="font-size:.73rem;color:var(--ink-soft);line-height:1.5;margin-top:.15rem">'+escapeHtml(h.note||'')+'</div></div></div>';
+    }).join('');
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">We recognised these claim phrases in your document. Each is a <b>known</b> phrase we check — there may be others we don’t recognise:</div>'+rows;
+  } else {
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">We did <b>not</b> recognise any flagged claim phrases. This does <b>not</b> mean the document is compliant — our scan only catches known phrases and is not a complete claims audit. Review remains your responsibility (and your RP’s).</div>';
+  }
+  return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+src+body+disclaimer+'</div>';
 }
 
 function pdfFooter(doc, pageNum, totalPages, pageW, pageH){
