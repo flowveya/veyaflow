@@ -28538,22 +28538,30 @@ function pdfWrap(doc, text, x, y, maxW, lineH){
   return y + lines.length * lineH;
 }
 
-function pdfHeader(doc, title, subtitle, accentHex, pageW){
-  // Full-width navy header block
-  pdfColorFill(doc, '#1E3A5F');
+function pdfHeader(doc, title, subtitle, accentHex, pageW, opts){
+  opts = opts || {};
+  // Header block — primaryHex is brand-TOKENISABLE (default navy). STRUCTURE/size fixed.
+  pdfColorFill(doc, opts.primaryHex || '#1E3A5F');
   doc.rect(0, 0, pageW, 28, 'F');
-  // Accent stripe
+  // Accent stripe — brand-tokenisable via accentHex (default gold)
   pdfColorFill(doc, accentHex||'#C4A882');
   doc.rect(0, 28, pageW, 2, 'F');
-  // Title
+  // Optional brand logo — bounded box top-left; a bad image NEVER breaks the layout.
+  let tx = 14;
+  if(opts.logo){
+    try{ doc.addImage(opts.logo, 14, 5, 18, 18); tx = 36; }
+    catch(e){ try{ doc.addImage(opts.logo, 'PNG', 14, 5, 18, 18); tx = 36; }catch(e2){ tx = 14; } }
+  }
+  // Title — heading FONT is brand-tokenisable from the curated type-pair (within jsPDF fonts)
   pdfSetFont(doc, 'heading');
+  if(opts.headingFont){ try{ doc.setFont(opts.headingFont, 'bold'); }catch(e){} }
   pdfColor(doc, '#FFFFFF');
-  doc.text(title, 14, 12);
+  doc.text(title, tx, 12);
   // Subtitle
   pdfSetFont(doc, 'small');
   doc.setTextColor(180,190,200);
-  doc.text(subtitle||'', 14, 19);
-  // VeyaFlow mark
+  doc.text(subtitle||'', tx, 19);
+  // VeyaFlow mark — ALWAYS present (provenance mark, NOT brandable)
   pdfSetFont(doc, 'footer');
   doc.setTextColor(150,160,170);
   doc.text('VeyaFlow · veyaflow.com', pageW-14, 10, {align:'right'});
@@ -28575,6 +28583,13 @@ function pdfHeader(doc, title, subtitle, accentHex, pageW){
 ═══════════════════════════════════════════════════ */
 const BD_CURRENCY = {rspSEK:'SEK',rspDKK:'DKK',rspGBP:'GBP',rspEUR:'EUR',rspNOK:'NOK',rspISK:'ISK'};
 const BD_RSP_KEYS = ['rspSEK','rspDKK','rspGBP','rspEUR','rspNOK','rspISK'];
+// CURATED type-pairs (brand chooses ONE — NOT free font entry). Mapped to the jsPDF
+// built-in font set; only the heading font is brand-controllable, body stays helvetica.
+const BD_TYPE_PAIRS = {
+  classic:   {label:'Classic (serif headings)',  heading:'times'},
+  modern:    {label:'Modern (sans headings)',    heading:'helvetica'},
+  editorial: {label:'Editorial (serif headings)',heading:'times'},
+};
 
 // Honesty rule: absence shown as absence.
 function bdVal(v, placeholder){
@@ -28599,7 +28614,7 @@ function bdClaimInfo(claim, productType){
 }
 
 // ── Line Sheet — door-opener: multi-SKU, commercial, NO claim lights, NO private fields ──
-async function generateLineSheetPDF(){
+async function generateLineSheetPDF(branded){
   const btn = (typeof event!=='undefined' && event) ? event.target : null;
   if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
   try{
@@ -28607,8 +28622,20 @@ async function generateLineSheetPDF(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
-    pdfHeader(doc, (brand&&brand.name||'Brand')+' — Line Sheet',
-      (brand&&brand.category||'')+' · '+(((brand&&brand.targetMarkets)||[]).join(', ')||'Markets'), '#0E8C8C', pageW);
+    // BRAND TOKENS reach ONLY the header zones (block colour, accent stripe, logo, heading
+    // font). Missing token → VeyaFlow default (never breaks). STRUCTURE/field-order/spacing
+    // below are UNCHANGED between standard and branded. No claim lights here → STATUS palette
+    // is structurally unreachable on this document.
+    const b = brand || {};
+    const useBrand = !!branded;
+    const accent = (useBrand && b.docAccentHex) ? b.docAccentHex : '#0E8C8C';
+    const headerOpts = useBrand ? {
+      primaryHex: b.docPrimaryHex || undefined,
+      logo:       b.docLogo || undefined,
+      headingFont:(BD_TYPE_PAIRS[b.docTypePair] || {}).heading || undefined,
+    } : {};
+    pdfHeader(doc, (b.name||'Brand')+' — Line Sheet',
+      (b.category||'')+' · '+((b.targetMarkets||[]).join(', ')||'Markets'), accent, pageW, headerOpts);
     let y=40;
     pdfSetFont(doc,'small'); pdfColor(doc,'#6B7280');
     doc.text('Commercial range overview · retail prices · prepared from VeyaFlow-verified data', margin, y); y+=8;
@@ -28628,8 +28655,8 @@ async function generateLineSheetPDF(){
       doc.text('EAN '+bdVal(sku.ean,'—')+'    ·    MOQ '+bdVal(sku.moq,'—')+'    ·    Lead '+bdVal(sku.leadDays,'—')+' days', margin, y); y+=6;
     });
     pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
-    doc.text('VeyaFlow-standard line sheet · commercial terms only · no compliance status or cost data on this document', margin, pageH-10);
-    doc.save(((brand&&brand.name)||'brand').replace(/\s+/g,'_')+'_LineSheet.pdf');
+    doc.text((useBrand?'Branded line sheet · brand identity applied to header only — structure & data VeyaFlow-controlled':'VeyaFlow-standard line sheet')+' · commercial terms only · no compliance status or cost data', margin, pageH-10);
+    doc.save(((b.name)||'brand').replace(/\s+/g,'_')+'_LineSheet'+(useBrand?'_branded':'')+'.pdf');
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate line sheet: '+(e&&e.message)); console.warn('Line sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Line Sheet'; } }
 }
@@ -28737,22 +28764,44 @@ function renderBuyerDocs(el){
   var hCss='font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.5rem';
   var pCss='font-size:.8rem;color:var(--ink-soft);line-height:1.5';
   var rowCss='display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem';
-  var soon='<div style="font-family:var(--mono);font-size:.58rem;color:var(--ink-mute);margin-top:.55rem;line-height:1.5">Branded styling and bring-your-own upload (+ PDF claims check) are coming in a later release — today the live option generates the VeyaFlow-standard version.</div>';
+  var noteCss='font-family:var(--mono);font-size:.58rem;color:var(--ink-mute);margin-top:.55rem;line-height:1.5';
+  var typeOpts=Object.keys(BD_TYPE_PAIRS).map(function(k){ return '<option value="'+k+'"'+((brand.docTypePair||'classic')===k?' selected':'')+'>'+BD_TYPE_PAIRS[k].label+'</option>'; }).join('');
 
   el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
     '<div class="head"><h1>Buyer documents</h1></div>'+
-    '<p class="sub">Generate a line sheet or a per-product spec sheet from your VeyaFlow-verified data — three ways to produce each; only the standard generator is live today.</p>'+
+    '<p class="sub">Generate a line sheet or a per-product spec sheet from your VeyaFlow-verified data. Three ways to produce each.</p>'+
 
+    // ── Bounded document-branding editor (applies to the branded LINE SHEET header only) ──
+    '<div style="'+cardCss+'">'+
+      '<div style="'+hCss+'">Document branding · bounded</div>'+
+      '<div style="'+pCss+'">Applies to the <b>branded line sheet</b> header only — your logo, two colours, and a typeface from a curated set. VeyaFlow controls structure, field order, claim-status colours and provenance.</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.85rem;margin-top:.85rem;align-items:end">'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Logo</div>'+
+          '<div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">'+
+            (brand.docLogo?'<img src="'+escapeHtml(brand.docLogo)+'" style="height:32px;max-width:110px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px"/>':'<span style="font-size:.72rem;color:var(--ink-mute)">none</span>')+
+            '<button class="btn-outline" onclick="document.getElementById(\'bd-logo-input\').click()" style="font-size:.6rem;padding:.3rem .55rem">'+(brand.docLogo?'Replace':'Upload')+'</button>'+
+            (brand.docLogo?'<button class="btn-outline" onclick="bdClearLogo()" style="font-size:.6rem;padding:.3rem .55rem">Remove</button>':'')+
+          '</div></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Primary (header)</div><input type="color" value="'+(brand.docPrimaryHex||'#1E3A5F')+'" onchange="bdSetToken(\'docPrimaryHex\', this.value)" style="width:100%;height:32px;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;background:var(--paper)"></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Accent (stripe)</div><input type="color" value="'+(brand.docAccentHex||'#0E8C8C')+'" onchange="bdSetToken(\'docAccentHex\', this.value)" style="width:100%;height:32px;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;background:var(--paper)"></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Typeface</div><select onchange="bdSetToken(\'docTypePair\', this.value)" style="width:100%;font-family:var(--sans);font-size:.72rem;padding:.42rem;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);color:var(--ink)">'+typeOpts+'</select></div>'+
+      '</div>'+
+      '<input type="file" id="bd-logo-input" accept="image/*" style="display:none" onchange="bdSetLogo(this)">'+
+    '</div>'+
+
+    // ── Line sheet ──
     '<div style="'+cardCss+'">'+
       '<div style="'+hCss+'">Line sheet · door-opener</div>'+
       '<div style="'+pCss+'">Your whole range on one commercial document — retail prices, MOQ, lead time. No compliance status, no cost data.</div>'+
       '<div style="'+rowCss+'">'+
         '<button class="btn-primary" onclick="generateLineSheetPDF()" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
-        '<button class="btn-outline" onclick="bdBrandedComingSoon(\'line\')" style="font-size:.7rem">Generate, branded</button>'+
+        '<button class="btn-outline" onclick="generateLineSheetPDF(true)" style="font-size:.7rem">Generate, branded →</button>'+
         '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
-      '</div>'+soon+
+      '</div>'+
+      '<div style="'+noteCss+'">Branded applies your logo/colours/typeface to the header only — structure, field order and data stay VeyaFlow-controlled. Upload (+ PDF claims check) arrives in a later release.</div>'+
     '</div>'+
 
+    // ── Spec sheet (stays VeyaFlow-standard — compliance artifact) ──
     '<div style="'+cardCss+'">'+
       '<div style="'+hCss+'">Spec sheet · data artifact (per product)</div>'+
       '<div style="'+pCss+'">One per product: identification, formulation/technical, retail terms, and claim status with verified provenance.</div>'+
@@ -28761,14 +28810,44 @@ function renderBuyerDocs(el){
             '<select id="bd-spec-sku" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
           '<div style="'+rowCss+'">'+
             '<button class="btn-primary" onclick="generateSpecSheetPDF(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
-            '<button class="btn-outline" onclick="bdBrandedComingSoon(\'spec\')" style="font-size:.7rem">Generate, branded</button>'+
+            '<button class="btn-outline" onclick="bdSpecBrandedNote(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, branded</button>'+
             '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
-          '</div>'+soon
+          '</div>'+
+          '<div style="'+noteCss+'">Spec sheets stay VeyaFlow-standard — a buyer scrutinising INCI / claims should see the trusted neutral look. Branding (and upload) do not skin the compliance artifact.</div>'
         : '<div style="margin-top:.7rem;padding:.6rem .8rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:9px;font-size:.78rem;color:var(--ink-soft)">No products yet — <span onclick="showPage(\'skus\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">add a product</span> to generate a spec sheet.</div>')+
     '</div>'+
 
     '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdUploadComingSoon(this)">'+
   '</div>';
+}
+
+// Bounded brand-token setters — persist to ns_brand. Tokens ONLY reach the line-sheet header.
+function bdSetToken(field, value){
+  if(!brand) return;
+  if(field==='docTypePair' && !BD_TYPE_PAIRS[value]) return;   // curated list only
+  brand[field] = value;
+  if(typeof saveBrandState==='function') saveBrandState();
+}
+function bdSetLogo(input){
+  if(!input || !input.files || !input.files[0]) return;
+  var f = input.files[0];
+  if(!/^image\//.test(f.type||'')){ if(typeof showSuccess==='function') showSuccess('Please choose an image file.'); input.value=''; return; }
+  var reader = new FileReader();
+  reader.onload = function(){ brand.docLogo = String(reader.result); if(typeof saveBrandState==='function') saveBrandState(); var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el); };
+  reader.onerror = function(){ if(typeof showSuccess==='function') showSuccess('Could not read that image.'); };
+  reader.readAsDataURL(f);
+  input.value='';
+}
+function bdClearLogo(){
+  if(!brand) return;
+  delete brand.docLogo;
+  if(typeof saveBrandState==='function') saveBrandState();
+  var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el);
+}
+// Spec-sheet "branded" = intentionally STANDARD (compliance artifact stays neutral) + honest note.
+function bdSpecBrandedNote(skuId){
+  if(typeof showSuccess==='function') showSuccess('Spec sheets stay VeyaFlow-standard for buyer trust — generating the standard version.');
+  setTimeout(function(){ generateSpecSheetPDF(skuId); }, 60);
 }
 
 // Branded (Part 3 pending): generate the STANDARD version + honest note. setTimeout decouples
