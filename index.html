@@ -1216,7 +1216,7 @@ const NEXT_STEPS = {
 const REG_DEADLINES = [
   {id:"textile_ban",title:"EU Textile Destruction Ban",deadline:"2026-07-19",cat:["Fashion & Apparel"],color:"#EF4444",link:"",confidence:"confirmed",market:"EU",actionLabel:"Textile destruction reporting obligation"},
   {id:"eudr",title:"EUDR Enforcement",deadline:"2026-12-30",cat:["Food & Beverage","Wellness & Supplements","Fashion & Apparel"],color:"#F59E0B",link:"",confidence:"confirmed",market:"EU",actionLabel:"Ingredient traceability due diligence required"},
-  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:null,color:"#1E3A5F",link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Generate in DPP Generator"},
+  {id:"espr_disclosure",title:"ESPR Article 24 Disclosure",deadline:"2027-03-01",cat:["Fashion & Apparel"],color:"#1E3A5F",link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Generate in DPP Generator"},
   {id:"green_claims",title:"Green Claims Directive",deadline:"2026-09-27",cat:null,link:"claims",confidence:"confirmed",market:"EU",actionLabel:"Check in Claim Localizer",source:"Dir (EU) 2024/825 (ECGT / Green Claims)"},
   // ── Merged + sourced rows (Strategy deadline research, 20 Jun 2026) ──
   {id:"fragrance_allergen",title:"Fragrance allergen relabelling (newly listed allergens)",deadline:"2026-07-31",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Relabel SKUs for newly listed fragrance allergens",source:"EU 1223/2009 Annex III (fragrance allergen labelling)"},
@@ -28554,6 +28554,168 @@ function pdfHeader(doc, title, subtitle, accentHex, pageW){
   doc.setTextColor(150,160,170);
   doc.text('VeyaFlow · veyaflow.com', pageW-14, 10, {align:'right'});
   doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), pageW-14, 15, {align:'right'});
+}
+
+/* ═══════════════════════════════════════════════════
+   BUYER-DOCS GENERATOR — Part 1 (trunk): Line Sheet + Spec Sheet
+   Generates ONLY from canonical reconciled sources so buyer docs inherit the
+   verified-provenance property: product substrate = skus; claim lights =
+   getClaimLight (the reconciled CLAIMS_RULES engine); provenance =
+   source/lastReviewed/reviewedBy on the claim row + brand.euResponsible.
+   HARD-EXCLUDES private fields (exWorksCost / netPriceSEK / vatRate) — never on a buyer doc.
+   Missing fields render as a VISIBLE placeholder, never invented or silently blank.
+   ⚠ FIELD-SPLIT PROPOSAL: which fields go on which doc + ordering is a DESIGN-lane
+   decision to confirm (the 17-Jun worked examples are gone) — not presented as settled.
+   Parts 2-5 (source selector, branded tokens, store-forward+PDF claims check, integrity
+   wrapper) attach to this trunk later. UI trigger = Part 2; these are invocable now.
+═══════════════════════════════════════════════════ */
+const BD_CURRENCY = {rspSEK:'SEK',rspDKK:'DKK',rspGBP:'GBP',rspEUR:'EUR',rspNOK:'NOK',rspISK:'ISK'};
+const BD_RSP_KEYS = ['rspSEK','rspDKK','rspGBP','rspEUR','rspNOK','rspISK'];
+
+// Honesty rule: absence shown as absence.
+function bdVal(v, placeholder){
+  if(v===undefined||v===null) return placeholder||'— not provided';
+  if(typeof v==='string' && v.trim()==='') return placeholder||'— not provided';
+  if(Array.isArray(v) && !v.length) return placeholder||'— not provided';
+  return String(v);
+}
+
+// Canonical claim light + provenance for a (claim, productType). getClaimLight reads the
+// GLOBAL skuForm.productType, so temporarily point it at THIS sku's type (save/restore) to
+// read the correct CLAIMS_RULES block; provenance fields come off the same reconciled rule.
+function bdClaimInfo(claim, productType){
+  var saved = (typeof skuForm!=='undefined') ? skuForm.productType : undefined;
+  if(typeof skuForm!=='undefined') skuForm.productType = productType||'cosmetic';
+  var lit = {light:'amber', note:''};
+  try{ lit = getClaimLight(claim); }catch(e){}
+  var rules = (CLAIMS_RULES[productType]||CLAIMS_RULES.cosmetic)||{};
+  var rule = rules[String(claim).toLowerCase().trim()] || {};
+  if(typeof skuForm!=='undefined') skuForm.productType = saved;
+  return { light: lit.light, note: lit.note||'', source: rule.source||'', lastReviewed: rule.lastReviewed||'', reviewedBy: rule.reviewedBy||'' };
+}
+
+// ── Line Sheet — door-opener: multi-SKU, commercial, NO claim lights, NO private fields ──
+async function generateLineSheetPDF(){
+  const btn = (typeof event!=='undefined' && event) ? event.target : null;
+  if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
+  try{
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
+    pdfHeader(doc, (brand&&brand.name||'Brand')+' — Line Sheet',
+      (brand&&brand.category||'')+' · '+(((brand&&brand.targetMarkets)||[]).join(', ')||'Markets'), '#0E8C8C', pageW);
+    let y=40;
+    pdfSetFont(doc,'small'); pdfColor(doc,'#6B7280');
+    doc.text('Commercial range overview · retail prices · prepared from VeyaFlow-verified data', margin, y); y+=8;
+    const list = (typeof skus!=='undefined' && skus) ? skus : [];
+    if(!list.length){ pdfSetFont(doc,'body'); pdfColor(doc,'#111'); doc.text('No products on file.', margin, y); }
+    list.forEach(function(sku){
+      if(y>pageH-42){ doc.addPage(); y=20; }
+      pdfDrawLine(doc, margin, y, pageW-margin, y, '#DCEDED', 0.3); y+=5;
+      pdfSetFont(doc,'subheading'); pdfColor(doc,'#0C2A2E');
+      doc.text(bdVal(sku.name,'[VERIFY] product name'), margin, y); y+=5;
+      pdfSetFont(doc,'small'); pdfColor(doc,'#3D5559');
+      y = pdfWrap(doc, bdVal(sku.descEN), margin, y, contentW, 4) + 2;
+      const rsp = BD_RSP_KEYS.map(function(k){ return (sku[k]!=null && sku[k]!=='') ? (sku[k]+' '+BD_CURRENCY[k]) : null; }).filter(Boolean).join('   ·   ') || '— RSP not provided';
+      pdfSetFont(doc,'mono'); pdfColor(doc,'#0A6E6E');
+      y = pdfWrap(doc, 'RSP   '+rsp, margin, y, contentW, 4) + 1;
+      pdfColor(doc,'#3D5559');
+      doc.text('EAN '+bdVal(sku.ean,'—')+'    ·    MOQ '+bdVal(sku.moq,'—')+'    ·    Lead '+bdVal(sku.leadDays,'—')+' days', margin, y); y+=6;
+    });
+    pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
+    doc.text('VeyaFlow-standard line sheet · commercial terms only · no compliance status or cost data on this document', margin, pageH-10);
+    doc.save(((brand&&brand.name)||'brand').replace(/\s+/g,'_')+'_LineSheet.pdf');
+  }catch(e){ if(typeof alert!=='undefined') alert('Could not generate line sheet: '+(e&&e.message)); console.warn('Line sheet error', e); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Line Sheet'; } }
+}
+
+// ── Spec Sheet — data artifact: ONE per SKU, dense/factual, claim lights + provenance ──
+async function generateSpecSheetPDF(skuId){
+  const btn = (typeof event!=='undefined' && event) ? event.target : null;
+  if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
+  try{
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const list = (typeof skus!=='undefined' && skus) ? skus : [];
+    const sku = list.find(function(s){ return String(s.id)===String(skuId); }) || list[0];
+    if(!sku){ if(typeof alert!=='undefined') alert('No product to generate a spec sheet for.'); return; }
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
+    const isDevice = (sku.productType==='device' || sku.productType==='beauty_device');
+    pdfHeader(doc, bdVal(sku.name,'[VERIFY] product')+' — Spec Sheet',
+      (brand&&brand.name||'')+' · '+(isDevice?'Device':'Cosmetic'), '#0E8C8C', pageW);
+    let y=40;
+    function sectionTitle(t){ if(y>pageH-28){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#0A6E6E'); doc.text(t.toUpperCase(), margin, y); y+=2; pdfDrawLine(doc,margin,y,pageW-margin,y,'#C4E0E0',0.3); y+=5; }
+    function row(label,val){ if(y>pageH-18){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#3D5559'); doc.text(label, margin, y); pdfSetFont(doc,'body'); pdfColor(doc,'#0C2A2E'); y=pdfWrap(doc, bdVal(val), margin+52, y, contentW-52, 4.2)+1.8; }
+
+    sectionTitle('Identification');
+    row('Product name', sku.name);
+    row('EAN-13', sku.ean);
+    row('Article number', sku.articleNo);
+    row('Net content', (sku.netContent!=null && sku.netContent!=='') ? (sku.netContent+' '+(sku.netUnit||'')).trim() : null);
+    row('Country of manufacture', sku.countryOfMfr);
+    row('Shelf life (months)', sku.shelfLifeMonths);
+    y+=2;
+
+    sectionTitle(isDevice ? 'Technical specification' : 'Formulation');
+    if(isDevice){
+      row('Model number', sku.modelNo);
+      row('Voltage input', sku.voltageInput);
+      row('CE marking', sku.ceMarking===true ? 'Yes' : (sku.ceMarking ? String(sku.ceMarking) : '— not provided'));
+      row('Declaration of Conformity', sku.docOnFile ? 'On file' : '— not provided');
+      row('Material composition', sku.materialComposition);
+      row('Certifications', Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications);
+    } else {
+      row('INCI list', sku.inci);
+    }
+    y+=2;
+
+    // Commercial — RETAIL prices only. exWorksCost / netPriceSEK / vatRate are NEVER read here.
+    sectionTitle('Commercial (retail)');
+    BD_RSP_KEYS.forEach(function(k){ if(sku[k]!=null && sku[k]!==''){ row((SKU_FIELDS.find(function(f){return f.key===k;})||{}).label||k, sku[k]); } });
+    row('MOQ', sku.moq);
+    row('Lead time (days)', sku.leadDays);
+    y+=2;
+
+    // Claim status — canonical engine, never-color-alone (mark + word + colour).
+    sectionTitle('Claim status (VeyaFlow-verified)');
+    pdfSetFont(doc,'small'); pdfColor(doc,'#7FA0A2');
+    doc.text('Light = reconciled verdict across target markets: '+(((brand&&brand.targetMarkets)||[]).join(', ')||'—'), margin, y); y+=5;
+    const claims = Array.isArray(sku.claims) ? sku.claims : [];
+    const LHEX={green:'#0F7A52',amber:'#A85D14',red:'#B32A1F'}, LWORD={green:'OK',amber:'Conditional',red:'Do not use'}, LMARK={green:'[check]',amber:'[!]',red:'[x]'};
+    let prov=null;
+    if(!claims.length){ pdfSetFont(doc,'small'); pdfColor(doc,'#7FA0A2'); doc.text('No claims declared for this product.', margin, y); y+=5; }
+    claims.forEach(function(c){
+      if(y>pageH-22){doc.addPage(); y=20;}
+      const info = bdClaimInfo(c, sku.productType);
+      if(!prov && info.source) prov = info;
+      pdfSetFont(doc,'body'); pdfColor(doc, LHEX[info.light]||'#3D5559');
+      doc.text((LMARK[info.light]||'[?]')+'  '+(LWORD[info.light]||'Verify')+' — '+c, margin, y); y+=4.4;
+      if(info.note){ pdfSetFont(doc,'small'); pdfColor(doc,'#3D5559'); y=pdfWrap(doc, info.note, margin+6, y, contentW-6, 3.6)+1.5; }
+    });
+    y+=2;
+
+    sectionTitle('Regulatory status');
+    row('CPNP notification', sku.cpnp);
+    const rp = brand && brand.euResponsible;
+    row('EU Responsible Person', (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '— not provided');
+    if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate);
+
+    // Provenance footer — the verified-provenance stamp.
+    if(y>pageH-26){doc.addPage(); y=20;}
+    y=Math.max(y, pageH-24);
+    pdfDrawLine(doc, margin, y, pageW-margin, y, '#C4E0E0', 0.3); y+=4;
+    pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
+    if(prov){
+      doc.text('Claim provenance: '+(prov.source||'—')+' · reviewed '+(prov.lastReviewed||'not yet reviewed')+' · by '+(prov.reviewedBy||'—'), margin, y); y+=3.6;
+    } else if(claims.length){
+      doc.text('Claim provenance: not recorded for these claims — verify before relying.', margin, y); y+=3.6;
+    }
+    doc.text('VeyaFlow-standard spec sheet · generated from verified canonical data · '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), margin, y);
+    doc.save((bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf');
+  }catch(e){ if(typeof alert!=='undefined') alert('Could not generate spec sheet: '+(e&&e.message)); console.warn('Spec sheet error', e); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Spec Sheet'; } }
 }
 
 function pdfFooter(doc, pageNum, totalPages, pageW, pageH){
