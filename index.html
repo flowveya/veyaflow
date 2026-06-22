@@ -1152,6 +1152,7 @@
     <div class="page" id="page-retail-templates"></div>
     <div class="page" id="page-compliance-cal"></div>
     <div class="page" id="page-seasonal"></div>
+    <div class="page" id="page-buyer-docs"></div>
     <div class="page" id="page-retail-checklist"></div>
     <div class="page" id="page-retail-performance"></div>
     <div class="page" id="page-retail-comms"></div>
@@ -4047,6 +4048,7 @@ const NAV=[
   {id:"retail-tracker",    sec:"retail", group:"sell", icon:"⟳", label:"Submission Tracker", stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-templates",  sec:"retail", group:"sell", icon:"◫", label:"Article Templates",  stages:["trading","expanding","scaling"], cats:null},
   {id:"seasonal",          sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18M8 2v4M16 2v4\"/></svg>", label:"Seasonal Calendar", stages:["trading","expanding","scaling"], cats:null},
+  {id:"buyer-docs",        sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M6 2h9l5 5v15a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0Z\"/><path d=\"M14 2v6h6M9 13h6M9 17h4\"/></svg>", label:"Buyer Documents", stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-checklist",  sec:"retail", group:"sell", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-performance",sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 3v18h18\"/><path d=\"m7 14 3-3 3 2 5-6\"/></svg>", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-comms",      sec:"retail", group:"sell", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
@@ -4056,7 +4058,7 @@ const NAV=[
 const NAV_GROUPS=[
   {key:"home",    label:"Home",     q:"your workspace",       ids:["home"]},
   {key:"comply",  label:"Comply",   q:"legal to sell?",       ids:["claims","reg_monitor","compliance-cal","rp-marketplace","dpp","csrd"]},
-  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","seasonal","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
+  {key:"sell",    label:"Sell",     q:"land & grow accounts", ids:["retail-templates","seasonal","buyer-docs","retail-tracker","retail-checklist","retail-comms","retail-performance","crm"]},
   {key:"mybrand", label:"My Brand", q:"my assets & records",  ids:["skus","brandpack"]},
 ];
 
@@ -4233,6 +4235,7 @@ const NAV_SUBTITLES = {
   'retail-templates':'Generate retailer masterdata',
   'compliance-cal':'Upcoming regulatory deadlines',
   'seasonal':'Upcoming retailer seasonal windows',
+  'buyer-docs':'Line sheets & spec sheets from verified data',
   'retail-checklist':'Everything needed to go live',
   'retail-performance':'Track sell-through per retailer',
   'retail-comms':'Log every buyer interaction',
@@ -4774,6 +4777,7 @@ function renderPage(id){
   else if(id==='retail-templates'){ renderRetailTemplates(el); }
   else if(id==='compliance-cal'){ renderComplianceCalendarPage(el); }
   else if(id==='seasonal'){ renderSeasonalCalendar(el); }
+  else if(id==='buyer-docs'){ renderBuyerDocs(el); }
   else if(id==='retail-checklist'){ loadRetailChecklist(); renderRetailChecklist(el); }
   else if(id==='retail-performance'){ loadRetailPerformance(); renderRetailPerformance(el); }
   else if(id==='retail-comms'){ loadRetailComms(); renderRetailComms(el); }
@@ -28716,6 +28720,69 @@ async function generateSpecSheetPDF(skuId){
     doc.save((bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf');
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate spec sheet: '+(e&&e.message)); console.warn('Spec sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Spec Sheet'; } }
+}
+
+/* ═══════════════════════════════════════════════════
+   BUYER-DOCS — Part 2: source-selector page (SELL lane)
+   Wires the ONE live path (standard generate → Part 1 generators). Branded (Part 3)
+   and Upload (Part 4) are HONEST placeholders: branded generates the standard version
+   with a visible note; upload shows the picker but stores/checks NOTHING yet.
+═══════════════════════════════════════════════════ */
+function renderBuyerDocs(el){
+  if(!el) return;
+  if(!brand){ el.innerHTML='<div style="padding:24px 20px;color:var(--ink-mute)">Set up your brand workspace first.</div>'; return; }
+  var list=(typeof skus!=='undefined' && skus)?skus:[];
+  var skuOpts=list.map(function(s){ return '<option value="'+escapeHtml(String(s.id))+'">'+escapeHtml(s.name||String(s.id)||'Unnamed')+'</option>'; }).join('');
+  var cardCss='border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)';
+  var hCss='font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.5rem';
+  var pCss='font-size:.8rem;color:var(--ink-soft);line-height:1.5';
+  var rowCss='display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem';
+  var soon='<div style="font-family:var(--mono);font-size:.58rem;color:var(--ink-mute);margin-top:.55rem;line-height:1.5">Branded styling and bring-your-own upload (+ PDF claims check) are coming in a later release — today the live option generates the VeyaFlow-standard version.</div>';
+
+  el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
+    '<div class="head"><h1>Buyer documents</h1></div>'+
+    '<p class="sub">Generate a line sheet or a per-product spec sheet from your VeyaFlow-verified data — three ways to produce each; only the standard generator is live today.</p>'+
+
+    '<div style="'+cardCss+'">'+
+      '<div style="'+hCss+'">Line sheet · door-opener</div>'+
+      '<div style="'+pCss+'">Your whole range on one commercial document — retail prices, MOQ, lead time. No compliance status, no cost data.</div>'+
+      '<div style="'+rowCss+'">'+
+        '<button class="btn-primary" onclick="generateLineSheetPDF()" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
+        '<button class="btn-outline" onclick="bdBrandedComingSoon(\'line\')" style="font-size:.7rem">Generate, branded</button>'+
+        '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
+      '</div>'+soon+
+    '</div>'+
+
+    '<div style="'+cardCss+'">'+
+      '<div style="'+hCss+'">Spec sheet · data artifact (per product)</div>'+
+      '<div style="'+pCss+'">One per product: identification, formulation/technical, retail terms, and claim status with verified provenance.</div>'+
+      (list.length
+        ? '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.7rem"><label style="'+hCss+';margin:0">Product</label>'+
+            '<select id="bd-spec-sku" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
+          '<div style="'+rowCss+'">'+
+            '<button class="btn-primary" onclick="generateSpecSheetPDF(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
+            '<button class="btn-outline" onclick="bdBrandedComingSoon(\'spec\')" style="font-size:.7rem">Generate, branded</button>'+
+            '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
+          '</div>'+soon
+        : '<div style="margin-top:.7rem;padding:.6rem .8rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:9px;font-size:.78rem;color:var(--ink-soft)">No products yet — <span onclick="showPage(\'skus\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">add a product</span> to generate a spec sheet.</div>')+
+    '</div>'+
+
+    '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdUploadComingSoon(this)">'+
+  '</div>';
+}
+
+// Branded (Part 3 pending): generate the STANDARD version + honest note. setTimeout decouples
+// from the click event so the generators' button-state logic doesn't relabel the branded button.
+function bdBrandedComingSoon(kind){
+  if(typeof showSuccess==='function') showSuccess('Branded styling is coming soon — generating the VeyaFlow-standard version.');
+  var skuId=null;
+  if(kind!=='line'){ var sel=document.getElementById('bd-spec-sku'); skuId=sel?sel.value:null; }
+  setTimeout(function(){ if(kind==='line') generateLineSheetPDF(); else generateSpecSheetPDF(skuId); }, 60);
+}
+// Upload (Part 4 pending): show the picker but store/check NOTHING — honest placeholder.
+function bdUploadComingSoon(input){
+  if(input) input.value='';
+  if(typeof showSuccess==='function') showSuccess('Upload handling + claims check arrives in a later release.');
 }
 
 function pdfFooter(doc, pageNum, totalPages, pageW, pageH){
