@@ -28680,6 +28680,7 @@ async function generateLineSheetPDF(branded){
     var _lsName=((b.name)||'brand').replace(/\s+/g,'_')+'_LineSheet'+(useBrand?'_branded':'')+'.pdf';
     doc.save(_lsName);
     try{ bdStoreVersion('line', {kind:'generated', filename:_lsName, integrity:_lsHash}); }catch(e){}
+    try{ if(typeof bdRefreshLineHistory==='function') bdRefreshLineHistory(); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate line sheet: '+(e&&e.message)); console.warn('Line sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Line Sheet'; } }
 }
@@ -28785,7 +28786,8 @@ async function generateSpecSheetPDF(skuId){
     doc.text('Document ID: '+_ssId+' · content fingerprint identifying this version — not a certification', margin, y);
     var _ssName=(bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf';
     doc.save(_ssName);
-    try{ bdStoreVersion('spec', {kind:'generated', filename:_ssName, integrity:_ssHash}); }catch(e){}
+    try{ bdStoreVersion('spec:'+sku.id, {kind:'generated', filename:_ssName, integrity:_ssHash}); }catch(e){}
+    try{ if(typeof bdRefreshSpecHistory==='function') bdRefreshSpecHistory(String(sku.id)); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate spec sheet: '+(e&&e.message)); console.warn('Spec sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Spec Sheet'; } }
 }
@@ -28800,7 +28802,10 @@ function renderBuyerDocs(el){
   if(!el) return;
   if(!brand){ el.innerHTML='<div style="padding:24px 20px;color:var(--ink-mute)">Set up your brand workspace first.</div>'; return; }
   var list=(typeof skus!=='undefined' && skus)?skus:[];
-  var skuOpts=list.map(function(s){ return '<option value="'+escapeHtml(String(s.id))+'">'+escapeHtml(s.name||String(s.id)||'Unnamed')+'</option>'; }).join('');
+  // Spec history is per-product: keep the selected product across re-renders so its
+  // history (and the <select>) stay in sync. Default to the first product.
+  var curSpec = (_bdSpecSku && list.some(function(s){return String(s.id)===_bdSpecSku;})) ? _bdSpecSku : (list[0]?String(list[0].id):'');
+  var skuOpts=list.map(function(s){ var sv=String(s.id); return '<option value="'+escapeHtml(sv)+'"'+(sv===curSpec?' selected':'')+'>'+escapeHtml(s.name||sv||'Unnamed')+'</option>'; }).join('');
   var cardCss='border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)';
   var hCss='font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.5rem';
   var pCss='font-size:.8rem;color:var(--ink-soft);line-height:1.5';
@@ -28840,7 +28845,7 @@ function renderBuyerDocs(el){
         '<button class="btn-outline" onclick="bdOpenUpload(\'line\')" style="font-size:.7rem">Bring your own (upload)</button>'+
       '</div>'+
       '<div style="'+noteCss+'">Branded applies your logo/colours/typeface to the header only — structure, field order and data stay VeyaFlow-controlled. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record; nothing is submitted.</div>'+
-      bdVersionHistoryHtml('line')+
+      '<div id="bd-line-history">'+bdVersionHistoryHtml('line')+'</div>'+
     '</div>'+
 
     // ── Spec sheet (stays VeyaFlow-standard — compliance artifact) ──
@@ -28849,14 +28854,14 @@ function renderBuyerDocs(el){
       '<div style="'+pCss+'">One per product: identification, formulation/technical, retail terms, and claim status with verified provenance.</div>'+
       (list.length
         ? '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.7rem"><label style="'+hCss+';margin:0">Product</label>'+
-            '<select id="bd-spec-sku" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
+            '<select id="bd-spec-sku" onchange="bdRefreshSpecHistory(this.value)" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
           '<div style="'+rowCss+'">'+
             '<button class="btn-primary" onclick="generateSpecSheetPDF(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
             '<button class="btn-outline" onclick="bdSpecBrandedNote(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, branded</button>'+
             '<button class="btn-outline" onclick="bdOpenUpload(\'spec\')" style="font-size:.7rem">Bring your own (upload)</button>'+
           '</div>'+
           '<div style="'+noteCss+'">Spec sheets stay VeyaFlow-standard — a buyer scrutinising INCI / claims should see the trusted neutral look. Branding does not skin the compliance artifact. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record.</div>'+
-          bdVersionHistoryHtml('spec')
+          '<div id="bd-spec-history">'+bdVersionHistoryHtml('spec:'+curSpec)+'</div>'
         : '<div style="margin-top:.7rem;padding:.6rem .8rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:9px;font-size:.78rem;color:var(--ink-soft)">No products yet — <span onclick="showPage(\'skus\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">add a product</span> to generate a spec sheet.</div>')+
     '</div>'+
 
@@ -28917,6 +28922,7 @@ const BD_MAX_VERSIONS = 5;
 const BD_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;   // mirror BIL's 25MB ceiling
 let _bdPendingDocType = 'line';
 let _bdLastScan = null;                          // transient panel state; survives re-render via this var
+let _bdSpecSku = '';                             // which product's spec history the card shows (spec is per-PRODUCT)
 
 // ── picker plumbing: remember which doc-type slot the upload is for ──
 function bdOpenUpload(docType){
@@ -28925,6 +28931,20 @@ function bdOpenUpload(docType){
   if(inp){ inp.value=''; inp.click(); }
 }
 function _bdRerender(){ var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el); }
+// Spec history is per-PRODUCT (docType key 'spec:'+skuId). Refresh just that block on
+// product-switch or after a generate/upload — no full-page re-render needed.
+function bdRefreshSpecHistory(skuId){
+  if(skuId!=null && skuId!=='') _bdSpecSku=String(skuId);
+  var sel=document.getElementById('bd-spec-sku');
+  if(sel && _bdSpecSku && sel.value!==_bdSpecSku) sel.value=_bdSpecSku;
+  var el=document.getElementById('bd-spec-history');
+  if(el) el.innerHTML = bdVersionHistoryHtml('spec:'+(_bdSpecSku||''));
+}
+// Line sheet is a single multi-product list ('line') — refresh its block after generate.
+function bdRefreshLineHistory(){
+  var el=document.getElementById('bd-line-history');
+  if(el) el.innerHTML = bdVersionHistoryHtml('line');
+}
 function bdShowScanBusy(docType, filename){ _bdLastScan={docType:docType, filename:filename, busy:true}; _bdRerender(); }
 function bdShowScanError(docType, msg){ _bdLastScan={docType:docType, error:msg}; _bdRerender(); }
 
@@ -29033,7 +29053,10 @@ async function bdHandleUpload(input){
   catch(e){ bdShowScanError(docType, 'Could not read this PDF — it may be corrupt or password-protected.'); return; }
   var noText = !(text && text.replace(/\s/g,'').length);
   var hits = noText ? [] : bdRunClaimsScan(text);
-  var rec = bdStoreVersion(docType, {kind:'uploaded', filename:file.name, size:file.size,
+  // Spec uploads are per-PRODUCT — key by the spec card's selected product (mirrors generate).
+  var storeKey = docType;
+  if(docType==='spec'){ var _ssel=document.getElementById('bd-spec-sku'); var _sid=_ssel?_ssel.value:''; if(_sid){ storeKey='spec:'+_sid; _bdSpecSku=String(_sid); } }
+  var rec = bdStoreVersion(storeKey, {kind:'uploaded', filename:file.name, size:file.size,
                                      integrity:integrity, scanCount:hits.length, textLen:(text||'').length, noText:noText});
   if(typeof showSuccess==='function'){
     showSuccess('Stored '+(docType==='spec'?'spec sheet':'line sheet')+(rec?(' v'+rec.v):'')+' — local versioning only, nothing submitted.');
