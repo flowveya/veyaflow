@@ -28664,9 +28664,22 @@ async function generateLineSheetPDF(branded){
       pdfColor(doc,'#3D5559');
       doc.text('EAN '+bdVal(sku.ean,'—')+'    ·    MOQ '+bdVal(sku.moq,'—')+'    ·    Lead '+bdVal(sku.leadDays,'—')+' days', margin, y); y+=6;
     });
+    // ── Integrity stamp (Part 5): SHA-256 fingerprint over the canonical SOURCE DATA
+    //    (brand + sku snapshot) — NOT the timestamp, so identical data reproduces the same
+    //    Document ID and any content change changes it. Version identity / tamper-evidence,
+    //    NOT a certification or signature. Reuses _atmHashContent (no new hasher).
+    var _lsCanon = JSON.stringify({ t:'line', brand:b.name||'', cat:b.category||'', mkts:(b.targetMarkets||[]),
+      skus:list.map(function(s){ var rsp={}; BD_RSP_KEYS.forEach(function(k){ if(s[k]!=null&&s[k]!=='') rsp[k]=s[k]; });
+        return {n:s.name||'', d:s.descEN||'', rsp:rsp, ean:s.ean||'', moq:s.moq||'', lead:s.leadDays||''}; }) });
+    var _lsHash=''; try{ _lsHash=await _atmHashContent(_lsCanon); }catch(e){}
+    var _lsId=(_lsHash && _lsHash!=='unavailable') ? _lsHash.slice(0,12) : 'unavailable';
+    var _lsDate=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
     doc.text((useBrand?'Branded line sheet · brand identity applied to header only — structure & data VeyaFlow-controlled':'VeyaFlow-standard line sheet')+' · commercial terms only · no compliance status or cost data', margin, pageH-10);
-    doc.save(((b.name)||'brand').replace(/\s+/g,'_')+'_LineSheet'+(useBrand?'_branded':'')+'.pdf');
+    doc.text('Document ID: '+_lsId+' · generated '+_lsDate+' from VeyaFlow-verified data · content fingerprint, not a certification', margin, pageH-6);
+    var _lsName=((b.name)||'brand').replace(/\s+/g,'_')+'_LineSheet'+(useBrand?'_branded':'')+'.pdf';
+    doc.save(_lsName);
+    try{ bdStoreVersion('line', {kind:'generated', filename:_lsName, integrity:_lsHash}); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate line sheet: '+(e&&e.message)); console.warn('Line sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Line Sheet'; } }
 }
@@ -28743,9 +28756,24 @@ async function generateSpecSheetPDF(skuId){
     row('EU Responsible Person', (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '— not provided');
     if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate);
 
+    // ── Integrity stamp (Part 5): SHA-256 fingerprint over the canonical SOURCE DATA
+    //    (sku snapshot + claim verdicts + RP) — NOT the timestamp, so identical data
+    //    reproduces the same Document ID and any content change changes it. Version
+    //    identity / tamper-evidence, NOT a certification. Reuses _atmHashContent.
+    var _ssCanon = JSON.stringify({ t:'spec', brand:(brand&&brand.name)||'',
+      sku:{ n:sku.name||'', ean:sku.ean||'', art:sku.articleNo||'', nc:sku.netContent||'', nu:sku.netUnit||'',
+            com:sku.countryOfMfr||'', sl:sku.shelfLifeMonths||'', dev:isDevice, model:sku.modelNo||'',
+            volt:sku.voltageInput||'', ce:sku.ceMarking||'', doc:sku.docOnFile||'', mat:sku.materialComposition||'',
+            inci:sku.inci||'', rsp:(function(){var r={};BD_RSP_KEYS.forEach(function(k){if(sku[k]!=null&&sku[k]!=='')r[k]=sku[k];});return r;})(),
+            moq:sku.moq||'', lead:sku.leadDays||'' },
+      claims: claims.map(function(c){ var i=bdClaimInfo(c,sku.productType); return {c:c,l:i.light}; }),
+      rp:(brand&&brand.euResponsible&&brand.euResponsible.name)||'' });
+    var _ssHash=''; try{ _ssHash=await _atmHashContent(_ssCanon); }catch(e){}
+    var _ssId=(_ssHash && _ssHash!=='unavailable') ? _ssHash.slice(0,12) : 'unavailable';
+
     // Provenance footer — the verified-provenance stamp.
-    if(y>pageH-26){doc.addPage(); y=20;}
-    y=Math.max(y, pageH-24);
+    if(y>pageH-30){doc.addPage(); y=20;}
+    y=Math.max(y, pageH-28);
     pdfDrawLine(doc, margin, y, pageW-margin, y, '#C4E0E0', 0.3); y+=4;
     pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
     if(prov){
@@ -28753,8 +28781,11 @@ async function generateSpecSheetPDF(skuId){
     } else if(claims.length){
       doc.text('Claim provenance: not recorded for these claims — verify before relying.', margin, y); y+=3.6;
     }
-    doc.text('VeyaFlow-standard spec sheet · generated from verified canonical data · '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), margin, y);
-    doc.save((bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf');
+    doc.text('VeyaFlow-standard spec sheet · generated from verified canonical data · '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), margin, y); y+=3.6;
+    doc.text('Document ID: '+_ssId+' · content fingerprint identifying this version — not a certification', margin, y);
+    var _ssName=(bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf';
+    doc.save(_ssName);
+    try{ bdStoreVersion('spec', {kind:'generated', filename:_ssName, integrity:_ssHash}); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate spec sheet: '+(e&&e.message)); console.warn('Spec sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Spec Sheet'; } }
 }
@@ -28905,14 +28936,18 @@ function bdVersionsFor(docType){
   var b = bdLoadDocStore()[bdBrandKey()];
   return (b && b[docType]) ? b[docType].slice() : [];
 }
-function bdStoreVersion(docType, file, hits, textLen, noText){
+// Unified version record — used by BOTH uploaded (Part 4) and generated (Part 5) docs.
+// meta carries: kind('uploaded'|'generated'), filename, size, integrity(hash), scanCount,
+// textLen, noText. The store is one list per brand→docType, so generated + uploaded
+// interleave in a single newest-first history. Last BD_MAX_VERSIONS kept. Local only.
+function bdStoreVersion(docType, meta){
   var store=bdLoadDocStore(), bk=bdBrandKey();
   if(!store[bk]) store[bk]={};
   if(!store[bk][docType]) store[bk][docType]=[];
   var arr=store[bk][docType];
   var v=(arr.length ? (arr[arr.length-1].v||arr.length) : 0) + 1;
-  var rec={ v:v, ts:new Date().toISOString(), filename:String(file.name||''), size:file.size||0,
-            scanCount:(hits?hits.length:0), textLen:textLen||0, noText:!!noText };
+  var rec=Object.assign({ v:v, ts:new Date().toISOString(), kind:'uploaded', filename:'', size:0,
+                          integrity:'', scanCount:0, textLen:0, noText:false }, meta||{});
   arr.push(rec);
   if(arr.length>BD_MAX_VERSIONS) store[bk][docType]=arr.slice(arr.length-BD_MAX_VERSIONS);
   bdSaveDocStore(store);
@@ -28922,10 +28957,9 @@ function bdStoreVersion(docType, file, hits, textLen, noText){
 // ── text extraction: reuse the BIL pdf.js path (loadPdfJs + getDocument), read TEXT ──
 // BIL renders pages to images for Vision; here we want text, so we use the library's
 // getTextContent across pages. Same loader, same getDocument — no new dependency.
-async function bdExtractPdfText(file){
+async function bdExtractPdfText(buf){
   await loadPdfJs();
   if(!window.pdfjsLib) throw new Error('PDF engine unavailable.');
-  var buf = await file.arrayBuffer();
   var pdf = await window.pdfjsLib.getDocument({ data:new Uint8Array(buf) }).promise;
   var cap = Math.min(pdf.numPages, 30);   // sanity cap — a line/spec sheet is a few pages
   var parts=[];
@@ -28990,12 +29024,17 @@ async function bdHandleUpload(input){
     bdShowScanError(docType, 'File too large — '+(file.size/1024/1024).toFixed(1)+'MB. Maximum is 25MB.'); return;
   }
   bdShowScanBusy(docType, file.name);
-  var text='';
-  try{ text=await bdExtractPdfText(file); }
+  var text='', integrity='';
+  try{
+    var buf = await file.arrayBuffer();
+    integrity = await _atmHashContent(buf);   // fingerprint of the actual bytes — BEFORE pdf.js may detach the buffer
+    text = await bdExtractPdfText(buf);
+  }
   catch(e){ bdShowScanError(docType, 'Could not read this PDF — it may be corrupt or password-protected.'); return; }
   var noText = !(text && text.replace(/\s/g,'').length);
   var hits = noText ? [] : bdRunClaimsScan(text);
-  var rec = bdStoreVersion(docType, file, hits, (text||'').length, noText);
+  var rec = bdStoreVersion(docType, {kind:'uploaded', filename:file.name, size:file.size,
+                                     integrity:integrity, scanCount:hits.length, textLen:(text||'').length, noText:noText});
   if(typeof showSuccess==='function'){
     showSuccess('Stored '+(docType==='spec'?'spec sheet':'line sheet')+(rec?(' v'+rec.v):'')+' — local versioning only, nothing submitted.');
   }
@@ -29009,10 +29048,12 @@ function bdVersionHistoryHtml(docType){
   if(!arr.length) return '';
   var rows=arr.slice().reverse().map(function(r){
     var d=''; try{ d=new Date(r.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ d=String(r.ts||''); }
-    var status = r.noText ? 'no text read' : (r.scanCount>0 ? (r.scanCount+' flagged') : 'none recognised');
+    var kind = (r.kind==='generated') ? 'generated' : 'uploaded';
+    var status = (r.kind==='generated') ? 'generated' : (r.noText ? 'no text read' : (r.scanCount>0 ? (r.scanCount+' flagged') : 'none recognised'));
+    var idTxt = (r.integrity && r.integrity!=='unavailable') ? r.integrity.slice(0,12) : (r.integrity==='unavailable' ? 'id n/a' : '—');
     return '<div style="display:flex;justify-content:space-between;gap:.6rem;font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);padding:.28rem 0;border-top:1px solid var(--line)">'+
-      '<span>v'+r.v+' · '+escapeHtml(r.filename||'')+'</span>'+
-      '<span style="color:var(--ink-mute)">'+escapeHtml(d)+' · '+status+'</span></div>';
+      '<span>v'+r.v+' · '+kind+' · '+escapeHtml(r.filename||'')+'</span>'+
+      '<span style="color:var(--ink-mute)">'+escapeHtml(d)+' · '+status+' · ID '+escapeHtml(idTxt)+'</span></div>';
   }).join('');
   return '<div style="margin-top:.8rem">'+
     '<div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute)">Your uploads · stored locally on this device, nothing submitted</div>'+
