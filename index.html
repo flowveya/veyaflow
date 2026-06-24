@@ -1197,11 +1197,12 @@ const SUSTAINABILITY_GOALS = [
 ];
 
 const NEXT_STEPS = {
-  idea:     [{icon:"◌",label:"Find a manufacturer",page:"find",desc:"Source verified, sustainable factories already compliant with your target markets"},{icon:"◎",label:"Validate the market",page:"report",desc:"Market sizing, retail landscape and compliance requirements before you commit"}],
-  product:  [{icon:"◎",label:"Generate a market entry report",page:"report",desc:"Full market intelligence — retail landscape, pricing, compliance checklist, 90-day plan"},{icon:"⇄",label:"Compare target markets",page:"compare",desc:"Side-by-side analysis to pick the right market to enter first"}],
-  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer email in the retailer's language, personalised to their priorities"},{icon:"◎",label:"Open a new market",page:"report",desc:"Intelligence report for your next market entry — retailer map, compliance, pricing"}],
-  expanding:[{icon:"◈",label:"Audit supplier compliance",page:"suppliers",desc:"Risk-score your supply chain and auto-chase missing data before retailers ask for it"},{icon:"⇄",label:"Prioritise your next market",page:"compare",desc:"Data-driven comparison to decide where to expand next"}],
-  scaling:  [{icon:"◈",label:"Supply chain risk report",page:"suppliers",desc:"Identify and remediate high-risk suppliers — EUDR, audit status, data gaps"},{icon:"◉",label:"ESPR deadstock routing",page:"circular",desc:"Route unsold inventory to verified circular partners, generate Article 24 disclosure"}],
+  // Live destinations only (parked pages removed). Per-stage picks are sensible defaults — Strategy-tunable.
+  idea:     [{icon:"▦",label:"Add your products",page:"skus",desc:"Build your product hub — everything in VeyaFlow reads from here"},{icon:"◎",label:"Check what you can claim",page:"claims",desc:"See which claims are defensible in your target markets before you commit"}],
+  product:  [{icon:"◎",label:"Check what you can claim",page:"claims",desc:"Run the Claim Localizer across your target markets before you print or pitch"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets from your verified data"}],
+  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"retail-comms",desc:"AI-drafted buyer email in the retailer's language, personalised to their priorities"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send with your pitch"}],
+  expanding:[{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Produce the line sheet and spec sheets retailers ask for"},{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Follow every retailer submission and chase stalled reviews"}],
+  scaling:  [{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Keep every retailer submission moving and spot stalls early"},{icon:"◉",label:"Plan your seasonal calendar",page:"seasonal",desc:"Line up buyer windows and seasonal ranges for your next push"}],
 };
 
 // confidence/market/actionLabel added 19 Jun 2026 (Compliance Calendar v1). ADDITIVE —
@@ -7237,7 +7238,7 @@ function renderReadinessHero(){
   var numColor='var(--accent)'; /* hero numeral + spine + bar tip: teal ALL tiers (brand identity); tier label carries status signal */
   var label=pct>=85?'Listing ready':pct>=70?'Pitch ready':pct>=50?'Nearly ready':'Building';
   var topBlocker=bestBlockers.filter(function(b){return b.level==='red';})[0]||bestBlockers[0];
-  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;pitch&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
+  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;retail-comms&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
   return '<div class="hero">'+
     '<div class="hero-row">'+
       '<div class="hero-num">'+pct+'<small>/100</small></div>'+
@@ -7308,8 +7309,7 @@ function renderNextActions(){
   // via requiredRetailers). This deduplicates the alert and ensures all retailers
   // are equal in the system — the brand's targeting determines what surfaces.
 
-  if(!savedReports.length)
-    actions.push({icon:'◎',label:'Generate your first Market Report',desc:'Full intelligence brief for your target market',page:'report',time:'3 min'});
+  // (Market Report next-action removed — report is launch-parked, no live equivalent.)
 
   const steps = NEXT_STEPS[brand.stage]||NEXT_STEPS.trading||[];
   steps.slice(0, 3-actions.length).forEach(s=>actions.push({icon:s.icon,label:s.label,desc:s.desc,page:s.page,time:'5 min'}));
@@ -7421,7 +7421,7 @@ const COMPLIANCE_RADAR_ITEMS = [
   // goods on the Italian market. Pattern matches FTI / Grønt Punkt.
   {id:'conai_it',      label:'CONAI packaging register',       categories:['all'],                      markets:['Italy'],                       check:(b,s)=>b?.conaiRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register with CONAI for Italian packaging compliance'},
   // Norway
-  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
+  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'', actionLabel:''},
   // Norwegian VAT (MVA) — registration required only when annual NO sales exceed NOK 50,000.
   // Below threshold + confirmed → info. Threshold unknown → amber. Above + unregistered → red. Registered → green.
   {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],
@@ -7448,7 +7448,7 @@ const COMPLIANCE_RADAR_ITEMS = [
     },
   },
   // Cross-category
-  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>isEudrCompliant(s?.eudrStatus)||isEudrCompliant(b?.eudrStatus)?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
+  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>isEudrCompliant(s?.eudrStatus)||isEudrCompliant(b?.eudrStatus)?'green':'amber', actionPage:'', actionLabel:''},
   {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
   {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
 ];
@@ -7555,7 +7555,7 @@ function renderComplianceRadar(){
 
   return `
     <div class="card">
-      <div class="card-h">Compliance radar <a onclick="showPage('report')">Full report <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+      <div class="card-h">Compliance radar</div>
       <div class="csum${csumCls}">
         <div class="big">${criticalCount?`${criticalCount} critical gap${criticalCount>1?'s':''} · `:''}${reds.length} red · ${ambers.length} action${ambers.length!==1?'s':''}</div>
         <div class="sub">${relevant.length} regulation${relevant.length!==1?'s':''} applicable · ${greens.length} covered${infos.length?` · ${infos.length} below threshold`:''}</div>
@@ -7716,22 +7716,10 @@ function renderDashboard(el){
 
         ${renderTargetRetailersPicker()}
 
-        <div style="margin-top:24px">
-          <div class="sec-lbl">Saved reports <span class="ct">${savedReports.length}</span></div>
-          ${reports.length===0?smartEmpty("report"):reports.map(r=>`
-            ${renderContextFixNotice(r.id)}
-            <div class="saved-report" onclick="expandReport('${r.id}')">
-              <div style="display:flex;justify-content:space-between">
-                <div>
-                  <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
-                  <div class="saved-report-name">${r.brandName}</div>
-                  <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
-                </div>
-                <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red-text);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
+        <!-- Saved-reports section removed (parked-routing sweep): the Market Report feature
+             is launch-parked. Both its empty state and its saved-report cards routed into
+             that parked feature from the live home. Restore this block when the report
+             feature un-parks. -->
 
         ${renderSupplierRiskAlerts()}
 
@@ -16592,7 +16580,6 @@ function renderBrandPackResult(el){
       <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
         <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← New pack</button>
         <button class="btn-gold" onclick="showPage('retail-comms')">Draft buyer email →</button>
-        <button class="btn-outline" onclick="showPage('bizcase')">Build business case →</button>
       </div>
     </div>
   `;
@@ -21333,7 +21320,7 @@ const PIF_REQUIREMENTS = [
   {id:'safety_assess', section:'B', label:'Safety Assessment',                description:'Signed by EU-qualified safety assessor. Must reference EU Regulation 1223/2009 Annex I.', check: (b,s)=>!!(s?.safetyAssessment||s?.safetyAssessor||b?.safetyAssessment), fixPage:'skus', fixLabel:'Upload safety report', severity:'blocker'},
   {id:'safety_profile',section:'B', label:'Cosmetic safety profile',          description:'Physicochemical + microbiological specifications; impurity levels; packaging compatibility.',check: ()=>false,                               fixPage:null,       fixLabel:'Compile safety profile',severity:'required'},
   // C. Manufacturing method
-  {id:'gmp',           section:'C', label:'GMP certificate or statement',     description:'ISO 22716 compliance certificate or signed statement from manufacturer.',                  check: (b,s)=>!!(s?.gmpCert||s?.gmpStatement||s?.gmp), fixPage:'sourcing', fixLabel:'Request from mfr', severity:'required'},
+  {id:'gmp',           section:'C', label:'GMP certificate or statement',     description:'ISO 22716 compliance certificate or signed statement from manufacturer.',                  check: (b,s)=>!!(s?.gmpCert||s?.gmpStatement||s?.gmp), fixPage:null, fixLabel:'Request from mfr', severity:'required'},
   // D. Proof of claimed effects
   {id:'claims_proof',  section:'D', label:'Claims substantiation',            description:'Evidence for each claim: clinical study, consumer test, expert opinion, or literature ref.',check: ()=>false,                               fixPage:'claims',   fixLabel:'Build claims evidence',severity:'required'},
   // E. Animal testing data
@@ -25360,7 +25347,6 @@ function renderSupplierRiskAlerts(){
     <div style="margin-bottom:1.25rem">
       <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;justify-content:space-between">
         <span>Supplier Risk Alerts (${alerts.length})</span>
-        <button class="btn-outline" style="font-size:.58rem;padding:.2rem .6rem" onclick="showPage('suppliers')">View all suppliers →</button>
       </div>
       ${[...highAlerts,...otherAlerts].slice(0,5).map(alert=>{
         const cat = RISK_CATEGORIES[alert.category]||RISK_CATEGORIES.compliance;
@@ -28697,9 +28683,15 @@ async function generateSpecSheetPDF(skuId){
     if(!sku){ if(typeof alert!=='undefined') alert('No product to generate a spec sheet for.'); return; }
     const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
-    const isDevice = (sku.productType==='device' || sku.productType==='beauty_device');
+    // 3-way productType awareness (was binary device/cosmetic). Gates each section to
+    // what genuinely applies — CPNP is cosmetic-only, accessories aren't formulations.
+    const pt = sku.productType || 'cosmetic';
+    const isDevice    = (pt==='device' || pt==='beauty_device');
+    const isAccessory = (pt==='beauty_accessory' || pt==='accessory');
+    const isCosmetic  = !isDevice && !isAccessory;   // default
+    const typeLabel = isDevice ? 'Device' : (isAccessory ? 'Accessory' : 'Cosmetic');
     pdfHeader(doc, bdVal(sku.name,'[VERIFY] product')+' — Spec Sheet',
-      (brand&&brand.name||'')+' · '+(isDevice?'Device':'Cosmetic'), '#0E8C8C', pageW);
+      (brand&&brand.name||'')+' · '+typeLabel, '#0E8C8C', pageW);
     let y=40;
     function sectionTitle(t){ if(y>pageH-28){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#0A6E6E'); doc.text(t.toUpperCase(), margin, y); y+=2; pdfDrawLine(doc,margin,y,pageW-margin,y,'#C4E0E0',0.3); y+=5; }
     function row(label,val){ if(y>pageH-18){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#3D5559'); doc.text(label, margin, y); pdfSetFont(doc,'body'); pdfColor(doc,'#0C2A2E'); y=pdfWrap(doc, bdVal(val), margin+52, y, contentW-52, 4.2)+1.8; }
@@ -28713,15 +28705,22 @@ async function generateSpecSheetPDF(skuId){
     row('Shelf life (months)', sku.shelfLifeMonths);
     y+=2;
 
-    sectionTitle(isDevice ? 'Technical specification' : 'Formulation');
     if(isDevice){
+      sectionTitle('Technical specification');
       row('Model number', sku.modelNo);
       row('Voltage input', sku.voltageInput);
       row('CE marking', sku.ceMarking===true ? 'Yes' : (sku.ceMarking ? String(sku.ceMarking) : '— not provided'));
       row('Declaration of Conformity', sku.docOnFile ? 'On file' : '— not provided');
       row('Material composition', sku.materialComposition);
       row('Certifications', Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications);
+    } else if(isAccessory){
+      // Accessory = physical, non-formulated → materials, not INCI; no device-electrical rows.
+      sectionTitle('Materials & specification');
+      row('Material composition', sku.materialComposition);
+      var _acCerts = Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications;
+      if(_acCerts!=null && _acCerts!=='') row('Certifications', _acCerts);
     } else {
+      sectionTitle('Formulation');
       row('INCI list', sku.inci);
     }
     y+=2;
@@ -28752,7 +28751,7 @@ async function generateSpecSheetPDF(skuId){
     y+=2;
 
     sectionTitle('Regulatory status');
-    row('CPNP notification', sku.cpnp);
+    if(isCosmetic) row('CPNP notification', sku.cpnp);   // CPNP = cosmetic notification (1223/2009) — N/A to devices/accessories
     const rp = brand && brand.euResponsible;
     row('EU Responsible Person', (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '— not provided');
     if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate);
@@ -29808,13 +29807,6 @@ function getSetupSteps(){
       action:()=>showPage('skus'),
     },
     {
-      id:'report',
-      label:'Run your first Market Entry Report',
-      done:savedReports.length>0,
-      cta:'Generate report',
-      action:()=>showPage('report'),
-    },
-    {
       id:'readiness',
       label:'Review your Readiness Score',
       done:!!(brand && (localStorage.getItem('ns_readiness_viewed')==='1')),
@@ -29855,8 +29847,7 @@ const BRAND_HOME_ALERTS = [
     requiredRetailers: ['apotek_hjartat_se'],
     title: 'APOTEK HJÄRTAT — ARTICLE SUBMISSION DEADLINE',
     body: 'Apotek Hjärtat closes article submissions for the autumn/winter range on May 8. Miss this window and the next opportunity is the spring 2027 cycle. Sweden\'s largest pharmacy chain — 390 stores, 4M+ loyalty members.',
-    primaryCta: { label: 'Generate Apotek Hjärtat pitch →', page: 'pitch' },
-    secondaryCta: { label: 'Run Sweden Market Report →', page: 'report' },
+    primaryCta: { label: 'Draft Apotek Hjärtat buyer email →', page: 'retail-comms' },
   },
   // ── Future retailer deadline alerts go here ──────
   // Template:
@@ -29870,8 +29861,8 @@ const BRAND_HOME_ALERTS = [
   //   requiredRetailers: ['matas_dk'],       // [] / omit = not retailer-specific
   //   title: 'RETAILER — SUBMISSION DEADLINE',
   //   body: 'Description of deadline and consequence.',
-  //   primaryCta: { label: 'CTA text →', page: 'pitch' },
-  //   secondaryCta: { label: 'CTA text →', page: 'report' },
+  //   primaryCta: { label: 'CTA text →', page: 'retail-comms' },   // live pages only — parked targets are swept out
+  //   secondaryCta: { label: 'CTA text →', page: 'retail-tracker' },
   // },
 ];
 
@@ -30230,7 +30221,6 @@ function renderExpansionOverview(){
         <div style="flex:1;min-width:140px;padding:.7rem .85rem">
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.2rem">
             <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Margin Watch</div>
-            <span onclick="showPage('cfo')" style="font-family:var(--mono);font-size:.48rem;color:var(--navy);cursor:pointer;text-decoration:underline;white-space:nowrap">CFO →</span>
           </div>
           <div style="font-family:var(--mono);font-size:.68rem;font-weight:700;color:${marginColor};margin-bottom:.25rem">${marginStatus}</div>
           <div style="font-family:var(--sans);font-size:.62rem;color:#555;line-height:1.5">${marginBody}<br><span style="color:var(--muted);font-size:.55rem">vs ${(brand.category||'').includes('Beauty')?50:(brand.category||'').includes('Food')?35:45}% category avg</span></div>
@@ -30792,7 +30782,7 @@ const PATHWAY_TIERS = [
     why: 'Premium online Nordic retailers. Buyer credibility and Nordic-first proof of concept that opens physical doors.',
     retailerIds: ['lyko_se','lyko_dk','nordicfeel_se','apotea_se','apoteket_se','apohem_se'],
     retailerNames: ['Lyko', 'NordicFeel', 'Apotea', 'Apoteket'],
-    tools: [{label:'Score readiness for Lyko', page:'home'},{label:'Generate Lyko pitch', page:'pitch'}],
+    tools: [{label:'Score readiness for Lyko', page:'home'},{label:'Draft Lyko buyer email', page:'retail-comms'}],
   },
   {
     id: 'tier_3_physical_premium',
@@ -30802,7 +30792,7 @@ const PATHWAY_TIERS = [
     why: 'Physical retail proof of concept. Door-opener for top-tier pharmacy and prestige buyers.',
     retailerIds: ['kicks_se','kicks_dk','kicks_no','vita_no','apotek_1_no','hebe_pl','wells_pt','perfumes_companhia_pt'],
     retailerNames: ['Kicks', 'Vita', 'Apotek 1', 'Hebe', 'Wells'],
-    tools: [{label:'Retailer Pitch', page:'pitch'},{label:'Business Case', page:'bizcase'}],
+    tools: [{label:'Draft buyer email', page:'retail-comms'}],
   },
   {
     id: 'tier_4_top_tier',
@@ -30812,7 +30802,7 @@ const PATHWAY_TIERS = [
     why: 'Top-tier retailers require track record from earlier stages. Stage 1–3 data becomes your proof package.',
     retailerIds: ['apotek_hjartat_se','matas_dk','sephora_eu','sephora_fr','douglas_de','douglas_at','douglas_ch','boots_uk','space_nk_uk'],
     retailerNames: ['Apotek Hjärtat', 'Matas', 'Sephora', 'Douglas', 'Boots'],
-    tools: [{label:'Market Entry Report', page:'report'},{label:'Brand Pack', page:'brandpack'}],
+    tools: [{label:'Brand Pack', page:'brandpack'}],
   },
 ];
 
@@ -32224,10 +32214,10 @@ const ACTION_PLAN_MILESTONES = [
   {id:'claims_check',  offset:-120, label:'Run Claim Localizer for this market',             page:'claims'},
   {id:'pack_adapt',    offset:-90,  label:'Packaging adaptation deadline (translation + label update)', page:'skus'},
   {id:'samples_out',  offset:-90,  label:'Physical sample box dispatched to buyer',          page:null},
-  {id:'first_email',  offset:-75,  label:'First contact email sent',                        page:'pitch'},
+  {id:'first_email',  offset:-75,  label:'First contact email sent',                        page:'retail-comms'},
   {id:'follow_up',    offset:-60,  label:'Follow-up if no response',                        page:null},
-  {id:'biz_case',     offset:-45,  label:'Retail Business Case completed',                  page:'bizcase'},
-  {id:'final_pitch',  offset:-30,  label:'Final pitch submitted with all documents',        page:'pitch'},
+  {id:'biz_case',     offset:-45,  label:'Retail Business Case completed',                  page:null},
+  {id:'final_pitch',  offset:-30,  label:'Final pitch submitted with all documents',        page:'retail-comms'},
   {id:'confirm_recv', offset:-21,  label:'Confirm buyer received materials',                page:null},
   {id:'chase',        offset:-14,  label:'Chase for meeting / decision',                   page:null},
   {id:'review_date',  offset:0,    label:'Range review date',                              page:null},
@@ -32391,7 +32381,6 @@ function renderActionPlanModal(card){
         <!-- Footer -->
         <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap">
           <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('retail-templates')" class="btn-primary" style="font-size:.65rem">Prepare retailer file →</button>
-          <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('bizcase')" class="btn-outline" style="font-size:.65rem">Business Case →</button>
           <button onclick="document.getElementById('vf-action-plan-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">Close</button>
         </div>
       </div>
@@ -32992,15 +32981,17 @@ function handleDeepLink(){
   // Hash-aware init route at init() calls handleDeepLink() before showPage('home'),
   // so this list determines what bookmarks/hard-reload-to-hash actually work.
   const validPages = [
-    // Brand section
-    'home','skus','report','compare','claims','pitch','brandpack','bizcase','cfo',
-    // Source section
-    'find','suppliers','sourcing','circular','dpp','csrd','reg_monitor',
+    // Brand section (parked pages — report/compare/pitch/bizcase/cfo — removed: no live page to land on)
+    'home','skus','claims','brandpack',
+    // Source section (parked — find/suppliers/sourcing/circular — removed)
+    'dpp','csrd','reg_monitor',
     // Retailer Relations section
     'crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms',
     // Admin (gated behind localStorage flag, but valid as deep-link target if user has flag set)
     'atm-admin'
   ];
+  // 'pitch' has a live equivalent (Buyer Comms); other parked deep-links fall through to home.
+  if(page==='pitch'){ showPage('retail-comms'); return true; }
   if(!validPages.includes(page)) return false;
 
   // Handle param-specific deep links
@@ -33008,18 +32999,6 @@ function handleDeepLink(){
     // Open CRM with specific card expanded: #crm/matas_dk
     showPage('crm');
     setTimeout(()=>{ crmEditId=param; renderPage('crm'); }, 100);
-    return true;
-  }
-  if(page==='pitch'&&param){
-    // Pre-fill retailer: #pitch/Matas
-    pitchForm.retailer = decodeURIComponent(param);
-    showPage('pitch');
-    return true;
-  }
-  if(page==='report'&&param){
-    // Pre-fill target market: #report/Denmark
-    reportForm.targetMarket = decodeURIComponent(param);
-    showPage('report');
     return true;
   }
   if(page==='atm-admin'){
