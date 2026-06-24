@@ -28538,22 +28538,40 @@ function pdfWrap(doc, text, x, y, maxW, lineH){
   return y + lines.length * lineH;
 }
 
-function pdfHeader(doc, title, subtitle, accentHex, pageW){
-  // Full-width navy header block
-  pdfColorFill(doc, '#1E3A5F');
+function pdfHeader(doc, title, subtitle, accentHex, pageW, opts){
+  opts = opts || {};
+  // Header block — primaryHex is brand-TOKENISABLE (default navy). STRUCTURE/size fixed.
+  pdfColorFill(doc, opts.primaryHex || '#1E3A5F');
   doc.rect(0, 0, pageW, 28, 'F');
-  // Accent stripe
+  // Accent stripe — brand-tokenisable via accentHex (default gold)
   pdfColorFill(doc, accentHex||'#C4A882');
   doc.rect(0, 28, pageW, 2, 'F');
-  // Title
+  // Optional brand logo — bounded box top-left; a bad image NEVER breaks the layout.
+  let tx = 14;
+  if(opts.logo){
+    try{
+      // Aspect-preserving fit inside a bounded header zone (band is 28 tall).
+      var lp = doc.getImageProperties(opts.logo);
+      var maxH = 18, maxW = 50, HEADER_H = 28;
+      var s = Math.min(maxH / lp.height, maxW / lp.width);
+      var lw = lp.width * s, lh = lp.height * s, ly = (HEADER_H - lh) / 2;
+      doc.addImage(opts.logo, 14, ly, lw, lh);
+      tx = 14 + lw + 6;   // title clears the drawn logo width — no overlap
+    }catch(e){
+      try{ doc.addImage(opts.logo, 'PNG', 14, 5, 18, 18); tx = 36; }   // legacy fixed-square fallback
+      catch(e2){ tx = 14; }   // bad image → no logo, layout unbroken
+    }
+  }
+  // Title — heading FONT is brand-tokenisable from the curated type-pair (within jsPDF fonts)
   pdfSetFont(doc, 'heading');
+  if(opts.headingFont){ try{ doc.setFont(opts.headingFont, 'bold'); }catch(e){} }
   pdfColor(doc, '#FFFFFF');
-  doc.text(title, 14, 12);
+  doc.text(title, tx, 12);
   // Subtitle
   pdfSetFont(doc, 'small');
   doc.setTextColor(180,190,200);
-  doc.text(subtitle||'', 14, 19);
-  // VeyaFlow mark
+  doc.text(subtitle||'', tx, 19);
+  // VeyaFlow mark — ALWAYS present (provenance mark, NOT brandable)
   pdfSetFont(doc, 'footer');
   doc.setTextColor(150,160,170);
   doc.text('VeyaFlow · veyaflow.com', pageW-14, 10, {align:'right'});
@@ -28575,6 +28593,13 @@ function pdfHeader(doc, title, subtitle, accentHex, pageW){
 ═══════════════════════════════════════════════════ */
 const BD_CURRENCY = {rspSEK:'SEK',rspDKK:'DKK',rspGBP:'GBP',rspEUR:'EUR',rspNOK:'NOK',rspISK:'ISK'};
 const BD_RSP_KEYS = ['rspSEK','rspDKK','rspGBP','rspEUR','rspNOK','rspISK'];
+// CURATED type-pairs (brand chooses ONE — NOT free font entry). Mapped to the jsPDF
+// built-in font set; only the heading font is brand-controllable, body stays helvetica.
+const BD_TYPE_PAIRS = {
+  classic:   {label:'Classic (serif headings)',  heading:'times'},
+  modern:    {label:'Modern (sans headings)',    heading:'helvetica'},
+  editorial: {label:'Editorial (serif headings)',heading:'times'},
+};
 
 // Honesty rule: absence shown as absence.
 function bdVal(v, placeholder){
@@ -28599,7 +28624,7 @@ function bdClaimInfo(claim, productType){
 }
 
 // ── Line Sheet — door-opener: multi-SKU, commercial, NO claim lights, NO private fields ──
-async function generateLineSheetPDF(){
+async function generateLineSheetPDF(branded){
   const btn = (typeof event!=='undefined' && event) ? event.target : null;
   if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
   try{
@@ -28607,8 +28632,20 @@ async function generateLineSheetPDF(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
-    pdfHeader(doc, (brand&&brand.name||'Brand')+' — Line Sheet',
-      (brand&&brand.category||'')+' · '+(((brand&&brand.targetMarkets)||[]).join(', ')||'Markets'), '#0E8C8C', pageW);
+    // BRAND TOKENS reach ONLY the header zones (block colour, accent stripe, logo, heading
+    // font). Missing token → VeyaFlow default (never breaks). STRUCTURE/field-order/spacing
+    // below are UNCHANGED between standard and branded. No claim lights here → STATUS palette
+    // is structurally unreachable on this document.
+    const b = brand || {};
+    const useBrand = !!branded;
+    const accent = (useBrand && b.docAccentHex) ? b.docAccentHex : '#0E8C8C';
+    const headerOpts = useBrand ? {
+      primaryHex: b.docPrimaryHex || undefined,
+      logo:       b.docLogo || undefined,
+      headingFont:(BD_TYPE_PAIRS[b.docTypePair] || {}).heading || undefined,
+    } : {};
+    pdfHeader(doc, (b.name||'Brand')+' — Line Sheet',
+      (b.category||'')+' · '+((b.targetMarkets||[]).join(', ')||'Markets'), accent, pageW, headerOpts);
     let y=40;
     pdfSetFont(doc,'small'); pdfColor(doc,'#6B7280');
     doc.text('Commercial range overview · retail prices · prepared from VeyaFlow-verified data', margin, y); y+=8;
@@ -28627,9 +28664,23 @@ async function generateLineSheetPDF(){
       pdfColor(doc,'#3D5559');
       doc.text('EAN '+bdVal(sku.ean,'—')+'    ·    MOQ '+bdVal(sku.moq,'—')+'    ·    Lead '+bdVal(sku.leadDays,'—')+' days', margin, y); y+=6;
     });
+    // ── Integrity stamp (Part 5): SHA-256 fingerprint over the canonical SOURCE DATA
+    //    (brand + sku snapshot) — NOT the timestamp, so identical data reproduces the same
+    //    Document ID and any content change changes it. Version identity / tamper-evidence,
+    //    NOT a certification or signature. Reuses _atmHashContent (no new hasher).
+    var _lsCanon = JSON.stringify({ t:'line', brand:b.name||'', cat:b.category||'', mkts:(b.targetMarkets||[]),
+      skus:list.map(function(s){ var rsp={}; BD_RSP_KEYS.forEach(function(k){ if(s[k]!=null&&s[k]!=='') rsp[k]=s[k]; });
+        return {n:s.name||'', d:s.descEN||'', rsp:rsp, ean:s.ean||'', moq:s.moq||'', lead:s.leadDays||''}; }) });
+    var _lsHash=''; try{ _lsHash=await _atmHashContent(_lsCanon); }catch(e){}
+    var _lsId=(_lsHash && _lsHash!=='unavailable') ? _lsHash.slice(0,12) : 'unavailable';
+    var _lsDate=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
-    doc.text('VeyaFlow-standard line sheet · commercial terms only · no compliance status or cost data on this document', margin, pageH-10);
-    doc.save(((brand&&brand.name)||'brand').replace(/\s+/g,'_')+'_LineSheet.pdf');
+    doc.text((useBrand?'Branded line sheet · brand identity applied to header only — structure & data VeyaFlow-controlled':'VeyaFlow-standard line sheet')+' · commercial terms only · no compliance status or cost data', margin, pageH-10);
+    doc.text('Document ID: '+_lsId+' · generated '+_lsDate+' from VeyaFlow-verified data · content fingerprint, not a certification', margin, pageH-6);
+    var _lsName=((b.name)||'brand').replace(/\s+/g,'_')+'_LineSheet'+(useBrand?'_branded':'')+'.pdf';
+    doc.save(_lsName);
+    try{ bdStoreVersion('line', {kind:'generated', filename:_lsName, integrity:_lsHash}); }catch(e){}
+    try{ if(typeof bdRefreshLineHistory==='function') bdRefreshLineHistory(); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate line sheet: '+(e&&e.message)); console.warn('Line sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Line Sheet'; } }
 }
@@ -28646,9 +28697,15 @@ async function generateSpecSheetPDF(skuId){
     if(!sku){ if(typeof alert!=='undefined') alert('No product to generate a spec sheet for.'); return; }
     const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
-    const isDevice = (sku.productType==='device' || sku.productType==='beauty_device');
+    // 3-way productType awareness (was binary device/cosmetic). Gates each section to
+    // what genuinely applies — CPNP is cosmetic-only, accessories aren't formulations.
+    const pt = sku.productType || 'cosmetic';
+    const isDevice    = (pt==='device' || pt==='beauty_device');
+    const isAccessory = (pt==='beauty_accessory' || pt==='accessory');
+    const isCosmetic  = !isDevice && !isAccessory;   // default
+    const typeLabel = isDevice ? 'Device' : (isAccessory ? 'Accessory' : 'Cosmetic');
     pdfHeader(doc, bdVal(sku.name,'[VERIFY] product')+' — Spec Sheet',
-      (brand&&brand.name||'')+' · '+(isDevice?'Device':'Cosmetic'), '#0E8C8C', pageW);
+      (brand&&brand.name||'')+' · '+typeLabel, '#0E8C8C', pageW);
     let y=40;
     function sectionTitle(t){ if(y>pageH-28){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#0A6E6E'); doc.text(t.toUpperCase(), margin, y); y+=2; pdfDrawLine(doc,margin,y,pageW-margin,y,'#C4E0E0',0.3); y+=5; }
     function row(label,val){ if(y>pageH-18){doc.addPage(); y=20;} pdfSetFont(doc,'label'); pdfColor(doc,'#3D5559'); doc.text(label, margin, y); pdfSetFont(doc,'body'); pdfColor(doc,'#0C2A2E'); y=pdfWrap(doc, bdVal(val), margin+52, y, contentW-52, 4.2)+1.8; }
@@ -28662,15 +28719,22 @@ async function generateSpecSheetPDF(skuId){
     row('Shelf life (months)', sku.shelfLifeMonths);
     y+=2;
 
-    sectionTitle(isDevice ? 'Technical specification' : 'Formulation');
     if(isDevice){
+      sectionTitle('Technical specification');
       row('Model number', sku.modelNo);
       row('Voltage input', sku.voltageInput);
       row('CE marking', sku.ceMarking===true ? 'Yes' : (sku.ceMarking ? String(sku.ceMarking) : '— not provided'));
       row('Declaration of Conformity', sku.docOnFile ? 'On file' : '— not provided');
       row('Material composition', sku.materialComposition);
       row('Certifications', Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications);
+    } else if(isAccessory){
+      // Accessory = physical, non-formulated → materials, not INCI; no device-electrical rows.
+      sectionTitle('Materials & specification');
+      row('Material composition', sku.materialComposition);
+      var _acCerts = Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications;
+      if(_acCerts!=null && _acCerts!=='') row('Certifications', _acCerts);
     } else {
+      sectionTitle('Formulation');
       row('INCI list', sku.inci);
     }
     y+=2;
@@ -28701,14 +28765,29 @@ async function generateSpecSheetPDF(skuId){
     y+=2;
 
     sectionTitle('Regulatory status');
-    row('CPNP notification', sku.cpnp);
+    if(isCosmetic) row('CPNP notification', sku.cpnp);   // CPNP = cosmetic notification (1223/2009) — N/A to devices/accessories
     const rp = brand && brand.euResponsible;
     row('EU Responsible Person', (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '— not provided');
     if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate);
 
+    // ── Integrity stamp (Part 5): SHA-256 fingerprint over the canonical SOURCE DATA
+    //    (sku snapshot + claim verdicts + RP) — NOT the timestamp, so identical data
+    //    reproduces the same Document ID and any content change changes it. Version
+    //    identity / tamper-evidence, NOT a certification. Reuses _atmHashContent.
+    var _ssCanon = JSON.stringify({ t:'spec', brand:(brand&&brand.name)||'',
+      sku:{ n:sku.name||'', ean:sku.ean||'', art:sku.articleNo||'', nc:sku.netContent||'', nu:sku.netUnit||'',
+            com:sku.countryOfMfr||'', sl:sku.shelfLifeMonths||'', dev:isDevice, model:sku.modelNo||'',
+            volt:sku.voltageInput||'', ce:sku.ceMarking||'', doc:sku.docOnFile||'', mat:sku.materialComposition||'',
+            inci:sku.inci||'', rsp:(function(){var r={};BD_RSP_KEYS.forEach(function(k){if(sku[k]!=null&&sku[k]!=='')r[k]=sku[k];});return r;})(),
+            moq:sku.moq||'', lead:sku.leadDays||'' },
+      claims: claims.map(function(c){ var i=bdClaimInfo(c,sku.productType); return {c:c,l:i.light}; }),
+      rp:(brand&&brand.euResponsible&&brand.euResponsible.name)||'' });
+    var _ssHash=''; try{ _ssHash=await _atmHashContent(_ssCanon); }catch(e){}
+    var _ssId=(_ssHash && _ssHash!=='unavailable') ? _ssHash.slice(0,12) : 'unavailable';
+
     // Provenance footer — the verified-provenance stamp.
-    if(y>pageH-26){doc.addPage(); y=20;}
-    y=Math.max(y, pageH-24);
+    if(y>pageH-30){doc.addPage(); y=20;}
+    y=Math.max(y, pageH-28);
     pdfDrawLine(doc, margin, y, pageW-margin, y, '#C4E0E0', 0.3); y+=4;
     pdfSetFont(doc,'footer'); pdfColor(doc,'#7FA0A2');
     if(prov){
@@ -28716,8 +28795,12 @@ async function generateSpecSheetPDF(skuId){
     } else if(claims.length){
       doc.text('Claim provenance: not recorded for these claims — verify before relying.', margin, y); y+=3.6;
     }
-    doc.text('VeyaFlow-standard spec sheet · generated from verified canonical data · '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), margin, y);
-    doc.save((bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf');
+    doc.text('VeyaFlow-standard spec sheet · generated from verified canonical data · '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), margin, y); y+=3.6;
+    doc.text('Document ID: '+_ssId+' · content fingerprint identifying this version — not a certification', margin, y);
+    var _ssName=(bdVal(sku.name,'product')).replace(/[^\w]+/g,'_')+'_SpecSheet.pdf';
+    doc.save(_ssName);
+    try{ bdStoreVersion('spec:'+sku.id, {kind:'generated', filename:_ssName, integrity:_ssHash}); }catch(e){}
+    try{ if(typeof bdRefreshSpecHistory==='function') bdRefreshSpecHistory(String(sku.id)); }catch(e){}
   }catch(e){ if(typeof alert!=='undefined') alert('Could not generate spec sheet: '+(e&&e.message)); console.warn('Spec sheet error', e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Spec Sheet'; } }
 }
@@ -28732,43 +28815,101 @@ function renderBuyerDocs(el){
   if(!el) return;
   if(!brand){ el.innerHTML='<div style="padding:24px 20px;color:var(--ink-mute)">Set up your brand workspace first.</div>'; return; }
   var list=(typeof skus!=='undefined' && skus)?skus:[];
-  var skuOpts=list.map(function(s){ return '<option value="'+escapeHtml(String(s.id))+'">'+escapeHtml(s.name||String(s.id)||'Unnamed')+'</option>'; }).join('');
+  // Spec history is per-product: keep the selected product across re-renders so its
+  // history (and the <select>) stay in sync. Default to the first product.
+  var curSpec = (_bdSpecSku && list.some(function(s){return String(s.id)===_bdSpecSku;})) ? _bdSpecSku : (list[0]?String(list[0].id):'');
+  var skuOpts=list.map(function(s){ var sv=String(s.id); return '<option value="'+escapeHtml(sv)+'"'+(sv===curSpec?' selected':'')+'>'+escapeHtml(s.name||sv||'Unnamed')+'</option>'; }).join('');
   var cardCss='border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)';
   var hCss='font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.5rem';
   var pCss='font-size:.8rem;color:var(--ink-soft);line-height:1.5';
   var rowCss='display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem';
-  var soon='<div style="font-family:var(--mono);font-size:.58rem;color:var(--ink-mute);margin-top:.55rem;line-height:1.5">Branded styling and bring-your-own upload (+ PDF claims check) are coming in a later release — today the live option generates the VeyaFlow-standard version.</div>';
+  var noteCss='font-family:var(--mono);font-size:.58rem;color:var(--ink-mute);margin-top:.55rem;line-height:1.5';
+  var typeOpts=Object.keys(BD_TYPE_PAIRS).map(function(k){ return '<option value="'+k+'"'+((brand.docTypePair||'classic')===k?' selected':'')+'>'+BD_TYPE_PAIRS[k].label+'</option>'; }).join('');
 
   el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
     '<div class="head"><h1>Buyer documents</h1></div>'+
-    '<p class="sub">Generate a line sheet or a per-product spec sheet from your VeyaFlow-verified data — three ways to produce each; only the standard generator is live today.</p>'+
+    '<p class="sub">Generate a line sheet or a per-product spec sheet from your VeyaFlow-verified data. Three ways to produce each.</p>'+
 
+    // ── Bounded document-branding editor (applies to the branded LINE SHEET header only) ──
+    '<div style="'+cardCss+'">'+
+      '<div style="'+hCss+'">Document branding · bounded</div>'+
+      '<div style="'+pCss+'">Applies to the <b>branded line sheet</b> header only — your logo, two colours, and a typeface from a curated set. VeyaFlow controls structure, field order, claim-status colours and provenance.</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.85rem;margin-top:.85rem;align-items:end">'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Logo</div>'+
+          '<div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">'+
+            (brand.docLogo?'<img src="'+escapeHtml(brand.docLogo)+'" style="height:32px;max-width:110px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px"/>':'<span style="font-size:.72rem;color:var(--ink-mute)">none</span>')+
+            '<button class="btn-outline" onclick="document.getElementById(\'bd-logo-input\').click()" style="font-size:.6rem;padding:.3rem .55rem">'+(brand.docLogo?'Replace':'Upload')+'</button>'+
+            (brand.docLogo?'<button class="btn-outline" onclick="bdClearLogo()" style="font-size:.6rem;padding:.3rem .55rem">Remove</button>':'')+
+          '</div></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Primary (header)</div><input type="color" value="'+(brand.docPrimaryHex||'#1E3A5F')+'" onchange="bdSetToken(\'docPrimaryHex\', this.value)" style="width:100%;height:32px;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;background:var(--paper)"></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Accent (stripe)</div><input type="color" value="'+(brand.docAccentHex||'#0E8C8C')+'" onchange="bdSetToken(\'docAccentHex\', this.value)" style="width:100%;height:32px;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;background:var(--paper)"></div>'+
+        '<div><div style="'+hCss+';margin-bottom:.3rem">Typeface</div><select onchange="bdSetToken(\'docTypePair\', this.value)" style="width:100%;font-family:var(--sans);font-size:.72rem;padding:.42rem;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);color:var(--ink)">'+typeOpts+'</select></div>'+
+      '</div>'+
+      '<input type="file" id="bd-logo-input" accept="image/*" style="display:none" onchange="bdSetLogo(this)">'+
+    '</div>'+
+
+    // ── Line sheet ──
     '<div style="'+cardCss+'">'+
       '<div style="'+hCss+'">Line sheet · door-opener</div>'+
       '<div style="'+pCss+'">Your whole range on one commercial document — retail prices, MOQ, lead time. No compliance status, no cost data.</div>'+
       '<div style="'+rowCss+'">'+
         '<button class="btn-primary" onclick="generateLineSheetPDF()" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
-        '<button class="btn-outline" onclick="bdBrandedComingSoon(\'line\')" style="font-size:.7rem">Generate, branded</button>'+
-        '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
-      '</div>'+soon+
+        '<button class="btn-outline" onclick="generateLineSheetPDF(true)" style="font-size:.7rem">Generate, branded →</button>'+
+        '<button class="btn-outline" onclick="bdOpenUpload(\'line\')" style="font-size:.7rem">Bring your own (upload)</button>'+
+      '</div>'+
+      '<div style="'+noteCss+'">Branded applies your logo/colours/typeface to the header only — structure, field order and data stay VeyaFlow-controlled. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record; nothing is submitted.</div>'+
+      '<div id="bd-line-history">'+bdVersionHistoryHtml('line')+'</div>'+
     '</div>'+
 
+    // ── Spec sheet (stays VeyaFlow-standard — compliance artifact) ──
     '<div style="'+cardCss+'">'+
       '<div style="'+hCss+'">Spec sheet · data artifact (per product)</div>'+
       '<div style="'+pCss+'">One per product: identification, formulation/technical, retail terms, and claim status with verified provenance.</div>'+
       (list.length
         ? '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.7rem"><label style="'+hCss+';margin:0">Product</label>'+
-            '<select id="bd-spec-sku" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
+            '<select id="bd-spec-sku" onchange="bdRefreshSpecHistory(this.value)" style="font-family:var(--sans);font-size:.78rem;padding:.4rem .6rem;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper);color:var(--ink)">'+skuOpts+'</select></div>'+
           '<div style="'+rowCss+'">'+
             '<button class="btn-primary" onclick="generateSpecSheetPDF(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, VeyaFlow-standard →</button>'+
-            '<button class="btn-outline" onclick="bdBrandedComingSoon(\'spec\')" style="font-size:.7rem">Generate, branded</button>'+
-            '<button class="btn-outline" onclick="document.getElementById(\'bd-upload-input\').click()" style="font-size:.7rem">Bring your own (upload)</button>'+
-          '</div>'+soon
+            '<button class="btn-outline" onclick="bdSpecBrandedNote(document.getElementById(\'bd-spec-sku\').value)" style="font-size:.7rem">Generate, branded</button>'+
+            '<button class="btn-outline" onclick="bdOpenUpload(\'spec\')" style="font-size:.7rem">Bring your own (upload)</button>'+
+          '</div>'+
+          '<div style="'+noteCss+'">Spec sheets stay VeyaFlow-standard — a buyer scrutinising INCI / claims should see the trusted neutral look. Branding does not skin the compliance artifact. Upload runs an <b>advisory</b> claims scan (recognised phrases only — not a certification) and keeps a local version record.</div>'+
+          '<div id="bd-spec-history">'+bdVersionHistoryHtml('spec:'+curSpec)+'</div>'
         : '<div style="margin-top:.7rem;padding:.6rem .8rem;background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:9px;font-size:.78rem;color:var(--ink-soft)">No products yet — <span onclick="showPage(\'skus\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">add a product</span> to generate a spec sheet.</div>')+
     '</div>'+
 
-    '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdUploadComingSoon(this)">'+
+    bdScanResultHtml()+
+    '<input type="file" id="bd-upload-input" accept="application/pdf" style="display:none" onchange="bdHandleUpload(this)">'+
   '</div>';
+}
+
+// Bounded brand-token setters — persist to ns_brand. Tokens ONLY reach the line-sheet header.
+function bdSetToken(field, value){
+  if(!brand) return;
+  if(field==='docTypePair' && !BD_TYPE_PAIRS[value]) return;   // curated list only
+  brand[field] = value;
+  if(typeof saveBrandState==='function') saveBrandState();
+}
+function bdSetLogo(input){
+  if(!input || !input.files || !input.files[0]) return;
+  var f = input.files[0];
+  if(!/^image\//.test(f.type||'')){ if(typeof showSuccess==='function') showSuccess('Please choose an image file.'); input.value=''; return; }
+  var reader = new FileReader();
+  reader.onload = function(){ brand.docLogo = String(reader.result); if(typeof saveBrandState==='function') saveBrandState(); var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el); };
+  reader.onerror = function(){ if(typeof showSuccess==='function') showSuccess('Could not read that image.'); };
+  reader.readAsDataURL(f);
+  input.value='';
+}
+function bdClearLogo(){
+  if(!brand) return;
+  delete brand.docLogo;
+  if(typeof saveBrandState==='function') saveBrandState();
+  var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el);
+}
+// Spec-sheet "branded" = intentionally STANDARD (compliance artifact stays neutral) + honest note.
+function bdSpecBrandedNote(skuId){
+  if(typeof showSuccess==='function') showSuccess('Spec sheets stay VeyaFlow-standard for buyer trust — generating the standard version.');
+  setTimeout(function(){ generateSpecSheetPDF(skuId); }, 60);
 }
 
 // Branded (Part 3 pending): generate the STANDARD version + honest note. setTimeout decouples
@@ -28779,10 +28920,218 @@ function bdBrandedComingSoon(kind){
   if(kind!=='line'){ var sel=document.getElementById('bd-spec-sku'); skuId=sel?sel.value:null; }
   setTimeout(function(){ if(kind==='line') generateLineSheetPDF(); else generateSpecSheetPDF(skuId); }, 60);
 }
-// Upload (Part 4 pending): show the picker but store/check NOTHING — honest placeholder.
-function bdUploadComingSoon(input){
-  if(input) input.value='';
-  if(typeof showSuccess==='function') showSuccess('Upload handling + claims check arrives in a later release.');
+// ════════════════════════════════════════════════════════════════════════════
+// Buyer-Docs Part 4 — upload store/version + ADVISORY Rung-1 claims scan
+// ════════════════════════════════════════════════════════════════════════════
+// HONESTY CONSTRAINT (literal): getClaimLight() matches KNOWN claim ids only — there
+// is no free-text claim detector. So this scan is a fixed KNOWN-PHRASE scan: it flags
+// recognised risky phrases, and CANNOT catch every claim. The result is therefore
+// ADVISORY + NON-EXHAUSTIVE — never a certification. Absence of flags ≠ compliant.
+// Storage mirrors BIL's lighter approach (the blob lives in memory, not localStorage):
+// localStorage holds only a versioned METADATA + scan record — the 25MB file is never
+// persisted (would blow the ~5MB quota). Nothing is submitted anywhere — local only.
+const BD_DOCS_KEY = 'ns_buyer_docs';
+const BD_MAX_VERSIONS = 5;
+const BD_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;   // mirror BIL's 25MB ceiling
+let _bdPendingDocType = 'line';
+let _bdLastScan = null;                          // transient panel state; survives re-render via this var
+let _bdSpecSku = '';                             // which product's spec history the card shows (spec is per-PRODUCT)
+
+// ── picker plumbing: remember which doc-type slot the upload is for ──
+function bdOpenUpload(docType){
+  _bdPendingDocType = (docType==='spec') ? 'spec' : 'line';
+  var inp = document.getElementById('bd-upload-input');
+  if(inp){ inp.value=''; inp.click(); }
+}
+function _bdRerender(){ var el=document.getElementById('page-buyer-docs'); if(el) renderBuyerDocs(el); }
+// Spec history is per-PRODUCT (docType key 'spec:'+skuId). Refresh just that block on
+// product-switch or after a generate/upload — no full-page re-render needed.
+function bdRefreshSpecHistory(skuId){
+  if(skuId!=null && skuId!=='') _bdSpecSku=String(skuId);
+  var sel=document.getElementById('bd-spec-sku');
+  if(sel && _bdSpecSku && sel.value!==_bdSpecSku) sel.value=_bdSpecSku;
+  var el=document.getElementById('bd-spec-history');
+  if(el) el.innerHTML = bdVersionHistoryHtml('spec:'+(_bdSpecSku||''));
+}
+// Line sheet is a single multi-product list ('line') — refresh its block after generate.
+function bdRefreshLineHistory(){
+  var el=document.getElementById('bd-line-history');
+  if(el) el.innerHTML = bdVersionHistoryHtml('line');
+}
+function bdShowScanBusy(docType, filename){ _bdLastScan={docType:docType, filename:filename, busy:true}; _bdRerender(); }
+function bdShowScanError(docType, msg){ _bdLastScan={docType:docType, error:msg}; _bdRerender(); }
+
+// ── local store (metadata + scan only; keyed by brand → docType → version list) ──
+function bdBrandKey(){ return (brand && brand.name) ? String(brand.name) : '_default'; }
+function bdLoadDocStore(){ try{ return JSON.parse(localStorage.getItem(BD_DOCS_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function bdSaveDocStore(store){ try{ localStorage.setItem(BD_DOCS_KEY, JSON.stringify(store)); return true; }catch(e){ return false; } }
+function bdVersionsFor(docType){
+  var b = bdLoadDocStore()[bdBrandKey()];
+  return (b && b[docType]) ? b[docType].slice() : [];
+}
+// Unified version record — used by BOTH uploaded (Part 4) and generated (Part 5) docs.
+// meta carries: kind('uploaded'|'generated'), filename, size, integrity(hash), scanCount,
+// textLen, noText. The store is one list per brand→docType, so generated + uploaded
+// interleave in a single newest-first history. Last BD_MAX_VERSIONS kept. Local only.
+function bdStoreVersion(docType, meta){
+  var store=bdLoadDocStore(), bk=bdBrandKey();
+  if(!store[bk]) store[bk]={};
+  if(!store[bk][docType]) store[bk][docType]=[];
+  var arr=store[bk][docType];
+  var v=(arr.length ? (arr[arr.length-1].v||arr.length) : 0) + 1;
+  var rec=Object.assign({ v:v, ts:new Date().toISOString(), kind:'uploaded', filename:'', size:0,
+                          integrity:'', scanCount:0, textLen:0, noText:false }, meta||{});
+  arr.push(rec);
+  if(arr.length>BD_MAX_VERSIONS) store[bk][docType]=arr.slice(arr.length-BD_MAX_VERSIONS);
+  bdSaveDocStore(store);
+  return rec;
+}
+
+// ── text extraction: reuse the BIL pdf.js path (loadPdfJs + getDocument), read TEXT ──
+// BIL renders pages to images for Vision; here we want text, so we use the library's
+// getTextContent across pages. Same loader, same getDocument — no new dependency.
+async function bdExtractPdfText(buf){
+  await loadPdfJs();
+  if(!window.pdfjsLib) throw new Error('PDF engine unavailable.');
+  var pdf = await window.pdfjsLib.getDocument({ data:new Uint8Array(buf) }).promise;
+  var cap = Math.min(pdf.numPages, 30);   // sanity cap — a line/spec sheet is a few pages
+  var parts=[];
+  for(var i=1;i<=cap;i++){
+    var page=await pdf.getPage(i);
+    var tc=await page.getTextContent();
+    parts.push(tc.items.map(function(it){ return (it && it.str)?it.str:''; }).join(' '));
+  }
+  return parts.join('\n');
+}
+
+// ── KNOWN-PHRASE scan: red/amber rule keys (+ obvious surface forms) for the brand's
+//    product types. Word-boundary match. Dedup by claim, keep the WORST verdict. ──
+function bdBrandProductTypes(){
+  var list=(typeof skus!=='undefined' && skus)?skus:[];
+  var set={}; list.forEach(function(s){ if(s && s.productType) set[s.productType]=1; });
+  var types=Object.keys(set);
+  return types.length ? types : ['cosmetic'];
+}
+function _bdEsc(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function _bdPhraseHit(hay, form){
+  try{ return new RegExp('\\b'+_bdEsc(form)+'\\b','i').test(hay); }
+  catch(e){ return hay.indexOf(String(form).toLowerCase())>=0; }
+}
+function bdRunClaimsScan(text){
+  var hay=(text||'').toLowerCase();
+  var types=bdBrandProductTypes();
+  var rank={green:0, amber:1, red:2};
+  var byKey={};
+  var saved=(typeof skuForm!=='undefined') ? skuForm.productType : undefined;
+  try{
+    types.forEach(function(t){
+      var rules=CLAIMS_RULES[t]; if(!rules) return;
+      Object.keys(rules).forEach(function(key){
+        var rule=rules[key];
+        var base=(rule.markets && rule.default) ? rule.default : rule.status;
+        if(base!=='amber' && base!=='red') return;   // only the risky ones are worth flagging
+        var forms=[key];
+        if(key.indexOf('-')>=0){ forms.push(key.replace(/-/g,' ')); forms.push(key.replace(/-/g,'')); }
+        if(!forms.some(function(f){ return _bdPhraseHit(hay, f); })) return;
+        if(typeof skuForm!=='undefined') skuForm.productType=t;
+        var v={light:'amber', note:''};
+        try{ v=getClaimLight(key); }catch(e){}
+        var cur=byKey[key];
+        if(!cur || rank[v.light]>rank[cur.light]) byKey[key]={claim:key, productType:t, light:v.light, note:v.note||''};
+      });
+    });
+  } finally { if(typeof skuForm!=='undefined') skuForm.productType=saved; }
+  return Object.keys(byKey).map(function(k){ return byKey[k]; });
+}
+
+// ── orchestrator: validate → extract → scan → store/version → render advisory panel ──
+async function bdHandleUpload(input){
+  var docType=_bdPendingDocType;
+  var file=input && input.files && input.files[0];
+  if(input) input.value='';   // capture file first, then clear so the same file can be re-picked
+  if(!file) return;           // dialog cancelled — leave state untouched
+  var ext=(String(file.name).split('.').pop()||'').toLowerCase();
+  var isPdf=file.type==='application/pdf' || (file.type===''&&ext==='pdf');
+  if(!isPdf){ bdShowScanError(docType, 'That isn’t a PDF. Upload a single PDF file.'); return; }
+  if(file.size>BD_MAX_UPLOAD_BYTES){
+    bdShowScanError(docType, 'File too large — '+(file.size/1024/1024).toFixed(1)+'MB. Maximum is 25MB.'); return;
+  }
+  bdShowScanBusy(docType, file.name);
+  var text='', integrity='';
+  try{
+    var buf = await file.arrayBuffer();
+    integrity = await _atmHashContent(buf);   // fingerprint of the actual bytes — BEFORE pdf.js may detach the buffer
+    text = await bdExtractPdfText(buf);
+  }
+  catch(e){ bdShowScanError(docType, 'Could not read this PDF — it may be corrupt or password-protected.'); return; }
+  var noText = !(text && text.replace(/\s/g,'').length);
+  var hits = noText ? [] : bdRunClaimsScan(text);
+  // Spec uploads are per-PRODUCT — key by the spec card's selected product (mirrors generate).
+  var storeKey = docType;
+  if(docType==='spec'){ var _ssel=document.getElementById('bd-spec-sku'); var _sid=_ssel?_ssel.value:''; if(_sid){ storeKey='spec:'+_sid; _bdSpecSku=String(_sid); } }
+  var rec = bdStoreVersion(storeKey, {kind:'uploaded', filename:file.name, size:file.size,
+                                     integrity:integrity, scanCount:hits.length, textLen:(text||'').length, noText:noText});
+  if(typeof showSuccess==='function'){
+    showSuccess('Stored '+(docType==='spec'?'spec sheet':'line sheet')+(rec?(' v'+rec.v):'')+' — local versioning only, nothing submitted.');
+  }
+  _bdLastScan={ docType:docType, filename:file.name, rec:rec, hits:hits, noText:noText };
+  _bdRerender();
+}
+
+// ── version-history block (per doc-type card); reads the local metadata store ──
+function bdVersionHistoryHtml(docType){
+  var arr=bdVersionsFor(docType);
+  if(!arr.length) return '';
+  var rows=arr.slice().reverse().map(function(r){
+    var d=''; try{ d=new Date(r.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ d=String(r.ts||''); }
+    var kind = (r.kind==='generated') ? 'generated' : 'uploaded';
+    var status = (r.kind==='generated') ? 'generated' : (r.noText ? 'no text read' : (r.scanCount>0 ? (r.scanCount+' flagged') : 'none recognised'));
+    var idTxt = (r.integrity && r.integrity!=='unavailable') ? r.integrity.slice(0,12) : (r.integrity==='unavailable' ? 'id n/a' : '—');
+    return '<div style="display:flex;justify-content:space-between;gap:.6rem;font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);padding:.28rem 0;border-top:1px solid var(--line)">'+
+      '<span>v'+r.v+' · '+kind+' · '+escapeHtml(r.filename||'')+'</span>'+
+      '<span style="color:var(--ink-mute)">'+escapeHtml(d)+' · '+status+' · ID '+escapeHtml(idTxt)+'</span></div>';
+  }).join('');
+  return '<div style="margin-top:.8rem">'+
+    '<div style="font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute)">Your uploads · stored locally on this device, nothing submitted</div>'+
+    rows+'</div>';
+}
+
+// ── advisory result panel (honesty-critical): NEVER a doc-level pass/clean/certified ──
+function bdScanResultHtml(){
+  var s=_bdLastScan;
+  if(!s) return '';
+  var SW={green:'#0F7A52', amber:'#A85D14', red:'#B32A1F'};
+  var WORD={green:'Generally OK', amber:'Caution', red:'High risk'};
+  var MARK={green:'●', amber:'▲', red:'■'};   // shape + word + colour — never colour alone
+  var hCss='font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:.4rem';
+  var head='<div style="font-family:var(--display);font-size:1.15rem;color:var(--ink);margin-bottom:.2rem">Advisory claims scan — <span style="color:'+SW.red+'">not a certification</span></div>';
+  // ALWAYS shown — both when phrases are found and when none are.
+  var disclaimer='<div style="margin-top:.75rem;padding:.7rem .85rem;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;font-size:.73rem;color:var(--ink-soft);line-height:1.55">'+
+    '<b>Advisory, non-exhaustive scan.</b> It recognises a fixed list of known risky claim phrases — it is <b>not</b> free-text claim detection and cannot catch every claim. Absence of flags does <b>not</b> mean the document is compliant. Final claims review remains your responsibility and your Responsible Person’s. Nothing here is a certification, approval, or pass.</div>';
+  var body;
+  if(s.busy){
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft)">Reading the PDF and running the advisory scan…</div>';
+    return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+body+'</div>';
+  }
+  var src = s.error ? '' : '<div style="'+hCss+'">'+escapeHtml(s.docType==='spec'?'Spec sheet':'Line sheet')+(s.rec?(' · v'+s.rec.v):'')+' · '+escapeHtml(s.filename||'')+'</div>';
+  if(s.error){
+    body='<div style="margin-top:.6rem;padding:.7rem .85rem;background:#FBEAE7;border:1px solid '+SW.red+';border-radius:10px;font-size:.78rem;color:'+SW.red+'">'+escapeHtml(s.error)+'</div>';
+    return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+body+'</div>';
+  }
+  if(s.noText){
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">No extractable text was found — the PDF is likely image-only / scanned. The claims scan could <b>not</b> run on this file, so this is <b>not</b> a pass. Re-export the PDF with selectable text to scan it.</div>';
+  } else if(s.hits && s.hits.length){
+    var rows=s.hits.map(function(h){
+      return '<div style="display:flex;gap:.6rem;align-items:flex-start;padding:.55rem 0;border-top:1px solid var(--line)">'+
+        '<span style="color:'+SW[h.light]+';font-size:.85rem;line-height:1.3">'+MARK[h.light]+'</span>'+
+        '<div><div style="font-size:.82rem;color:var(--ink)"><b>“'+escapeHtml(h.claim)+'”</b> — <span style="color:'+SW[h.light]+';font-weight:600">'+WORD[h.light]+'</span></div>'+
+        '<div style="font-size:.73rem;color:var(--ink-soft);line-height:1.5;margin-top:.15rem">'+escapeHtml(h.note||'')+'</div></div></div>';
+    }).join('');
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">We recognised these claim phrases in your document. Each is a <b>known</b> phrase we check — there may be others we don’t recognise:</div>'+rows;
+  } else {
+    body='<div style="margin-top:.6rem;font-size:.8rem;color:var(--ink-soft);line-height:1.55">We did <b>not</b> recognise any flagged claim phrases. This does <b>not</b> mean the document is compliant — our scan only catches known phrases and is not a complete claims audit. Review remains your responsibility (and your RP’s).</div>';
+  }
+  return '<div id="bd-scan-result" style="border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin-top:14px;background:var(--paper)">'+head+src+body+disclaimer+'</div>';
 }
 
 function pdfFooter(doc, pageNum, totalPages, pageW, pageH){
