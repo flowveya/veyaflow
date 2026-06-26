@@ -1200,7 +1200,7 @@ const NEXT_STEPS = {
   // Live destinations only (parked pages removed). Per-stage picks are sensible defaults — Strategy-tunable.
   idea:     [{icon:"▦",label:"Add your products",page:"skus",desc:"Build your product hub — everything in VeyaFlow reads from here"},{icon:"◎",label:"Check what you can claim",page:"claims",desc:"See which claims are defensible in your target markets before you commit"}],
   product:  [{icon:"◎",label:"Check what you can claim",page:"claims",desc:"Run the Claim Localizer across your target markets before you print or pitch"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets from your verified data"}],
-  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"retail-comms",desc:"AI-drafted buyer email in the retailer's language, personalised to their priorities"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send with your pitch"}],
+  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer pitch in the retailer's language, personalised to their priorities"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send with your pitch"}],
   expanding:[{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Produce the line sheet and spec sheets retailers ask for"},{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Follow every retailer submission and chase stalled reviews"}],
   scaling:  [{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Keep every retailer submission moving and spot stalls early"},{icon:"◉",label:"Plan your seasonal calendar",page:"seasonal",desc:"Line up buyer windows and seasonal ranges for your next push"}],
 };
@@ -1227,7 +1227,7 @@ const REG_DEADLINES = [
   {id:"omnibus_ingredient_ii",title:"Omnibus II ingredient restrictions apply",deadline:"2027-01-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Apply Omnibus II ingredient restrictions",source:"Commission Reg (EU) 2026/909"},
   {id:"cmr_omnibus_viii",title:"CMR Omnibus VIII — substance bans (verify formulae)",deadline:"2026-05-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Verify formulae against CMR Omnibus VIII bans",source:"Commission Reg (EU) 2026/78"},
   {id:"ppwr",title:"PPWR packaging requirements apply",deadline:"2026-08-12",cat:null,link:"dpp",confidence:"confirmed",market:"EU",actionLabel:"Meet PPWR packaging requirements",source:"Reg (EU) 2025/40 (PPWR)"},
-  {id:"epr_dk",title:"Danish EPR packaging registration",deadline:"2025-10-01",cat:null,link:"home",confidence:"confirmed",market:"DK",actionLabel:"Register for Danish packaging EPR",source:"Strategy deadline research (20 Jun 2026)"},
+  {id:"epr_dk",title:"Danish EPR packaging registration",deadline:"2025-10-01",cat:null,link:"",confidence:"confirmed",market:"DK",actionLabel:"Register for Danish packaging EPR",source:"Strategy deadline research (20 Jun 2026)"},
   {id:"uk_cmr_si_2026_23_labelling",title:"UK SI 2026/23 — labelling requirements in force",deadline:"2026-07-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Meet UK SI 2026/23 labelling requirements",source:"UK SI 2026/23"},
   {id:"uk_cmr_si_2026_23_cmrban",title:"UK SI 2026/23 — CMR substance bans in force",deadline:"2026-08-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Verify formulae against UK SI 2026/23 CMR bans",source:"UK SI 2026/23"},
   {id:"dpp_apparel",title:"EU Digital Product Passport mandatory for apparel",deadline:"2027-01-01",cat:["Fashion & Apparel"],link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Complete your DPP",source:"ESPR DPP delegated act (apparel)"},
@@ -4109,7 +4109,7 @@ function getVisibleNav(){
   } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
   // Launch IA: parked features hidden from nav by default. Flip back via
   // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
-  var PARKED_IDS = ['report','compare','bizcase','cfo','pitch','find','sourcing','circular','suppliers'];
+  var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers'];
   var showParked = false;
   try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
   if(!showParked){
@@ -4724,7 +4724,8 @@ function renderRegStrip(){
   strip.innerHTML=`<span class="dl-title">⚠ Upcoming deadlines</span>`+
     relevant.map(r=>{
       const d=daysUntil(r.deadline);
-      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span><button class="dl-arrow" onclick="showPage('${r.link}')">→</button></span>`;
+      const hasLink = !!(r.link && r.link.length); // no live page → no arrow (honest affordance — mirrors the calendar L32109)
+      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span>${hasLink?`<button class="dl-arrow" onclick="showPage('${r.link}')">→</button>`:''}</span>`;
     }).join('');
 }
 
@@ -7238,7 +7239,7 @@ function renderReadinessHero(){
   var numColor='var(--accent)'; /* hero numeral + spine + bar tip: teal ALL tiers (brand identity); tier label carries status signal */
   var label=pct>=85?'Listing ready':pct>=70?'Pitch ready':pct>=50?'Nearly ready':'Building';
   var topBlocker=bestBlockers.filter(function(b){return b.level==='red';})[0]||bestBlockers[0];
-  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;retail-comms&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
+  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;pitch&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
   return '<div class="hero">'+
     '<div class="hero-row">'+
       '<div class="hero-num">'+pct+'<small>/100</small></div>'+
@@ -21314,27 +21315,27 @@ const PIF_REQUIREMENTS = [
   // A. Product description
   {id:'prod_desc',     section:'A', label:'Product description',             description:'Trade name, intended use, target group (gender/age), and country of manufacture.',           check: b=>!!(b?.name),                          fixPage:'brand',    fixLabel:'Add brand name',     severity:'blocker'},
   {id:'inci',          section:'A', label:'INCI ingredient list',             description:'Full INCI declaration in descending order of weight (>1%) and alphabetical below 1%.',      check: (b,s)=>!!(s?.inci||s?.ingredients),       fixPage:'skus',     fixLabel:'Add INCI list',      severity:'blocker'},
-  {id:'function',      section:'A', label:'Function of ingredients',          description:'Brief description of role of each ingredient in the formulation.',                          check: ()=>false,                                fixPage:'skus',     fixLabel:'Add ingredient notes',severity:'required'},
+  {id:'function',      section:'A', label:'Function of ingredients',          description:'Brief description of role of each ingredient in the formulation.',                          check: ()=>false,                                fixPage:null,     fixLabel:'Add ingredient notes',severity:'required'},
   {id:'impurities',    section:'A', label:'Impurity / trace substance check', description:'Statement that raw materials conform to GMP and impurity levels are within limits.',        check: ()=>false,                                fixPage:null,       fixLabel:'Prepare statement',  severity:'required'},
   // B. Cosmetic product safety assessment
-  {id:'safety_assess', section:'B', label:'Safety Assessment',                description:'Signed by EU-qualified safety assessor. Must reference EU Regulation 1223/2009 Annex I.', check: (b,s)=>!!(s?.safetyAssessment||s?.safetyAssessor||b?.safetyAssessment), fixPage:'skus', fixLabel:'Upload safety report', severity:'blocker'},
+  {id:'safety_assess', section:'B', label:'Safety Assessment',                description:'Signed by EU-qualified safety assessor. Must reference EU Regulation 1223/2009 Annex I.', check: (b,s)=>!!(s?.safetyAssessment||s?.safetyAssessor||b?.safetyAssessment), fixPage:null, fixLabel:'Upload safety report', severity:'blocker'},
   {id:'safety_profile',section:'B', label:'Cosmetic safety profile',          description:'Physicochemical + microbiological specifications; impurity levels; packaging compatibility.',check: ()=>false,                               fixPage:null,       fixLabel:'Compile safety profile',severity:'required'},
   // C. Manufacturing method
   {id:'gmp',           section:'C', label:'GMP certificate or statement',     description:'ISO 22716 compliance certificate or signed statement from manufacturer.',                  check: (b,s)=>!!(s?.gmpCert||s?.gmpStatement||s?.gmp), fixPage:null, fixLabel:'Request from mfr', severity:'required'},
   // D. Proof of claimed effects
   {id:'claims_proof',  section:'D', label:'Claims substantiation',            description:'Evidence for each claim: clinical study, consumer test, expert opinion, or literature ref.',check: ()=>false,                               fixPage:'claims',   fixLabel:'Build claims evidence',severity:'required'},
   // E. Animal testing data
-  {id:'no_animal',     section:'E', label:'Animal testing statement',          description:'Declaration that product + ingredients have not been tested on animals post-March 2013.',  check: (b,s)=>!!(s?.noAnimalTesting||s?.crueltyFree||b?.crueltyFree), fixPage:'skus', fixLabel:'Add declaration', severity:'required'},
+  {id:'no_animal',     section:'E', label:'Animal testing statement',          description:'Declaration that product + ingredients have not been tested on animals post-March 2013.',  check: (b,s)=>!!(s?.noAnimalTesting||s?.crueltyFree||b?.crueltyFree), fixPage:null, fixLabel:'Add declaration', severity:'required'},
   // F. EU Responsible Person
   {id:'eu_rp',         section:'F', label:'EU Responsible Person',            description:'Appointed EU RP with name, address, contact. Mandatory for EU market.',                    check: b=>!!(b?.euResponsible?.name), fixPage:'rp-marketplace', fixLabel:'Appoint EU RP', severity:'blocker'},
   {id:'eu_rp_contact', section:'F', label:'EU RP contact details on file',   description:'EU RP email and postal address.',                                                           check: b=>!!(b?.euResponsible?.email), fixPage:'rp-marketplace', fixLabel:'Add RP contact', severity:'required'},
   // G. CPNP notification
   {id:'cpnp',          section:'G', label:'CPNP notification',               description:'Notification via portal.cpnp.eu before first EU placement. Product reference number.',     check: (b,s)=>!!(s?.cpnpRef||s?.cpnp||b?.cpnpRef), fixPage:'skus', fixLabel:'Notify at cpnp.eu', severity:'blocker'},
   // H. UK-specific (if UK market targeted)
-  {id:'uk_rp',         section:'H', label:'UK Responsible Person (UK market)',description:'Separate UK RP required for Great Britain. Not covered by EU RP post-Brexit.',             check: b=>!!(b?.ukRP||b?.ukRpName||b?.ukResponsiblePerson), fixPage:'brand', fixLabel:'Appoint UK RP', severity:'uk_only'},
-  {id:'uk_scpn',       section:'H', label:'UK SCPN registration (UK market)', description:'Submit to OPSS Submit Cosmetic Product Notification portal before UK placement.',         check: (b,s)=>!!(s?.ukScpn||s?.scpnRef||b?.ukScpn), fixPage:'skus', fixLabel:'Register at SCPN portal', severity:'uk_only'},
+  {id:'uk_rp',         section:'H', label:'UK Responsible Person (UK market)',description:'Separate UK RP required for Great Britain. Not covered by EU RP post-Brexit.',             check: b=>!!(b?.ukRP||b?.ukRpName||b?.ukResponsiblePerson), fixPage:null, fixLabel:'Appoint UK RP', severity:'uk_only'},
+  {id:'uk_scpn',       section:'H', label:'UK SCPN registration (UK market)', description:'Submit to OPSS Submit Cosmetic Product Notification portal before UK placement.',         check: (b,s)=>!!(s?.ukScpn||s?.scpnRef||b?.ukScpn), fixPage:null, fixLabel:'Register at SCPN portal', severity:'uk_only'},
   // I. Labelling
-  {id:'label_eu',      section:'I', label:'EU label compliance',              description:'Product name, nominal content, date of minimum durability or PAO, precautions, batch ref, RP details.', check: (b,s)=>!!(s?.ean||s?.labelLanguages||s?.labelCompliant), fixPage:'skus', fixLabel:'Review label spec', severity:'required'},
+  {id:'label_eu',      section:'I', label:'EU label compliance',              description:'Product name, nominal content, date of minimum durability or PAO, precautions, batch ref, RP details.', check: (b,s)=>!!(s?.ean||s?.labelLanguages||s?.labelCompliant), fixPage:null, fixLabel:'Review label spec', severity:'required'},
   {id:'ean',           section:'I', label:'EAN-13 barcode',                   description:'Valid EAN-13 registered with GS1. Required by all Nordic retailers.',                      check: (b,s)=>!!(s?.ean),                        fixPage:'skus',     fixLabel:'Add EAN',            severity:'blocker'},
   // J. REACH / SVHC
   {id:'svhc_check',    section:'J', label:'SVHC declaration (REACH)',          description:'Confirm no Substances of Very High Concern (SVHC) above 0.1% in finished product. SCIP database notification required for articles containing SVHC above 0.1%.',
@@ -32981,8 +32982,8 @@ function handleDeepLink(){
   // Hash-aware init route at init() calls handleDeepLink() before showPage('home'),
   // so this list determines what bookmarks/hard-reload-to-hash actually work.
   const validPages = [
-    // Brand section (parked pages — report/compare/pitch/bizcase/cfo — removed: no live page to land on)
-    'home','skus','claims','brandpack',
+    // Brand section (pitch un-parked → valid again; report/compare/bizcase/cfo remain parked)
+    'home','skus','claims','pitch','brandpack',
     // Source section (parked — find/suppliers/sourcing/circular — removed)
     'dpp','csrd','reg_monitor',
     // Retailer Relations section
@@ -32990,8 +32991,7 @@ function handleDeepLink(){
     // Admin (gated behind localStorage flag, but valid as deep-link target if user has flag set)
     'atm-admin'
   ];
-  // 'pitch' has a live equivalent (Buyer Comms); other parked deep-links fall through to home.
-  if(page==='pitch'){ showPage('retail-comms'); return true; }
+  // Remaining parked deep-links (report/compare/bizcase/cfo/find/suppliers/sourcing/circular) fall through to home.
   if(!validPages.includes(page)) return false;
 
   // Handle param-specific deep links
