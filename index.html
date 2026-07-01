@@ -7161,7 +7161,7 @@ function renderVerificationCard(){
     !claimsState.result.split('---').some(b=>b.includes('STATUS: RED')||b.includes('STATUS:RED'));
 
   const t1Reqs = [
-    {label:'Brand profile 100% complete', done: profilePct>=100, action:"showPage('home')", detail: profilePct<100?`${profilePct}% complete — fill all required fields`:''},
+    {label:'Complete your brand profile', done: profilePct>=100, action:"showPage('home')", detail: profilePct<100?`${profilePct}% complete — fill all required fields`:''},
     {label:'At least one SKU added',       done: hasSku,          action:"showPage('skus')", detail: !hasSku?'Add your hero product in My Products':''},
     {label:'Readiness score >70 for one market', done: bestReadiness>=70, action:"showPage('home')", detail: bestReadiness>0?`Best: ${bestMarket} at ${bestReadiness}`:' Run market readiness check'},
     {label:'No unresolved RED claims',     done: noRedClaims,     action:"showPage('claims')", detail: !noRedClaims?'Unresolved RED claims in Claim Localizer':''},
@@ -16247,6 +16247,8 @@ function renderBrandPack(el){
         </div>
       </div>
 
+      <div style="background:var(--accent-soft);border:1px solid var(--line-strong);border-left:3px solid var(--accent);padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:var(--ink-soft);line-height:1.6">[HONESTY_BANNER_BRANDPACK: This pack uses only data you've entered and verified. Empty fields are shown as "Not set," never invented.]</div>
+
       ${renderMagicLinkCard()}
 
       <div class="card" style="margin-bottom:1rem">
@@ -16322,6 +16324,97 @@ function renderBrandPack(el){
   `;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Generator honesty enforcement (Retailer Pitch + Brand Pack) — Stage 1 (26 Jun 2026)
+// Both generators are LLM-based (callAPI) — honesty is enforced at PROMPT + POST-GEN
+// VERIFY, never a template gate. The verify pass FLAGS unsourced claims for the user;
+// it NEVER rewrites the prose (breakage risk). ONE shared scanner backs both generators.
+// ════════════════════════════════════════════════════════════════════════════
+
+// (c) STRATEGY fills — AI-tell / filler phrases a buyer pitch should never contain.
+// Placeholder set; Charlotte swaps/extends.
+const PITCH_AI_BLOCKLIST = [
+  'quick question',
+  'I hope this email finds you',
+  'thought this might be useful',
+  'I wanted to reach out',
+  'reaching out to',
+  'circle back',
+  'touch base',
+  'just following up',
+  'game-changer',
+  "in today's fast-paced",
+];
+
+// Compliance-CERTAINTY assertions that must never appear unless the provided data
+// block backs them (flag-never-certify, applied to generated prose). Heuristic; tunable.
+const _COMPLIANCE_CERTAINTY_PATTERNS = [
+  /\bverified\b/i,
+  /\bsubstantiated?\b/i,
+  /\bfully\s+compliant\b/i,
+  /\bcompliance\s+(?:confirmed|complete)\b/i,
+  /full[^.\n]{0,40}certification/i,
+  /✓\s*confirmed/i,
+  /claims?\s+audit\s*(?:result)?\s*[:=]?\s*(?:✓|complete|passed|confirmed)/i,
+  /\bclinically\s+(?:proven|substantiated)\b/i,
+];
+
+// Shared post-gen scanner. Returns the claim-shaped tokens in `text` NOT traceable to
+// `allowed` (sanctioned figures) or, for compliance assertions, not present in
+// `allowedComplianceText`. Conservative + heuristic — v1 FLAGS, never blocks/rewrites.
+function extractUnsourcedClaims(text, allowed, allowedComplianceText){
+  if(!text) return [];
+  const allowedFlat = (allowed||[]).filter(Boolean).map(a=>String(a).toLowerCase().replace(/\s+/g,''));
+  const compOk = String(allowedComplianceText||'').toLowerCase();
+  const flags = [], seen = {};
+  const push = s => { const k=String(s).toLowerCase().trim(); if(k&&!seen[k]){ seen[k]=1; flags.push(String(s).trim()); } };
+  const traceable = tok => { const t=tok.toLowerCase().replace(/\s+/g,''); return allowedFlat.some(a=> a && (a.includes(t)||t.includes(a))); };
+  const numPatterns = [
+    /\b\d{1,3}%[^.\n]{0,30}?(?:repeat|growth|retention|sell-?through|conversion|margin|uplift)?/gi,
+    /\b[\d,]{2,}\s*(?:units|transactions|followers|customers|reviews|stores|orders|subscribers)\b/gi,
+    /\b\d+(?:\.\d+)?\s*\/\s*5\b/gi,
+    /\bn\s*=\s*\d+/gi,
+    /\b\d+(?:\.\d+)?x\b/gi,
+    /\b\d+\s*-?\s*month[^.\n]{0,25}(?:cycle|repeat|retention|purchase)/gi,
+    /\b(?:SEK|DKK|NOK|EUR|GBP|kr|£|€)\s?[\d,]{2,}/gi,
+    /\b[\d,]{2,}\s?(?:SEK|DKK|NOK|EUR|GBP|kr)\b/gi,
+  ];
+  numPatterns.forEach(re=>{ let m; while((m=re.exec(text))!==null){ const tok=(m[0]||'').trim(); if(tok && !traceable(tok)) push(tok); } });
+  _COMPLIANCE_CERTAINTY_PATTERNS.forEach(re=>{ const m=text.match(re); if(m){ const tok=m[0].trim(); if(!compOk.includes(tok.toLowerCase())) push(tok); } });
+  return flags;
+}
+
+// Count distinct "asks" in a pitch body — more than one CTA hurts reply rates.
+function _countPitchAsks(text){
+  if(!text) return 0;
+  const m = text.match(/(?:call|meeting|sample|chat|connect|\b15[\s-]*min|range\s+review|ship|send)[^?.!\n]{0,70}\?/gi);
+  return m ? m.length : 0;
+}
+
+// A4 — post-gen verify for a pitch body. Returns {clean, flagged, multiCta}.
+function verifyPitchProof(bodyText, allowedNumbers, allowedComplianceText){
+  const flags = extractUnsourcedClaims(bodyText, allowedNumbers, allowedComplianceText);
+  (PITCH_AI_BLOCKLIST||[]).forEach(p=>{
+    if(!p) return;
+    try{ if(new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(bodyText)) flags.push('AI phrase: "'+p+'"'); }catch(e){}
+  });
+  const multiCta = _countPitchAsks(bodyText) > 1;
+  return { clean: flags.length===0 && !multiCta, flagged: flags, multiCta };
+}
+
+// B4 — post-gen verify for a Brand Pack. complianceData = the EXACT block fed to the
+// prompt (a status present there is allowed; an upgraded ✓ on an absent item is not).
+function verifyBrandPackProof(text, allowedNumbers, complianceData){
+  const flags = extractUnsourcedClaims(text, allowedNumbers, complianceData);
+  return { clean: flags.length===0, flagged: flags };
+}
+
+// Shared FLAG copy (STRATEGY may swap). kind: 'pitch'|'pack'.
+function honestyFlagCopy(kind, list){
+  const what = kind==='pack' ? 'pack' : 'draft';
+  return '[FLAG_COPY: This '+what+' contains claims VeyaFlow did not source: '+(list||[]).join(', ')+'. Verify or remove before sending.]';
+}
+
 async function generateBrandPack(){
   if(!brandPackState.retailer){
     const sel2 = document.getElementById('bp-retailer-err')||document.createElement('div');
@@ -16378,6 +16471,19 @@ Category manager argument: "We don't just add one SKU — we lift the entire rou
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
 
+  // hasProof gates every quantitative section — no verified numbers → no invented numbers (B2).
+  const hasProof = proofPoints.length > 0;
+
+  // COMPLIANCE DATA — read from the SAME structured fields the page-1/PDF snapshot uses
+  // (heroSku.cpnp / euResponsible / safetyRef / certifications) so Section 5 can never
+  // contradict the snapshot or upgrade an absent item to ✓ (B3).
+  const complianceData = [
+    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
+    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
+    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+  ].join('\n');
+
   const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. April 2026.
 
 BRAND CONTEXT:
@@ -16387,7 +16493,10 @@ Price point: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':brand.pricePoint||'Premium'
 ${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.certifications?.length?' | Certs: '+heroSku.certifications.join(', '):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
 
 VERIFIED COMMERCIAL PROOF (use exactly — do not estimate differently):
-${proofPoints||'[No proof points set — describe as estimates]'}
+${proofPoints||'NO VERIFIED COMMERCIAL PROOF AVAILABLE. Do NOT invent, estimate, or project any revenue, units, repeat rate, review score, social following, press mention, sell-through, velocity, or basket figure. Omit all such numbers. Write qualitative positioning only.'}
+
+COMPLIANCE DATA (render EXACTLY — do not upgrade a missing item to present):
+${complianceData}
 
 RETAILER INTELLIGENCE:
 Tone required: ${cover.tone}
@@ -16409,7 +16518,7 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 3 paragraphs ONLY:
 P1: What ${brand.name} sells and who buys it (buyer briefing, not brand story)
 P2: Why entering ${market} now — one specific 2026 timing argument referencing ${retailer}'s current strategy
-P3: What Year 1 success looks like in numbers at ${retailer}
+P3: ${hasProof?`What Year 1 success looks like in numbers at ${retailer}`:`Describe what Year 1 success looks like at ${retailer} QUALITATIVELY — what good looks like — WITHOUT inventing unit, revenue, or volume figures`}
 
 ## SECTION 2 — Product Highlights
 For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
@@ -16417,7 +16526,7 @@ For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
 - Key claims with compliance status (Green/Amber/Red) for ${market}
 - Certifications
 - Basket position: Step X of routine — pairs naturally with [product types]
-- Velocity benchmark: projected units/store/week based on home market data
+${hasProof?'- Velocity benchmark: projected units/store/week based on home market data':'(Omit any velocity / units-per-store projection — no verified home-market data exists; do not invent one)'}
 
 ## SECTION 3 — Market Fit & Competitive Positioning
 ${posMap?'Use the competitive positioning table provided above.':'Describe where '+brand.name+' sits in the '+market+' category.'}
@@ -16425,17 +16534,16 @@ Identify the specific white space — what is missing at ${retailer} that ${bran
 Do NOT use generic market size figures. Use shelf-level framing.
 
 ## SECTION 4 — Commercial Proof
-Evidence pyramid — hardest proof first:
+${hasProof?`Evidence pyramid — hardest proof first:
 Tier 1: Revenue/units data (verified numbers above — lead with these)
 Tier 2: Repeat purchase and review data
 Tier 3: Social and press signals
 End with: velocity benchmark — "At our SE sell-through rate, we project X units/store/week at ${retailer}."
-Do not lead with social following. It is the weakest proof type.
+Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
 ## SECTION 5 — Compliance & Sustainability
-For EACH compliance item, explain what it means for ${retailer}'s risk — not just list it.
-Format: [Item]: ✓/✗ → Means: [what this removes from ${retailer}'s risk register]
-Include: CPNP status, EU RP, claims audit result, EUDR status, certifications.
+Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, explain what that status means for ${retailer}'s risk — not just list it.
+If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
 ${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
 Language register: ${retailer} compliance team, not brand marketing.
 
@@ -16458,9 +16566,13 @@ NEVER write "please don't hesitate to contact us."`;
     brandPackState.result = text;
     brandPackState.generating = false;
     brandPackState.timestamp = new Date().toISOString();
+    // B4 — post-gen honesty verify: flag unsourced numbers + compliance overclaims.
+    const _bpAllowed = [proofPoints, basketData, posMap, (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):''].filter(Boolean);
+    brandPackState.verify = verifyBrandPackProof(text, _bpAllowed, complianceData);
   }catch(err){
     brandPackState.generating = false;
     brandPackState.result = 'ERROR:'+err.message;
+    brandPackState.verify = null;
   }
   renderBrandPack(document.getElementById('page-brandpack'));
 }
@@ -16484,8 +16596,14 @@ function renderBrandPackResult(el){
     return {title: lines[0].replace(/SECTION \d+ — /,'').trim(), body: lines.slice(1).join('\n').trim()};
   });
 
+  // B4 — surface the honesty flag above the rendered pack (and the PDF path, separately).
+  const _bpFlag = (brandPackState.verify && !brandPackState.verify.clean)
+    ? `<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.7rem .9rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.62rem;color:#B32A1F;line-height:1.6">${honestyFlagCopy('pack', brandPackState.verify.flagged)}</div>`
+    : '';
+
   el.innerHTML=`
     <div class="page-wrap">
+      ${_bpFlag}
       <div class="topbar">
         <div>
           <div class="page-title">Brand Pack</div>
@@ -23705,13 +23823,15 @@ function renderPitch(el){
       <div class="topbar">
         <div>
           <div class="page-title">${catLabel}</div>
-          <div class="page-sub">Lead with the buyer's problem, not your brand story. Under 150 words.</div>
+          <div class="page-sub">Lead with the buyer's problem, not your brand story. Target 75-125 words.</div>
         </div>
       </div>
 
+      <div style="background:var(--accent-soft);border:1px solid var(--line-strong);border-left:3px solid var(--accent);padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:var(--ink-soft);line-height:1.6">[HONESTY_BANNER_PITCH: VeyaFlow only uses the numbers you enter — we never invent stats.]</div>
+
       ${pitchResult ? renderPitchResult() : `
       <div style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)">
-        ◎ Lead with the buyer's problem, not your brand story. Under 150 words. Three tone variants generated at once.
+        ◎ Lead with the buyer's problem, not your brand story. Target 75-125 words. Three tone variants generated at once.
       </div>
       <div class="card" style="margin-bottom:1rem">
         <div class="section-tag">Target</div>
@@ -23756,7 +23876,7 @@ function renderPitch(el){
             brand.reviewScore   ? `Reviews: ${brand.reviewScore} avg` : null,
             brand.clinicalClaims? `Clinical: ${brand.clinicalClaims}` : null,
           ].filter(Boolean).map(p=>`<div>${p}</div>`).join('')||
-          '<div style="color:var(--muted)">No proof points set — <span onclick="showPage(\'home\')" style="cursor:pointer;color:var(--gold);text-decoration:underline">add them on Brand Home</span></div>'}
+          '<div style="color:var(--muted)">No proof points set — <span onclick="resetBrand()" style="cursor:pointer;color:var(--gold);text-decoration:underline">edit your Brand Profile</span> to add Revenue &amp; sales data.</div>'}
         </div>
         <div class="field"><label class="lbl">Add any recent news or hook for this pitch <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(press mention, award, new stockist)</span></label>
           <input type="text" id="p-hook" value="${pitchForm.hook||''}" placeholder="e.g. Just listed in Selfridges. Won Best New Brand at CEW 2026." oninput="pitchForm.hook=this.value"></div>
@@ -24212,10 +24332,10 @@ function buildAsk(){
   const retailer = pitchForm.retailer||'the retailer';
   const intel = PITCH_INTEL[retailer];
   const reviewDate = intel?.rangeReview || 'their next range review';
-  if(stage==='cold')    return `15-minute call this month`;
+  if(stage==='cold')    return `15 minutes next week — Tuesday or Thursday?`;
   if(stage==='followup')return `Range review meeting — ${retailer} reviews in ${reviewDate}`;
   if(stage==='warm')    return `Sample send and data pack — can I ship to your office?`;
-  return '15-minute call this month';
+  return '15 minutes next week — Tuesday or Thursday?';
 }
 
 async function generatePitch(){
@@ -24271,7 +24391,7 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
 
   const numbersStr = numbers.length>0
     ? numbers.join(' | ')
-    : 'Include 2-3 credible commercial proof points based on the brand description — flag clearly as estimates';
+    : 'NO VERIFIED METRICS PROVIDED. Do NOT invent, estimate, project, or imply any statistic, percentage, count, rate, cycle, or currency figure. Write the pitch around positioning and product only. Omit every quantified proof claim.';
 
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
@@ -24302,39 +24422,44 @@ THE ASK: ${ask}
 Generate THREE email variants. For EACH variant output in this EXACT format:
 
 VARIANT: [Direct & Commercial]
-SUBJECT: [max 8 words]
+SUBJECT: [6-10 words, ~36-50 chars]
 BODY:
 [email body]
 LINKEDIN: [max 300 chars, one question that invites reply]
 ---
 VARIANT: [Brand Story-Led]
-SUBJECT: [max 8 words]
+SUBJECT: [6-10 words, ~36-50 chars]
 BODY:
 [email body]
 LINKEDIN: [max 300 chars, one question that invites reply]
 ---
 VARIANT: [Trend-Anchored]
-SUBJECT: [max 8 words]
+SUBJECT: [6-10 words, ~36-50 chars]
 BODY:
 [email body]
 LINKEDIN: [max 300 chars, one question that invites reply]
 ---
 
 HARD RULES FOR ALL THREE VARIANTS:
-1. Subject line: MAX 8 WORDS. References retailer name or specific category — not brand name
+1. Subject line: 6-10 WORDS, ~36-50 characters. References retailer name or specific category — not brand name
 2. Opening line: References something SPECIFIC to ${retailer} in 2026 — not generic flattery, not "I hope this email finds you well"
-3. Paragraph 2: EXACTLY the 3 commercial numbers provided above — no more, no estimates
-4. ONE ask only. One next step. Use: "${ask}"
-5. Total email: UNDER 150 WORDS
+3. ${numbers.length>0?`Paragraph 2: EXACTLY the ${numbers.length} commercial numbers provided above — no more, no estimates`:`Do NOT state any numeric proof of any kind. No invented figures, projections, or 'typical/estimated' numbers.`}
+4. EXACTLY ONE call-to-action. One next step — use: "${ask}". A second ask of any kind is a failure.
+5. Total email: TARGET 75-125 WORDS (hard ceiling 150)
 6. End with: "View our verified brand profile: [VeyaFlow Brand Pack link]"
-7. NO: "I hope", "Reaching out to", "I wanted to", "Please find attached"
+7. NO filler / AI-tell phrases. Banned: ${(PITCH_AI_BLOCKLIST||[]).map(p=>'"'+p+'"').join(', ')}, "Please find attached".
 8. Direct & Commercial = numbers first, no brand story
 9. Brand Story-Led = founder origin in one sentence, then commercial
-10. Trend-Anchored = opens with a specific 2026 trend, connects brand to it`;
+10. Trend-Anchored = opens with a specific 2026 trend, connects brand to it
+11. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 1400);
-    pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString()};
+    // A4 — post-gen honesty verify: flags unsourced numbers/compliance overclaims + multi-CTA.
+    const _pAllowed = numbers.concat([pitchForm.pricePoint||'', (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):'']).filter(Boolean);
+    const _pCompliance = ((heroSku&&heroSku.certifications)?heroSku.certifications.join(' '):'')+' '+((heroSku&&heroSku.claims)?heroSku.claims.join(' '):'');
+    const _pVerify = verifyPitchProof(text, _pAllowed, _pCompliance);
+    pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
@@ -24472,7 +24597,11 @@ function renderPitchResult(){
     ? active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink)
     : active.body;
 
+  const _pFlag = (pitchResult.verify && !pitchResult.verify.clean)
+    ? `<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:#B32A1F;line-height:1.6">${honestyFlagCopy('pitch', pitchResult.verify.flagged)}${pitchResult.verify.multiCta?' · More than one ask detected — single-CTA emails reply better.':''}</div>`
+    : '';
   return `
+    ${_pFlag}
     <!-- Header -->
     <div style="background:var(--accent);padding:1rem 1.25rem;margin-bottom:1rem">
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem">Generated for</div>
@@ -24516,7 +24645,7 @@ function renderPitchResult(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
         <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Email body</div>
         <div style="display:flex;gap:.35rem;align-items:center">
-          <span style="font-family:var(--mono);font-size:.5rem;background:${wordCount<=150?'#ECFDF5':'#FFFBEB'};color:${wordCount<=150?'#065F46':'#92400E'};padding:.1rem .3rem">${wordCount} words${wordCount<=150?' ✓':' — over 150'}</span>
+          <span style="font-family:var(--mono);font-size:.5rem;background:${wordCount<=125?'#ECFDF5':wordCount<=150?'#FFFBEB':'#FBEAE7'};color:${wordCount<=125?'#065F46':wordCount<=150?'#92400E':'#B32A1F'};padding:.1rem .3rem">${wordCount} words · ${wordCount<=125?'good':wordCount<=150?'above target':'too long — reply rates drop'}</span>
         </div>
       </div>
       <div class="email-box" style="margin-bottom:.75rem">${bodyWithLink.replace(/\n/g,'<br>')}</div>
@@ -29331,6 +29460,13 @@ async function generateBrandPackPDF(){
     doc.text('Generated by VeyaFlow · veyaflow.com', pageW/2, pageH-15, {align:'center'});
     doc.setTextColor(180,180,180);
     doc.text('Confidential — not for distribution', pageW/2, pageH-9, {align:'center'});
+    // B4 — honesty flag on the cover (white band) when the verify pass flagged claims.
+    // The PDF is what reaches the buyer, so the flag MUST surface here, not just on screen.
+    if(brandPackState.verify && !brandPackState.verify.clean){
+      pdfSetFont(doc, 'body'); doc.setFontSize(9);
+      doc.setTextColor(179,42,31); // #B32A1F
+      pdfWrap(doc, honestyFlagCopy('pack', brandPackState.verify.flagged), margin, pageH*0.68+14, contentW, 4.6);
+    }
 
     // ── PAGE 2: Brand Overview ──
     doc.addPage();
