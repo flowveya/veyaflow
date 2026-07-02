@@ -16357,6 +16357,17 @@ const _COMPLIANCE_CERTAINTY_PATTERNS = [
   /✓\s*confirmed/i,
   /claims?\s+audit\s*(?:result)?\s*[:=]?\s*(?:✓|complete|passed|confirmed)/i,
   /\bclinically\s+(?:proven|substantiated)\b/i,
+  // Stage 2.1 — assurance-PHRASE class (multi-word verdicts the single-token list misses).
+  // Kept tight: honest status like "appointment in progress" / "not on file" must NOT match.
+  /\bno\s+regulatory\s+risk\b/i,
+  /\b(?:retailer|buyer|you)\s+(?:hold|holds|carry|carries|bear|bears)\s+no\s+(?:regulatory\s+)?risk\b/i,
+  /\bmay\s+stock\s+without\s+delay\b/i,
+  /\bwithout\s+regulatory\s+(?:delay|risk|liability)\b/i,
+  /\bcompliance\s+(?:structure\s+)?is\s+(?:set|established|complete|in\s+place)\b/i,
+  /\b(?:device\s+)?compliance\s+is\s+established\b/i,
+  /\bfully\s+(?:notified|registered|documented)\b/i,
+  /\bzero\s+(?:regulatory\s+)?(?:risk|liability)\b/i,
+  /\bno\s+(?:import|onboarding|audit)\s+(?:hold|risk|delay)\b/i,
 ];
 
 // Shared post-gen scanner. Returns the claim-shaped tokens in `text` NOT traceable to
@@ -16515,6 +16526,8 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 - Under 600 words total across all sections.
 - The basket figures are CATEGORY-TYPICAL retailer/category averages, NOT ${brand.name}'s data. Present them explicitly as a category pattern / illustrative routine economics. NEVER state or imply ${brand.name} has measured this basket uplift.
 - NEVER invent a net-to-retailer price or margin %. State RSP only unless a verified wholesale/margin figure is provided; if none, say commercial terms are "to be discussed."
+- NEVER issue a risk assurance ("no regulatory risk", "stock without delay", "no liability", "fully compliant", "compliance is set/established/complete"). State the factual status only — the retailer's own regulatory assessment is theirs to make.
+- Use ONLY the verified figures provided. Do NOT project, extrapolate, or derive NEW numbers from them — no units/store/week velocity, no margin-requirement %, no annual-investment figure, no AV/MSEK contribution — unless that exact figure is in the verified data. Reference the real numbers; do not multiply them into projections.
 
 ## SECTION 1 — Brand Overview
 3 paragraphs ONLY:
@@ -16528,7 +16541,7 @@ For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
 - Key claims with compliance status (Green/Amber/Red) for ${market}
 - Certifications
 - Basket position: Step X of routine — pairs naturally with [product types]
-${hasProof?'- Velocity benchmark: projected units/store/week based on home market data':'(Omit any velocity / units-per-store projection — no verified home-market data exists; do not invent one)'}
+${hasProof?'- Reference the verified sell-through / units figures as provided — do NOT derive a units/store/week velocity projection unless that exact figure is in the data':'(Omit any velocity / units-per-store projection — no verified home-market data exists; do not invent one)'}
 
 ## SECTION 3 — Market Fit & Competitive Positioning
 ${posMap?'Use the competitive positioning table provided above.':'Describe where '+brand.name+' sits in the '+market+' category.'}
@@ -16540,11 +16553,11 @@ ${hasProof?`Evidence pyramid — hardest proof first:
 Tier 1: Revenue/units data (verified numbers above — lead with these)
 Tier 2: Repeat purchase and review data
 Tier 3: Social and press signals
-End with: velocity benchmark — "At our SE sell-through rate, we project X units/store/week at ${retailer}."
+Reference the verified numbers as provided. Do NOT project a velocity benchmark or derive units/store/week — no extrapolated figures unless they are in the verified data.
 Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
 ## SECTION 5 — Compliance & Sustainability
-Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, explain what that status means for ${retailer}'s risk — not just list it.
+Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict.
 If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
 ${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
 Language register: ${retailer} compliance team, not brand marketing.
@@ -24413,7 +24426,7 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
   const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
   if(_pitchStage==='warm' || _pitchStage==='followup') _pitchArchetypes.push({name:'Brand Story-Led', rule:'founder origin in one sentence, then commercial'});
   _pitchArchetypes.push({name:'Trend-Anchored', rule:'opens with a specific 2026 trend, connects brand to it'});
-  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed'});
+  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed. State each item\'s factual status only; NEVER assert compliance "is set", "is established", or "is complete", or that the buyer carries "no risk" / "no liability"; if items are outstanding, say so — describe status, never certify risk-free'});
   const _countWord = _pitchArchetypes.length===3?'THREE':_pitchArchetypes.length===4?'FOUR':String(_pitchArchetypes.length);
   const _variantFormat = _pitchArchetypes.map(a=>`VARIANT: [${a.name}]\nSUBJECT: [6-10 words, ~36-50 chars]\nBODY:\n[email body]\nLINKEDIN: [max 300 chars, one question that invites reply]\n---`).join('\n');
   const _archetypeRules = _pitchArchetypes.map((a,i)=>`${8+i}. ${a.name} = ${a.rule}`).join('\n');
@@ -24457,7 +24470,9 @@ HARD RULES FOR ALL VARIANTS:
 6. End with: "View our verified brand profile: [VeyaFlow Brand Pack link]"
 7. NO filler / AI-tell phrases. Banned: ${(PITCH_AI_BLOCKLIST||[]).map(p=>'"'+p+'"').join(', ')}, "Please find attached".
 ${_archetypeRules}
-${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.`;
+${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.
+${9+_pitchArchetypes.length}. NEVER issue a risk assurance — do not say compliance "is set/established/complete", or that the buyer/retailer carries "no risk", "no liability", or "may stock without delay". State factual status only; if items are outstanding, say so.
+${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures into new numbers (velocity, per-store, per-week, annualised, margin %, investment). Use only the figures provided, as provided.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 1400);
