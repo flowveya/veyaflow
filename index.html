@@ -16454,6 +16454,9 @@ ${neighbours.map(n=>`${n.tier} | ${n.brand} | ${n.origin} | ${n.clinical} | ${n.
 [YOU] | ${brand.name} | Swedish | [based on brand claims] | [RSP]
 Show where ${brand.name} sits relative to these brands. Identify the white space.` : '';
 
+  // hasProof gates the quantitative sections (B2) — defined here so basket math can use it too (D1 ordering).
+  const hasProof = proofPoints.length > 0;
+
   // Basket economics
   const routineStep = heroSku?.routineStep || 3;
   const basketStep = `step${routineStep}` in basket ? basket[`step${routineStep}`] : basket.step3;
@@ -16461,18 +16464,15 @@ Show where ${brand.name} sits relative to these brands. Identify the white space
     .map(s=>({step:s, val:basket[`step${s}`]||basket.step3, currency:basket.currency}));
   const basketTotal = basketPairs.reduce((sum,p)=>sum+p.val, 0);
   const basketData = `
-BASKET ECONOMICS FOR SECTION 6 (use these exact numbers):
-${brand.name} occupies Step ${routineStep} of the routine.
-If ${brand.name} drives a Step ${routineStep} purchase, the natural basket additions are:
-${basketPairs.map(p=>`Step ${p.step}: avg addition ${p.val} ${p.currency}`).join('\n')}
-Total basket uplift potential: ${basketTotal} ${basket.currency} per transaction.
-Category manager argument: "We don't just add one SKU — we lift the entire routine bay by ${basketTotal} ${basket.currency}."`;
+CATEGORY-TYPICAL BASKET PATTERN (retailer/category averages — NOT ${brand.name}'s measured data; label as such):
+${brand.name} sits at Step ${routineStep} of the routine.
+For a Step ${routineStep} purchase at this retailer, the CATEGORY-TYPICAL adjacent-step additions are:
+${basketPairs.map(p=>`Step ${p.step}: category-typical addition ${p.val} ${p.currency}`).join('\n')}
+Category-typical adjacent-step value: ~${basketTotal} ${basket.currency} per transaction (category pattern, not brand-measured).
+Framing to use: "typical Step-${routineStep} baskets at this retailer add ~${basketTotal} ${basket.currency} in adjacent-step value (category pattern, not ${brand.name}-measured)."`;
 
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
-
-  // hasProof gates every quantitative section — no verified numbers → no invented numbers (B2).
-  const hasProof = proofPoints.length > 0;
 
   // COMPLIANCE DATA — read from the SAME structured fields the page-1/PDF snapshot uses
   // (heroSku.cpnp / euResponsible / safetyRef / certifications) so Section 5 can never
@@ -16513,6 +16513,8 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 - Use ## for section headers.
 - Numbers from the verified proof above are facts — never estimate or round them differently.
 - Under 600 words total across all sections.
+- The basket figures are CATEGORY-TYPICAL retailer/category averages, NOT ${brand.name}'s data. Present them explicitly as a category pattern / illustrative routine economics. NEVER state or imply ${brand.name} has measured this basket uplift.
+- NEVER invent a net-to-retailer price or margin %. State RSP only unless a verified wholesale/margin figure is provided; if none, say commercial terms are "to be discussed."
 
 ## SECTION 1 — Brand Overview
 3 paragraphs ONLY:
@@ -16522,7 +16524,7 @@ P3: ${hasProof?`What Year 1 success looks like in numbers at ${retailer}`:`Descr
 
 ## SECTION 2 — Product Highlights
 For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
-- RSP and proposed net price to ${retailer}
+- RSP only — do NOT state a net-to-retailer price or margin %; none is on file. Note commercial terms are "to be discussed."
 - Key claims with compliance status (Green/Amber/Red) for ${market}
 - Certifications
 - Basket position: Step X of routine — pairs naturally with [product types]
@@ -16683,6 +16685,7 @@ function renderBrandPackResult(el){
             <div style="font-family:var(--mono);font-size:.75rem;color:${cover.accent};font-weight:700;opacity:.5">${String(i+1).padStart(2,'0')}</div>
             <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--navy);letter-spacing:.1em;text-transform:uppercase">${s.title}</div>
           </div>
+          ${/basket|routine/i.test(s.title||'')?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--ink-mute);margin:-.35rem 0 .55rem;line-height:1.5">[BASKET_PROVENANCE: Category-typical pattern — retailer/category averages, not ${brand.name}-measured data.]</div>`:''}
           <div class="prose">${parseMarkdown(s.body)}</div>
         </div>
       `).join('')}
@@ -23831,7 +23834,7 @@ function renderPitch(el){
 
       ${pitchResult ? renderPitchResult() : `
       <div style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)">
-        ◎ Lead with the buyer's problem, not your brand story. Target 75-125 words. Three tone variants generated at once.
+        ◎ Lead with the buyer's problem, not your brand story. Target 75-125 words. Multiple tone variants at once — Direct &amp; Commercial leads (cold pitches omit Brand Story-Led).
       </div>
       <div class="card" style="margin-bottom:1rem">
         <div class="section-tag">Target</div>
@@ -24396,6 +24399,25 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
 
+  // ── Stage-2 archetypes (conditioned on the already-wired pitchForm.stage) ──
+  // Direct & Commercial always LEADS (index 0). Brand Story-Led only for warm/followup
+  // (founder origin is wrong for a cold buyer). Compliance-Anchored — VeyaFlow's real
+  // differentiator — is included at every stage, honesty-constrained to real status only.
+  const _pitchStage = pitchForm.stage||'cold';
+  const _pitchCompliance = [
+    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
+    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
+    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+  ].join('\n');
+  const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
+  if(_pitchStage==='warm' || _pitchStage==='followup') _pitchArchetypes.push({name:'Brand Story-Led', rule:'founder origin in one sentence, then commercial'});
+  _pitchArchetypes.push({name:'Trend-Anchored', rule:'opens with a specific 2026 trend, connects brand to it'});
+  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed'});
+  const _countWord = _pitchArchetypes.length===3?'THREE':_pitchArchetypes.length===4?'FOUR':String(_pitchArchetypes.length);
+  const _variantFormat = _pitchArchetypes.map(a=>`VARIANT: [${a.name}]\nSUBJECT: [6-10 words, ~36-50 chars]\nBODY:\n[email body]\nLINKEDIN: [max 300 chars, one question that invites reply]\n---`).join('\n');
+  const _archetypeRules = _pitchArchetypes.map((a,i)=>`${8+i}. ${a.name} = ${a.rule}`).join('\n');
+
   const prompt = `You are a retail sales expert writing buyer pitch emails for a ${brand?.category||'consumer'} brand entering ${pitchForm.targetMarket}.
 
 BRAND: ${brand?.name||pitchForm.brandName}
@@ -24417,30 +24439,16 @@ AVOID: ${intel.avoid}
 COMMERCIAL NUMBERS (verified — do not change or estimate differently):
 ${numbersStr}
 
+COMPLIANCE STATUS (render EXACTLY — for the Compliance-Anchored variant; never upgrade an absent item to present):
+${_pitchCompliance}
+
 THE ASK: ${ask}
 
-Generate THREE email variants. For EACH variant output in this EXACT format:
+Generate ${_countWord} email variants — Direct & Commercial FIRST (the primary variant). For EACH variant output in this EXACT format:
 
-VARIANT: [Direct & Commercial]
-SUBJECT: [6-10 words, ~36-50 chars]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
-VARIANT: [Brand Story-Led]
-SUBJECT: [6-10 words, ~36-50 chars]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
-VARIANT: [Trend-Anchored]
-SUBJECT: [6-10 words, ~36-50 chars]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
+${_variantFormat}
 
-HARD RULES FOR ALL THREE VARIANTS:
+HARD RULES FOR ALL VARIANTS:
 1. Subject line: 6-10 WORDS, ~36-50 characters. References retailer name or specific category — not brand name
 2. Opening line: References something SPECIFIC to ${retailer} in 2026 — not generic flattery, not "I hope this email finds you well"
 3. ${numbers.length>0?`Paragraph 2: EXACTLY the ${numbers.length} commercial numbers provided above — no more, no estimates`:`Do NOT state any numeric proof of any kind. No invented figures, projections, or 'typical/estimated' numbers.`}
@@ -24448,17 +24456,16 @@ HARD RULES FOR ALL THREE VARIANTS:
 5. Total email: TARGET 75-125 WORDS (hard ceiling 150)
 6. End with: "View our verified brand profile: [VeyaFlow Brand Pack link]"
 7. NO filler / AI-tell phrases. Banned: ${(PITCH_AI_BLOCKLIST||[]).map(p=>'"'+p+'"').join(', ')}, "Please find attached".
-8. Direct & Commercial = numbers first, no brand story
-9. Brand Story-Led = founder origin in one sentence, then commercial
-10. Trend-Anchored = opens with a specific 2026 trend, connects brand to it
-11. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.`;
+${_archetypeRules}
+${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 1400);
     // A4 — post-gen honesty verify: flags unsourced numbers/compliance overclaims + multi-CTA.
     const _pAllowed = numbers.concat([pitchForm.pricePoint||'', (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):'']).filter(Boolean);
-    const _pCompliance = ((heroSku&&heroSku.certifications)?heroSku.certifications.join(' '):'')+' '+((heroSku&&heroSku.claims)?heroSku.claims.join(' '):'');
-    const _pVerify = verifyPitchProof(text, _pAllowed, _pCompliance);
+    // allowedComplianceText = the real status block, so the Compliance-Anchored variant's
+    // honest statements aren't false-flagged; overclaims beyond it still flag (E4).
+    const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
     pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
     savePageState('ns_pitchResult', pitchResult);
@@ -24577,11 +24584,12 @@ function renderPitchResult(){
     return '';
   }
 
-  const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑'};
+  const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑','Compliance-Anchored':'◇'};
   const variantDesc  = {
     'Direct & Commercial':'Numbers first. No brand story. Buyer sees ROI in 10 seconds.',
     'Brand Story-Led':'Founder origin in one sentence, then commercial proof. Use when buyer has met you.',
     'Trend-Anchored':'Opens with a specific 2026 trend. Best for trend-driven retailers (Lyko, Kicks).',
+    'Compliance-Anchored':"[COMPLIANCE_ARCHETYPE_DESC: Leads with regulatory de-risking — real compliance status only. VeyaFlow's differentiator.]",
   };
 
   // Magic link — γ architecture: append ?retailer=slug when Magic Link exists,
@@ -24618,7 +24626,7 @@ function renderPitchResult(){
         <div onclick="pitchActiveVariant=${i};renderPitch(document.getElementById('page-pitch'))"
           style="flex:1;min-width:140px;padding:.6rem .85rem;border:1px solid ${pitchActiveVariant===i?'var(--accent)':'var(--border)'};background:${pitchActiveVariant===i?'var(--accent)':'#fff'};cursor:pointer;transition:all .15s">
           <div style="font-family:var(--mono);font-size:.75rem;color:${pitchActiveVariant===i?'var(--gold)':'var(--muted)'};">${variantIcons[p.variant]||'◌'}</div>
-          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${pitchActiveVariant===i?'#fff':'var(--navy)'};margin-top:.1rem">${p.variant}</div>
+          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${pitchActiveVariant===i?'#fff':'var(--navy)'};margin-top:.1rem">${p.variant}${p.variant==='Direct & Commercial'?` <span style="font-weight:400;font-size:.5rem;color:${pitchActiveVariant===i?'var(--gold)':'var(--accent)'}">· PRIMARY</span>`:''}</div>
           <div style="font-family:var(--sans);font-size:.62rem;color:${pitchActiveVariant===i?'rgba(255,255,255,.55)':'var(--muted)'};margin-top:.1rem;line-height:1.4">${variantDesc[p.variant]||''}</div>
         </div>
       `).join('')}
@@ -29544,6 +29552,10 @@ async function generateBrandPackPDF(){
       doc.addPage();
       pdfHeader(doc, section.title, `${brand?.name||'Brand'} · ${retailer} · ${market}`, cover.accent, pageW);
       let sy = 40;
+      if(/basket|routine/i.test(section.title||'')){
+        pdfSetFont(doc,'small'); doc.setTextColor(127,160,162); // --ink-mute
+        sy = pdfWrap(doc, '[BASKET_PROVENANCE: Category-typical pattern — retailer/category averages, not '+(brand?.name||'the brand')+'-measured data.]', margin, sy, contentW, 4.2) + 2;
+      }
       pdfSetFont(doc, 'body');
       doc.setTextColor(40,40,40);
       // Split body into paragraphs
