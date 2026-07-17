@@ -23798,17 +23798,9 @@ function renderPitch(el){
   // guards called renderPitch() back mid-render, and the nested innerHTML was
   // clobbered when the outer call completed with an empty result string. Now we
   // clear a stale/malformed pitchResult here so the ternary falls to the form.
-  if(pitchResult){
-    var _valid = pitchResult.text && typeof pitchResult.text === 'string';
-    if(_valid){
-      var _blocks = pitchResult.text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.includes('VARIANT:');});
-      var _hasBody = _blocks.some(function(b){var m=b.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/);return m&&m[1]&&m[1].trim().length>20;});
-      if(!_hasBody) _valid = false;
-    }
-    if(!_valid){
-      pitchResult = null;
-      try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
-    }
+  if(pitchResult && !isPitchTextValid(pitchResult.text)){
+    pitchResult = null;
+    try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
   }
 
   // Pre-fill from brand profile — always refresh from canonical brand state (Apr 2026)
@@ -24354,6 +24346,19 @@ function buildAsk(){
   return '15 minutes next week — Tuesday or Thursday?';
 }
 
+// Shared pitch-parse validity check — used by BOTH generatePitch (pre-toast) and the
+// renderPitch guard, so the two can NEVER diverge. Core check: text parses into VARIANT
+// blocks with at least one real BODY. Optional minBlocks adds generate-time strictness
+// (expect one block per archetype); the render guard calls it WITHOUT minBlocks (lenient —
+// render whatever parses) since it can't know the archetype count on a reload.
+function isPitchTextValid(text, minBlocks){
+  if(!text || typeof text !== 'string') return false;
+  var blocks = text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.indexOf('VARIANT:')>=0;});
+  if(!blocks.length) return false;
+  if(minBlocks && blocks.length < minBlocks) return false;
+  return blocks.some(function(b){ var m=b.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/); return m&&m[1]&&m[1].trim().length>20; });
+}
+
 async function generatePitch(){
   const retailer = pitchForm.retailer;
   if(!retailer){
@@ -24461,6 +24466,8 @@ Generate ${_countWord} email variants — Direct & Commercial FIRST (the primary
 
 ${_variantFormat}
 
+OUTPUT FORMAT IS MANDATORY. Return EXACTLY these blocks, each starting with the literal token "VARIANT:" and separated by a line containing only ---. Do not add preamble, commentary, or markdown. Every VARIANT block MUST contain SUBJECT:, BODY:, and LINKEDIN: lines.
+
 HARD RULES FOR ALL VARIANTS:
 1. Subject line: 6-10 WORDS, ~36-50 characters. References retailer name or specific category — not brand name
 2. Opening line: References something SPECIFIC to ${retailer} in 2026 — not generic flattery, not "I hope this email finds you well"
@@ -24475,11 +24482,22 @@ ${9+_pitchArchetypes.length}. NEVER issue a risk assurance — do not say compli
 ${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures into new numbers (velocity, per-store, per-week, annualised, margin %, investment). Use only the figures provided, as provided.`;
 
   try{
-    const text = await callAPI([{role:'user',content:prompt}], 1400);
+    let text = await callAPI([{role:'user',content:prompt}], 1400);
+    // Validate BEFORE any success toast — the toast must only ever reflect a real render.
+    // Format-drift from the heavy multi-archetype prompt is usually transient → regenerate
+    // ONCE (single-retry guard, no loop). Reuses isPitchTextValid so generate + render agree.
+    if(!isPitchTextValid(text, _pitchArchetypes.length)) text = await callAPI([{role:'user',content:prompt}], 1400);
+    if(!isPitchTextValid(text, _pitchArchetypes.length)){
+      // Both attempts unusable — honest failure: NO success toast, form + inputs preserved.
+      if(btn){btn.disabled=false;btn.textContent=`Generate ${getCatLabel('pitch')||'Retailer Pitch'} →`;}
+      const _pfErr = document.getElementById('pitch-error');
+      if(_pfErr) _pfErr.innerHTML = errCard('Draft not usable', "[PITCH_GEN_FAILED: The draft didn't come back in a usable format. Try Generate again — this is usually transient.]", 'Try again', 'generatePitch()');
+      return;
+    }
     // A4 — post-gen honesty verify: flags unsourced numbers/compliance overclaims + multi-CTA.
+    // allowedComplianceText = the real status block, so the Compliance-Anchored variant's honest
+    // statements aren't false-flagged; overclaims beyond it still flag (E4).
     const _pAllowed = numbers.concat([pitchForm.pricePoint||'', (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):'']).filter(Boolean);
-    // allowedComplianceText = the real status block, so the Compliance-Anchored variant's
-    // honest statements aren't false-flagged; overclaims beyond it still flag (E4).
     const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
     pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
