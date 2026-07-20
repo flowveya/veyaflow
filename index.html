@@ -16368,6 +16368,13 @@ const _COMPLIANCE_CERTAINTY_PATTERNS = [
   /\bfully\s+(?:notified|registered|documented)\b/i,
   /\bzero\s+(?:regulatory\s+)?(?:risk|liability)\b/i,
   /\bno\s+(?:import|onboarding|audit)\s+(?:hold|risk|delay)\b/i,
+  // Stage 2.1.1 — "documentation/docs current" family. Anchored on compliance/doc context
+  // so benign "current premium tier" / "current stock levels" do NOT false-flag (tested).
+  /\b(?:all\s+)?(?:compliance\s+)?documentation\s+(?:is\s+)?current\b/i,
+  /\b(?:compliance\s+)?docs?\s+(?:are\s+)?current\b/i,
+  /\ball\s+compliance\s+(?:documentation|docs?|paperwork)\b/i,
+  /\bcompliance\s+(?:documentation|paperwork)\s+(?:current|complete|in\s+order|handled|sorted)\b/i,
+  /\beverything\s+(?:is\s+)?(?:in\s+order|handled|current|sorted|squared\s+away)\b/i,
 ];
 
 // Shared post-gen scanner. Returns the claim-shaped tokens in `text` NOT traceable to
@@ -16526,7 +16533,7 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 - Under 600 words total across all sections.
 - The basket figures are CATEGORY-TYPICAL retailer/category averages, NOT ${brand.name}'s data. Present them explicitly as a category pattern / illustrative routine economics. NEVER state or imply ${brand.name} has measured this basket uplift.
 - NEVER invent a net-to-retailer price or margin %. State RSP only unless a verified wholesale/margin figure is provided; if none, say commercial terms are "to be discussed."
-- NEVER issue a risk assurance ("no regulatory risk", "stock without delay", "no liability", "fully compliant", "compliance is set/established/complete"). State the factual status only — the retailer's own regulatory assessment is theirs to make.
+- COMPLIANCE HONESTY (absolute): state each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that the retailer holds no regulatory risk. Do NOT summarise items as "all documentation current" or similar. If an item is outstanding, say so. Describe status; never certify — the retailer's own regulatory assessment is theirs to make. This applies to paraphrases and new wordings, not only the examples given.
 - Use ONLY the verified figures provided. Do NOT project, extrapolate, or derive NEW numbers from them — no units/store/week velocity, no margin-requirement %, no annual-investment figure, no AV/MSEK contribution — unless that exact figure is in the verified data. Reference the real numbers; do not multiply them into projections.
 
 ## SECTION 1 — Brand Overview
@@ -16557,7 +16564,7 @@ Reference the verified numbers as provided. Do NOT project a velocity benchmark 
 Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
 ## SECTION 5 — Compliance & Sustainability
-Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict.
+Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict. Never summarise across items as "all documentation current" / "compliance ready" or any blanket completeness/currency assertion — even as a paraphrase.
 If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
 ${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
 Language register: ${retailer} compliance team, not brand marketing.
@@ -24431,7 +24438,7 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
   const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
   if(_pitchStage==='warm' || _pitchStage==='followup') _pitchArchetypes.push({name:'Brand Story-Led', rule:'founder origin in one sentence, then commercial'});
   _pitchArchetypes.push({name:'Trend-Anchored', rule:'opens with a specific 2026 trend, connects brand to it'});
-  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed. State each item\'s factual status only; NEVER assert compliance "is set", "is established", or "is complete", or that the buyer carries "no risk" / "no liability"; if items are outstanding, say so — describe status, never certify risk-free'});
+  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed. State each item\'s factual status only; NEVER assert — in any wording (incl. "documentation current", "all handled", "ready", "in order") — that compliance is current/complete/done or that the buyer carries no risk; if items are outstanding, say so. Describe status, never certify — this applies to paraphrases and new wordings, not only these examples'});
   const _countWord = _pitchArchetypes.length===3?'THREE':_pitchArchetypes.length===4?'FOUR':String(_pitchArchetypes.length);
   const _variantFormat = _pitchArchetypes.map(a=>`VARIANT: [${a.name}]\nSUBJECT: [6-10 words, ~36-50 chars]\nBODY:\n[email body]\nLINKEDIN: [max 300 chars, one question that invites reply]\n---`).join('\n');
   const _archetypeRules = _pitchArchetypes.map((a,i)=>`${8+i}. ${a.name} = ${a.rule}`).join('\n');
@@ -24478,7 +24485,7 @@ HARD RULES FOR ALL VARIANTS:
 7. NO filler / AI-tell phrases. Banned: ${(PITCH_AI_BLOCKLIST||[]).map(p=>'"'+p+'"').join(', ')}, "Please find attached".
 ${_archetypeRules}
 ${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.
-${9+_pitchArchetypes.length}. NEVER issue a risk assurance — do not say compliance "is set/established/complete", or that the buyer/retailer carries "no risk", "no liability", or "may stock without delay". State factual status only; if items are outstanding, say so.
+${9+_pitchArchetypes.length}. COMPLIANCE HONESTY (absolute): State each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that there is no regulatory risk. If an item is "Not started" / "Not set" / "unknown", you may not imply it is done. Do not summarise multiple items as "all documentation current" or similar. Describe status; never certify. This applies to paraphrases and new wordings, not only the examples given.
 ${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures into new numbers (velocity, per-store, per-week, annualised, margin %, investment). Use only the figures provided, as provided.`;
 
   try{
