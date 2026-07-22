@@ -1197,11 +1197,12 @@ const SUSTAINABILITY_GOALS = [
 ];
 
 const NEXT_STEPS = {
-  idea:     [{icon:"◌",label:"Find a manufacturer",page:"find",desc:"Source verified, sustainable factories already compliant with your target markets"},{icon:"◎",label:"Validate the market",page:"report",desc:"Market sizing, retail landscape and compliance requirements before you commit"}],
-  product:  [{icon:"◎",label:"Generate a market entry report",page:"report",desc:"Full market intelligence — retail landscape, pricing, compliance checklist, 90-day plan"},{icon:"⇄",label:"Compare target markets",page:"compare",desc:"Side-by-side analysis to pick the right market to enter first"}],
-  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer email in the retailer's language, personalised to their priorities"},{icon:"◎",label:"Open a new market",page:"report",desc:"Intelligence report for your next market entry — retailer map, compliance, pricing"}],
-  expanding:[{icon:"◈",label:"Audit supplier compliance",page:"suppliers",desc:"Risk-score your supply chain and auto-chase missing data before retailers ask for it"},{icon:"⇄",label:"Prioritise your next market",page:"compare",desc:"Data-driven comparison to decide where to expand next"}],
-  scaling:  [{icon:"◈",label:"Supply chain risk report",page:"suppliers",desc:"Identify and remediate high-risk suppliers — EUDR, audit status, data gaps"},{icon:"◉",label:"ESPR deadstock routing",page:"circular",desc:"Route unsold inventory to verified circular partners, generate Article 24 disclosure"}],
+  // Live destinations only (parked pages removed). Per-stage picks are sensible defaults — Strategy-tunable.
+  idea:     [{icon:"▦",label:"Add your products",page:"skus",desc:"Build your product hub — everything in VeyaFlow reads from here"},{icon:"◎",label:"Check what you can claim",page:"claims",desc:"See which claims are defensible in your target markets before you commit"}],
+  product:  [{icon:"◎",label:"Check what you can claim",page:"claims",desc:"Run the Claim Localizer across your target markets before you print or pitch"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets from your verified data"}],
+  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer pitch in the retailer's language, personalised to their priorities"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send with your pitch"}],
+  expanding:[{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Produce the line sheet and spec sheets retailers ask for"},{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Follow every retailer submission and chase stalled reviews"}],
+  scaling:  [{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Keep every retailer submission moving and spot stalls early"},{icon:"◉",label:"Plan your seasonal calendar",page:"seasonal",desc:"Line up buyer windows and seasonal ranges for your next push"}],
 };
 
 // confidence/market/actionLabel added 19 Jun 2026 (Compliance Calendar v1). ADDITIVE —
@@ -1226,7 +1227,7 @@ const REG_DEADLINES = [
   {id:"omnibus_ingredient_ii",title:"Omnibus II ingredient restrictions apply",deadline:"2027-01-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Apply Omnibus II ingredient restrictions",source:"Commission Reg (EU) 2026/909"},
   {id:"cmr_omnibus_viii",title:"CMR Omnibus VIII — substance bans (verify formulae)",deadline:"2026-05-01",cat:["Skincare & Beauty"],link:"skus",confidence:"confirmed",market:"EU",actionLabel:"Verify formulae against CMR Omnibus VIII bans",source:"Commission Reg (EU) 2026/78"},
   {id:"ppwr",title:"PPWR packaging requirements apply",deadline:"2026-08-12",cat:null,link:"dpp",confidence:"confirmed",market:"EU",actionLabel:"Meet PPWR packaging requirements",source:"Reg (EU) 2025/40 (PPWR)"},
-  {id:"epr_dk",title:"Danish EPR packaging registration",deadline:"2025-10-01",cat:null,link:"home",confidence:"confirmed",market:"DK",actionLabel:"Register for Danish packaging EPR",source:"Strategy deadline research (20 Jun 2026)"},
+  {id:"epr_dk",title:"Danish EPR packaging registration",deadline:"2025-10-01",cat:null,link:"",confidence:"confirmed",market:"DK",actionLabel:"Register for Danish packaging EPR",source:"Strategy deadline research (20 Jun 2026)"},
   {id:"uk_cmr_si_2026_23_labelling",title:"UK SI 2026/23 — labelling requirements in force",deadline:"2026-07-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Meet UK SI 2026/23 labelling requirements",source:"UK SI 2026/23"},
   {id:"uk_cmr_si_2026_23_cmrban",title:"UK SI 2026/23 — CMR substance bans in force",deadline:"2026-08-15",cat:["Skincare & Beauty"],link:"claims",confidence:"confirmed",market:"UK",actionLabel:"Verify formulae against UK SI 2026/23 CMR bans",source:"UK SI 2026/23"},
   {id:"dpp_apparel",title:"EU Digital Product Passport mandatory for apparel",deadline:"2027-01-01",cat:["Fashion & Apparel"],link:"dpp",confidence:"proposed",market:"EU",actionLabel:"Complete your DPP",source:"ESPR DPP delegated act (apparel)"},
@@ -4108,7 +4109,7 @@ function getVisibleNav(){
   } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
   // Launch IA: parked features hidden from nav by default. Flip back via
   // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
-  var PARKED_IDS = ['report','compare','bizcase','cfo','pitch','find','sourcing','circular','suppliers'];
+  var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers'];
   var showParked = false;
   try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
   if(!showParked){
@@ -4723,7 +4724,8 @@ function renderRegStrip(){
   strip.innerHTML=`<span class="dl-title">⚠ Upcoming deadlines</span>`+
     relevant.map(r=>{
       const d=daysUntil(r.deadline);
-      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span><button class="dl-arrow" onclick="showPage('${r.link}')">→</button></span>`;
+      const hasLink = !!(r.link && r.link.length); // no live page → no arrow (honest affordance — mirrors the calendar L32109)
+      return `<span class="dl-item"><span class="dl-days">${d}d</span><span class="dl-name">${r.title}</span>${hasLink?`<button class="dl-arrow" onclick="showPage('${r.link}')">→</button>`:''}</span>`;
     }).join('');
 }
 
@@ -7159,7 +7161,7 @@ function renderVerificationCard(){
     !claimsState.result.split('---').some(b=>b.includes('STATUS: RED')||b.includes('STATUS:RED'));
 
   const t1Reqs = [
-    {label:'Brand profile 100% complete', done: profilePct>=100, action:"showPage('home')", detail: profilePct<100?`${profilePct}% complete — fill all required fields`:''},
+    {label:'Complete your brand profile', done: profilePct>=100, action:"showPage('home')", detail: profilePct<100?`${profilePct}% complete — fill all required fields`:''},
     {label:'At least one SKU added',       done: hasSku,          action:"showPage('skus')", detail: !hasSku?'Add your hero product in My Products':''},
     {label:'Readiness score >70 for one market', done: bestReadiness>=70, action:"showPage('home')", detail: bestReadiness>0?`Best: ${bestMarket} at ${bestReadiness}`:' Run market readiness check'},
     {label:'No unresolved RED claims',     done: noRedClaims,     action:"showPage('claims')", detail: !noRedClaims?'Unresolved RED claims in Claim Localizer':''},
@@ -7308,8 +7310,7 @@ function renderNextActions(){
   // via requiredRetailers). This deduplicates the alert and ensures all retailers
   // are equal in the system — the brand's targeting determines what surfaces.
 
-  if(!savedReports.length)
-    actions.push({icon:'◎',label:'Generate your first Market Report',desc:'Full intelligence brief for your target market',page:'report',time:'3 min'});
+  // (Market Report next-action removed — report is launch-parked, no live equivalent.)
 
   const steps = NEXT_STEPS[brand.stage]||NEXT_STEPS.trading||[];
   steps.slice(0, 3-actions.length).forEach(s=>actions.push({icon:s.icon,label:s.label,desc:s.desc,page:s.page,time:'5 min'}));
@@ -7421,7 +7422,7 @@ const COMPLIANCE_RADAR_ITEMS = [
   // goods on the Italian market. Pattern matches FTI / Grønt Punkt.
   {id:'conai_it',      label:'CONAI packaging register',       categories:['all'],                      markets:['Italy'],                       check:(b,s)=>b?.conaiRegistered?'green':'amber',                    actionPage:'home',        actionLabel:'Register with CONAI for Italian packaging compliance'},
   // Norway
-  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'report', actionLabel:'Check Norway Customs Checklist'},
+  {id:'no_customs',    label:'Norwegian customs declaration',  categories:['all'],                      markets:['Norway'],                      check:(b,s)=>{const ch=safeJsonParse(localStorage.getItem('ns_no_customs_checks'),{});return Object.keys(ch).filter(k=>ch[k]).length>=5?'green':Object.keys(ch).filter(k=>ch[k]).length>=2?'amber':'red';}, actionPage:'', actionLabel:''},
   // Norwegian VAT (MVA) — registration required only when annual NO sales exceed NOK 50,000.
   // Below threshold + confirmed → info. Threshold unknown → amber. Above + unregistered → red. Registered → green.
   {id:'no_vat',        label:'Norwegian VAT (MVA) registration',categories:['all'],                     markets:['Norway'],
@@ -7448,7 +7449,7 @@ const COMPLIANCE_RADAR_ITEMS = [
     },
   },
   // Cross-category
-  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>isEudrCompliant(s?.eudrStatus)||isEudrCompliant(b?.eudrStatus)?'green':'amber', actionPage:'suppliers', actionLabel:'Complete in Ingredient Traceability'},
+  {id:'eudr',          label:'EUDR due diligence',             categories:['food_beverage','fashion_apparel','wellness_supplement','cosmetic_skincare'], markets:['all_eu'], check:(b,s)=>isEudrCompliant(s?.eudrStatus)||isEudrCompliant(b?.eudrStatus)?'green':'amber', actionPage:'', actionLabel:''},
   {id:'dpp',           label:'Digital Product Passport',       categories:['all'],                      markets:['all_eu'],                      check:(b,s)=>s?.dppGenerated||s?.dppId?'green':'amber',             actionPage:'dpp',         actionLabel:'Generate in DPP Generator'},
   {id:'csrd',          label:'CSRD supply chain disclosure',   categories:['all'],                      markets:['all_eu','United Kingdom'],     check:(b,s)=>{const a=safeJsonParse(localStorage.getItem('ns_csrd_answers'),{});const filled=Object.keys(a).filter(k=>a[k]).length;return filled>=10?'green':filled>=5?'amber':'amber';}, actionPage:'csrd', actionLabel:'Generate in CSRD Pack'},
 ];
@@ -7555,7 +7556,7 @@ function renderComplianceRadar(){
 
   return `
     <div class="card">
-      <div class="card-h">Compliance radar <a onclick="showPage('report')">Full report <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+      <div class="card-h">Compliance radar</div>
       <div class="csum${csumCls}">
         <div class="big">${criticalCount?`${criticalCount} critical gap${criticalCount>1?'s':''} · `:''}${reds.length} red · ${ambers.length} action${ambers.length!==1?'s':''}</div>
         <div class="sub">${relevant.length} regulation${relevant.length!==1?'s':''} applicable · ${greens.length} covered${infos.length?` · ${infos.length} below threshold`:''}</div>
@@ -7716,22 +7717,10 @@ function renderDashboard(el){
 
         ${renderTargetRetailersPicker()}
 
-        <div style="margin-top:24px">
-          <div class="sec-lbl">Saved reports <span class="ct">${savedReports.length}</span></div>
-          ${reports.length===0?smartEmpty("report"):reports.map(r=>`
-            ${renderContextFixNotice(r.id)}
-            <div class="saved-report" onclick="expandReport('${r.id}')">
-              <div style="display:flex;justify-content:space-between">
-                <div>
-                  <div class="saved-report-meta">${r.category} · ${r.currentMarket||''} → ${r.targetMarket}</div>
-                  <div class="saved-report-name">${r.brandName}</div>
-                  <div class="saved-report-date">${r.date}${r.generatedBy?' · by '+r.generatedBy:''} · ${r.sections?.length||0} sections</div>
-                </div>
-                <button onclick="event.stopPropagation();deleteReport('${r.id}')" style="background:none;border:none;color:var(--red-text);cursor:pointer;font-size:.7rem;align-self:flex-start">✕</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
+        <!-- Saved-reports section removed (parked-routing sweep): the Market Report feature
+             is launch-parked. Both its empty state and its saved-report cards routed into
+             that parked feature from the live home. Restore this block when the report
+             feature un-parks. -->
 
         ${renderSupplierRiskAlerts()}
 
@@ -16258,6 +16247,8 @@ function renderBrandPack(el){
         </div>
       </div>
 
+      <div style="background:var(--accent-soft);border:1px solid var(--line-strong);border-left:3px solid var(--accent);padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:var(--ink-soft);line-height:1.6">[HONESTY_BANNER_BRANDPACK: This pack uses only data you've entered and verified. Empty fields are shown as "Not set," never invented.]</div>
+
       ${renderMagicLinkCard()}
 
       <div class="card" style="margin-bottom:1rem">
@@ -16333,6 +16324,115 @@ function renderBrandPack(el){
   `;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Generator honesty enforcement (Retailer Pitch + Brand Pack) — Stage 1 (26 Jun 2026)
+// Both generators are LLM-based (callAPI) — honesty is enforced at PROMPT + POST-GEN
+// VERIFY, never a template gate. The verify pass FLAGS unsourced claims for the user;
+// it NEVER rewrites the prose (breakage risk). ONE shared scanner backs both generators.
+// ════════════════════════════════════════════════════════════════════════════
+
+// (c) STRATEGY fills — AI-tell / filler phrases a buyer pitch should never contain.
+// Placeholder set; Charlotte swaps/extends.
+const PITCH_AI_BLOCKLIST = [
+  'quick question',
+  'I hope this email finds you',
+  'thought this might be useful',
+  'I wanted to reach out',
+  'reaching out to',
+  'circle back',
+  'touch base',
+  'just following up',
+  'game-changer',
+  "in today's fast-paced",
+];
+
+// Compliance-CERTAINTY assertions that must never appear unless the provided data
+// block backs them (flag-never-certify, applied to generated prose). Heuristic; tunable.
+const _COMPLIANCE_CERTAINTY_PATTERNS = [
+  /\bverified\b/i,
+  /\bsubstantiated?\b/i,
+  /\bfully\s+compliant\b/i,
+  /\bcompliance\s+(?:confirmed|complete)\b/i,
+  /full[^.\n]{0,40}certification/i,
+  /✓\s*confirmed/i,
+  /claims?\s+audit\s*(?:result)?\s*[:=]?\s*(?:✓|complete|passed|confirmed)/i,
+  /\bclinically\s+(?:proven|substantiated)\b/i,
+  // Stage 2.1 — assurance-PHRASE class (multi-word verdicts the single-token list misses).
+  // Kept tight: honest status like "appointment in progress" / "not on file" must NOT match.
+  /\bno\s+regulatory\s+risk\b/i,
+  /\b(?:retailer|buyer|you)\s+(?:hold|holds|carry|carries|bear|bears)\s+no\s+(?:regulatory\s+)?risk\b/i,
+  /\bmay\s+stock\s+without\s+delay\b/i,
+  /\bwithout\s+regulatory\s+(?:delay|risk|liability)\b/i,
+  /\bcompliance\s+(?:structure\s+)?is\s+(?:set|established|complete|in\s+place)\b/i,
+  /\b(?:device\s+)?compliance\s+is\s+established\b/i,
+  /\bfully\s+(?:notified|registered|documented)\b/i,
+  /\bzero\s+(?:regulatory\s+)?(?:risk|liability)\b/i,
+  /\bno\s+(?:import|onboarding|audit)\s+(?:hold|risk|delay)\b/i,
+  // Stage 2.1.1 — "documentation/docs current" family. Anchored on compliance/doc context
+  // so benign "current premium tier" / "current stock levels" do NOT false-flag (tested).
+  /\b(?:all\s+)?(?:compliance\s+)?documentation\s+(?:is\s+)?current\b/i,
+  /\b(?:compliance\s+)?docs?\s+(?:are\s+)?current\b/i,
+  /\ball\s+compliance\s+(?:documentation|docs?|paperwork)\b/i,
+  /\bcompliance\s+(?:documentation|paperwork)\s+(?:current|complete|in\s+order|handled|sorted)\b/i,
+  /\beverything\s+(?:is\s+)?(?:in\s+order|handled|current|sorted|squared\s+away)\b/i,
+];
+
+// Shared post-gen scanner. Returns the claim-shaped tokens in `text` NOT traceable to
+// `allowed` (sanctioned figures) or, for compliance assertions, not present in
+// `allowedComplianceText`. Conservative + heuristic — v1 FLAGS, never blocks/rewrites.
+function extractUnsourcedClaims(text, allowed, allowedComplianceText){
+  if(!text) return [];
+  const allowedFlat = (allowed||[]).filter(Boolean).map(a=>String(a).toLowerCase().replace(/\s+/g,''));
+  const compOk = String(allowedComplianceText||'').toLowerCase();
+  const flags = [], seen = {};
+  const push = s => { const k=String(s).toLowerCase().trim(); if(k&&!seen[k]){ seen[k]=1; flags.push(String(s).trim()); } };
+  const traceable = tok => { const t=tok.toLowerCase().replace(/\s+/g,''); return allowedFlat.some(a=> a && (a.includes(t)||t.includes(a))); };
+  const numPatterns = [
+    /\b\d{1,3}%[^.\n]{0,30}?(?:repeat|growth|retention|sell-?through|conversion|margin|uplift)?/gi,
+    /\b[\d,]{2,}\s*(?:units|transactions|followers|customers|reviews|stores|orders|subscribers)\b/gi,
+    /\b\d+(?:\.\d+)?\s*\/\s*5\b/gi,
+    /\bn\s*=\s*\d+/gi,
+    /\b\d+(?:\.\d+)?x\b/gi,
+    /\b\d+\s*-?\s*month[^.\n]{0,25}(?:cycle|repeat|retention|purchase)/gi,
+    /\b(?:SEK|DKK|NOK|EUR|GBP|kr|£|€)\s?[\d,]{2,}/gi,
+    /\b[\d,]{2,}\s?(?:SEK|DKK|NOK|EUR|GBP|kr)\b/gi,
+  ];
+  numPatterns.forEach(re=>{ let m; while((m=re.exec(text))!==null){ const tok=(m[0]||'').trim(); if(tok && !traceable(tok)) push(tok); } });
+  _COMPLIANCE_CERTAINTY_PATTERNS.forEach(re=>{ const m=text.match(re); if(m){ const tok=m[0].trim(); if(!compOk.includes(tok.toLowerCase())) push(tok); } });
+  return flags;
+}
+
+// Count distinct "asks" in a pitch body — more than one CTA hurts reply rates.
+function _countPitchAsks(text){
+  if(!text) return 0;
+  const m = text.match(/(?:call|meeting|sample|chat|connect|\b15[\s-]*min|range\s+review|ship|send)[^?.!\n]{0,70}\?/gi);
+  return m ? m.length : 0;
+}
+
+// A4 — post-gen verify for a pitch body. Returns {clean, flagged, multiCta}.
+function verifyPitchProof(bodyText, allowedNumbers, allowedComplianceText){
+  const flags = extractUnsourcedClaims(bodyText, allowedNumbers, allowedComplianceText);
+  (PITCH_AI_BLOCKLIST||[]).forEach(p=>{
+    if(!p) return;
+    try{ if(new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(bodyText)) flags.push('AI phrase: "'+p+'"'); }catch(e){}
+  });
+  const multiCta = _countPitchAsks(bodyText) > 1;
+  return { clean: flags.length===0 && !multiCta, flagged: flags, multiCta };
+}
+
+// B4 — post-gen verify for a Brand Pack. complianceData = the EXACT block fed to the
+// prompt (a status present there is allowed; an upgraded ✓ on an absent item is not).
+function verifyBrandPackProof(text, allowedNumbers, complianceData){
+  const flags = extractUnsourcedClaims(text, allowedNumbers, complianceData);
+  return { clean: flags.length===0, flagged: flags };
+}
+
+// Shared FLAG copy (STRATEGY may swap). kind: 'pitch'|'pack'.
+function honestyFlagCopy(kind, list){
+  const what = kind==='pack' ? 'pack' : 'draft';
+  return '[FLAG_COPY: This '+what+' contains claims VeyaFlow did not source: '+(list||[]).join(', ')+'. Verify or remove before sending.]';
+}
+
 async function generateBrandPack(){
   if(!brandPackState.retailer){
     const sel2 = document.getElementById('bp-retailer-err')||document.createElement('div');
@@ -16372,6 +16472,9 @@ ${neighbours.map(n=>`${n.tier} | ${n.brand} | ${n.origin} | ${n.clinical} | ${n.
 [YOU] | ${brand.name} | Swedish | [based on brand claims] | [RSP]
 Show where ${brand.name} sits relative to these brands. Identify the white space.` : '';
 
+  // hasProof gates the quantitative sections (B2) — defined here so basket math can use it too (D1 ordering).
+  const hasProof = proofPoints.length > 0;
+
   // Basket economics
   const routineStep = heroSku?.routineStep || 3;
   const basketStep = `step${routineStep}` in basket ? basket[`step${routineStep}`] : basket.step3;
@@ -16379,15 +16482,25 @@ Show where ${brand.name} sits relative to these brands. Identify the white space
     .map(s=>({step:s, val:basket[`step${s}`]||basket.step3, currency:basket.currency}));
   const basketTotal = basketPairs.reduce((sum,p)=>sum+p.val, 0);
   const basketData = `
-BASKET ECONOMICS FOR SECTION 6 (use these exact numbers):
-${brand.name} occupies Step ${routineStep} of the routine.
-If ${brand.name} drives a Step ${routineStep} purchase, the natural basket additions are:
-${basketPairs.map(p=>`Step ${p.step}: avg addition ${p.val} ${p.currency}`).join('\n')}
-Total basket uplift potential: ${basketTotal} ${basket.currency} per transaction.
-Category manager argument: "We don't just add one SKU — we lift the entire routine bay by ${basketTotal} ${basket.currency}."`;
+CATEGORY-TYPICAL BASKET PATTERN (retailer/category averages — NOT ${brand.name}'s measured data; label as such):
+${brand.name} sits at Step ${routineStep} of the routine.
+For a Step ${routineStep} purchase at this retailer, the CATEGORY-TYPICAL adjacent-step additions are:
+${basketPairs.map(p=>`Step ${p.step}: category-typical addition ${p.val} ${p.currency}`).join('\n')}
+Category-typical adjacent-step value: ~${basketTotal} ${basket.currency} per transaction (category pattern, not brand-measured).
+Framing to use: "typical Step-${routineStep} baskets at this retailer add ~${basketTotal} ${basket.currency} in adjacent-step value (category pattern, not ${brand.name}-measured)."`;
 
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
+  // COMPLIANCE DATA — read from the SAME structured fields the page-1/PDF snapshot uses
+  // (heroSku.cpnp / euResponsible / safetyRef / certifications) so Section 5 can never
+  // contradict the snapshot or upgrade an absent item to ✓ (B3).
+  const complianceData = [
+    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
+    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
+    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+  ].join('\n');
 
   const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. April 2026.
 
@@ -16398,7 +16511,10 @@ Price point: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':brand.pricePoint||'Premium'
 ${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.certifications?.length?' | Certs: '+heroSku.certifications.join(', '):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
 
 VERIFIED COMMERCIAL PROOF (use exactly — do not estimate differently):
-${proofPoints||'[No proof points set — describe as estimates]'}
+${proofPoints||'NO VERIFIED COMMERCIAL PROOF AVAILABLE. Do NOT invent, estimate, or project any revenue, units, repeat rate, review score, social following, press mention, sell-through, velocity, or basket figure. Omit all such numbers. Write qualitative positioning only.'}
+
+COMPLIANCE DATA (render EXACTLY — do not upgrade a missing item to present):
+${complianceData}
 
 RETAILER INTELLIGENCE:
 Tone required: ${cover.tone}
@@ -16415,20 +16531,24 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 - Use ## for section headers.
 - Numbers from the verified proof above are facts — never estimate or round them differently.
 - Under 600 words total across all sections.
+- The basket figures are CATEGORY-TYPICAL retailer/category averages, NOT ${brand.name}'s data. Present them explicitly as a category pattern / illustrative routine economics. NEVER state or imply ${brand.name} has measured this basket uplift.
+- NEVER invent a net-to-retailer price or margin %. State RSP only unless a verified wholesale/margin figure is provided; if none, say commercial terms are "to be discussed."
+- COMPLIANCE HONESTY (absolute): state each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that the retailer holds no regulatory risk. Do NOT summarise items as "all documentation current" or similar. If an item is outstanding, say so. Describe status; never certify — the retailer's own regulatory assessment is theirs to make. This applies to paraphrases and new wordings, not only the examples given.
+- Use ONLY the verified figures provided. Do NOT project, extrapolate, or derive NEW numbers from them — no units/store/week velocity, no margin-requirement %, no annual-investment figure, no AV/MSEK contribution — unless that exact figure is in the verified data. Reference the real numbers; do not multiply them into projections.
 
 ## SECTION 1 — Brand Overview
 3 paragraphs ONLY:
 P1: What ${brand.name} sells and who buys it (buyer briefing, not brand story)
 P2: Why entering ${market} now — one specific 2026 timing argument referencing ${retailer}'s current strategy
-P3: What Year 1 success looks like in numbers at ${retailer}
+P3: ${hasProof?`What Year 1 success looks like in numbers at ${retailer}`:`Describe what Year 1 success looks like at ${retailer} QUALITATIVELY — what good looks like — WITHOUT inventing unit, revenue, or volume figures`}
 
 ## SECTION 2 — Product Highlights
 For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
-- RSP and proposed net price to ${retailer}
+- RSP only — do NOT state a net-to-retailer price or margin %; none is on file. Note commercial terms are "to be discussed."
 - Key claims with compliance status (Green/Amber/Red) for ${market}
 - Certifications
 - Basket position: Step X of routine — pairs naturally with [product types]
-- Velocity benchmark: projected units/store/week based on home market data
+${hasProof?'- Reference the verified sell-through / units figures as provided — do NOT derive a units/store/week velocity projection unless that exact figure is in the data':'(Omit any velocity / units-per-store projection — no verified home-market data exists; do not invent one)'}
 
 ## SECTION 3 — Market Fit & Competitive Positioning
 ${posMap?'Use the competitive positioning table provided above.':'Describe where '+brand.name+' sits in the '+market+' category.'}
@@ -16436,17 +16556,16 @@ Identify the specific white space — what is missing at ${retailer} that ${bran
 Do NOT use generic market size figures. Use shelf-level framing.
 
 ## SECTION 4 — Commercial Proof
-Evidence pyramid — hardest proof first:
+${hasProof?`Evidence pyramid — hardest proof first:
 Tier 1: Revenue/units data (verified numbers above — lead with these)
 Tier 2: Repeat purchase and review data
 Tier 3: Social and press signals
-End with: velocity benchmark — "At our SE sell-through rate, we project X units/store/week at ${retailer}."
-Do not lead with social following. It is the weakest proof type.
+Reference the verified numbers as provided. Do NOT project a velocity benchmark or derive units/store/week — no extrapolated figures unless they are in the verified data.
+Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
 ## SECTION 5 — Compliance & Sustainability
-For EACH compliance item, explain what it means for ${retailer}'s risk — not just list it.
-Format: [Item]: ✓/✗ → Means: [what this removes from ${retailer}'s risk register]
-Include: CPNP status, EU RP, claims audit result, EUDR status, certifications.
+Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict. Never summarise across items as "all documentation current" / "compliance ready" or any blanket completeness/currency assertion — even as a paraphrase.
+If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
 ${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
 Language register: ${retailer} compliance team, not brand marketing.
 
@@ -16469,9 +16588,13 @@ NEVER write "please don't hesitate to contact us."`;
     brandPackState.result = text;
     brandPackState.generating = false;
     brandPackState.timestamp = new Date().toISOString();
+    // B4 — post-gen honesty verify: flag unsourced numbers + compliance overclaims.
+    const _bpAllowed = [proofPoints, basketData, posMap, (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):''].filter(Boolean);
+    brandPackState.verify = verifyBrandPackProof(text, _bpAllowed, complianceData);
   }catch(err){
     brandPackState.generating = false;
     brandPackState.result = 'ERROR:'+err.message;
+    brandPackState.verify = null;
   }
   renderBrandPack(document.getElementById('page-brandpack'));
 }
@@ -16495,8 +16618,14 @@ function renderBrandPackResult(el){
     return {title: lines[0].replace(/SECTION \d+ — /,'').trim(), body: lines.slice(1).join('\n').trim()};
   });
 
+  // B4 — surface the honesty flag above the rendered pack (and the PDF path, separately).
+  const _bpFlag = (brandPackState.verify && !brandPackState.verify.clean)
+    ? `<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.7rem .9rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.62rem;color:#B32A1F;line-height:1.6">${honestyFlagCopy('pack', brandPackState.verify.flagged)}</div>`
+    : '';
+
   el.innerHTML=`
     <div class="page-wrap">
+      ${_bpFlag}
       <div class="topbar">
         <div>
           <div class="page-title">Brand Pack</div>
@@ -16576,6 +16705,7 @@ function renderBrandPackResult(el){
             <div style="font-family:var(--mono);font-size:.75rem;color:${cover.accent};font-weight:700;opacity:.5">${String(i+1).padStart(2,'0')}</div>
             <div style="font-family:var(--mono);font-size:.62rem;font-weight:700;color:var(--navy);letter-spacing:.1em;text-transform:uppercase">${s.title}</div>
           </div>
+          ${/basket|routine/i.test(s.title||'')?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--ink-mute);margin:-.35rem 0 .55rem;line-height:1.5">[BASKET_PROVENANCE: Category-typical pattern — retailer/category averages, not ${brand.name}-measured data.]</div>`:''}
           <div class="prose">${parseMarkdown(s.body)}</div>
         </div>
       `).join('')}
@@ -16592,7 +16722,6 @@ function renderBrandPackResult(el){
       <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
         <button class="btn-outline" onclick="brandPackState.result=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← New pack</button>
         <button class="btn-gold" onclick="showPage('retail-comms')">Draft buyer email →</button>
-        <button class="btn-outline" onclick="showPage('bizcase')">Build business case →</button>
       </div>
     </div>
   `;
@@ -18132,7 +18261,9 @@ Checks to run (assess each):
 7. Packaging supplier gap (if material/supplier gaps found, recommend from database above)
 
 End with:
-**SUMMARY**: X green, Y amber, Z red. [Priority action before ${market} market entry.]`;
+**SUMMARY**: X green, Y amber, Z red. [Priority action before ${market} market entry.]
+
+${CLAIMS_HONESTY_RULE}`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 600);
@@ -19280,6 +19411,65 @@ async function formatInci(){
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Claims-copy honesty (Stage 3) — parity for the live claims-page generators.
+// Wires the EXISTING substantiation gate (safetyRef && cpnpNumber — same as the PIF
+// checklist ~L6260) + Green Claims Directive discipline into generateSkuDesc /
+// rewriteClaimsCopy / rewriteClaimsCopyForMarket, via a shared prompt rule + a backstop
+// scanner. ONE definition so the claims page can't diverge from the rest.
+// ════════════════════════════════════════════════════════════════════════════
+function claimsSubstantiationState(sku){
+  sku = sku||{};
+  var documented = !!(sku.safetyRef && sku.cpnpNumber); // same gate as the PIF checklist (~L6260)
+  return { documented: documented, note: documented ? 'PIF with claims documented' : 'PIF status unclear — add safetyRef to confirm' };
+}
+
+const CLAIMS_HONESTY_RULE = `CLAIMS HONESTY (absolute — Reg (EU) 655/2013 + Green Claims Directive):
+- Write ONLY mechanical/descriptive copy: what the product IS and DOES functionally, not efficacy outcomes.
+- NEVER upgrade a user-entered claim into clinical/proven/guaranteed language. If a claim is not substantiated (no PIF/safetyRef on file), do NOT state it as fact — describe the product mechanically instead.
+- NEVER generate environmental/"clean" claims (clean, natural, non-toxic, eco-friendly, sustainable, chemical-free, EWG-verified, planet-friendly) unless explicitly verified — these are AMBER now / illegal from the GCD. If the user entered one, omit or neutralise it.
+- No superlatives or comparative efficacy ("best", "clinically superior", "#1") without on-file evidence.
+- Describe; never certify. This applies to paraphrases and new wordings, not only these examples.`;
+
+// Backstop scanner — flags unsubstantiated efficacy + Green Claims tokens. Tightness-anchored
+// so mechanical descriptors (hydrating, lightweight, fragrance-free, for sensitive skin,
+// "clean skin feel", "natural-looking glow", "reduces the appearance of") do NOT flag.
+const _CLAIMS_EFFICACY_PATTERNS = [
+  /\bclinically\s+(?:proven|tested|validated|shown)\b/i,
+  /\bdermatologically\s+proven\b/i,
+  /\bproven\s+to\b/i,
+  /\bguarantee(?:d|s)?\b/i,
+  /\beliminat(?:es?|ing)\b/i,
+  /\bcures?\b/i,
+  /\breduces?[^.\n]{0,20}\d+\s?%/i,
+  /\b\d+\s?%[^.\n]{0,20}reduction\b/i,
+  /\bclinically\s+superior\b/i,
+  /\bbest[\s-]in[\s-]class\b/i,
+  /#\s?1\b/i,
+  /\bnumber\s+one\b/i,
+];
+const _CLAIMS_GCD_PATTERNS = [
+  /\bclean\s+(?:beauty|formula(?:tion)?|ingredients?|label|skincare|product|brand)\b/i,
+  /\b(?:all[\s-]|100%\s+)?natural\s+(?:ingredients?|formula(?:tion)?|origin|product)\b/i,
+  /\ball[\s-]natural\b/i,
+  /\bnon-?toxic\b/i,
+  /\bchemical-?free\b/i,
+  /\bEWG(?:[\s-]verified)?\b/i,
+  /\beco-?friendly\b/i,
+  /\bplanet-?friendly\b/i,
+  /\bsustainable\b/i,
+];
+function scanClaimsCopy(text){
+  if(!text) return [];
+  var flags=[], seen={};
+  var push=function(s){ var k=String(s).toLowerCase().trim(); if(k&&!seen[k]){seen[k]=1; flags.push(String(s).trim());} };
+  _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS).forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
+  return flags;
+}
+function claimsFlagCopy(list){
+  return '[FLAG_COPY: This copy contains unverified efficacy or environmental claims: '+(list||[]).join(', ')+'. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
+}
+
 async function generateSkuDesc(lang){
   if(!brand?.usp&&!skuForm.name){
     const ni=document.getElementById('sku-name'); if(ni){ni.style.borderColor='#EF4444'; ni.placeholder='Add a product name first'; setTimeout(()=>{ni.style.borderColor='';ni.placeholder='e.g. Cloud & Glow LED Face Mask';},2500);}
@@ -19288,13 +19478,20 @@ async function generateSkuDesc(lang){
   const btn = document.getElementById('desc-gen-'+lang);
   if(btn){btn.disabled=true;btn.textContent='Generating...';}
   try{
-    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}`}],200);
+    const _sub = claimsSubstantiationState(skuForm);
+    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file — write mechanical/descriptive copy only; do not state any claim as a proven benefit.";
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
     if(lang==='sv') skuForm.descSV=text.trim();
     else if(lang==='da') skuForm.descDA=text.trim();
     else skuForm.descEN=text.trim();
     const area = document.getElementById('desc-area-'+lang);
     if(area) area.value = text.trim();
-    if(btn){btn.disabled=false;btn.textContent='✓ Generated';}
+    // Stage 3 — backstop scan; surface beside the description (never silent).
+    const _dflags = scanClaimsCopy(text);
+    let _dfEl = document.getElementById('desc-flag-'+lang);
+    if(!_dfEl && area && area.parentElement){ _dfEl = document.createElement('div'); _dfEl.id='desc-flag-'+lang; area.parentElement.insertBefore(_dfEl, area.nextSibling); }
+    if(_dfEl) _dfEl.innerHTML = _dflags.length ? '<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.5rem .75rem;margin-top:.4rem;font-family:var(--mono);font-size:.56rem;color:#B32A1F;line-height:1.6">'+claimsFlagCopy(_dflags)+'</div>' : '';
+    if(btn){btn.disabled=false;btn.textContent='Generated';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Generate';}
     const db3=btn?.parentElement; if(db3){const de3=document.createElement('div'); de3.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem'; de3.textContent='Could not generate — check connection and try again.'; db3.appendChild(de3); setTimeout(()=>de3.remove(),4000);}
@@ -21327,27 +21524,27 @@ const PIF_REQUIREMENTS = [
   // A. Product description
   {id:'prod_desc',     section:'A', label:'Product description',             description:'Trade name, intended use, target group (gender/age), and country of manufacture.',           check: b=>!!(b?.name),                          fixPage:'brand',    fixLabel:'Add brand name',     severity:'blocker'},
   {id:'inci',          section:'A', label:'INCI ingredient list',             description:'Full INCI declaration in descending order of weight (>1%) and alphabetical below 1%.',      check: (b,s)=>!!(s?.inci||s?.ingredients),       fixPage:'skus',     fixLabel:'Add INCI list',      severity:'blocker'},
-  {id:'function',      section:'A', label:'Function of ingredients',          description:'Brief description of role of each ingredient in the formulation.',                          check: ()=>false,                                fixPage:'skus',     fixLabel:'Add ingredient notes',severity:'required'},
+  {id:'function',      section:'A', label:'Function of ingredients',          description:'Brief description of role of each ingredient in the formulation.',                          check: ()=>false,                                fixPage:null,     fixLabel:'Add ingredient notes',severity:'required'},
   {id:'impurities',    section:'A', label:'Impurity / trace substance check', description:'Statement that raw materials conform to GMP and impurity levels are within limits.',        check: ()=>false,                                fixPage:null,       fixLabel:'Prepare statement',  severity:'required'},
   // B. Cosmetic product safety assessment
-  {id:'safety_assess', section:'B', label:'Safety Assessment',                description:'Signed by EU-qualified safety assessor. Must reference EU Regulation 1223/2009 Annex I.', check: (b,s)=>!!(s?.safetyAssessment||s?.safetyAssessor||b?.safetyAssessment), fixPage:'skus', fixLabel:'Upload safety report', severity:'blocker'},
+  {id:'safety_assess', section:'B', label:'Safety Assessment',                description:'Signed by EU-qualified safety assessor. Must reference EU Regulation 1223/2009 Annex I.', check: (b,s)=>!!(s?.safetyAssessment||s?.safetyAssessor||b?.safetyAssessment), fixPage:null, fixLabel:'Upload safety report', severity:'blocker'},
   {id:'safety_profile',section:'B', label:'Cosmetic safety profile',          description:'Physicochemical + microbiological specifications; impurity levels; packaging compatibility.',check: ()=>false,                               fixPage:null,       fixLabel:'Compile safety profile',severity:'required'},
   // C. Manufacturing method
-  {id:'gmp',           section:'C', label:'GMP certificate or statement',     description:'ISO 22716 compliance certificate or signed statement from manufacturer.',                  check: (b,s)=>!!(s?.gmpCert||s?.gmpStatement||s?.gmp), fixPage:'sourcing', fixLabel:'Request from mfr', severity:'required'},
+  {id:'gmp',           section:'C', label:'GMP certificate or statement',     description:'ISO 22716 compliance certificate or signed statement from manufacturer.',                  check: (b,s)=>!!(s?.gmpCert||s?.gmpStatement||s?.gmp), fixPage:null, fixLabel:'Request from mfr', severity:'required'},
   // D. Proof of claimed effects
   {id:'claims_proof',  section:'D', label:'Claims substantiation',            description:'Evidence for each claim: clinical study, consumer test, expert opinion, or literature ref.',check: ()=>false,                               fixPage:'claims',   fixLabel:'Build claims evidence',severity:'required'},
   // E. Animal testing data
-  {id:'no_animal',     section:'E', label:'Animal testing statement',          description:'Declaration that product + ingredients have not been tested on animals post-March 2013.',  check: (b,s)=>!!(s?.noAnimalTesting||s?.crueltyFree||b?.crueltyFree), fixPage:'skus', fixLabel:'Add declaration', severity:'required'},
+  {id:'no_animal',     section:'E', label:'Animal testing statement',          description:'Declaration that product + ingredients have not been tested on animals post-March 2013.',  check: (b,s)=>!!(s?.noAnimalTesting||s?.crueltyFree||b?.crueltyFree), fixPage:null, fixLabel:'Add declaration', severity:'required'},
   // F. EU Responsible Person
   {id:'eu_rp',         section:'F', label:'EU Responsible Person',            description:'Appointed EU RP with name, address, contact. Mandatory for EU market.',                    check: b=>!!(b?.euResponsible?.name), fixPage:'rp-marketplace', fixLabel:'Appoint EU RP', severity:'blocker'},
   {id:'eu_rp_contact', section:'F', label:'EU RP contact details on file',   description:'EU RP email and postal address.',                                                           check: b=>!!(b?.euResponsible?.email), fixPage:'rp-marketplace', fixLabel:'Add RP contact', severity:'required'},
   // G. CPNP notification
   {id:'cpnp',          section:'G', label:'CPNP notification',               description:'Notification via portal.cpnp.eu before first EU placement. Product reference number.',     check: (b,s)=>!!(s?.cpnpRef||s?.cpnp||b?.cpnpRef), fixPage:'skus', fixLabel:'Notify at cpnp.eu', severity:'blocker'},
   // H. UK-specific (if UK market targeted)
-  {id:'uk_rp',         section:'H', label:'UK Responsible Person (UK market)',description:'Separate UK RP required for Great Britain. Not covered by EU RP post-Brexit.',             check: b=>!!(b?.ukRP||b?.ukRpName||b?.ukResponsiblePerson), fixPage:'brand', fixLabel:'Appoint UK RP', severity:'uk_only'},
-  {id:'uk_scpn',       section:'H', label:'UK SCPN registration (UK market)', description:'Submit to OPSS Submit Cosmetic Product Notification portal before UK placement.',         check: (b,s)=>!!(s?.ukScpn||s?.scpnRef||b?.ukScpn), fixPage:'skus', fixLabel:'Register at SCPN portal', severity:'uk_only'},
+  {id:'uk_rp',         section:'H', label:'UK Responsible Person (UK market)',description:'Separate UK RP required for Great Britain. Not covered by EU RP post-Brexit.',             check: b=>!!(b?.ukRP||b?.ukRpName||b?.ukResponsiblePerson), fixPage:null, fixLabel:'Appoint UK RP', severity:'uk_only'},
+  {id:'uk_scpn',       section:'H', label:'UK SCPN registration (UK market)', description:'Submit to OPSS Submit Cosmetic Product Notification portal before UK placement.',         check: (b,s)=>!!(s?.ukScpn||s?.scpnRef||b?.ukScpn), fixPage:null, fixLabel:'Register at SCPN portal', severity:'uk_only'},
   // I. Labelling
-  {id:'label_eu',      section:'I', label:'EU label compliance',              description:'Product name, nominal content, date of minimum durability or PAO, precautions, batch ref, RP details.', check: (b,s)=>!!(s?.ean||s?.labelLanguages||s?.labelCompliant), fixPage:'skus', fixLabel:'Review label spec', severity:'required'},
+  {id:'label_eu',      section:'I', label:'EU label compliance',              description:'Product name, nominal content, date of minimum durability or PAO, precautions, batch ref, RP details.', check: (b,s)=>!!(s?.ean||s?.labelLanguages||s?.labelCompliant), fixPage:null, fixLabel:'Review label spec', severity:'required'},
   {id:'ean',           section:'I', label:'EAN-13 barcode',                   description:'Valid EAN-13 registered with GS1. Required by all Nordic retailers.',                      check: (b,s)=>!!(s?.ean),                        fixPage:'skus',     fixLabel:'Add EAN',            severity:'blocker'},
   // J. REACH / SVHC
   {id:'svhc_check',    section:'J', label:'SVHC declaration (REACH)',          description:'Confirm no Substances of Very High Concern (SVHC) above 0.1% in finished product. SCIP database notification required for articles containing SVHC above 0.1%.',
@@ -22234,7 +22431,8 @@ function renderClaimsResult(){
         </div>
       `:claimsState.rewriteResult?`
         <div style="margin-bottom:.75rem">
-          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">✓ Rewritten copy</div>
+          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">Rewritten copy</div>
+          ${(claimsState.rewriteFlags&&claimsState.rewriteFlags.length)?`<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.55rem .8rem;margin-bottom:.5rem;font-family:var(--mono);font-size:.58rem;color:#B32A1F;line-height:1.6">${claimsFlagCopy(claimsState.rewriteFlags)}</div>`:''}
           <div id="claims-rewrite-box" style="font-family:var(--sans);font-size:.85rem;line-height:1.8;color:var(--ink);background:#F9F8F6;border:1px solid var(--border);padding:1rem 1.25rem;white-space:pre-wrap">${claimsState.rewriteResult}</div>
           <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
             <button class="btn-primary" style="font-size:.68rem" onclick="copyToClipboard(document.getElementById('claims-rewrite-box').textContent)">Copy text</button>
@@ -22290,6 +22488,8 @@ async function rewriteClaimsCopy(){
     replaceRules,
     keepRules ? 'CLAIMS TO KEEP UNCHANGED:' : '',
     keepRules,
+    CLAIMS_HONESTY_RULE,
+    claimsSubstantiationState((typeof skuForm!=='undefined'&&skuForm)||(typeof skus!=='undefined'&&skus&&skus[0])||{}).documented ? '' : 'These claims are NOT substantiated on file — do NOT upgrade any into proven/clinical language; describe mechanically.',
     'OUTPUT: Only the rewritten copy. No preamble, no labels, no explanation.',
   ];
   var prompt = promptParts.filter(function(p){return p;}).join('\n\n');
@@ -22297,6 +22497,7 @@ async function rewriteClaimsCopy(){
   try{
     var text = await callAPI([{role:'user',content:prompt}], 800);
     claimsState.rewriteResult = text.trim();
+    claimsState.rewriteFlags = scanClaimsCopy(text);   // Stage 3 backstop
     claimsState.rewriteLoading = false;
   }catch(err){
     claimsState.rewriteLoading = false;
@@ -22341,11 +22542,14 @@ ${claimsState.input}
 ${replaceRules}
 ${keepRules}
 
+${CLAIMS_HONESTY_RULE}
+
 Output: ONLY the rewritten copy for ${market}. No preamble.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 600);
     claimsState.rewriteResult = `--- ${market.toUpperCase()} VERSION ---\n\n${text.trim()}`;
+    claimsState.rewriteFlags = scanClaimsCopy(text);   // Stage 3 backstop
     claimsState.rewriteLoading = false;
   }catch(err){
     claimsState.rewriteLoading = false;
@@ -23676,17 +23880,9 @@ function renderPitch(el){
   // guards called renderPitch() back mid-render, and the nested innerHTML was
   // clobbered when the outer call completed with an empty result string. Now we
   // clear a stale/malformed pitchResult here so the ternary falls to the form.
-  if(pitchResult){
-    var _valid = pitchResult.text && typeof pitchResult.text === 'string';
-    if(_valid){
-      var _blocks = pitchResult.text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.includes('VARIANT:');});
-      var _hasBody = _blocks.some(function(b){var m=b.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/);return m&&m[1]&&m[1].trim().length>20;});
-      if(!_hasBody) _valid = false;
-    }
-    if(!_valid){
-      pitchResult = null;
-      try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
-    }
+  if(pitchResult && !isPitchTextValid(pitchResult.text)){
+    pitchResult = null;
+    try{ localStorage.removeItem('ns_pitchResult'); }catch(e){}
   }
 
   // Pre-fill from brand profile — always refresh from canonical brand state (Apr 2026)
@@ -23717,13 +23913,15 @@ function renderPitch(el){
       <div class="topbar">
         <div>
           <div class="page-title">${catLabel}</div>
-          <div class="page-sub">Lead with the buyer's problem, not your brand story. Under 150 words.</div>
+          <div class="page-sub">Lead with the buyer's problem, not your brand story. Target 75-125 words.</div>
         </div>
       </div>
 
+      <div style="background:var(--accent-soft);border:1px solid var(--line-strong);border-left:3px solid var(--accent);padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:var(--ink-soft);line-height:1.6">[HONESTY_BANNER_PITCH: VeyaFlow only uses the numbers you enter — we never invent stats.]</div>
+
       ${pitchResult ? renderPitchResult() : `
       <div style="background:#F9F8F6;border:1px solid var(--border);padding:.75rem 1rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)">
-        ◎ Lead with the buyer's problem, not your brand story. Under 150 words. Three tone variants generated at once.
+        ◎ Lead with the buyer's problem, not your brand story. Target 75-125 words. Multiple tone variants at once — Direct &amp; Commercial leads (cold pitches omit Brand Story-Led).
       </div>
       <div class="card" style="margin-bottom:1rem">
         <div class="section-tag">Target</div>
@@ -23768,7 +23966,7 @@ function renderPitch(el){
             brand.reviewScore   ? `Reviews: ${brand.reviewScore} avg` : null,
             brand.clinicalClaims? `Clinical: ${brand.clinicalClaims}` : null,
           ].filter(Boolean).map(p=>`<div>${p}</div>`).join('')||
-          '<div style="color:var(--muted)">No proof points set — <span onclick="showPage(\'home\')" style="cursor:pointer;color:var(--gold);text-decoration:underline">add them on Brand Home</span></div>'}
+          '<div style="color:var(--muted)">No proof points set — <span onclick="resetBrand()" style="cursor:pointer;color:var(--gold);text-decoration:underline">edit your Brand Profile</span> to add Revenue &amp; sales data.</div>'}
         </div>
         <div class="field"><label class="lbl">Add any recent news or hook for this pitch <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(press mention, award, new stockist)</span></label>
           <input type="text" id="p-hook" value="${pitchForm.hook||''}" placeholder="e.g. Just listed in Selfridges. Won Best New Brand at CEW 2026." oninput="pitchForm.hook=this.value"></div>
@@ -24224,10 +24422,23 @@ function buildAsk(){
   const retailer = pitchForm.retailer||'the retailer';
   const intel = PITCH_INTEL[retailer];
   const reviewDate = intel?.rangeReview || 'their next range review';
-  if(stage==='cold')    return `15-minute call this month`;
+  if(stage==='cold')    return `15 minutes next week — Tuesday or Thursday?`;
   if(stage==='followup')return `Range review meeting — ${retailer} reviews in ${reviewDate}`;
   if(stage==='warm')    return `Sample send and data pack — can I ship to your office?`;
-  return '15-minute call this month';
+  return '15 minutes next week — Tuesday or Thursday?';
+}
+
+// Shared pitch-parse validity check — used by BOTH generatePitch (pre-toast) and the
+// renderPitch guard, so the two can NEVER diverge. Core check: text parses into VARIANT
+// blocks with at least one real BODY. Optional minBlocks adds generate-time strictness
+// (expect one block per archetype); the render guard calls it WITHOUT minBlocks (lenient —
+// render whatever parses) since it can't know the archetype count on a reload.
+function isPitchTextValid(text, minBlocks){
+  if(!text || typeof text !== 'string') return false;
+  var blocks = text.split('---').map(function(b){return b.trim();}).filter(function(b){return b.indexOf('VARIANT:')>=0;});
+  if(!blocks.length) return false;
+  if(minBlocks && blocks.length < minBlocks) return false;
+  return blocks.some(function(b){ var m=b.match(/BODY:\n([\s\S]+?)(?=LINKEDIN:|$)/); return m&&m[1]&&m[1].trim().length>20; });
 }
 
 async function generatePitch(){
@@ -24283,10 +24494,29 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
 
   const numbersStr = numbers.length>0
     ? numbers.join(' | ')
-    : 'Include 2-3 credible commercial proof points based on the brand description — flag clearly as estimates';
+    : 'NO VERIFIED METRICS PROVIDED. Do NOT invent, estimate, project, or imply any statistic, percentage, count, rate, cycle, or currency figure. Write the pitch around positioning and product only. Omit every quantified proof claim.';
 
   // Product-type awareness — surfaces device/accessory specifics that brand category alone misses
   const productTypesPromptCtx = getProductTypesPromptContext(skus);
+
+  // ── Stage-2 archetypes (conditioned on the already-wired pitchForm.stage) ──
+  // Direct & Commercial always LEADS (index 0). Brand Story-Led only for warm/followup
+  // (founder origin is wrong for a cold buyer). Compliance-Anchored — VeyaFlow's real
+  // differentiator — is included at every stage, honesty-constrained to real status only.
+  const _pitchStage = pitchForm.stage||'cold';
+  const _pitchCompliance = [
+    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
+    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
+    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+  ].join('\n');
+  const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
+  if(_pitchStage==='warm' || _pitchStage==='followup') _pitchArchetypes.push({name:'Brand Story-Led', rule:'founder origin in one sentence, then commercial'});
+  _pitchArchetypes.push({name:'Trend-Anchored', rule:'opens with a specific 2026 trend, connects brand to it'});
+  _pitchArchetypes.push({name:'Compliance-Anchored', rule:'leads with regulatory de-risking — use ONLY the COMPLIANCE STATUS block above, stating each item\'s EXACT status; frame as "we remove your onboarding audit risk." NEVER assert compliant/certified/verified beyond what is on file; if EU RP is "Not set", say the appointment is in progress, never claim it is confirmed. State each item\'s factual status only; NEVER assert — in any wording (incl. "documentation current", "all handled", "ready", "in order") — that compliance is current/complete/done or that the buyer carries no risk; if items are outstanding, say so. Describe status, never certify — this applies to paraphrases and new wordings, not only these examples'});
+  const _countWord = _pitchArchetypes.length===3?'THREE':_pitchArchetypes.length===4?'FOUR':String(_pitchArchetypes.length);
+  const _variantFormat = _pitchArchetypes.map(a=>`VARIANT: [${a.name}]\nSUBJECT: [6-10 words, ~36-50 chars]\nBODY:\n[email body]\nLINKEDIN: [max 300 chars, one question that invites reply]\n---`).join('\n');
+  const _archetypeRules = _pitchArchetypes.map((a,i)=>`${8+i}. ${a.name} = ${a.rule}`).join('\n');
 
   const prompt = `You are a retail sales expert writing buyer pitch emails for a ${brand?.category||'consumer'} brand entering ${pitchForm.targetMarket}.
 
@@ -24309,44 +24539,49 @@ AVOID: ${intel.avoid}
 COMMERCIAL NUMBERS (verified — do not change or estimate differently):
 ${numbersStr}
 
+COMPLIANCE STATUS (render EXACTLY — for the Compliance-Anchored variant; never upgrade an absent item to present):
+${_pitchCompliance}
+
 THE ASK: ${ask}
 
-Generate THREE email variants. For EACH variant output in this EXACT format:
+Generate ${_countWord} email variants — Direct & Commercial FIRST (the primary variant). For EACH variant output in this EXACT format:
 
-VARIANT: [Direct & Commercial]
-SUBJECT: [max 8 words]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
-VARIANT: [Brand Story-Led]
-SUBJECT: [max 8 words]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
-VARIANT: [Trend-Anchored]
-SUBJECT: [max 8 words]
-BODY:
-[email body]
-LINKEDIN: [max 300 chars, one question that invites reply]
----
+${_variantFormat}
 
-HARD RULES FOR ALL THREE VARIANTS:
-1. Subject line: MAX 8 WORDS. References retailer name or specific category — not brand name
+OUTPUT FORMAT IS MANDATORY. Return EXACTLY these blocks, each starting with the literal token "VARIANT:" and separated by a line containing only ---. Do not add preamble, commentary, or markdown. Every VARIANT block MUST contain SUBJECT:, BODY:, and LINKEDIN: lines.
+
+HARD RULES FOR ALL VARIANTS:
+1. Subject line: 6-10 WORDS, ~36-50 characters. References retailer name or specific category — not brand name
 2. Opening line: References something SPECIFIC to ${retailer} in 2026 — not generic flattery, not "I hope this email finds you well"
-3. Paragraph 2: EXACTLY the 3 commercial numbers provided above — no more, no estimates
-4. ONE ask only. One next step. Use: "${ask}"
-5. Total email: UNDER 150 WORDS
+3. ${numbers.length>0?`Paragraph 2: EXACTLY the ${numbers.length} commercial numbers provided above — no more, no estimates`:`Do NOT state any numeric proof of any kind. No invented figures, projections, or 'typical/estimated' numbers.`}
+4. EXACTLY ONE call-to-action. One next step — use: "${ask}". A second ask of any kind is a failure.
+5. Total email: TARGET 75-125 WORDS (hard ceiling 150)
 6. End with: "View our verified brand profile: [VeyaFlow Brand Pack link]"
-7. NO: "I hope", "Reaching out to", "I wanted to", "Please find attached"
-8. Direct & Commercial = numbers first, no brand story
-9. Brand Story-Led = founder origin in one sentence, then commercial
-10. Trend-Anchored = opens with a specific 2026 trend, connects brand to it`;
+7. NO filler / AI-tell phrases. Banned: ${(PITCH_AI_BLOCKLIST||[]).map(p=>'"'+p+'"').join(', ')}, "Please find attached".
+${_archetypeRules}
+${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.
+${9+_pitchArchetypes.length}. COMPLIANCE HONESTY (absolute): State each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that there is no regulatory risk. If an item is "Not started" / "Not set" / "unknown", you may not imply it is done. Do not summarise multiple items as "all documentation current" or similar. Describe status; never certify. This applies to paraphrases and new wordings, not only the examples given.
+${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures into new numbers (velocity, per-store, per-week, annualised, margin %, investment). Use only the figures provided, as provided.`;
 
   try{
-    const text = await callAPI([{role:'user',content:prompt}], 1400);
-    pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString()};
+    let text = await callAPI([{role:'user',content:prompt}], 1400);
+    // Validate BEFORE any success toast — the toast must only ever reflect a real render.
+    // Format-drift from the heavy multi-archetype prompt is usually transient → regenerate
+    // ONCE (single-retry guard, no loop). Reuses isPitchTextValid so generate + render agree.
+    if(!isPitchTextValid(text, _pitchArchetypes.length)) text = await callAPI([{role:'user',content:prompt}], 1400);
+    if(!isPitchTextValid(text, _pitchArchetypes.length)){
+      // Both attempts unusable — honest failure: NO success toast, form + inputs preserved.
+      if(btn){btn.disabled=false;btn.textContent=`Generate ${getCatLabel('pitch')||'Retailer Pitch'} →`;}
+      const _pfErr = document.getElementById('pitch-error');
+      if(_pfErr) _pfErr.innerHTML = errCard('Draft not usable', "[PITCH_GEN_FAILED: The draft didn't come back in a usable format. Try Generate again — this is usually transient.]", 'Try again', 'generatePitch()');
+      return;
+    }
+    // A4 — post-gen honesty verify: flags unsourced numbers/compliance overclaims + multi-CTA.
+    // allowedComplianceText = the real status block, so the Compliance-Anchored variant's honest
+    // statements aren't false-flagged; overclaims beyond it still flag (E4).
+    const _pAllowed = numbers.concat([pitchForm.pricePoint||'', (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):'']).filter(Boolean);
+    const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
+    pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
@@ -24464,11 +24699,12 @@ function renderPitchResult(){
     return '';
   }
 
-  const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑'};
+  const variantIcons = {'Direct & Commercial':'◈','Brand Story-Led':'◉','Trend-Anchored':'⚑','Compliance-Anchored':'◇'};
   const variantDesc  = {
     'Direct & Commercial':'Numbers first. No brand story. Buyer sees ROI in 10 seconds.',
     'Brand Story-Led':'Founder origin in one sentence, then commercial proof. Use when buyer has met you.',
     'Trend-Anchored':'Opens with a specific 2026 trend. Best for trend-driven retailers (Lyko, Kicks).',
+    'Compliance-Anchored':"[COMPLIANCE_ARCHETYPE_DESC: Leads with regulatory de-risking — real compliance status only. VeyaFlow's differentiator.]",
   };
 
   // Magic link — γ architecture: append ?retailer=slug when Magic Link exists,
@@ -24484,7 +24720,11 @@ function renderPitchResult(){
     ? active.body.replace(/\[VeyaFlow Brand Pack link\]/g, magicLink)
     : active.body;
 
+  const _pFlag = (pitchResult.verify && !pitchResult.verify.clean)
+    ? `<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.6rem .85rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.6rem;color:#B32A1F;line-height:1.6">${honestyFlagCopy('pitch', pitchResult.verify.flagged)}${pitchResult.verify.multiCta?' · More than one ask detected — single-CTA emails reply better.':''}</div>`
+    : '';
   return `
+    ${_pFlag}
     <!-- Header -->
     <div style="background:var(--accent);padding:1rem 1.25rem;margin-bottom:1rem">
       <div style="font-family:var(--mono);font-size:.55rem;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem">Generated for</div>
@@ -24501,7 +24741,7 @@ function renderPitchResult(){
         <div onclick="pitchActiveVariant=${i};renderPitch(document.getElementById('page-pitch'))"
           style="flex:1;min-width:140px;padding:.6rem .85rem;border:1px solid ${pitchActiveVariant===i?'var(--accent)':'var(--border)'};background:${pitchActiveVariant===i?'var(--accent)':'#fff'};cursor:pointer;transition:all .15s">
           <div style="font-family:var(--mono);font-size:.75rem;color:${pitchActiveVariant===i?'var(--gold)':'var(--muted)'};">${variantIcons[p.variant]||'◌'}</div>
-          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${pitchActiveVariant===i?'#fff':'var(--navy)'};margin-top:.1rem">${p.variant}</div>
+          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:${pitchActiveVariant===i?'#fff':'var(--navy)'};margin-top:.1rem">${p.variant}${p.variant==='Direct & Commercial'?` <span style="font-weight:400;font-size:.5rem;color:${pitchActiveVariant===i?'var(--gold)':'var(--accent)'}">· PRIMARY</span>`:''}</div>
           <div style="font-family:var(--sans);font-size:.62rem;color:${pitchActiveVariant===i?'rgba(255,255,255,.55)':'var(--muted)'};margin-top:.1rem;line-height:1.4">${variantDesc[p.variant]||''}</div>
         </div>
       `).join('')}
@@ -24528,7 +24768,7 @@ function renderPitchResult(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
         <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Email body</div>
         <div style="display:flex;gap:.35rem;align-items:center">
-          <span style="font-family:var(--mono);font-size:.5rem;background:${wordCount<=150?'#ECFDF5':'#FFFBEB'};color:${wordCount<=150?'#065F46':'#92400E'};padding:.1rem .3rem">${wordCount} words${wordCount<=150?' ✓':' — over 150'}</span>
+          <span style="font-family:var(--mono);font-size:.5rem;background:${wordCount<=125?'#ECFDF5':wordCount<=150?'#FFFBEB':'#FBEAE7'};color:${wordCount<=125?'#065F46':wordCount<=150?'#92400E':'#B32A1F'};padding:.1rem .3rem">${wordCount} words · ${wordCount<=125?'good':wordCount<=150?'above target':'too long — reply rates drop'}</span>
         </div>
       </div>
       <div class="email-box" style="margin-bottom:.75rem">${bodyWithLink.replace(/\n/g,'<br>')}</div>
@@ -25360,7 +25600,6 @@ function renderSupplierRiskAlerts(){
     <div style="margin-bottom:1.25rem">
       <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;justify-content:space-between">
         <span>Supplier Risk Alerts (${alerts.length})</span>
-        <button class="btn-outline" style="font-size:.58rem;padding:.2rem .6rem" onclick="showPage('suppliers')">View all suppliers →</button>
       </div>
       ${[...highAlerts,...otherAlerts].slice(0,5).map(alert=>{
         const cat = RISK_CATEGORIES[alert.category]||RISK_CATEGORIES.compliance;
@@ -29344,6 +29583,13 @@ async function generateBrandPackPDF(){
     doc.text('Generated by VeyaFlow · veyaflow.com', pageW/2, pageH-15, {align:'center'});
     doc.setTextColor(180,180,180);
     doc.text('Confidential — not for distribution', pageW/2, pageH-9, {align:'center'});
+    // B4 — honesty flag on the cover (white band) when the verify pass flagged claims.
+    // The PDF is what reaches the buyer, so the flag MUST surface here, not just on screen.
+    if(brandPackState.verify && !brandPackState.verify.clean){
+      pdfSetFont(doc, 'body'); doc.setFontSize(9);
+      doc.setTextColor(179,42,31); // #B32A1F
+      pdfWrap(doc, honestyFlagCopy('pack', brandPackState.verify.flagged), margin, pageH*0.68+14, contentW, 4.6);
+    }
 
     // ── PAGE 2: Brand Overview ──
     doc.addPage();
@@ -29421,6 +29667,10 @@ async function generateBrandPackPDF(){
       doc.addPage();
       pdfHeader(doc, section.title, `${brand?.name||'Brand'} · ${retailer} · ${market}`, cover.accent, pageW);
       let sy = 40;
+      if(/basket|routine/i.test(section.title||'')){
+        pdfSetFont(doc,'small'); doc.setTextColor(127,160,162); // --ink-mute
+        sy = pdfWrap(doc, '[BASKET_PROVENANCE: Category-typical pattern — retailer/category averages, not '+(brand?.name||'the brand')+'-measured data.]', margin, sy, contentW, 4.2) + 2;
+      }
       pdfSetFont(doc, 'body');
       doc.setTextColor(40,40,40);
       // Split body into paragraphs
@@ -29821,13 +30071,6 @@ function getSetupSteps(){
       action:()=>showPage('skus'),
     },
     {
-      id:'report',
-      label:'Run your first Market Entry Report',
-      done:savedReports.length>0,
-      cta:'Generate report',
-      action:()=>showPage('report'),
-    },
-    {
       id:'readiness',
       label:'Review your Readiness Score',
       done:!!(brand && (localStorage.getItem('ns_readiness_viewed')==='1')),
@@ -29868,8 +30111,7 @@ const BRAND_HOME_ALERTS = [
     requiredRetailers: ['apotek_hjartat_se'],
     title: 'APOTEK HJÄRTAT — ARTICLE SUBMISSION DEADLINE',
     body: 'Apotek Hjärtat closes article submissions for the autumn/winter range on May 8. Miss this window and the next opportunity is the spring 2027 cycle. Sweden\'s largest pharmacy chain — 390 stores, 4M+ loyalty members.',
-    primaryCta: { label: 'Generate Apotek Hjärtat pitch →', page: 'pitch' },
-    secondaryCta: { label: 'Run Sweden Market Report →', page: 'report' },
+    primaryCta: { label: 'Draft Apotek Hjärtat buyer email →', page: 'retail-comms' },
   },
   // ── Future retailer deadline alerts go here ──────
   // Template:
@@ -29883,8 +30125,8 @@ const BRAND_HOME_ALERTS = [
   //   requiredRetailers: ['matas_dk'],       // [] / omit = not retailer-specific
   //   title: 'RETAILER — SUBMISSION DEADLINE',
   //   body: 'Description of deadline and consequence.',
-  //   primaryCta: { label: 'CTA text →', page: 'pitch' },
-  //   secondaryCta: { label: 'CTA text →', page: 'report' },
+  //   primaryCta: { label: 'CTA text →', page: 'retail-comms' },   // live pages only — parked targets are swept out
+  //   secondaryCta: { label: 'CTA text →', page: 'retail-tracker' },
   // },
 ];
 
@@ -30243,7 +30485,6 @@ function renderExpansionOverview(){
         <div style="flex:1;min-width:140px;padding:.7rem .85rem">
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.2rem">
             <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Margin Watch</div>
-            <span onclick="showPage('cfo')" style="font-family:var(--mono);font-size:.48rem;color:var(--navy);cursor:pointer;text-decoration:underline;white-space:nowrap">CFO →</span>
           </div>
           <div style="font-family:var(--mono);font-size:.68rem;font-weight:700;color:${marginColor};margin-bottom:.25rem">${marginStatus}</div>
           <div style="font-family:var(--sans);font-size:.62rem;color:#555;line-height:1.5">${marginBody}<br><span style="color:var(--muted);font-size:.55rem">vs ${(brand.category||'').includes('Beauty')?50:(brand.category||'').includes('Food')?35:45}% category avg</span></div>
@@ -30805,7 +31046,7 @@ const PATHWAY_TIERS = [
     why: 'Premium online Nordic retailers. Buyer credibility and Nordic-first proof of concept that opens physical doors.',
     retailerIds: ['lyko_se','lyko_dk','nordicfeel_se','apotea_se','apoteket_se','apohem_se'],
     retailerNames: ['Lyko', 'NordicFeel', 'Apotea', 'Apoteket'],
-    tools: [{label:'Score readiness for Lyko', page:'home'},{label:'Generate Lyko pitch', page:'pitch'}],
+    tools: [{label:'Score readiness for Lyko', page:'home'},{label:'Draft Lyko buyer email', page:'retail-comms'}],
   },
   {
     id: 'tier_3_physical_premium',
@@ -30815,7 +31056,7 @@ const PATHWAY_TIERS = [
     why: 'Physical retail proof of concept. Door-opener for top-tier pharmacy and prestige buyers.',
     retailerIds: ['kicks_se','kicks_dk','kicks_no','vita_no','apotek_1_no','hebe_pl','wells_pt','perfumes_companhia_pt'],
     retailerNames: ['Kicks', 'Vita', 'Apotek 1', 'Hebe', 'Wells'],
-    tools: [{label:'Retailer Pitch', page:'pitch'},{label:'Business Case', page:'bizcase'}],
+    tools: [{label:'Draft buyer email', page:'retail-comms'}],
   },
   {
     id: 'tier_4_top_tier',
@@ -30825,7 +31066,7 @@ const PATHWAY_TIERS = [
     why: 'Top-tier retailers require track record from earlier stages. Stage 1–3 data becomes your proof package.',
     retailerIds: ['apotek_hjartat_se','matas_dk','sephora_eu','sephora_fr','douglas_de','douglas_at','douglas_ch','boots_uk','space_nk_uk'],
     retailerNames: ['Apotek Hjärtat', 'Matas', 'Sephora', 'Douglas', 'Boots'],
-    tools: [{label:'Market Entry Report', page:'report'},{label:'Brand Pack', page:'brandpack'}],
+    tools: [{label:'Brand Pack', page:'brandpack'}],
   },
 ];
 
@@ -32237,10 +32478,10 @@ const ACTION_PLAN_MILESTONES = [
   {id:'claims_check',  offset:-120, label:'Run Claim Localizer for this market',             page:'claims'},
   {id:'pack_adapt',    offset:-90,  label:'Packaging adaptation deadline (translation + label update)', page:'skus'},
   {id:'samples_out',  offset:-90,  label:'Physical sample box dispatched to buyer',          page:null},
-  {id:'first_email',  offset:-75,  label:'First contact email sent',                        page:'pitch'},
+  {id:'first_email',  offset:-75,  label:'First contact email sent',                        page:'retail-comms'},
   {id:'follow_up',    offset:-60,  label:'Follow-up if no response',                        page:null},
-  {id:'biz_case',     offset:-45,  label:'Retail Business Case completed',                  page:'bizcase'},
-  {id:'final_pitch',  offset:-30,  label:'Final pitch submitted with all documents',        page:'pitch'},
+  {id:'biz_case',     offset:-45,  label:'Retail Business Case completed',                  page:null},
+  {id:'final_pitch',  offset:-30,  label:'Final pitch submitted with all documents',        page:'retail-comms'},
   {id:'confirm_recv', offset:-21,  label:'Confirm buyer received materials',                page:null},
   {id:'chase',        offset:-14,  label:'Chase for meeting / decision',                   page:null},
   {id:'review_date',  offset:0,    label:'Range review date',                              page:null},
@@ -32404,7 +32645,6 @@ function renderActionPlanModal(card){
         <!-- Footer -->
         <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap">
           <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('retail-templates')" class="btn-primary" style="font-size:.65rem">Prepare retailer file →</button>
-          <button onclick="document.getElementById('vf-action-plan-modal').remove();showPage('bizcase')" class="btn-outline" style="font-size:.65rem">Business Case →</button>
           <button onclick="document.getElementById('vf-action-plan-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;margin-left:auto">Close</button>
         </div>
       </div>
@@ -33005,15 +33245,16 @@ function handleDeepLink(){
   // Hash-aware init route at init() calls handleDeepLink() before showPage('home'),
   // so this list determines what bookmarks/hard-reload-to-hash actually work.
   const validPages = [
-    // Brand section
-    'home','skus','report','compare','claims','pitch','brandpack','bizcase','cfo',
-    // Source section
-    'find','suppliers','sourcing','circular','dpp','csrd','reg_monitor',
+    // Brand section (pitch un-parked → valid again; report/compare/bizcase/cfo remain parked)
+    'home','skus','claims','pitch','brandpack',
+    // Source section (parked — find/suppliers/sourcing/circular — removed)
+    'dpp','csrd','reg_monitor',
     // Retailer Relations section
     'crm','retail-tracker','retail-templates','retail-checklist','retail-performance','retail-comms',
     // Admin (gated behind localStorage flag, but valid as deep-link target if user has flag set)
     'atm-admin'
   ];
+  // Remaining parked deep-links (report/compare/bizcase/cfo/find/suppliers/sourcing/circular) fall through to home.
   if(!validPages.includes(page)) return false;
 
   // Handle param-specific deep links
@@ -33021,18 +33262,6 @@ function handleDeepLink(){
     // Open CRM with specific card expanded: #crm/matas_dk
     showPage('crm');
     setTimeout(()=>{ crmEditId=param; renderPage('crm'); }, 100);
-    return true;
-  }
-  if(page==='pitch'&&param){
-    // Pre-fill retailer: #pitch/Matas
-    pitchForm.retailer = decodeURIComponent(param);
-    showPage('pitch');
-    return true;
-  }
-  if(page==='report'&&param){
-    // Pre-fill target market: #report/Denmark
-    reportForm.targetMarket = decodeURIComponent(param);
-    showPage('report');
     return true;
   }
   if(page==='atm-admin'){
