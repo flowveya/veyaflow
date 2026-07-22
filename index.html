@@ -18261,7 +18261,9 @@ Checks to run (assess each):
 7. Packaging supplier gap (if material/supplier gaps found, recommend from database above)
 
 End with:
-**SUMMARY**: X green, Y amber, Z red. [Priority action before ${market} market entry.]`;
+**SUMMARY**: X green, Y amber, Z red. [Priority action before ${market} market entry.]
+
+${CLAIMS_HONESTY_RULE}`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 600);
@@ -19409,6 +19411,65 @@ async function formatInci(){
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Claims-copy honesty (Stage 3) — parity for the live claims-page generators.
+// Wires the EXISTING substantiation gate (safetyRef && cpnpNumber — same as the PIF
+// checklist ~L6260) + Green Claims Directive discipline into generateSkuDesc /
+// rewriteClaimsCopy / rewriteClaimsCopyForMarket, via a shared prompt rule + a backstop
+// scanner. ONE definition so the claims page can't diverge from the rest.
+// ════════════════════════════════════════════════════════════════════════════
+function claimsSubstantiationState(sku){
+  sku = sku||{};
+  var documented = !!(sku.safetyRef && sku.cpnpNumber); // same gate as the PIF checklist (~L6260)
+  return { documented: documented, note: documented ? 'PIF with claims documented' : 'PIF status unclear — add safetyRef to confirm' };
+}
+
+const CLAIMS_HONESTY_RULE = `CLAIMS HONESTY (absolute — Reg (EU) 655/2013 + Green Claims Directive):
+- Write ONLY mechanical/descriptive copy: what the product IS and DOES functionally, not efficacy outcomes.
+- NEVER upgrade a user-entered claim into clinical/proven/guaranteed language. If a claim is not substantiated (no PIF/safetyRef on file), do NOT state it as fact — describe the product mechanically instead.
+- NEVER generate environmental/"clean" claims (clean, natural, non-toxic, eco-friendly, sustainable, chemical-free, EWG-verified, planet-friendly) unless explicitly verified — these are AMBER now / illegal from the GCD. If the user entered one, omit or neutralise it.
+- No superlatives or comparative efficacy ("best", "clinically superior", "#1") without on-file evidence.
+- Describe; never certify. This applies to paraphrases and new wordings, not only these examples.`;
+
+// Backstop scanner — flags unsubstantiated efficacy + Green Claims tokens. Tightness-anchored
+// so mechanical descriptors (hydrating, lightweight, fragrance-free, for sensitive skin,
+// "clean skin feel", "natural-looking glow", "reduces the appearance of") do NOT flag.
+const _CLAIMS_EFFICACY_PATTERNS = [
+  /\bclinically\s+(?:proven|tested|validated|shown)\b/i,
+  /\bdermatologically\s+proven\b/i,
+  /\bproven\s+to\b/i,
+  /\bguarantee(?:d|s)?\b/i,
+  /\beliminat(?:es?|ing)\b/i,
+  /\bcures?\b/i,
+  /\breduces?[^.\n]{0,20}\d+\s?%/i,
+  /\b\d+\s?%[^.\n]{0,20}reduction\b/i,
+  /\bclinically\s+superior\b/i,
+  /\bbest[\s-]in[\s-]class\b/i,
+  /#\s?1\b/i,
+  /\bnumber\s+one\b/i,
+];
+const _CLAIMS_GCD_PATTERNS = [
+  /\bclean\s+(?:beauty|formula(?:tion)?|ingredients?|label|skincare|product|brand)\b/i,
+  /\b(?:all[\s-]|100%\s+)?natural\s+(?:ingredients?|formula(?:tion)?|origin|product)\b/i,
+  /\ball[\s-]natural\b/i,
+  /\bnon-?toxic\b/i,
+  /\bchemical-?free\b/i,
+  /\bEWG(?:[\s-]verified)?\b/i,
+  /\beco-?friendly\b/i,
+  /\bplanet-?friendly\b/i,
+  /\bsustainable\b/i,
+];
+function scanClaimsCopy(text){
+  if(!text) return [];
+  var flags=[], seen={};
+  var push=function(s){ var k=String(s).toLowerCase().trim(); if(k&&!seen[k]){seen[k]=1; flags.push(String(s).trim());} };
+  _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS).forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
+  return flags;
+}
+function claimsFlagCopy(list){
+  return '[FLAG_COPY: This copy contains unverified efficacy or environmental claims: '+(list||[]).join(', ')+'. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
+}
+
 async function generateSkuDesc(lang){
   if(!brand?.usp&&!skuForm.name){
     const ni=document.getElementById('sku-name'); if(ni){ni.style.borderColor='#EF4444'; ni.placeholder='Add a product name first'; setTimeout(()=>{ni.style.borderColor='';ni.placeholder='e.g. Cloud & Glow LED Face Mask';},2500);}
@@ -19417,13 +19478,20 @@ async function generateSkuDesc(lang){
   const btn = document.getElementById('desc-gen-'+lang);
   if(btn){btn.disabled=true;btn.textContent='Generating...';}
   try{
-    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}`}],200);
+    const _sub = claimsSubstantiationState(skuForm);
+    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file — write mechanical/descriptive copy only; do not state any claim as a proven benefit.";
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
     if(lang==='sv') skuForm.descSV=text.trim();
     else if(lang==='da') skuForm.descDA=text.trim();
     else skuForm.descEN=text.trim();
     const area = document.getElementById('desc-area-'+lang);
     if(area) area.value = text.trim();
-    if(btn){btn.disabled=false;btn.textContent='✓ Generated';}
+    // Stage 3 — backstop scan; surface beside the description (never silent).
+    const _dflags = scanClaimsCopy(text);
+    let _dfEl = document.getElementById('desc-flag-'+lang);
+    if(!_dfEl && area && area.parentElement){ _dfEl = document.createElement('div'); _dfEl.id='desc-flag-'+lang; area.parentElement.insertBefore(_dfEl, area.nextSibling); }
+    if(_dfEl) _dfEl.innerHTML = _dflags.length ? '<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.5rem .75rem;margin-top:.4rem;font-family:var(--mono);font-size:.56rem;color:#B32A1F;line-height:1.6">'+claimsFlagCopy(_dflags)+'</div>' : '';
+    if(btn){btn.disabled=false;btn.textContent='Generated';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Generate';}
     const db3=btn?.parentElement; if(db3){const de3=document.createElement('div'); de3.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem'; de3.textContent='Could not generate — check connection and try again.'; db3.appendChild(de3); setTimeout(()=>de3.remove(),4000);}
@@ -22363,7 +22431,8 @@ function renderClaimsResult(){
         </div>
       `:claimsState.rewriteResult?`
         <div style="margin-bottom:.75rem">
-          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">✓ Rewritten copy</div>
+          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">Rewritten copy</div>
+          ${(claimsState.rewriteFlags&&claimsState.rewriteFlags.length)?`<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.55rem .8rem;margin-bottom:.5rem;font-family:var(--mono);font-size:.58rem;color:#B32A1F;line-height:1.6">${claimsFlagCopy(claimsState.rewriteFlags)}</div>`:''}
           <div id="claims-rewrite-box" style="font-family:var(--sans);font-size:.85rem;line-height:1.8;color:var(--ink);background:#F9F8F6;border:1px solid var(--border);padding:1rem 1.25rem;white-space:pre-wrap">${claimsState.rewriteResult}</div>
           <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
             <button class="btn-primary" style="font-size:.68rem" onclick="copyToClipboard(document.getElementById('claims-rewrite-box').textContent)">Copy text</button>
@@ -22419,6 +22488,8 @@ async function rewriteClaimsCopy(){
     replaceRules,
     keepRules ? 'CLAIMS TO KEEP UNCHANGED:' : '',
     keepRules,
+    CLAIMS_HONESTY_RULE,
+    claimsSubstantiationState((typeof skuForm!=='undefined'&&skuForm)||(typeof skus!=='undefined'&&skus&&skus[0])||{}).documented ? '' : 'These claims are NOT substantiated on file — do NOT upgrade any into proven/clinical language; describe mechanically.',
     'OUTPUT: Only the rewritten copy. No preamble, no labels, no explanation.',
   ];
   var prompt = promptParts.filter(function(p){return p;}).join('\n\n');
@@ -22426,6 +22497,7 @@ async function rewriteClaimsCopy(){
   try{
     var text = await callAPI([{role:'user',content:prompt}], 800);
     claimsState.rewriteResult = text.trim();
+    claimsState.rewriteFlags = scanClaimsCopy(text);   // Stage 3 backstop
     claimsState.rewriteLoading = false;
   }catch(err){
     claimsState.rewriteLoading = false;
@@ -22470,11 +22542,14 @@ ${claimsState.input}
 ${replaceRules}
 ${keepRules}
 
+${CLAIMS_HONESTY_RULE}
+
 Output: ONLY the rewritten copy for ${market}. No preamble.`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 600);
     claimsState.rewriteResult = `--- ${market.toUpperCase()} VERSION ---\n\n${text.trim()}`;
+    claimsState.rewriteFlags = scanClaimsCopy(text);   // Stage 3 backstop
     claimsState.rewriteLoading = false;
   }catch(err){
     claimsState.rewriteLoading = false;
