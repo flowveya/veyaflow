@@ -19429,6 +19429,7 @@ const CLAIMS_HONESTY_RULE = `CLAIMS HONESTY (absolute — Reg (EU) 655/2013 + Gr
 - NEVER upgrade a user-entered claim into clinical/proven/guaranteed language. If a claim is not substantiated (no PIF/safetyRef on file), do NOT state it as fact — describe the product mechanically instead.
 - NEVER generate environmental/"clean" claims (clean, natural, non-toxic, eco-friendly, sustainable, chemical-free, EWG-verified, planet-friendly) unless explicitly verified — these are AMBER now / illegal from the GCD. If the user entered one, omit or neutralise it.
 - No superlatives or comparative efficacy ("best", "clinically superior", "#1") without on-file evidence.
+- A claim being LEGALLY PERMITTED (a cosmetic claim) is NOT the same as it being SUBSTANTIATED. Permitted claims may be described in appearance/intent register; they must never be stated as proven, clinical, or mechanistic.
 - Describe; never certify. This applies to paraphrases and new wordings, not only these examples.`;
 
 // Backstop scanner — flags unsubstantiated efficacy + Green Claims tokens. Tightness-anchored
@@ -19447,6 +19448,18 @@ const _CLAIMS_EFFICACY_PATTERNS = [
   /\bbest[\s-]in[\s-]class\b/i,
   /#\s?1\b/i,
   /\bnumber\s+one\b/i,
+  // Stage 3.1 — efficacy/mechanism family the Retinol-Serum smoke slipped (tightness-tested:
+  // "lightweight texture" / "fast-absorbing" / "reduces the appearance of" do NOT flag).
+  /\b(?:clinical|pharmaceutical|medical|professional|prescription)[\s-]?(?:grade|strength)\b/i,
+  /\bevidence[\s-]based\b/i,
+  /\bdermatologist[\s-]?tested\b/i,
+  /\bclinically\s+formulated\b/i,
+  /\baddresses\s+(?:fine\s+lines|wrinkles|pigmentation|uneven\s+tone|texture|acne|redness)\b/i,
+  /\b(?:optimal|maximum|enhanced)\s+(?:absorption|penetration|efficacy|delivery)\b/i,
+  /\bcellular\s+(?:renewal|turnover|regeneration)\b/i,
+  /\b(?:amplifies|stimulates|boosts|accelerates)\s+\w+/i,
+  /\bbarrier\s+integrity\b/i,
+  /\bdelivery\s+system\b/i,
 ];
 const _CLAIMS_GCD_PATTERNS = [
   /\bclean\s+(?:beauty|formula(?:tion)?|ingredients?|label|skincare|product|brand)\b/i,
@@ -19479,8 +19492,18 @@ async function generateSkuDesc(lang){
   if(btn){btn.disabled=true;btn.textContent='Generating...';}
   try{
     const _sub = claimsSubstantiationState(skuForm);
-    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file — write mechanical/descriptive copy only; do not state any claim as a proven benefit.";
-    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
+    // Tone + length are substantiation-conditional (Stage 3.1). A fixed "clinical-cool" tone
+    // and a "Max 120 words" target on a thin, unsubstantiated SKU FOUGHT the honesty rule and
+    // manufactured claim language — so when undocumented we ask for a restrained/factual register
+    // and only as much copy as the facts support.
+    const _tone = _sub.documented
+      ? 'premium, clinical-cool, Scandinavian'
+      : 'restrained, factual, Scandinavian. Descriptive register only — NOT clinical, NOT pharmaceutical, NOT medical';
+    const _lenReq = _sub.documented
+      ? 'Max 120 words.'
+      : 'Write only as much as the verified facts support — brevity is correct. Do NOT pad to a length. If there is little verified information, write 2-3 short factual sentences and stop.';
+    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file. User-entered claims MAY be used, but ONLY in permitted cosmetic register: phrase them as appearance or formulation intent ('formulated to help reduce the appearance of…', 'targets the look of…'), NEVER as proof, mechanism, or clinical fact. Do not add claims the user did not enter; if no claims were entered, do not invent any. Do NOT use: clinical-grade, pharmaceutical-strength, medical-grade, evidence-based, clinically/dermatologically tested or proven, 'addresses [condition]', 'optimal absorption', 'cellular renewal', 'amplifies', 'stimulates', 'boosts', or any mechanism-of-action language. Cover what the product is, its format/texture, how and when it is used, and its listed ingredients. The product NAME is not a claim — do not build efficacy statements from it.";
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. ${_lenReq} Tone: ${_tone}. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
     if(lang==='sv') skuForm.descSV=text.trim();
     else if(lang==='da') skuForm.descDA=text.trim();
     else skuForm.descEN=text.trim();
@@ -20171,14 +20194,14 @@ function renderSkuEdit(el){
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (English) *</label>
-              <button id="desc-gen-en" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('en')">✦ Generate from USP</button>
+              <button id="desc-gen-en" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('en')">Generate from USP</button>
             </div>
             <textarea id="desc-area-en" rows="4" placeholder="Max 120 words — used for Boots UK, Holland & Barrett, Matas EN..." oninput="skuForm.descEN=this.value">${skuForm.descEN||''}</textarea>
           </div>
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (Swedish)</label>
-              <button id="desc-gen-sv" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('sv')">✦ Generate</button>
+              <button id="desc-gen-sv" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('sv')">Generate</button>
             </div>
             <textarea id="desc-area-sv" rows="4" placeholder="Lyko, Kicks, Apotek Hjärtat..." oninput="skuForm.descSV=this.value">${skuForm.descSV||''}</textarea>
           </div>
@@ -20186,7 +20209,7 @@ function renderSkuEdit(el){
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (Danish)</label>
-              <button id="desc-gen-da" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('da')">✦ Generate</button>
+              <button id="desc-gen-da" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('da')">Generate</button>
             </div>
             <textarea id="desc-area-da" rows="4" placeholder="Matas, Magasin..." oninput="skuForm.descDA=this.value">${skuForm.descDA||''}</textarea>
           </div>`:''}
