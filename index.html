@@ -19430,6 +19430,7 @@ const CLAIMS_HONESTY_RULE = `CLAIMS HONESTY (absolute — Reg (EU) 655/2013 + Gr
 - NEVER generate environmental/"clean" claims (clean, natural, non-toxic, eco-friendly, sustainable, chemical-free, EWG-verified, planet-friendly) unless explicitly verified — these are AMBER now / illegal from the GCD. If the user entered one, omit or neutralise it.
 - No superlatives or comparative efficacy ("best", "clinically superior", "#1") without on-file evidence.
 - A claim being LEGALLY PERMITTED (a cosmetic claim) is NOT the same as it being SUBSTANTIATED. Permitted claims may be described in appearance/intent register; they must never be stated as proven, clinical, or mechanistic.
+- USAGE & COMPATIBILITY (absolute): Do NOT write directions for use, application instructions, sequencing, frequency, timing, or routine placement (e.g. 'apply to clean skin', 'use in the evening', 'apply before/after X', 'use twice weekly'). Do NOT state or imply that the product is intended for, compatible with, or should be paired with any device, tool, or other product. Do NOT recommend combining it with anything. If usage information is not supplied as product data, say nothing about usage. Directions for use are regulated label content and must come from the brand's own approved documentation — never from inference.
 - Describe; never certify. This applies to paraphrases and new wordings, not only these examples.`;
 
 // Backstop scanner — flags unsubstantiated efficacy + Green Claims tokens. Tightness-anchored
@@ -19472,15 +19473,33 @@ const _CLAIMS_GCD_PATTERNS = [
   /\bplanet-?friendly\b/i,
   /\bsustainable\b/i,
 ];
+// Stage 3.2 — invented usage / cross-product compatibility directives. Not a "claim",
+// so efficacy/GCD scanners miss them; there is no usage field in the SKU schema, so any
+// directive is necessarily inferred. Tightness-tested ("fast-absorbing" / "suitable for
+// facial use" stay clean; "designed for evening application" / "before using" flag).
+const _CLAIMS_USAGE_PATTERNS = [
+  /\bapply\s+(?:to|on|before|after|in the)\b/i,
+  /\buse\s+(?:with|before|after|alongside|together with)\b/i,
+  /\b(?:before|after)\s+using\b/i,
+  /\bpair(?:s|ed)?\s+with\b/i,
+  /\bcompatible\s+with\b/i,
+  /\bintended\s+for\s+use\s+with\b/i,
+  /\b(?:designed|formulated)\s+to\s+be\s+used\s+with\b/i,
+  /\bfor\s+(?:best|optimal)\s+results,?\s+(?:use|apply|combine)\b/i,
+  /\b(?:twice|once|three times)\s+(?:daily|weekly|a week|per week)\b/i,
+  /\bin\s+(?:the\s+)?(?:morning|evening)\b/i,
+  /\bfollow\s+with\b/i,
+  /\b(?:morning|evening|night(?:ly|time)?|daytime)\s+(?:application|use)\b/i,
+];
 function scanClaimsCopy(text){
   if(!text) return [];
   var flags=[], seen={};
   var push=function(s){ var k=String(s).toLowerCase().trim(); if(k&&!seen[k]){seen[k]=1; flags.push(String(s).trim());} };
-  _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS).forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
+  _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS).concat(_CLAIMS_USAGE_PATTERNS).forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
   return flags;
 }
 function claimsFlagCopy(list){
-  return '[FLAG_COPY: This copy contains unverified efficacy or environmental claims: '+(list||[]).join(', ')+'. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
+  return '[FLAG_COPY: This copy contains unverified efficacy/environmental claims or usage/compatibility instructions VeyaFlow cannot source: '+(list||[]).join(', ')+'. Claims need on-file evidence; directions for use must come from your approved product documentation. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
 }
 
 async function generateSkuDesc(lang){
@@ -19502,8 +19521,8 @@ async function generateSkuDesc(lang){
     const _lenReq = _sub.documented
       ? 'Max 120 words.'
       : 'Write only as much as the verified facts support — brevity is correct. Do NOT pad to a length. If there is little verified information, write 2-3 short factual sentences and stop.';
-    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file. User-entered claims MAY be used, but ONLY in permitted cosmetic register: phrase them as appearance or formulation intent ('formulated to help reduce the appearance of…', 'targets the look of…'), NEVER as proof, mechanism, or clinical fact. Do not add claims the user did not enter; if no claims were entered, do not invent any. Do NOT use: clinical-grade, pharmaceutical-strength, medical-grade, evidence-based, clinically/dermatologically tested or proven, 'addresses [condition]', 'optimal absorption', 'cellular renewal', 'amplifies', 'stimulates', 'boosts', or any mechanism-of-action language. Cover what the product is, its format/texture, how and when it is used, and its listed ingredients. The product NAME is not a claim — do not build efficacy statements from it.";
-    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. ${_lenReq} Tone: ${_tone}. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
+    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file. User-entered claims MAY be used, but ONLY in permitted cosmetic register: phrase them as appearance or formulation intent ('formulated to help reduce the appearance of…', 'targets the look of…'), NEVER as proof, mechanism, or clinical fact. Do not add claims the user did not enter; if no claims were entered, do not invent any. Do NOT use: clinical-grade, pharmaceutical-strength, medical-grade, evidence-based, clinically/dermatologically tested or proven, 'addresses [condition]', 'optimal absorption', 'cellular renewal', 'amplifies', 'stimulates', 'boosts', or any mechanism-of-action language. Cover only: what the product is (product type/format), its texture/format, and its listed ingredients as entered. The product NAME is not a claim — do not build efficacy statements from it.";
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. ${_lenReq} Tone: ${_tone}. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\nSCOPE (absolute): The USP above describes the BRAND, not this product — do NOT attribute brand-level capabilities, categories, or other products in the brand's range to THIS product; this product is only what the Product / INCI / claims fields state. Do NOT reference, name, or imply any other product in the brand's catalogue. Write about THIS product only.\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
     if(lang==='sv') skuForm.descSV=text.trim();
     else if(lang==='da') skuForm.descDA=text.trim();
     else skuForm.descEN=text.trim();
