@@ -3283,6 +3283,15 @@ function renderBilReviewForm(){
   BIL_C1_COMMERCIAL_FIELDS.forEach(function(f){
     var missing=_bilIsMissing(ex,'commercialIntelligence.'+f.key);
     ciCard.appendChild(_bilField(f.label,f.type,draft.commercialIntelligence[f.key],missing,function(v){ draft.commercialIntelligence[f.key]=v; }));
+    if(f.key==='marginStructure'){
+      // Margin helper (Part B) + in-app-only Nordic reference (Part D) — this is the real
+      // entry point for the brand's margin (BIL-extracted; there is no standalone form input).
+      // The reference table is guidance for the BRAND — never rendered into the buyer PDF/pack.
+      var help=document.createElement('div');
+      help.style.cssText='font-family:var(--mono);font-size:.55rem;color:var(--muted);line-height:1.6;margin:-.15rem 0 .6rem;padding:.45rem .6rem;background:var(--surface);border:1px solid var(--line)';
+      help.innerHTML='Typical premium-beauty retail margin is 40–50% of RRP. Enter the margin to show this buyer, or leave blank. This is margin on RETAIL price, not markup on cost (a 50% margin = a 100% markup).<br><span style="color:var(--ink-mute)">Typical Nordic retail margins — for your reference, not shown to the buyer: Matas banner ~47% · Lyko ~44% · Kicks ~42–44% · pharmacy / dermocosmetics ~40–48% · supplements ~30–50% · devices variable.</span>';
+      ciCard.appendChild(help);
+    }
   });
 
   // ── C2: confirm action — commit the edited draft into the brand object ────
@@ -15755,7 +15764,7 @@ function renderBizCaseResult(el){
    Buyer-first document. Page 1 = zero AI, all verified data.
    7 sections rebuilt with buyer psychology.
 ═══════════════════════════════════════════════════ */
-let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null};
+let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null, hideTerms:false};
 
 // Retailer-specific tones and cover colours
 const BRAND_PACK_COVERS = {
@@ -16685,17 +16694,25 @@ function renderBrandPackResult(el){
               </div>`).join('')}
           </div>
         </div>
-        <!-- Proposed terms -->
-        <div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
-          <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Proposed terms</div>
+        <!-- Proposed terms (Margin-fix Aug 2026): render ONLY brand-set data, else "To be
+             discussed" — never a hardcoded 50% / 14 days / Beauty Days (fabrication class,
+             Stages 1–3.2). Omit toggle: a first pitch needn't quote cost-to-retailer. -->
+        ${brandPackState.hideTerms
+          ? `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted)">Commercial terms omitted for this pitch. <span onclick="brandPackState.hideTerms=false;renderBrandPack(document.getElementById('page-brandpack'))" style="color:var(--navy);cursor:pointer;text-decoration:underline">Show</span></div>`
+          : `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem">
+            <span style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Proposed terms</span>
+            <span style="font-family:var(--mono);font-size:.5rem;color:var(--ink-mute)">Indicative — brand-set, subject to confirmation</span>
+            <span onclick="brandPackState.hideTerms=true;renderBrandPack(document.getElementById('page-brandpack'))" style="font-family:var(--mono);font-size:.5rem;color:var(--navy);cursor:pointer;text-decoration:underline;margin-left:auto">Omit</span>
+          </div>
           <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
             ${[
-              ['Margin','50%'],
-              ['Lead time', heroSku?.leadDays?heroSku.leadDays+' days':'14 days'],
-              ['Launch support','Beauty Days participation'],
+              ['Margin', (brand.marginStructure&&String(brand.marginStructure).trim()) ? escapeHtml(String(brand.marginStructure).trim()) : 'To be discussed'],
+              ['Lead time', heroSku?.leadDays ? heroSku.leadDays+' days' : 'To be discussed'],
+              ['Launch support', (brand.launchSupport&&String(brand.launchSupport).trim()) ? escapeHtml(String(brand.launchSupport).trim()) : 'To be discussed'],
             ].map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase">${l}</div><div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${v}</div></div>`).join('')}
           </div>
-        </div>
+        </div>`}
       </div>
 
       <!-- AI-generated sections -->
