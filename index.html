@@ -24640,6 +24640,7 @@ ${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures int
     const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
     pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
+    try{ if(typeof crmLogPitchFor==='function') crmLogPitchFor(retailer); }catch(e){}   // Spec 2 — log back to the matching CRM card
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
     renderPitch(document.getElementById('page-pitch'));
@@ -27026,7 +27027,7 @@ function renderCRM(el){
                     <div style="background:#fff;border:1px solid ${stage.border};padding:.65rem .75rem;margin-bottom:.4rem;position:relative">
                       <!-- Card header -->
                       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
-                        <div>
+                        <div onclick="openRetailerDetail('${card.id}')" style="cursor:pointer;flex:1;min-width:0" title="View retailer detail">
                           <div style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:var(--navy)">${card.name}${nlActive&&nlMatchMap[card.id]?` <span style="font-family:var(--mono);font-size:.5rem;background:#EFF6FF;color:#1E40AF;padding:.05rem .3rem;border:1px solid #BFDBFE;vertical-align:middle">${nlMatchMap[card.id].relevanceScore}</span>`:''}</div>
                           <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:flex;align-items:center;gap:.25rem;flex-wrap:wrap">${card.market}${getBrandCategories().length>1?(card.categories||[]).filter(cat=>getBrandCategories().includes(cat)).map(cat=>renderCategoryBadge(cat,{small:true})).join(''):'' }</div>
                           ${nlActive&&nlMatchMap[card.id]?.reason?`<div style="font-family:var(--sans);font-size:.62rem;color:#1E40AF;line-height:1.4;margin-top:.15rem">${nlMatchMap[card.id].reason}</div>`:''}
@@ -32704,6 +32705,93 @@ function toggleMilestone(retailerId, milestoneId){
   }
   // Refresh brand home overdue count if on home
   if(currentPage==='home') renderPage('home');
+}
+
+// ── Retailer detail modal (Spec 2) — the READ view; mirrors openActionPlanModal
+//    but is emoji-free (the pre-existing modals' ✓/⏰/○/✕ are NOT copied here). ──
+function openRetailerDetail(cardId){
+  const card = crmCards.find(c=>c.id===cardId);
+  if(!card) return;
+  const existing = document.getElementById('vf-retailer-detail-modal');
+  if(existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'vf-retailer-detail-modal';
+  document.body.appendChild(el);
+  renderRetailerDetail(card);
+}
+function renderRetailerDetail(card){
+  const modal = document.getElementById('vf-retailer-detail-modal');
+  if(!modal) return;
+  const stage = CRM_STAGES.find(s=>s.id===card.stage) || CRM_STAGES[0];
+  const contacts = Array.isArray(card.contacts)?card.contacts:[];
+  const activity = (Array.isArray(card.activity)?card.activity:[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
+  const rule = 'border-top:1px solid var(--border);padding-top:.7rem;margin-top:.7rem';
+  const lbl  = 'font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.35rem';
+  const empty = t=>`<div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);font-style:italic">${t}</div>`;
+  const chips = [];
+  if(card.marginMin||card.marginMax) chips.push(`Margin ${card.marginMin||'?'}–${card.marginMax||'?'}%`);
+  if(card.rangeReview)  chips.push('Range review: '+escapeHtml(card.rangeReview));
+  if(card.approachRoute) chips.push(escapeHtml(card.approachRoute));
+  const X = "document.getElementById('vf-retailer-detail-modal').remove()";
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto" onclick="if(event.target===this)${X}">
+      <div style="background:#fff;width:100%;max-width:520px;position:relative">
+        <div style="padding:1.1rem 1.25rem .8rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+            <div>
+              <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.15rem">Retailer</div>
+              <div style="font-family:var(--sans);font-size:.95rem;font-weight:600;color:var(--navy)">${escapeHtml(card.name)}</div>
+              <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;gap:.4rem;margin-top:.2rem">${escapeHtml(card.market||'')}<span style="font-family:var(--mono);font-size:.52rem;padding:.05rem .35rem;color:${stage.color};background:${stage.bg};border:1px solid ${stage.border}">${stage.label}</span></div>
+            </div>
+            <button onclick="${X}" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.2rem .5rem;flex-shrink:0">Close</button>
+          </div>
+        </div>
+        <div style="padding:1rem 1.25rem 1.25rem">
+          <button class="btn-primary" style="width:100%;font-size:.72rem;padding:.5rem" onclick="pitchFromCRM('${card.id}')">Pitch this retailer →</button>
+          <div style="${rule}"><div style="${lbl}">Snapshot</div>${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:.35rem">${chips.map(c=>`<span style="font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);padding:.15rem .45rem">${c}</span>`).join('')}</div>`:empty('No snapshot data.')}</div>
+          <div style="${rule}"><div style="${lbl}">Contacts</div>${contacts.length?contacts.map(ct=>`<div style="font-size:.68rem;padding:.15rem 0"><span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(ct.name||'')}</span>${ct.role?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(ct.role)}</span>`:''}${ct.email?`<span style="font-family:var(--mono);color:var(--muted)"> · ${escapeHtml(ct.email)}</span>`:''}</div>`).join(''):empty('No contacts added yet.')}</div>
+          <div style="${rule}"><div style="${lbl}">Activity</div>${activity.length?activity.map(a=>{const tl=(CRM_ACTIVITY_TYPES.find(t=>t.id===a.type)||{}).label||a.type;return `<div style="font-size:.66rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span style="font-family:var(--mono);color:var(--muted)">${a.ts}</span> · <span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(tl)}</span>${a.note?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(a.note)}</span>`:''}</div>`;}).join(''):empty('No activity logged yet.')}</div>
+          <div style="${rule}"><div style="${lbl}">Next action</div>${card.nextAction?`<div style="font-family:var(--sans);font-size:.7rem;color:var(--navy)">${escapeHtml(card.nextAction)}</div>`:empty('None set.')}
+            <div style="${lbl};margin-top:.55rem">Notes</div>${card.notes?`<div style="font-family:var(--sans);font-size:.7rem;color:var(--ink-soft);line-height:1.5">${escapeHtml(card.notes)}</div>`:empty('No notes.')}</div>
+          <div style="${rule};display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};openActionPlanModal('${card.id}')">Action plan →</button>
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};openAssetModal('${card.id}')">Asset requirements →</button>
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};showPage('retail-templates')">Prepare file →</button>
+            <button class="btn-outline" style="font-size:.6rem;margin-left:auto" onclick="${X};crmEditId='${card.id}';renderPage('crm')">Edit details</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// B1 — pitch from the CRM card: pre-fill ONLY real card data (retailer + market).
+// No fabricated proof points/contacts; the pitch generator's own honesty rules govern output.
+function pitchFromCRM(cardId){
+  const card = crmCards.find(c=>c.id===cardId);
+  if(!card) return;
+  const m = document.getElementById('vf-retailer-detail-modal'); if(m) m.remove();
+  pitchForm.retailer = card.name;
+  pitchForm.targetMarket = card.market || pitchForm.targetMarket || '';
+  showPage('pitch');
+}
+
+// B2 — log a generated pitch back to its matching CRM card (the hub loop).
+// Non-destructive: forward-only advance (not_contacted→pitched), additive activity, no
+// silent card creation, no double-log same-day.
+function crmLogPitchFor(retailerName){
+  if(!retailerName) return;
+  if(typeof loadCRM==='function' && (!crmCards || !crmCards.length)){ try{ loadCRM(); }catch(e){} }
+  const card = (crmCards||[]).find(c=>c.name===retailerName);
+  if(!card) return;   // retailer isn't a CRM card → do nothing
+  if(!Array.isArray(card.activity)) card.activity=[];
+  const ts = new Date().toISOString().slice(0,10);
+  const alreadyToday = card.activity.some(a=>a.type==='pitched' && a.ts===ts);
+  if(!alreadyToday){
+    card.activity.push({id:Date.now(), ts, type:'pitched', note:'Pitch generated'});
+    card.lastContact = ts;
+  }
+  if(card.stage==='not_contacted') card.stage='pitched';   // forward-only
+  saveCRM();
 }
 
 function openActionPlanModal(cardId){
