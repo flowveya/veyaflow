@@ -26627,8 +26627,11 @@ const CRM_STAGES = [
   {id:'not_contacted', label:'Not Contacted', color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB'},
   {id:'pitched',       label:'Pitched',       color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE'},
   {id:'meeting',       label:'Meeting Booked',color:'#92400E', bg:'#FFFBEB', border:'#FDE68A'},
-  {id:'listed',        label:'Listed ✓',      color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7'},
+  {id:'listed',        label:'Listed',        color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7'},
 ];
+
+// Typed activity log (Spec 1) — typed so Spec 3 can derive staleness signals; each carries an optional free note.
+const CRM_ACTIVITY_TYPES = [{id:'pitched',label:'Pitched'},{id:'emailed',label:'Emailed'},{id:'called',label:'Called'},{id:'met',label:'Met'},{id:'replied',label:'They replied'},{id:'sample',label:'Sent samples'},{id:'note',label:'Note'}];
 
 // Initialise CRM cards from RETAILER_REGISTRY
 function initCRMCards(){
@@ -26671,6 +26674,8 @@ function initCRMCards(){
       marginMin: r.marginMin||null,
       marginMax: r.marginMax||null,
       approachRoute: r.approachRoute||'',
+      contacts: [],   // [{id, name, role, email}]  (Spec 1)
+      activity: [],   // [{id, ts, type, note}]      (Spec 1)
     }));
 }
 
@@ -26762,6 +26767,8 @@ function loadCRM(){
   } else {
     crmCards = initCRMCards();
   }
+  // Spec 1 migration — backfill contacts/activity on any card that predates them (no break).
+  crmCards.forEach(c=>{ if(!Array.isArray(c.contacts)) c.contacts=[]; if(!Array.isArray(c.activity)) c.activity=[]; });
 }
 
 function saveCRM(){
@@ -26801,16 +26808,68 @@ function saveCRMEdit(id){
   renderPage('crm');
 }
 
+// Preserve any in-progress date/action/notes edits in the open panel before a re-render
+// (contact/activity actions re-render, and we don't want to lose typed-but-unsaved fields).
+function _crmPreservePanelEdits(card){
+  const _n=document.getElementById(`crm-notes-${card.id}`);  if(_n) card.notes=_n.value;
+  const _a=document.getElementById(`crm-action-${card.id}`); if(_a) card.nextAction=_a.value;
+  const _d=document.getElementById(`crm-date-${card.id}`);   if(_d) card.lastContact=_d.value;
+}
+
+// ── Contacts (Spec 1) ──
+function crmAddContact(id){
+  const card = crmCards.find(c=>c.id===id); if(!card) return;
+  if(!Array.isArray(card.contacts)) card.contacts=[];
+  const name=(document.getElementById(`crm-contact-name-${id}`)?.value||'').trim();
+  const role=(document.getElementById(`crm-contact-role-${id}`)?.value||'').trim();
+  const email=(document.getElementById(`crm-contact-email-${id}`)?.value||'').trim();
+  if(!name && !email) return;   // need at least a name or an email
+  _crmPreservePanelEdits(card);
+  card.contacts.push({id:Date.now(), name, role, email});
+  saveCRM(); renderPage('crm');
+}
+function crmRemoveContact(id, contactId){
+  const card = crmCards.find(c=>c.id===id); if(!card||!Array.isArray(card.contacts)) return;
+  card.contacts = card.contacts.filter(ct=>String(ct.id)!==String(contactId));
+  saveCRM(); renderPage('crm');
+}
+
+// ── Activity log (Spec 1) ──
+function crmLogActivity(id){
+  const card = crmCards.find(c=>c.id===id); if(!card) return;
+  if(!Array.isArray(card.activity)) card.activity=[];
+  const type=(document.getElementById(`crm-activity-type-${id}`)?.value||'note');
+  const note=(document.getElementById(`crm-activity-note-${id}`)?.value||'').trim();
+  const ts=new Date().toISOString().slice(0,10);
+  _crmPreservePanelEdits(card);
+  card.activity.push({id:Date.now(), ts, type, note});
+  // Keep lastContact coherent for the overdue counter (L~7267) + Spec 3.
+  if(type==='pitched'||type==='met') card.lastContact = ts;
+  saveCRM(); renderPage('crm');
+}
+function crmRemoveActivity(id, activityId){
+  const card = crmCards.find(c=>c.id===id); if(!card||!Array.isArray(card.activity)) return;
+  card.activity = card.activity.filter(a=>String(a.id)!==String(activityId));
+  saveCRM(); renderPage('crm');
+}
+
 function exportCRMcsv(){
-  const headers = ['Retailer','Market','Stage','Last Contact','Next Action','Notes','Range Review','Approach Route'];
-  const rows = crmCards.map(c=>[
-    c.name, c.market,
-    CRM_STAGES.find(s=>s.id===c.stage)?.label||c.stage,
-    c.lastContact, c.nextAction,
-    (c.notes||'').replace(/"/g,'""'),
-    c.rangeReview,
-    (c.approachRoute||'').replace(/"/g,'""'),
-  ].map(v=>`"${v}"`).join(','));
+  const headers = ['Retailer','Market','Stage','Last Contact','Next Action','Notes','Range Review','Approach Route','Contacts','Last Activity'];
+  const rows = crmCards.map(c=>{
+    const contactsStr = (c.contacts||[]).map(ct=>`${ct.name||''}${ct.role?' ('+ct.role+')':''}${ct.email?' <'+ct.email+'>':''}`).join('; ');
+    const acts = (c.activity||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
+    const lastAct = acts.length ? `${acts[0].ts} · ${(CRM_ACTIVITY_TYPES.find(t=>t.id===acts[0].type)||{}).label||acts[0].type}` : '';
+    return [
+      c.name, c.market,
+      CRM_STAGES.find(s=>s.id===c.stage)?.label||c.stage,
+      c.lastContact, c.nextAction,
+      (c.notes||'').replace(/"/g,'""'),
+      c.rangeReview,
+      (c.approachRoute||'').replace(/"/g,'""'),
+      contactsStr.replace(/"/g,'""'),
+      lastAct.replace(/"/g,'""'),
+    ].map(v=>`"${v}"`).join(',');
+  });
   const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -27054,6 +27113,38 @@ function renderCRM(el){
                             <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Notes</label>
                             <textarea id="crm-notes-${card.id}" rows="2" placeholder="${card.approachRoute||'Add notes…'}"
                               style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--sans);font-size:.65rem;color:var(--navy);resize:vertical">${card.notes||''}</textarea>
+                          </div>
+                          <!-- Contacts (Spec 1) -->
+                          <div style="margin-bottom:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.25rem">Contacts</label>
+                            ${(card.contacts||[]).map(ct=>`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;padding:.15rem 0;border-bottom:1px solid var(--border)">
+                                <span style="font-family:var(--sans);font-size:.62rem;color:var(--navy)">${escapeHtml(ct.name||'')}${ct.role?`<span style="color:var(--muted)"> · ${escapeHtml(ct.role)}</span>`:''}${ct.email?`<span style="font-family:var(--mono);color:var(--muted)"> · ${escapeHtml(ct.email)}</span>`:''}</span>
+                                <button onclick="crmRemoveContact('${card.id}','${ct.id}')" title="Remove contact" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;line-height:1;flex-shrink:0">×</button>
+                              </div>`).join('')}
+                            <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">
+                              <input type="text" id="crm-contact-name-${card.id}" placeholder="Name" style="flex:1;min-width:70px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <input type="text" id="crm-contact-role-${card.id}" placeholder="Role" style="flex:1;min-width:60px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <input type="text" id="crm-contact-email-${card.id}" placeholder="Email" style="flex:1.4;min-width:90px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--mono);font-size:.6rem">
+                              <button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="crmAddContact('${card.id}')">Add</button>
+                            </div>
+                          </div>
+                          <!-- Activity log (Spec 1) -->
+                          <div style="margin-bottom:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.25rem">Activity</label>
+                            <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.3rem">
+                              <select id="crm-activity-type-${card.id}" style="padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem;color:var(--navy)">
+                                ${CRM_ACTIVITY_TYPES.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}
+                              </select>
+                              <input type="text" id="crm-activity-note-${card.id}" placeholder="Optional note" style="flex:1;min-width:90px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="crmLogActivity('${card.id}')">Log</button>
+                            </div>
+                            ${(card.activity||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0)).map(a=>{
+                              const _tl=(CRM_ACTIVITY_TYPES.find(t=>t.id===a.type)||{}).label||a.type;
+                              return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;padding:.15rem 0;border-bottom:1px solid var(--border)">
+                                <span style="font-size:.6rem"><span style="font-family:var(--mono);color:var(--muted)">${a.ts}</span> · <span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(_tl)}</span>${a.note?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(a.note)}</span>`:''}</span>
+                                <button onclick="crmRemoveActivity('${card.id}','${a.id}')" title="Remove entry" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;line-height:1;flex-shrink:0">×</button>
+                              </div>`;
+                            }).join('')}
                           </div>
                           <!-- Stage buttons -->
                           <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">
