@@ -3283,6 +3283,15 @@ function renderBilReviewForm(){
   BIL_C1_COMMERCIAL_FIELDS.forEach(function(f){
     var missing=_bilIsMissing(ex,'commercialIntelligence.'+f.key);
     ciCard.appendChild(_bilField(f.label,f.type,draft.commercialIntelligence[f.key],missing,function(v){ draft.commercialIntelligence[f.key]=v; }));
+    if(f.key==='marginStructure'){
+      // Margin helper (Part B) + in-app-only Nordic reference (Part D) — this is the real
+      // entry point for the brand's margin (BIL-extracted; there is no standalone form input).
+      // The reference table is guidance for the BRAND — never rendered into the buyer PDF/pack.
+      var help=document.createElement('div');
+      help.style.cssText='font-family:var(--mono);font-size:.55rem;color:var(--muted);line-height:1.6;margin:-.15rem 0 .6rem;padding:.45rem .6rem;background:var(--surface);border:1px solid var(--line)';
+      help.innerHTML='Typical premium-beauty retail margin is 40–50% of RRP. Enter the margin to show this buyer, or leave blank. This is margin on RETAIL price, not markup on cost (a 50% margin = a 100% markup).<br><span style="color:var(--ink-mute)">Typical Nordic retail margins — for your reference, not shown to the buyer: Matas banner ~47% · Lyko ~44% · Kicks ~42–44% · pharmacy / dermocosmetics ~40–48% · supplements ~30–50% · devices variable.</span>';
+      ciCard.appendChild(help);
+    }
   });
 
   // ── C2: confirm action — commit the edited draft into the brand object ────
@@ -15755,7 +15764,7 @@ function renderBizCaseResult(el){
    Buyer-first document. Page 1 = zero AI, all verified data.
    7 sections rebuilt with buyer psychology.
 ═══════════════════════════════════════════════════ */
-let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null};
+let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null, hideTerms:false};
 
 // Retailer-specific tones and cover colours
 const BRAND_PACK_COVERS = {
@@ -16685,17 +16694,25 @@ function renderBrandPackResult(el){
               </div>`).join('')}
           </div>
         </div>
-        <!-- Proposed terms -->
-        <div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
-          <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Proposed terms</div>
+        <!-- Proposed terms (Margin-fix Aug 2026): render ONLY brand-set data, else "To be
+             discussed" — never a hardcoded 50% / 14 days / Beauty Days (fabrication class,
+             Stages 1–3.2). Omit toggle: a first pitch needn't quote cost-to-retailer. -->
+        ${brandPackState.hideTerms
+          ? `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted)">Commercial terms omitted for this pitch. <span onclick="brandPackState.hideTerms=false;renderBrandPack(document.getElementById('page-brandpack'))" style="color:var(--navy);cursor:pointer;text-decoration:underline">Show</span></div>`
+          : `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem">
+            <span style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Proposed terms</span>
+            <span style="font-family:var(--mono);font-size:.5rem;color:var(--ink-mute)">Indicative — brand-set, subject to confirmation</span>
+            <span onclick="brandPackState.hideTerms=true;renderBrandPack(document.getElementById('page-brandpack'))" style="font-family:var(--mono);font-size:.5rem;color:var(--navy);cursor:pointer;text-decoration:underline;margin-left:auto">Omit</span>
+          </div>
           <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
             ${[
-              ['Margin','50%'],
-              ['Lead time', heroSku?.leadDays?heroSku.leadDays+' days':'14 days'],
-              ['Launch support','Beauty Days participation'],
+              ['Margin', (brand.marginStructure&&String(brand.marginStructure).trim()) ? escapeHtml(String(brand.marginStructure).trim()) : 'To be discussed'],
+              ['Lead time', heroSku?.leadDays ? heroSku.leadDays+' days' : 'To be discussed'],
+              ['Launch support', (brand.launchSupport&&String(brand.launchSupport).trim()) ? escapeHtml(String(brand.launchSupport).trim()) : 'To be discussed'],
             ].map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase">${l}</div><div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${v}</div></div>`).join('')}
           </div>
-        </div>
+        </div>`}
       </div>
 
       <!-- AI-generated sections -->
@@ -17407,6 +17424,7 @@ function newSkuForm(){
     netPriceSEK:'', vatRate:25, moq:'', caseQty:'', leadDays:'', warehouse:'', gln:'',
     // Tab 4 — Assets
     descSV:'', descEN:'', descDA:'',
+    howToUse:'', texture:'', keyBenefit:'', differentiation:'',   // Stage 3.3 — optional sourced descriptive fields
     // Financials (PRIVATE)
     exWorksCost:'',
     // Device fields (rendered when productType==='device')
@@ -17820,7 +17838,7 @@ const FIELD_LABELS = {
   countryOfMfr:'Country of manufacture', shelfLifeMonths:'Shelf life',
   inci:'INCI list', cpnp:'CPNP number', euResponsible:'EU Responsible Person',
   safetyRef:'Safety Assessment', rspSEK:'RSP (SEK)', rspNOK:'RSP (NOK)', rspISK:'RSP (ISK)', netPriceSEK:'Net price',
-  moq:'MOQ', descEN:'Description (EN)', modelNo:'Model number',
+  moq:'MOQ', descEN:'Description (EN)', howToUse:'How to use', texture:'Texture / format', keyBenefit:'Key benefit', differentiation:'What makes it different', modelNo:'Model number',
   ceMarking:'CE marking', docOnFile:'Declaration of Conformity',
   voltageInput:'Voltage input', batteryType:'Battery type',
   ukCaMarking:'UK CA marking', materialComposition:'Material composition',
@@ -19429,6 +19447,8 @@ const CLAIMS_HONESTY_RULE = `CLAIMS HONESTY (absolute — Reg (EU) 655/2013 + Gr
 - NEVER upgrade a user-entered claim into clinical/proven/guaranteed language. If a claim is not substantiated (no PIF/safetyRef on file), do NOT state it as fact — describe the product mechanically instead.
 - NEVER generate environmental/"clean" claims (clean, natural, non-toxic, eco-friendly, sustainable, chemical-free, EWG-verified, planet-friendly) unless explicitly verified — these are AMBER now / illegal from the GCD. If the user entered one, omit or neutralise it.
 - No superlatives or comparative efficacy ("best", "clinically superior", "#1") without on-file evidence.
+- A claim being LEGALLY PERMITTED (a cosmetic claim) is NOT the same as it being SUBSTANTIATED. Permitted claims may be described in appearance/intent register; they must never be stated as proven, clinical, or mechanistic.
+- USAGE & COMPATIBILITY: You MAY state directions for use ONLY if a 'How to use' direction was provided in the product data above — and then ONLY as given: do not embellish, re-sequence, add frequency/timing, or add compatibility. If no 'How to use' was provided, say nothing about usage. ABSOLUTE regardless of any field: never state or imply the product is intended for, compatible with, or should be paired with any device, tool, or other product, and never recommend combining it with anything. Directions for use are regulated label content and must come from the brand's own approved documentation — never from inference.
 - Describe; never certify. This applies to paraphrases and new wordings, not only these examples.`;
 
 // Backstop scanner — flags unsubstantiated efficacy + Green Claims tokens. Tightness-anchored
@@ -19447,6 +19467,18 @@ const _CLAIMS_EFFICACY_PATTERNS = [
   /\bbest[\s-]in[\s-]class\b/i,
   /#\s?1\b/i,
   /\bnumber\s+one\b/i,
+  // Stage 3.1 — efficacy/mechanism family the Retinol-Serum smoke slipped (tightness-tested:
+  // "lightweight texture" / "fast-absorbing" / "reduces the appearance of" do NOT flag).
+  /\b(?:clinical|pharmaceutical|medical|professional|prescription)[\s-]?(?:grade|strength)\b/i,
+  /\bevidence[\s-]based\b/i,
+  /\bdermatologist[\s-]?tested\b/i,
+  /\bclinically\s+formulated\b/i,
+  /\baddresses\s+(?:fine\s+lines|wrinkles|pigmentation|uneven\s+tone|texture|acne|redness)\b/i,
+  /\b(?:optimal|maximum|enhanced)\s+(?:absorption|penetration|efficacy|delivery)\b/i,
+  /\bcellular\s+(?:renewal|turnover|regeneration)\b/i,
+  /\b(?:amplifies|stimulates|boosts|accelerates)\s+\w+/i,
+  /\bbarrier\s+integrity\b/i,
+  /\bdelivery\s+system\b/i,
 ];
 const _CLAIMS_GCD_PATTERNS = [
   /\bclean\s+(?:beauty|formula(?:tion)?|ingredients?|label|skincare|product|brand)\b/i,
@@ -19459,15 +19491,39 @@ const _CLAIMS_GCD_PATTERNS = [
   /\bplanet-?friendly\b/i,
   /\bsustainable\b/i,
 ];
-function scanClaimsCopy(text){
+// Stage 3.2 — invented usage / cross-product compatibility directives. Not a "claim",
+// so efficacy/GCD scanners miss them; there is no usage field in the SKU schema, so any
+// directive is necessarily inferred. Tightness-tested ("fast-absorbing" / "suitable for
+// facial use" stay clean; "designed for evening application" / "before using" flag).
+const _CLAIMS_USAGE_PATTERNS = [
+  /\bapply\s+(?:to|on|before|after|in the)\b/i,
+  /\buse\s+(?:with|before|after|alongside|together with)\b/i,
+  /\b(?:before|after)\s+using\b/i,
+  /\bpair(?:s|ed)?\s+with\b/i,
+  /\bcompatible\s+with\b/i,
+  /\bintended\s+for\s+use\s+with\b/i,
+  /\b(?:designed|formulated)\s+to\s+be\s+used\s+with\b/i,
+  /\bfor\s+(?:best|optimal)\s+results,?\s+(?:use|apply|combine)\b/i,
+  /\b(?:twice|once|three times)\s+(?:daily|weekly|a week|per week)\b/i,
+  /\bin\s+(?:the\s+)?(?:morning|evening)\b/i,
+  /\bfollow\s+with\b/i,
+  /\b(?:morning|evening|night(?:ly|time)?|daytime)\s+(?:application|use)\b/i,
+  /\bas part of (?:a |your )?(?:skincare |daily )?routine\b/i,   // Stage 3.3 — routine-placement tail
+  /\bdesigned for use\b/i,
+];
+function scanClaimsCopy(text, usageSourced){
   if(!text) return [];
   var flags=[], seen={};
   var push=function(s){ var k=String(s).toLowerCase().trim(); if(k&&!seen[k]){seen[k]=1; flags.push(String(s).trim());} };
-  _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS).forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
+  // Usage patterns are the backstop for INVENTED usage. When the brand supplied a 'How to use'
+  // direction (usageSourced), the copy legitimately contains directions — do not flag those.
+  var pats = _CLAIMS_EFFICACY_PATTERNS.concat(_CLAIMS_GCD_PATTERNS);
+  if(!usageSourced) pats = pats.concat(_CLAIMS_USAGE_PATTERNS);
+  pats.forEach(function(re){ var m=text.match(re); if(m) push(m[0]); });
   return flags;
 }
 function claimsFlagCopy(list){
-  return '[FLAG_COPY: This copy contains unverified efficacy or environmental claims: '+(list||[]).join(', ')+'. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
+  return '[FLAG_COPY: This copy contains unverified efficacy/environmental claims or usage/compatibility instructions VeyaFlow cannot source: '+(list||[]).join(', ')+'. Claims need on-file evidence; directions for use must come from your approved product documentation. Review against Reg (EU) 655/2013 + the Green Claims Directive before use.]';
 }
 
 async function generateSkuDesc(lang){
@@ -19479,15 +19535,25 @@ async function generateSkuDesc(lang){
   if(btn){btn.disabled=true;btn.textContent='Generating...';}
   try{
     const _sub = claimsSubstantiationState(skuForm);
-    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file — write mechanical/descriptive copy only; do not state any claim as a proven benefit.";
-    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. Max 120 words. Tone: premium, clinical-cool, Scandinavian. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
+    // Tone + length are substantiation-conditional (Stage 3.1). A fixed "clinical-cool" tone
+    // and a "Max 120 words" target on a thin, unsubstantiated SKU FOUGHT the honesty rule and
+    // manufactured claim language — so when undocumented we ask for a restrained/factual register
+    // and only as much copy as the facts support.
+    const _tone = _sub.documented
+      ? 'premium, clinical-cool, Scandinavian'
+      : 'restrained, factual, Scandinavian. Descriptive register only — NOT clinical, NOT pharmaceutical, NOT medical';
+    const _lenReq = _sub.documented
+      ? 'Max 120 words.'
+      : 'Write only as much as the verified facts support — brevity is correct. Do NOT pad to a length. If there is little verified information, write 2-3 short factual sentences and stop.';
+    const _subNote = _sub.documented ? '' : "\nThis product's claims are NOT substantiated on file. User-entered claims MAY be used, but ONLY in permitted cosmetic register: phrase them as appearance or formulation intent ('formulated to help reduce the appearance of…', 'targets the look of…'), NEVER as proof, mechanism, or clinical fact. Do not add claims the user did not enter; if no claims were entered, do not invent any. Do NOT use: clinical-grade, pharmaceutical-strength, medical-grade, evidence-based, clinically/dermatologically tested or proven, 'addresses [condition]', 'optimal absorption', 'cellular renewal', 'amplifies', 'stimulates', 'boosts', or any mechanism-of-action language. Cover only: what the product is (product type/format), its texture/format, and its listed ingredients as entered. The product NAME is not a claim — do not build efficacy statements from it.";
+    const text = await callAPI([{role:'user',content:`Write a professional retail product description in ${lang==='sv'?'Swedish':lang==='da'?'Danish':'English'} for this product. ${_lenReq} Tone: ${_tone}. No emojis.\n\nBrand: ${brand?.name||''}\nProduct: ${skuForm.name||''}\nUSP: ${brand?.usp||''}\nKey claims: ${skuForm.claims?.join(', ')||''}\nCertifications: ${skuForm.certifications?.join(', ')||''}\nTexture/format: ${skuForm.texture||'(not provided)'}\nKey benefit (brand's words): ${skuForm.keyBenefit||'(not provided)'}\nDifferentiation: ${skuForm.differentiation||'(not provided)'}\nHow to use (brand-provided directions): ${skuForm.howToUse||'(not provided)'}\n\nSCOPE (absolute): The USP above describes the BRAND, not this product — do NOT attribute brand-level capabilities, categories, or other products in the brand's range to THIS product; this product is only what the Product / INCI / claims fields state. Do NOT reference, name, or imply any other product in the brand's catalogue. Write about THIS product only. Fields provided by the brand (Key benefit, Differentiation, How to use) are still subject to ALL claims rules — a claim typed into a field does not make it substantiated; apply the permitted-register and efficacy rules to them exactly as to any other claim.\n\n${CLAIMS_HONESTY_RULE}${_subNote}`}],200);
     if(lang==='sv') skuForm.descSV=text.trim();
     else if(lang==='da') skuForm.descDA=text.trim();
     else skuForm.descEN=text.trim();
     const area = document.getElementById('desc-area-'+lang);
     if(area) area.value = text.trim();
     // Stage 3 — backstop scan; surface beside the description (never silent).
-    const _dflags = scanClaimsCopy(text);
+    const _dflags = scanClaimsCopy(text, !!(skuForm.howToUse && String(skuForm.howToUse).trim()));
     let _dfEl = document.getElementById('desc-flag-'+lang);
     if(!_dfEl && area && area.parentElement){ _dfEl = document.createElement('div'); _dfEl.id='desc-flag-'+lang; area.parentElement.insertBefore(_dfEl, area.nextSibling); }
     if(_dfEl) _dfEl.innerHTML = _dflags.length ? '<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.5rem .75rem;margin-top:.4rem;font-family:var(--mono);font-size:.56rem;color:#B32A1F;line-height:1.6">'+claimsFlagCopy(_dflags)+'</div>' : '';
@@ -20168,17 +20234,25 @@ function renderSkuEdit(el){
       ${skuTab===4?`
         <div class="card">
           <div class="section-tag">What appears on the shelf and online</div>
+          <div class="field"><label class="lbl">Texture / format <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+            <input type="text" value="${skuForm.texture||''}" placeholder="e.g. Lightweight gel-serum" oninput="skuForm.texture=this.value"></div>
+          <div class="field"><label class="lbl">Key benefit <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional · brand's own words)</span></label>
+            <textarea rows="2" placeholder="e.g. Overnight hydration and barrier support" oninput="skuForm.keyBenefit=this.value">${skuForm.keyBenefit||''}</textarea></div>
+          <div class="field"><label class="lbl">What makes it different <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></label>
+            <textarea rows="2" placeholder="e.g. Stabilised retinyl palmitate in a fragrance-light base" oninput="skuForm.differentiation=this.value">${skuForm.differentiation||''}</textarea></div>
+          <div class="field"><label class="lbl">How to use <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional · directions appear in copy only if entered)</span></label>
+            <textarea rows="2" placeholder="e.g. Apply to clean skin morning and evening. Directions appear only if entered here." oninput="skuForm.howToUse=this.value">${skuForm.howToUse||''}</textarea></div>
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (English) *</label>
-              <button id="desc-gen-en" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('en')">✦ Generate from USP</button>
+              <button id="desc-gen-en" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('en')">Generate from USP</button>
             </div>
             <textarea id="desc-area-en" rows="4" placeholder="Max 120 words — used for Boots UK, Holland & Barrett, Matas EN..." oninput="skuForm.descEN=this.value">${skuForm.descEN||''}</textarea>
           </div>
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (Swedish)</label>
-              <button id="desc-gen-sv" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('sv')">✦ Generate</button>
+              <button id="desc-gen-sv" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('sv')">Generate</button>
             </div>
             <textarea id="desc-area-sv" rows="4" placeholder="Lyko, Kicks, Apotek Hjärtat..." oninput="skuForm.descSV=this.value">${skuForm.descSV||''}</textarea>
           </div>
@@ -20186,7 +20260,7 @@ function renderSkuEdit(el){
           <div class="field">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
               <label class="lbl" style="margin:0">Product description (Danish)</label>
-              <button id="desc-gen-da" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('da')">✦ Generate</button>
+              <button id="desc-gen-da" class="btn-outline" style="font-size:.65rem;padding:.2rem .6rem" onclick="generateSkuDesc('da')">Generate</button>
             </div>
             <textarea id="desc-area-da" rows="4" placeholder="Matas, Magasin..." oninput="skuForm.descDA=this.value">${skuForm.descDA||''}</textarea>
           </div>`:''}
@@ -24583,6 +24657,7 @@ ${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures int
     const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
     pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
+    try{ if(typeof crmLogPitchFor==='function') crmLogPitchFor(retailer); }catch(e){}   // Spec 2 — log back to the matching CRM card
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
     renderPitch(document.getElementById('page-pitch'));
@@ -26570,8 +26645,11 @@ const CRM_STAGES = [
   {id:'not_contacted', label:'Not Contacted', color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB'},
   {id:'pitched',       label:'Pitched',       color:'#1E40AF', bg:'#EFF6FF', border:'#BFDBFE'},
   {id:'meeting',       label:'Meeting Booked',color:'#92400E', bg:'#FFFBEB', border:'#FDE68A'},
-  {id:'listed',        label:'Listed ✓',      color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7'},
+  {id:'listed',        label:'Listed',        color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7'},
 ];
+
+// Typed activity log (Spec 1) — typed so Spec 3 can derive staleness signals; each carries an optional free note.
+const CRM_ACTIVITY_TYPES = [{id:'pitched',label:'Pitched'},{id:'emailed',label:'Emailed'},{id:'called',label:'Called'},{id:'met',label:'Met'},{id:'replied',label:'They replied'},{id:'sample',label:'Sent samples'},{id:'note',label:'Note'}];
 
 // Initialise CRM cards from RETAILER_REGISTRY
 function initCRMCards(){
@@ -26614,6 +26692,8 @@ function initCRMCards(){
       marginMin: r.marginMin||null,
       marginMax: r.marginMax||null,
       approachRoute: r.approachRoute||'',
+      contacts: [],   // [{id, name, role, email}]  (Spec 1)
+      activity: [],   // [{id, ts, type, note}]      (Spec 1)
     }));
 }
 
@@ -26622,6 +26702,7 @@ let crmFilter = {market:'', stage:'', search:'', categoryFilter:''};
 let crmNLSearch = {query:'', loading:false, results:null, interpretation:'', error:null};
 // results: [{retailerId, relevanceScore, reason}] or null when inactive
 let crmEditId = null;
+let crmModalEditId = null;   // Refinement #1 — modal-scoped edit flag, DISTINCT from crmEditId (invariant)
 
 async function runCRMNLSearch(){
   const q = (document.getElementById('crm-nl-input')?.value||'').trim();
@@ -26705,13 +26786,38 @@ function loadCRM(){
   } else {
     crmCards = initCRMCards();
   }
+  // Spec 1 migration — backfill contacts/activity on any card that predates them (no break).
+  crmCards.forEach(c=>{ if(!Array.isArray(c.contacts)) c.contacts=[]; if(!Array.isArray(c.activity)) c.activity=[]; });
 }
 
 function saveCRM(){
   try{ localStorage.setItem('ns_crm', JSON.stringify(crmCards)); }catch(e){}
 }
 
-function moveCRMCard(id, stage){
+// Route a CRM mutation's re-render: the modal edit surface (Refinement #1) vs the board.
+function _crmAfterMutation(cardId, fromModal){
+  if(fromModal && document.getElementById('vf-retailer-detail-modal')){
+    const card = crmCards.find(c=>c.id===cardId);
+    if(card){ renderRetailerDetail(card); return; }   // crmModalEditId governs editor-vs-read
+  }
+  renderPage('crm');
+}
+
+// Enter/leave modal edit (Refinement #1). crmModalEditId is DISTINCT from crmEditId so the
+// board card underneath never mounts a second editor for the same card — duplicate
+// card-keyed input ids would make saveCRMEdit's getElementById read the wrong instance.
+function crmEditInModal(cardId){
+  if(crmEditId){ crmEditId=null; renderPage('crm'); }   // collapse any board editor first (invariant)
+  crmModalEditId=cardId;
+  const c=crmCards.find(x=>x.id===cardId); if(c) renderRetailerDetail(c);
+}
+function crmCancelModalEdit(cardId){
+  crmModalEditId=null;
+  const c=crmCards.find(x=>x.id===cardId); if(c) renderRetailerDetail(c);
+}
+
+function moveCRMCard(id, stage, opts){
+  const fromModal = !!(opts && opts.fromModal);
   const card = crmCards.find(c=>c.id===id);
   if(!card) return;
   const wasNotPitched = card.stage !== 'pitched';
@@ -26727,10 +26833,11 @@ function moveCRMCard(id, stage){
     const retailerName = card.name||'this retailer';
     showCSRDListingPrompt(retailerName);
   }
-  renderPage('crm');
+  _crmAfterMutation(id, fromModal);
 }
 
-function saveCRMEdit(id){
+function saveCRMEdit(id, opts){
+  const fromModal = !!(opts && opts.fromModal);
   const card = crmCards.find(c=>c.id===id);
   if(!card) return;
   const noteEl = document.getElementById(`crm-notes-${id}`);
@@ -26739,27 +26846,147 @@ function saveCRMEdit(id){
   if(noteEl) card.notes = noteEl.value;
   if(actionEl) card.nextAction = actionEl.value;
   if(dateEl) card.lastContact = dateEl.value;
-  crmEditId = null;
   saveCRM();
-  renderPage('crm');
+  if(fromModal){ crmModalEditId = null; } else { crmEditId = null; }
+  _crmAfterMutation(id, fromModal);
+}
+
+// Preserve any in-progress date/action/notes edits in the open panel before a re-render
+// (contact/activity actions re-render, and we don't want to lose typed-but-unsaved fields).
+function _crmPreservePanelEdits(card){
+  const _n=document.getElementById(`crm-notes-${card.id}`);  if(_n) card.notes=_n.value;
+  const _a=document.getElementById(`crm-action-${card.id}`); if(_a) card.nextAction=_a.value;
+  const _d=document.getElementById(`crm-date-${card.id}`);   if(_d) card.lastContact=_d.value;
+}
+
+// ── Contacts (Spec 1) ──
+function crmAddContact(id, opts){
+  const fromModal = !!(opts && opts.fromModal);
+  const card = crmCards.find(c=>c.id===id); if(!card) return;
+  if(!Array.isArray(card.contacts)) card.contacts=[];
+  const name=(document.getElementById(`crm-contact-name-${id}`)?.value||'').trim();
+  const role=(document.getElementById(`crm-contact-role-${id}`)?.value||'').trim();
+  const email=(document.getElementById(`crm-contact-email-${id}`)?.value||'').trim();
+  if(!name && !email) return;   // need at least a name or an email
+  _crmPreservePanelEdits(card);
+  card.contacts.push({id:Date.now(), name, role, email});
+  saveCRM(); _crmAfterMutation(id, fromModal);
+}
+function crmRemoveContact(id, contactId, opts){
+  const fromModal = !!(opts && opts.fromModal);
+  const card = crmCards.find(c=>c.id===id); if(!card||!Array.isArray(card.contacts)) return;
+  card.contacts = card.contacts.filter(ct=>String(ct.id)!==String(contactId));
+  saveCRM(); _crmAfterMutation(id, fromModal);
+}
+
+// ── Activity log (Spec 1) ──
+function crmLogActivity(id, opts){
+  const fromModal = !!(opts && opts.fromModal);
+  const card = crmCards.find(c=>c.id===id); if(!card) return;
+  if(!Array.isArray(card.activity)) card.activity=[];
+  const type=(document.getElementById(`crm-activity-type-${id}`)?.value||'note');
+  const note=(document.getElementById(`crm-activity-note-${id}`)?.value||'').trim();
+  const ts=new Date().toISOString().slice(0,10);
+  _crmPreservePanelEdits(card);
+  card.activity.push({id:Date.now(), ts, type, note});
+  // Keep lastContact coherent for the overdue counter (L~7267) + Spec 3.
+  if(type==='pitched'||type==='met') card.lastContact = ts;
+  saveCRM(); _crmAfterMutation(id, fromModal);
+}
+function crmRemoveActivity(id, activityId, opts){
+  const fromModal = !!(opts && opts.fromModal);
+  const card = crmCards.find(c=>c.id===id); if(!card||!Array.isArray(card.activity)) return;
+  card.activity = card.activity.filter(a=>String(a.id)!==String(activityId));
+  saveCRM(); _crmAfterMutation(id, fromModal);
 }
 
 function exportCRMcsv(){
-  const headers = ['Retailer','Market','Stage','Last Contact','Next Action','Notes','Range Review','Approach Route'];
-  const rows = crmCards.map(c=>[
-    c.name, c.market,
-    CRM_STAGES.find(s=>s.id===c.stage)?.label||c.stage,
-    c.lastContact, c.nextAction,
-    (c.notes||'').replace(/"/g,'""'),
-    c.rangeReview,
-    (c.approachRoute||'').replace(/"/g,'""'),
-  ].map(v=>`"${v}"`).join(','));
+  const headers = ['Retailer','Market','Stage','Last Contact','Next Action','Notes','Range Review','Approach Route','Contacts','Last Activity'];
+  const rows = crmCards.map(c=>{
+    const contactsStr = (c.contacts||[]).map(ct=>`${ct.name||''}${ct.role?' ('+ct.role+')':''}${ct.email?' <'+ct.email+'>':''}`).join('; ');
+    const acts = (c.activity||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
+    const lastAct = acts.length ? `${acts[0].ts} · ${(CRM_ACTIVITY_TYPES.find(t=>t.id===acts[0].type)||{}).label||acts[0].type}` : '';
+    return [
+      c.name, c.market,
+      CRM_STAGES.find(s=>s.id===c.stage)?.label||c.stage,
+      c.lastContact, c.nextAction,
+      (c.notes||'').replace(/"/g,'""'),
+      c.rangeReview,
+      (c.approachRoute||'').replace(/"/g,'""'),
+      contactsStr.replace(/"/g,'""'),
+      lastAct.replace(/"/g,'""'),
+    ].map(v=>`"${v}"`).join(',');
+  });
   const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href=url; a.download=`VeyaFlow_RetailerCRM_${new Date().toISOString().slice(0,10)}.csv`;
   a.click(); URL.revokeObjectURL(url);
+}
+
+// Shared CRM editor (Refinement #1) — ONE definition, mounted in exactly one place at a
+// time: the board card (fromModal=false) OR the detail modal (fromModal=true). fm threads
+// the re-render context into every action so saves/moves/contact/activity land back on the
+// surface they were invoked from. Markup is byte-identical to the former inline editor.
+function renderCrmEditor(card, fromModal){
+  const fm = fromModal ? ", {fromModal:true}" : "";
+  const nextStageId = CRM_STAGES[CRM_STAGES.findIndex(s=>s.id===card.stage)+1]?.id;
+  const prevStageId = CRM_STAGES[CRM_STAGES.findIndex(s=>s.id===card.stage)-1]?.id;
+  const nextStageLabel = CRM_STAGES.find(s=>s.id===nextStageId)?.label||'';
+  return `
+                        <div style="border-top:1px solid var(--border);padding-top:.5rem;margin-top:.35rem">
+                          <div style="margin-bottom:.35rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Last contact</label>
+                            <input lang="en" type="date" id="crm-date-${card.id}" value="${card.lastContact}"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+                          </div>
+                          <div style="margin-bottom:.35rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Next action</label>
+                            <input type="text" id="crm-action-${card.id}" value="${card.nextAction||''}" placeholder="e.g. Send samples, Follow up, Book call…"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
+                          </div>
+                          <div style="margin-bottom:.5rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Notes</label>
+                            <textarea id="crm-notes-${card.id}" rows="2" placeholder="${card.approachRoute||'Add notes…'}"
+                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--sans);font-size:.65rem;color:var(--navy);resize:vertical">${card.notes||''}</textarea>
+                          </div>
+                          <div style="margin-bottom:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.25rem">Contacts</label>
+                            ${(card.contacts||[]).map(ct=>`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;padding:.15rem 0;border-bottom:1px solid var(--border)">
+                                <span style="font-family:var(--sans);font-size:.62rem;color:var(--navy)">${escapeHtml(ct.name||'')}${ct.role?`<span style="color:var(--muted)"> · ${escapeHtml(ct.role)}</span>`:''}${ct.email?`<span style="font-family:var(--mono);color:var(--muted)"> · ${escapeHtml(ct.email)}</span>`:''}</span>
+                                <button onclick="crmRemoveContact('${card.id}','${ct.id}'${fm})" title="Remove contact" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;line-height:1;flex-shrink:0">×</button>
+                              </div>`).join('')}
+                            <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">
+                              <input type="text" id="crm-contact-name-${card.id}" placeholder="Name" style="flex:1;min-width:70px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <input type="text" id="crm-contact-role-${card.id}" placeholder="Role" style="flex:1;min-width:60px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <input type="text" id="crm-contact-email-${card.id}" placeholder="Email" style="flex:1.4;min-width:90px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--mono);font-size:.6rem">
+                              <button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="crmAddContact('${card.id}'${fm})">Add</button>
+                            </div>
+                          </div>
+                          <div style="margin-bottom:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.25rem">Activity</label>
+                            <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.3rem">
+                              <select id="crm-activity-type-${card.id}" style="padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem;color:var(--navy)">
+                                ${CRM_ACTIVITY_TYPES.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}
+                              </select>
+                              <input type="text" id="crm-activity-note-${card.id}" placeholder="Optional note" style="flex:1;min-width:90px;padding:.25rem .4rem;border:1px solid var(--border);font-family:var(--sans);font-size:.6rem">
+                              <button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="crmLogActivity('${card.id}'${fm})">Log</button>
+                            </div>
+                            ${(card.activity||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0)).map(a=>{
+                              const _tl=(CRM_ACTIVITY_TYPES.find(t=>t.id===a.type)||{}).label||a.type;
+                              return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;padding:.15rem 0;border-bottom:1px solid var(--border)">
+                                <span style="font-size:.6rem"><span style="font-family:var(--mono);color:var(--muted)">${a.ts}</span> · <span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(_tl)}</span>${a.note?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(a.note)}</span>`:''}</span>
+                                <button onclick="crmRemoveActivity('${card.id}','${a.id}'${fm})" title="Remove entry" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;line-height:1;flex-shrink:0">×</button>
+                              </div>`;
+                            }).join('')}
+                          </div>
+                          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">
+                            ${prevStageId?`<button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="moveCRMCard('${card.id}','${prevStageId}'${fm})">← ${CRM_STAGES.find(s=>s.id===prevStageId)?.label}</button>`:''}
+                            ${nextStageId?`<button class="btn-primary" style="font-size:.58rem;padding:.2rem .5rem" onclick="saveCRMEdit('${card.id}'${fm});moveCRMCard('${card.id}','${nextStageId}'${fm})">→ ${nextStageLabel}</button>`:''}
+                          </div>
+                          <button class="btn-outline" style="font-size:.6rem;padding:.25rem .5rem;width:100%" onclick="saveCRMEdit('${card.id}'${fm})">Save</button>
+                        </div>`;
 }
 
 function renderCRM(el){
@@ -26910,7 +27137,7 @@ function renderCRM(el){
                     <div style="background:#fff;border:1px solid ${stage.border};padding:.65rem .75rem;margin-bottom:.4rem;position:relative">
                       <!-- Card header -->
                       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
-                        <div>
+                        <div onclick="openRetailerDetail('${card.id}')" style="cursor:pointer;flex:1;min-width:0" title="View retailer detail">
                           <div style="font-family:var(--sans);font-size:.78rem;font-weight:600;color:var(--navy)">${card.name}${nlActive&&nlMatchMap[card.id]?` <span style="font-family:var(--mono);font-size:.5rem;background:#EFF6FF;color:#1E40AF;padding:.05rem .3rem;border:1px solid #BFDBFE;vertical-align:middle">${nlMatchMap[card.id].relevanceScore}</span>`:''}</div>
                           <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);display:flex;align-items:center;gap:.25rem;flex-wrap:wrap">${card.market}${getBrandCategories().length>1?(card.categories||[]).filter(cat=>getBrandCategories().includes(cat)).map(cat=>renderCategoryBadge(cat,{small:true})).join(''):'' }</div>
                           ${nlActive&&nlMatchMap[card.id]?.reason?`<div style="font-family:var(--sans);font-size:.62rem;color:#1E40AF;line-height:1.4;margin-top:.15rem">${nlMatchMap[card.id].reason}</div>`:''}
@@ -26980,32 +27207,7 @@ function renderCRM(el){
                         `;
                       })()}
 
-                      ${isEditing?`
-                        <!-- Edit form -->
-                        <div style="border-top:1px solid var(--border);padding-top:.5rem;margin-top:.35rem">
-                          <div style="margin-bottom:.35rem">
-                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Last contact</label>
-                            <input lang="en" type="date" id="crm-date-${card.id}" value="${card.lastContact}"
-                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
-                          </div>
-                          <div style="margin-bottom:.35rem">
-                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Next action</label>
-                            <input type="text" id="crm-action-${card.id}" value="${card.nextAction||''}" placeholder="e.g. Send samples, Follow up, Book call…"
-                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--mono);font-size:.62rem;color:var(--navy)">
-                          </div>
-                          <div style="margin-bottom:.5rem">
-                            <label style="font-family:var(--mono);font-size:.53rem;color:var(--muted);display:block;margin-bottom:.15rem">Notes</label>
-                            <textarea id="crm-notes-${card.id}" rows="2" placeholder="${card.approachRoute||'Add notes…'}"
-                              style="width:100%;padding:.3rem .5rem;border:1px solid var(--border);font-family:var(--sans);font-size:.65rem;color:var(--navy);resize:vertical">${card.notes||''}</textarea>
-                          </div>
-                          <!-- Stage buttons -->
-                          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">
-                            ${prevStageId?`<button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="moveCRMCard('${card.id}','${prevStageId}')">← ${CRM_STAGES.find(s=>s.id===prevStageId)?.label}</button>`:''}
-                            ${nextStageId?`<button class="btn-primary" style="font-size:.58rem;padding:.2rem .5rem" onclick="saveCRMEdit('${card.id}');moveCRMCard('${card.id}','${nextStageId}')">→ ${nextStageLabel}</button>`:''}
-                          </div>
-                          <button class="btn-outline" style="font-size:.6rem;padding:.25rem .5rem;width:100%" onclick="saveCRMEdit('${card.id}')">Save</button>
-                        </div>
-                      `:`
+                      ${isEditing?renderCrmEditor(card):`
                         <!-- Collapsed view -->
                         ${card.nextAction?`<div style="font-family:var(--sans);font-size:.65rem;color:#555;line-height:1.4;margin-bottom:.3rem">→ ${card.nextAction}</div>`:''}
                         ${card.lastContact?`<div style="font-family:var(--mono);font-size:.53rem;color:var(--muted)">Last: ${card.lastContact}</div>`:''}
@@ -32556,6 +32758,97 @@ function toggleMilestone(retailerId, milestoneId){
   }
   // Refresh brand home overdue count if on home
   if(currentPage==='home') renderPage('home');
+}
+
+// ── Retailer detail modal (Spec 2) — the READ view; mirrors openActionPlanModal
+//    but is emoji-free (the pre-existing modals' ✓/⏰/○/✕ are NOT copied here). ──
+function openRetailerDetail(cardId){
+  const card = crmCards.find(c=>c.id===cardId);
+  if(!card) return;
+  crmModalEditId = null;   // a fresh open always starts on the read-view (modal=read, Edit=change)
+  const existing = document.getElementById('vf-retailer-detail-modal');
+  if(existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'vf-retailer-detail-modal';
+  document.body.appendChild(el);
+  renderRetailerDetail(card);
+}
+function renderRetailerDetail(card){
+  const modal = document.getElementById('vf-retailer-detail-modal');
+  if(!modal) return;
+  const stage = CRM_STAGES.find(s=>s.id===card.stage) || CRM_STAGES[0];
+  const contacts = Array.isArray(card.contacts)?card.contacts:[];
+  const activity = (Array.isArray(card.activity)?card.activity:[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
+  const rule = 'border-top:1px solid var(--border);padding-top:.7rem;margin-top:.7rem';
+  const lbl  = 'font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.35rem';
+  const empty = t=>`<div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);font-style:italic">${t}</div>`;
+  const chips = [];
+  if(card.marginMin||card.marginMax) chips.push(`Margin ${typeof card.marginMin==='number'?Math.round(card.marginMin*100):'?'}–${typeof card.marginMax==='number'?Math.round(card.marginMax*100):'?'}%`);   // Refinement #2 — ×100 (matches board)
+  if(card.rangeReview)  chips.push('Range review: '+escapeHtml(card.rangeReview));
+  if(card.approachRoute) chips.push(escapeHtml(card.approachRoute));
+  const X = "document.getElementById('vf-retailer-detail-modal').remove()";
+  const inEdit = crmModalEditId===card.id;   // Refinement #1 — modal renders editor vs read-view
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto" onclick="if(event.target===this)${X}">
+      <div style="background:#fff;width:100%;max-width:520px;position:relative">
+        <div style="padding:1.1rem 1.25rem .8rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+            <div>
+              <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.15rem">Retailer</div>
+              <div style="font-family:var(--sans);font-size:.95rem;font-weight:600;color:var(--navy)">${escapeHtml(card.name)}</div>
+              <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;gap:.4rem;margin-top:.2rem">${escapeHtml(card.market||'')}<span style="font-family:var(--mono);font-size:.52rem;padding:.05rem .35rem;color:${stage.color};background:${stage.bg};border:1px solid ${stage.border}">${stage.label}</span></div>
+            </div>
+            <button onclick="${X}" style="background:none;border:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:.2rem .5rem;flex-shrink:0">Close</button>
+          </div>
+        </div>
+        <div style="padding:1rem 1.25rem 1.25rem">${inEdit?`
+          ${renderCrmEditor(card, true)}
+          <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.3rem .5rem;margin-top:.4rem" onclick="crmCancelModalEdit('${card.id}')">Cancel</button>`:`
+          <button class="btn-primary" style="width:100%;font-size:.72rem;padding:.5rem" onclick="pitchFromCRM('${card.id}')">Pitch this retailer →</button>
+          <div style="${rule}"><div style="${lbl}">Snapshot</div>${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:.35rem">${chips.map(c=>`<span style="font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);padding:.15rem .45rem">${c}</span>`).join('')}</div>`:empty('No snapshot data.')}</div>
+          <div style="${rule}"><div style="${lbl}">Contacts</div>${contacts.length?contacts.map(ct=>`<div style="font-size:.68rem;padding:.15rem 0"><span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(ct.name||'')}</span>${ct.role?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(ct.role)}</span>`:''}${ct.email?`<span style="font-family:var(--mono);color:var(--muted)"> · ${escapeHtml(ct.email)}</span>`:''}</div>`).join(''):empty('No contacts added yet.')}</div>
+          <div style="${rule}"><div style="${lbl}">Activity</div>${activity.length?activity.map(a=>{const tl=(CRM_ACTIVITY_TYPES.find(t=>t.id===a.type)||{}).label||a.type;return `<div style="font-size:.66rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span style="font-family:var(--mono);color:var(--muted)">${a.ts}</span> · <span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(tl)}</span>${a.note?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(a.note)}</span>`:''}</div>`;}).join(''):empty('No activity logged yet.')}</div>
+          <div style="${rule}"><div style="${lbl}">Next action</div>${card.nextAction?`<div style="font-family:var(--sans);font-size:.7rem;color:var(--navy)">${escapeHtml(card.nextAction)}</div>`:empty('None set.')}
+            <div style="${lbl};margin-top:.55rem">Notes</div>${card.notes?`<div style="font-family:var(--sans);font-size:.7rem;color:var(--ink-soft);line-height:1.5">${escapeHtml(card.notes)}</div>`:empty('No notes.')}</div>
+          <div style="${rule};display:flex;flex-wrap:wrap;gap:.5rem">
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};openActionPlanModal('${card.id}')">Action plan →</button>
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};openAssetModal('${card.id}')">Asset requirements →</button>
+            <button class="btn-outline" style="font-size:.6rem" onclick="${X};showPage('retail-templates')">Prepare file →</button>
+            <button class="btn-outline" style="font-size:.6rem;margin-left:auto" onclick="crmEditInModal('${card.id}')">Edit details</button>
+          </div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+// B1 — pitch from the CRM card: pre-fill ONLY real card data (retailer + market).
+// No fabricated proof points/contacts; the pitch generator's own honesty rules govern output.
+function pitchFromCRM(cardId){
+  const card = crmCards.find(c=>c.id===cardId);
+  if(!card) return;
+  const m = document.getElementById('vf-retailer-detail-modal'); if(m) m.remove();
+  pitchForm.retailer = card.name;
+  pitchForm.targetMarket = card.market || pitchForm.targetMarket || '';
+  showPage('pitch');
+}
+
+// B2 — log a generated pitch back to its matching CRM card (the hub loop).
+// Non-destructive: forward-only advance (not_contacted→pitched), additive activity, no
+// silent card creation, no double-log same-day.
+function crmLogPitchFor(retailerName){
+  if(!retailerName) return;
+  if(typeof loadCRM==='function' && (!crmCards || !crmCards.length)){ try{ loadCRM(); }catch(e){} }
+  const card = (crmCards||[]).find(c=>c.name===retailerName);
+  if(!card) return;   // retailer isn't a CRM card → do nothing
+  if(!Array.isArray(card.activity)) card.activity=[];
+  const ts = new Date().toISOString().slice(0,10);
+  const alreadyToday = card.activity.some(a=>a.type==='pitched' && a.ts===ts);
+  if(!alreadyToday){
+    card.activity.push({id:Date.now(), ts, type:'pitched', note:'Pitch generated'});
+    card.lastContact = ts;
+  }
+  if(card.stage==='not_contacted') card.stage='pitched';   // forward-only
+  saveCRM();
 }
 
 function openActionPlanModal(cardId){
