@@ -16694,25 +16694,29 @@ function renderBrandPackResult(el){
               </div>`).join('')}
           </div>
         </div>
-        <!-- Proposed terms (Margin-fix Aug 2026): render ONLY brand-set data, else "To be
-             discussed" — never a hardcoded 50% / 14 days / Beauty Days (fabrication class,
-             Stages 1–3.2). Omit toggle: a first pitch needn't quote cost-to-retailer. -->
-        ${brandPackState.hideTerms
-          ? `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted)">Commercial terms omitted for this pitch. <span onclick="brandPackState.hideTerms=false;renderBrandPack(document.getElementById('page-brandpack'))" style="color:var(--navy);cursor:pointer;text-decoration:underline">Show</span></div>`
-          : `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
+        <!-- Proposed terms (Margin-fix Aug 2026, omit-by-default per Charlotte's ruling 4 Aug):
+             a term renders ONLY from brand-set data; a blank term's line is OMITTED (not
+             "To be discussed"); if ALL terms are blank the whole strip is suppressed — no
+             orphan header. Never a hardcoded 50% / 14 days / Beauty Days (fabrication class,
+             Stages 1–3.2). Omit toggle stays as the explicit control when terms exist. -->
+        ${(()=>{
+          const _terms=[];
+          const _m=(brand.marginStructure&&String(brand.marginStructure).trim())?String(brand.marginStructure).trim():'';
+          if(_m) _terms.push(['Margin', escapeHtml(_m)]);
+          if(heroSku?.leadDays) _terms.push(['Lead time', heroSku.leadDays+' days']);
+          if(!_terms.length) return '';
+          if(brandPackState.hideTerms) return `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border);font-family:var(--mono);font-size:.55rem;color:var(--muted)">Commercial terms omitted for this pitch. <span onclick="brandPackState.hideTerms=false;renderBrandPack(document.getElementById('page-brandpack'))" style="color:var(--navy);cursor:pointer;text-decoration:underline">Show</span></div>`;
+          return `<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border)">
           <div style="display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem">
             <span style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Proposed terms</span>
             <span style="font-family:var(--mono);font-size:.5rem;color:var(--ink-mute)">Indicative — brand-set, subject to confirmation</span>
             <span onclick="brandPackState.hideTerms=true;renderBrandPack(document.getElementById('page-brandpack'))" style="font-family:var(--mono);font-size:.5rem;color:var(--navy);cursor:pointer;text-decoration:underline;margin-left:auto">Omit</span>
           </div>
           <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
-            ${[
-              ['Margin', (brand.marginStructure&&String(brand.marginStructure).trim()) ? escapeHtml(String(brand.marginStructure).trim()) : 'To be discussed'],
-              ['Lead time', heroSku?.leadDays ? heroSku.leadDays+' days' : 'To be discussed'],
-              ['Launch support', (brand.launchSupport&&String(brand.launchSupport).trim()) ? escapeHtml(String(brand.launchSupport).trim()) : 'To be discussed'],
-            ].map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase">${l}</div><div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${v}</div></div>`).join('')}
+            ${_terms.map(([l,v])=>`<div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase">${l}</div><div style="font-family:var(--sans);font-size:.8rem;font-weight:600;color:var(--navy)">${v}</div></div>`).join('')}
           </div>
-        </div>`}
+        </div>`;
+        })()}
       </div>
 
       <!-- AI-generated sections -->
