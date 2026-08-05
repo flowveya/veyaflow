@@ -16391,14 +16391,17 @@ const _COMPLIANCE_CERTAINTY_PATTERNS = [
 // `allowedComplianceText`. Conservative + heuristic — v1 FLAGS, never blocks/rewrites.
 function extractUnsourcedClaims(text, allowed, allowedComplianceText){
   if(!text) return [];
-  const allowedFlat = (allowed||[]).filter(Boolean).map(a=>String(a).toLowerCase().replace(/\s+/g,''));
+  // Extrapolation-fix (4 Aug): strip thousands commas + all spaces so "4,000" traces to entered 4000.
+  const allowedFlat = (allowed||[]).filter(Boolean).map(a=>String(a).toLowerCase().replace(/[,\s]/g,''));
   const compOk = String(allowedComplianceText||'').toLowerCase();
   const flags = [], seen = {};
   const push = s => { const k=String(s).toLowerCase().trim(); if(k&&!seen[k]){ seen[k]=1; flags.push(String(s).trim()); } };
-  const traceable = tok => { const t=tok.toLowerCase().replace(/\s+/g,''); return allowedFlat.some(a=> a && (a.includes(t)||t.includes(a))); };
+  const traceable = tok => { const t=tok.toLowerCase().replace(/[,\s]/g,''); return allowedFlat.some(a=> a && (a.includes(t)||t.includes(a))); };
   const numPatterns = [
     /\b\d{1,3}%[^.\n]{0,30}?(?:repeat|growth|retention|sell-?through|conversion|margin|uplift)?/gi,
-    /\b[\d,]{2,}\s*(?:units|transactions|followers|customers|reviews|stores|orders|subscribers)\b/gi,
+    /\b[\d,]{2,}(?:\s+\w+){0,2}\s+(?:units|transactions|customers|orders|subscribers|reviews|stores|followers)\b/gi,   // tolerate up to 2 intervening words ("160 repeat transactions")
+    /\b\d{1,3}(?:\.\d+)?%\s+of\s+[^.\n]{0,40}(?:volume|sales|revenue|units|market|business)\b/gi,   // derived share ("8% of home-market volume")
+    /\b[Yy]ear\s*(?:1|one|2|two)\b[^.\n]{0,50}\b(?:success|sold|units|revenue|growth)\b/gi,   // period attribution ("Year 1 success … sold")
     /\b\d+(?:\.\d+)?\s*\/\s*5\b/gi,
     /\bn\s*=\s*\d+/gi,
     /\b\d+(?:\.\d+)?x\b/gi,
@@ -16525,6 +16528,8 @@ ${proofPoints||'NO VERIFIED COMMERCIAL PROOF AVAILABLE. Do NOT invent, estimate,
 COMPLIANCE DATA (render EXACTLY — do not upgrade a missing item to present):
 ${complianceData}
 
+WHOLESALE / MARGIN TERMS (brand-set): ${(brand.marginStructure&&String(brand.marginStructure).trim())?String(brand.marginStructure).trim()+' — indicative, subject to confirmation':'not on file — say commercial terms are "to be discussed"; do NOT invent a margin or wholesale figure'}
+
 RETAILER INTELLIGENCE:
 Tone required: ${cover.tone}
 Buyer priority: ${retailerEntry.buyerPriority||intel.negIntel.slice(0,200)}
@@ -16543,6 +16548,10 @@ Generate the Brand Pack in 7 sections. HARD RULES:
 - The basket figures are CATEGORY-TYPICAL retailer/category averages, NOT ${brand.name}'s data. Present them explicitly as a category pattern / illustrative routine economics. NEVER state or imply ${brand.name} has measured this basket uplift.
 - NEVER invent a net-to-retailer price or margin %. State RSP only unless a verified wholesale/margin figure is provided; if none, say commercial terms are "to be discussed."
 - COMPLIANCE HONESTY (absolute): state each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that the retailer holds no regulatory risk. Do NOT summarise items as "all documentation current" or similar. If an item is outstanding, say so. Describe status; never certify — the retailer's own regulatory assessment is theirs to make. This applies to paraphrases and new wordings, not only the examples given.
+- NEVER state that VeyaFlow (or anyone) "verified", "confirmed", "checked", or "validated" anything unless that verification event is explicitly in the provided data. No invented verification, audits, or "retailer intelligence checks".
+- NO invented benchmarks or demographics: no "typical X–Y%" category benchmarks and no buyer-demographic ranges (e.g. "25–45") unless they are in the provided data; if used as context, label them explicitly as unverified.
+- Competitor prices are NOT verified data: if you name any competitor price or price band, label the set "indicative market context, not verified" — never assert competitor pricing as fact.
+- NEVER present commercial commitments as agreed (e.g. "minimum 2 rolling monthly reviews without delisting"); only registry- or brand-entered terms may be stated, and only as provided (the wholesale/margin figure above is indicative — label it so, never as a settled term).
 - Use ONLY the verified figures provided. Do NOT project, extrapolate, or derive NEW numbers from them — no units/store/week velocity, no margin-requirement %, no annual-investment figure, no AV/MSEK contribution — unless that exact figure is in the verified data. Reference the real numbers; do not multiply them into projections.
 
 ## SECTION 1 — Brand Overview
@@ -16569,7 +16578,7 @@ ${hasProof?`Evidence pyramid — hardest proof first:
 Tier 1: Revenue/units data (verified numbers above — lead with these)
 Tier 2: Repeat purchase and review data
 Tier 3: Social and press signals
-Reference the verified numbers as provided. Do NOT project a velocity benchmark or derive units/store/week — no extrapolated figures unless they are in the verified data.
+Reference the verified numbers EXACTLY as provided. NEVER perform arithmetic on them: no derived, allocated, projected, or estimated figures of any kind — no percentages, shares, splits, per-retailer/per-store/per-period breakdowns, run-rates, or velocity benchmarks that are not verbatim in the verified data. NEVER attribute any figure, growth, or "success" to a specific retailer, channel, or time period unless a figure for THAT retailer/channel/period is itself in the verified data. If asked to characterise performance at ${retailer} and no ${retailer}-specific data exists, say plainly that retailer-level performance data is not yet on file — never estimate it.
 Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
 ## SECTION 5 — Compliance & Sustainability
@@ -16598,7 +16607,7 @@ NEVER write "please don't hesitate to contact us."`;
     brandPackState.generating = false;
     brandPackState.timestamp = new Date().toISOString();
     // B4 — post-gen honesty verify: flag unsourced numbers + compliance overclaims.
-    const _bpAllowed = [proofPoints, basketData, posMap, (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):''].filter(Boolean);
+    const _bpAllowed = [proofPoints, basketData, posMap, (heroSku&&heroSku.rspSEK)?String(heroSku.rspSEK):'', (brand.marginStructure?String(brand.marginStructure):'')].filter(Boolean);
     brandPackState.verify = verifyBrandPackProof(text, _bpAllowed, complianceData);
   }catch(err){
     brandPackState.generating = false;
@@ -24639,7 +24648,7 @@ HARD RULES FOR ALL VARIANTS:
 ${_archetypeRules}
 ${8+_pitchArchetypes.length}. NEVER assert that claims are "verified" or "substantiated", or that the brand/product is "compliant" or "certified", unless that exact status is in the data provided above. If certifications are absent, do not mention certification status. State only what is given.
 ${9+_pitchArchetypes.length}. COMPLIANCE HONESTY (absolute): State each compliance item's EXACT status only. NEVER assert — in any wording — that compliance/documentation/certification is current, complete, in order, handled, ready, set, established, or that there is no regulatory risk. If an item is "Not started" / "Not set" / "unknown", you may not imply it is done. Do not summarise multiple items as "all documentation current" or similar. Describe status; never certify. This applies to paraphrases and new wordings, not only the examples given.
-${10+_pitchArchetypes.length}. Do NOT project or extrapolate entered figures into new numbers (velocity, per-store, per-week, annualised, margin %, investment). Use only the figures provided, as provided.`;
+${10+_pitchArchetypes.length}. NEVER perform arithmetic on entered figures — no derived, allocated, projected, or estimated numbers (shares, per-retailer / per-store / per-period splits, run-rates, velocity, annualised or margin figures). NEVER attribute a figure, growth, or "success" to a specific retailer or period unless a figure for THAT retailer/period is itself provided. Use only the figures given, verbatim.`;
 
   try{
     let text = await callAPI([{role:'user',content:prompt}], 1400);
