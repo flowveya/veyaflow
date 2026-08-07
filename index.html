@@ -1200,7 +1200,7 @@ const NEXT_STEPS = {
   // Live destinations only (parked pages removed). Per-stage picks are sensible defaults — Strategy-tunable.
   idea:     [{icon:"▦",label:"Add your products",page:"skus",desc:"Build your product hub — everything in VeyaFlow reads from here"},{icon:"◎",label:"Check what you can claim",page:"claims",desc:"See which claims are defensible in your target markets before you commit"}],
   product:  [{icon:"◎",label:"Check what you can claim",page:"claims",desc:"Run the Claim Localizer across your target markets before you print or pitch"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets from your verified data"}],
-  trading:  [{icon:"✉",label:"Pitch your next retail account",page:"pitch",desc:"AI-written buyer pitch in the retailer's language, personalised to their priorities"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send with your pitch"}],
+  trading:  [{icon:"◈",label:"Track your retailer submissions",page:"retail-tracker",desc:"Keep every retailer submission moving and spot stalls early"},{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Line sheet and per-product spec sheets to send to buyers"}],
   expanding:[{icon:"⇄",label:"Generate buyer documents",page:"buyer-docs",desc:"Produce the line sheet and spec sheets retailers ask for"},{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Follow every retailer submission and chase stalled reviews"}],
   scaling:  [{icon:"◈",label:"Track your submissions",page:"retail-tracker",desc:"Keep every retailer submission moving and spot stalls early"},{icon:"◉",label:"Plan your seasonal calendar",page:"seasonal",desc:"Line up buyer windows and seasonal ranges for your next push"}],
 };
@@ -4118,7 +4118,7 @@ function getVisibleNav(){
   } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
   // Launch IA: parked features hidden from nav by default. Flip back via
   // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
-  var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers'];
+  var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers','pitch'];   // 'pitch' removed from platform (5 Aug refocus to compliant→shelf-ready); code preserved at tag pitch-feature-preserved-2026-08-05
   var showParked = false;
   try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
   if(!showParked){
@@ -7248,7 +7248,7 @@ function renderReadinessHero(){
   var numColor='var(--accent)'; /* hero numeral + spine + bar tip: teal ALL tiers (brand identity); tier label carries status signal */
   var label=pct>=85?'Listing ready':pct>=70?'Pitch ready':pct>=50?'Nearly ready':'Building';
   var topBlocker=bestBlockers.filter(function(b){return b.level==='red';})[0]||bestBlockers[0];
-  var pitchBtn=pct>=70?'<button class="btn-ghost" onclick="showPage(&apos;pitch&apos;)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Generate pitch</button>':'';
+  var pitchBtn='';   // Retailer Pitch removed from platform (5 Aug refocus); preserved at tag pitch-feature-preserved-2026-08-05
   return '<div class="hero">'+
     '<div class="hero-row">'+
       '<div class="hero-num">'+pct+'<small>/100</small></div>'+
@@ -24681,7 +24681,6 @@ ${10+_pitchArchetypes.length}. NEVER perform arithmetic on entered figures — n
     const _pVerify = verifyPitchProof(text, _pAllowed, _pitchCompliance);
     pitchResult = {text, retailer, market:pitchForm.targetMarket, timestamp:new Date().toISOString(), verify:_pVerify};
     showSuccess('Retailer pitch generated for '+retailer);
-    try{ if(typeof crmLogPitchFor==='function') crmLogPitchFor(retailer); }catch(e){}   // Spec 2 — log back to the matching CRM card
     savePageState('ns_pitchResult', pitchResult);
     savePageState('ns_pitchForm', pitchForm);
     renderPitch(document.getElementById('page-pitch'));
@@ -32828,7 +32827,6 @@ function renderRetailerDetail(card){
         <div style="padding:1rem 1.25rem 1.25rem">${inEdit?`
           ${renderCrmEditor(card, true)}
           <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.3rem .5rem;margin-top:.4rem" onclick="crmCancelModalEdit('${card.id}')">Cancel</button>`:`
-          <button class="btn-primary" style="width:100%;font-size:.72rem;padding:.5rem" onclick="pitchFromCRM('${card.id}')">Pitch this retailer →</button>
           <div style="${rule}"><div style="${lbl}">Snapshot</div>${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:.35rem">${chips.map(c=>`<span style="font-family:var(--mono);font-size:.58rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);padding:.15rem .45rem">${c}</span>`).join('')}</div>`:empty('No snapshot data.')}</div>
           <div style="${rule}"><div style="${lbl}">Contacts</div>${contacts.length?contacts.map(ct=>`<div style="font-size:.68rem;padding:.15rem 0"><span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(ct.name||'')}</span>${ct.role?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(ct.role)}</span>`:''}${ct.email?`<span style="font-family:var(--mono);color:var(--muted)"> · ${escapeHtml(ct.email)}</span>`:''}</div>`).join(''):empty('No contacts added yet.')}</div>
           <div style="${rule}"><div style="${lbl}">Activity</div>${activity.length?activity.map(a=>{const tl=(CRM_ACTIVITY_TYPES.find(t=>t.id===a.type)||{}).label||a.type;return `<div style="font-size:.66rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span style="font-family:var(--mono);color:var(--muted)">${a.ts}</span> · <span style="font-family:var(--sans);color:var(--navy)">${escapeHtml(tl)}</span>${a.note?`<span style="font-family:var(--sans);color:var(--muted)"> · ${escapeHtml(a.note)}</span>`:''}</div>`;}).join(''):empty('No activity logged yet.')}</div>
@@ -32845,35 +32843,9 @@ function renderRetailerDetail(card){
     </div>`;
 }
 
-// B1 — pitch from the CRM card: pre-fill ONLY real card data (retailer + market).
-// No fabricated proof points/contacts; the pitch generator's own honesty rules govern output.
-function pitchFromCRM(cardId){
-  const card = crmCards.find(c=>c.id===cardId);
-  if(!card) return;
-  const m = document.getElementById('vf-retailer-detail-modal'); if(m) m.remove();
-  pitchForm.retailer = card.name;
-  pitchForm.targetMarket = card.market || pitchForm.targetMarket || '';
-  showPage('pitch');
-}
-
-// B2 — log a generated pitch back to its matching CRM card (the hub loop).
-// Non-destructive: forward-only advance (not_contacted→pitched), additive activity, no
-// silent card creation, no double-log same-day.
-function crmLogPitchFor(retailerName){
-  if(!retailerName) return;
-  if(typeof loadCRM==='function' && (!crmCards || !crmCards.length)){ try{ loadCRM(); }catch(e){} }
-  const card = (crmCards||[]).find(c=>c.name===retailerName);
-  if(!card) return;   // retailer isn't a CRM card → do nothing
-  if(!Array.isArray(card.activity)) card.activity=[];
-  const ts = new Date().toISOString().slice(0,10);
-  const alreadyToday = card.activity.some(a=>a.type==='pitched' && a.ts===ts);
-  if(!alreadyToday){
-    card.activity.push({id:Date.now(), ts, type:'pitched', note:'Pitch generated'});
-    card.lastContact = ts;
-  }
-  if(card.stage==='not_contacted') card.stage='pitched';   // forward-only
-  saveCRM();
-}
+// CRM↔Pitch loop removed (5 Aug refocus). pitchFromCRM / crmLogPitchFor preserved at
+// tag pitch-feature-preserved-2026-08-05. The CRM itself (contacts/activity/stages) stays;
+// a user may still log a 'pitched' activity manually — only the auto-loop is gone.
 
 function openActionPlanModal(cardId){
   const card = crmCards.find(c=>c.id===cardId);
@@ -33563,7 +33535,7 @@ function handleDeepLink(){
   // so this list determines what bookmarks/hard-reload-to-hash actually work.
   const validPages = [
     // Brand section (pitch un-parked → valid again; report/compare/bizcase/cfo remain parked)
-    'home','skus','claims','pitch','brandpack',
+    'home','skus','claims','brandpack',
     // Source section (parked — find/suppliers/sourcing/circular — removed)
     'dpp','csrd','reg_monitor',
     // Retailer Relations section
