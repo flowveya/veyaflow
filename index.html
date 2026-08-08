@@ -6524,7 +6524,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
 
   let status, statusColor, pitchReady, listingReady;
   if(total>=85){ status='LISTING READY'; statusColor='#065F46'; pitchReady=true; listingReady=true; }
-  else if(total>=70){ status='PITCH READY'; statusColor='#1E40AF'; pitchReady=true; listingReady=false; }
+  else if(total>=70){ status='OUTREACH READY'; statusColor='#1E40AF'; pitchReady=true; listingReady=false; }
   else if(total>=50){ status='NEARLY READY'; statusColor='#92400E'; pitchReady=false; listingReady=false; }
   else { status='NOT READY'; statusColor='#991B1B'; pitchReady=false; listingReady=false; }
 
@@ -30634,6 +30634,7 @@ function renderBrandHomeAlert(alertDef) {
 ═══════════════════════════════════════════════════ */
 function renderExpansionOverview(){
   if(!brand) return '';
+  if(!crmCards.length) loadCRM();   // Margin Watch reads crmCards before any loader on a fresh #home landing (guard mirrors L20585/L23046/L27018)
 
   const sku  = skus[0]||null;
   const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Finland:'FI',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'};
