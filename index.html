@@ -4123,6 +4123,8 @@ function getVisibleNav(){
   try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
   if(!showParked){
     visible = visible.filter(function(n){ return PARKED_IDS.indexOf(n.id) === -1; });
+  } else {
+    visible = visible.filter(function(n){ return n.id !== 'pitch'; });   // removed-beats-parked: pitch stays hidden even in dev X-ray mode (7 Aug)
   }
   return visible;
 }
@@ -6522,7 +6524,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
 
   let status, statusColor, pitchReady, listingReady;
   if(total>=85){ status='LISTING READY'; statusColor='#065F46'; pitchReady=true; listingReady=true; }
-  else if(total>=70){ status='PITCH READY'; statusColor='#1E40AF'; pitchReady=true; listingReady=false; }
+  else if(total>=70){ status='OUTREACH READY'; statusColor='#1E40AF'; pitchReady=true; listingReady=false; }
   else if(total>=50){ status='NEARLY READY'; statusColor='#92400E'; pitchReady=false; listingReady=false; }
   else { status='NOT READY'; statusColor='#991B1B'; pitchReady=false; listingReady=false; }
 
@@ -6600,7 +6602,7 @@ function renderReadinessScore(){
           <div style="background:${barColor};height:8px;border-radius:4px;width:${barW}%;transition:width .6s ease"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.52rem;color:var(--muted)">
-          <span>Not ready</span><span style="color:#92400E">50 — Nearly ready</span><span style="color:#1E40AF">70 — Pitch ready</span><span style="color:#065F46">85 — Listing ready</span>
+          <span>Not ready</span><span style="color:#92400E">50 — Nearly ready</span><span style="color:#1E40AF">70 — Outreach ready</span><span style="color:#065F46">85 — Listing ready</span>
         </div>
       </div>
 
@@ -7246,7 +7248,7 @@ function renderReadinessHero(){
   var pct=Math.min(100,bestScore);
   var color=pct>=85?'var(--green)':pct>=70?'var(--amber)':'var(--red)';
   var numColor='var(--accent)'; /* hero numeral + spine + bar tip: teal ALL tiers (brand identity); tier label carries status signal */
-  var label=pct>=85?'Listing ready':pct>=70?'Pitch ready':pct>=50?'Nearly ready':'Building';
+  var label=pct>=85?'Listing ready':pct>=70?'Outreach ready':pct>=50?'Nearly ready':'Building';
   var topBlocker=bestBlockers.filter(function(b){return b.level==='red';})[0]||bestBlockers[0];
   var pitchBtn='';   // Retailer Pitch removed from platform (5 Aug refocus); preserved at tag pitch-feature-preserved-2026-08-05
   return '<div class="hero">'+
@@ -7263,7 +7265,7 @@ function renderReadinessHero(){
     '</div>'+
     '<div class="rbar">'+
       '<div class="rtrack"><div class="rfill" style="width:'+pct+'%"></div></div>'+
-      '<div class="rscale"><span>0</span><span>70 pitch ready</span><span>85 listing ready</span><span>100</span></div>'+
+      '<div class="rscale"><span>0</span><span>70 outreach ready</span><span>85 listing ready</span><span>100</span></div>'+
     '</div>'+
   '</div>';
 }
@@ -30632,6 +30634,7 @@ function renderBrandHomeAlert(alertDef) {
 ═══════════════════════════════════════════════════ */
 function renderExpansionOverview(){
   if(!brand) return '';
+  if(!crmCards.length) loadCRM();   // Margin Watch reads crmCards before any loader on a fresh #home landing (guard mirrors L20585/L23046/L27018)
 
   const sku  = skus[0]||null;
   const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Finland:'FI',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'};
@@ -30647,7 +30650,7 @@ function renderExpansionOverview(){
     }catch(e){ return {mkt: mkt.replace('United Kingdom','UK'), score: 0}; }
   });
   const bestScore = mktScores.length ? Math.max(...mktScores.map(m=>m.score)) : 0;
-  const mktStatus = bestScore>=85 ? 'Listing ready' : bestScore>=70 ? 'Pitch ready' : bestScore>=50 ? 'Nearly ready' : 'Building';
+  const mktStatus = bestScore>=85 ? 'Listing ready' : bestScore>=70 ? 'Outreach ready' : bestScore>=50 ? 'Nearly ready' : 'Building';
   const mktColor  = bestScore>=85 ? '#065F46' : bestScore>=70 ? '#1E40AF' : bestScore>=50 ? '#92400E' : '#991B1B';
 
   // ── Column 2: Compliance Health ────────────────────
@@ -35240,6 +35243,7 @@ function dismissReferralNudge(){
   try{ localStorage.setItem('ns_referral_nudge_dismissed', new Date().toISOString()); }catch(e){}
 }
 function shouldShowReferralNudge(){
+  return false;   // Referral flywheel hidden 7 Aug 2026 (off-spine post-refocus; sourcing lane parked). Plumbing preserved — re-enable by removing this line.
   if(!sourcingCRM.length) return false;
   const dismissed = localStorage.getItem('ns_referral_nudge_dismissed');
   if(dismissed){
@@ -38333,7 +38337,7 @@ function renderRetailPerformance(el){
     html += '<div class="card empty-state" style="text-align:center;padding:2.5rem 1.5rem">';
     html += '<div style="font-size:2rem;margin-bottom:.75rem;opacity:.3">◉</div>';
     html += '<div class="empty-title" style="font-family:var(--serif);font-size:1.1rem;color:var(--navy);margin-bottom:.5rem">Nothing listed yet</div>';
-    html += '<div class="empty-sub" style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.25rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.55">Once a submission reaches "Listed" status in the Submission Tracker, you can track monthly sell-through data here to catch ranging risk early and build proof points for future pitches.</div>';
+    html += '<div class="empty-sub" style="font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.25rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.55">Once a submission reaches "Listed" status in the Submission Tracker, you can track monthly sell-through data here to catch ranging risk early and build proof points for future listings and range reviews.</div>';
     html += '<button class="btn-primary" style="width:auto;padding:.6rem 1.25rem" onclick="showPage(\'retail-tracker\')">Open Submission Tracker →</button>';
     html += '</div>';
     html += '</div></div>';
