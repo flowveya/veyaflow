@@ -1,5 +1,10 @@
 {
+  "name": "veyaflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VeyaFlow — Brand Growth Intelligence platform",
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "acorn": "^8.16.0"
   }
 }
