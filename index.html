@@ -8410,9 +8410,21 @@ const RETAILER_REGISTRY = [
     insiderNote:"Clinical files reviewed by their in-house pharmacist, not the buyer. Get PIF reviewed by a Swedish safety assessor before submitting. Hjärtat rejects 60% of applications for incomplete documentation. Process takes 3-6 months — start early.",
     flagshipStores:["Apotek Hjärtat Stockholm Hötorget","Apotek Hjärtat Göteborg Nordstan"],
     flagshipRationale:"Hötorget is the clinical beauty flagship — most visible to pharmacy buyers nationally. Nordstan covers Göteborg.",
-    approachRoute:"Formal supplier application at apotekhjartat.se/leverantor. Prepare full PIF, safety assessment, and CPNP certificate before first contact.",
+    approachRoute:"Formal supplier application at apotekhjartat.se/leverantor. Article notification via the PDX article portal (Excel notifications retired 2026) — request portal invite with legal company name + org.nr to Masterdata.supplier@apotekhjartat.se. Prepare full PIF, safety assessment, and CPNP certificate before first contact.",
+    articleNotification: {
+      route: 'PDX article portal',
+      excelRetired: true,
+      portalInviteEmail: 'Masterdata.supplier@apotekhjartat.se',
+      inviteRequires: 'Legal company name + org.nr',
+      notificationDeadline: '2026-10-02',
+      deadlineNote: 'February 2027 revision notifications ONLY via PDX. Align with Category/Purchasing manager BEFORE notifying.',
+      gtinPolicy: 'New GTIN = hard change = new article. Packaging/size changes that alter the GTIN must be notified as a NEW article.',
+      dataBackbone: 'Validoo (GDSN) — open all article information against GLN 7312440012653.',
+      source: 'AH supplier email, Aug 2026 (primary)',
+      confidence: 'veyaflow_verified',
+    },
         listingFee: {value:null, note:"No listing fee. Standard article submission via supplier portal.", confidence:"veyaflow_verified"},
-    verifiedDate:"2026-04", verifiedBy:"Charlotte",
+    verifiedDate:"2026-08", verifiedBy:"Charlotte",
   },
   // ── GERMANY ──────────────────────────────────────
   {
@@ -30845,7 +30857,7 @@ function renderGTMDeadlineBanner() {
 ═══════════════════════════════════════════════════ */
 const ASSET_SPECS = {
   apotek_hjartat_se: {
-    confidence:'research_verified', lastVerified:'2026-04',
+    confidence:'research_verified', lastVerified:'2026-08',
     productImages:{
       background:'Pure white (#FFFFFF)',
       dimensions:'1000×1000px minimum (2000×2000px recommended)',
@@ -30859,7 +30871,7 @@ const ASSET_SPECS = {
     lifestyleImages:{minimum:2, style:'Natural Scandinavian lighting, clean neutral backgrounds', brandLogoRequired:false},
     barcode:{type:'EAN-13', minimumWidth:'25mm', placement:'Back panel lower right', note:'Must scan cleanly — test before submission'},
     video:{required:false, note:'Product video welcomed but not mandatory for pharmacy listing'},
-    masterdata:{format:'Excel template via Apotek Hjärtat supplier portal', portalUrl:'leverantor.apotekshjartat.se'},
+    masterdata:{format:'PDX article portal (Excel notifications retired 2026). Article data sourced from Validoo (GDSN) — open against GLN 7312440012653. New GTIN = new article.', portalUrl:'apotekhjartat.se — PDX invite via Masterdata.supplier@apotekhjartat.se'},
   },
   matas_dk: {
     confidence:'research_verified', lastVerified:'2026-04',
