@@ -4322,7 +4322,19 @@ function buildNav(){
             var ref=s.statusChangedAt||s.submittedDate; if(!ref) return false;
             return (Date.now()-new Date(ref).getTime())/86400000 > 21;
           }).length;
-          if(stale>0) html+='<span class="nav-badge alert">'+stale+'</span>';
+          // Unseen portal status updates badge the tracker too (2-E) — same count that
+          // surfaces on Brand Home. Cleared when retail-tracker renders.
+          var unseenPortal = 0;
+          try{ unseenPortal = (JSON.parse(localStorage.getItem('ns_portal_alerts')||'[]')||[]).filter(function(a){ return a && !a.seen; }).length; }catch(e2){ unseenPortal = 0; }
+          // Two INDEPENDENT badges — they mean different things ("gone quiet" vs "retailer
+          // just moved") and neither may hide the other. Wrapped in one flex container:
+          // .nav-badge carries margin-left:auto, and two such siblings would each absorb
+          // free space and drift apart. The wrapper owns the auto-margin instead, leaving
+          // .nav-badge (shared with other nav items) untouched.
+          var badges = '';
+          if(stale>0)        badges += '<span class="nav-badge alert">'+stale+'</span>';
+          if(unseenPortal>0) badges += '<span class="nav-badge">'+unseenPortal+'</span>';
+          if(badges) html += '<span style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0">'+badges+'</span>';
         }catch(e){}
       }
       if(n.flag) html+='<span class="flag '+(n.flag==='pending'?'pend':n.flag)+'">'+n.flag+'</span>';
@@ -37029,6 +37041,16 @@ function retailChecklistAutoCheckValue(expr, sku){
 
 function renderRetailTracker(el){
   if(!el) return;
+  // Viewing the tracker IS seeing the portal updates — clear the badge (2-E).
+  try{
+    if(typeof loadPortalAlerts==='function' && typeof persistPortalAlerts==='function'){
+      var _pa = loadPortalAlerts();
+      if(_pa.some(function(a){ return a && !a.seen; })){
+        _pa.forEach(function(a){ if(a) a.seen = true; });
+        persistPortalAlerts(_pa);
+      }
+    }
+  }catch(e){}
   loadRetailSubmissions();
   var subs = retailSubmissions.slice().sort(function(a,b){
     return new Date(b.submittedDate||0) - new Date(a.submittedDate||0);
@@ -37193,6 +37215,18 @@ function renderRetailSubmissionCard(s){
     html += '<div style="flex:1;min-width:180px"><div class="lbl" style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem">Contact email</div>';
     html += '<input type="email" id="rsub-cemail-'+s.id+'" value="'+retailEsc(s.contactEmail||'')+'" style="width:100%;padding:.45rem .6rem;font-family:var(--sans);font-size:.78rem;border:1px solid var(--border)"></div>';
     html += '</div>';
+
+    // Retailer's rejection reason, relayed from the portal (2-D). Read-only, clearly
+    // attributed — this is the buyer's words, not the brand's private note.
+    if(s.status==='rejected' && (s.rejectionNote || s.rejectionCategory)){
+      html += '<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.7rem .85rem;margin-bottom:.85rem">';
+      html +=   '<div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:#B32A1F;font-weight:700;margin-bottom:.25rem">Reason from ' + retailEsc(s.retailerName||'retailer') + '</div>';
+      html +=   '<div style="font-family:var(--sans);font-size:.75rem;color:#7F1D1D;line-height:1.55">'
+             +    (s.rejectionCategory ? '<strong>' + retailEsc(s.rejectionCategory) + '</strong>' + (s.rejectionNote ? ': ' : '') : '')
+             +    retailEsc(s.rejectionNote||'')
+             +  '</div>';
+      html += '</div>';
+    }
 
     // ── SECTION 2 — "Your private notes" ─────────────────
     html += '<div style="background:#F9F8F6;border:1px solid var(--border);border-left:3px solid #C4A882;padding:.7rem .85rem;margin-bottom:.85rem">';
@@ -38946,16 +38980,26 @@ function buildPortalBrandPack(sub){
     verifiedTier: (typeof brand!=='undefined'&&brand&&brand.verifiedTier) || '',
     articleTemplate: {},
   };
-  // Readiness dimensions: from latest saved report if available
-  if(typeof savedReports!=='undefined' && savedReports.length){
+  // Brand-level EU Responsible Person (2-C) — NAME ONLY. The buyer needs
+  // "RP on file: Cosmeservice GmbH", never the RP's address or contact details.
+  var _rp = (typeof brand!=='undefined' && brand && brand.euResponsible) || null;
+  if(_rp && _rp.name){
+    pack.euResponsible = { name: String(_rp.name), onFile: true };
+  }
+  // Readiness dimensions: live computation first (same source as Brand Home's hero),
+  // falling back to the latest saved report. Omitted entirely when neither exists —
+  // the portal hides the breakdown rather than drawing zeroed bars.
+  var _live = (typeof computeLiveReadiness==='function') ? computeLiveReadiness() : null;
+  if(_live && _live.dims && Object.keys(_live.dims).length){
+    pack.readinessDimensions = _live.dims;
+  } else if(typeof savedReports!=='undefined' && savedReports.length){
     var r = savedReports[0] || {};
     var d = r.dimensions || r.dims || {};
-    pack.readinessDimensions = {
-      compliance:  d.compliance  || 0,
-      commercial:  d.commercial  || 0,
-      operational: d.operational || 0,
-      brand:       d.brand       || 0,
-    };
+    var fallbackDims = {};
+    ['compliance','commercial','operational','brand'].forEach(function(k){
+      if(typeof d[k] === 'number') fallbackDims[k] = d[k];
+    });
+    pack.readinessDimensions = fallbackDims;
   }
   // Claims aggregated across submitted SKUs
   if(typeof skus!=='undefined' && Array.isArray(skus) && skus.length){
@@ -38980,6 +39024,10 @@ function buildPortalSkuSnapshot(skuIds){
     return {
       name: sk.name || '',
       ean:  sk.ean  || '',
+      // productType + ceMarking drive the portal's framework-correct columns (1-E):
+      // a device must not be shown a CPNP column. Without these the portal can only guess.
+      productType: sk.productType || '',
+      ceMarking: !!(sk.ceMarking || sk.ceMarked),
       cpnp: !!(sk.cpnp || sk.cpnpRef),
       claimsAudited: Array.isArray(sk.claimsApproved) && sk.claimsApproved.length > 0,
       euRp: !!(sk.euRp || sk.euRpConfirmed),
@@ -38988,12 +39036,58 @@ function buildPortalSkuSnapshot(skuIds){
   }).filter(Boolean);
 }
 
+// Live readiness — the SAME computation Brand Home's hero displays (best score across
+// target markets via scoreReadiness), so the portal shows what the brand sees.
+// scoreReadiness returns dims as {score,max} per dimension with DIFFERENT maxima
+// (compliance 35, commercial 18, logistics 7…), so dims are normalised to 0-100
+// before they leave here — the portal renders them as percentage bars.
+function computeLiveReadiness(){
+  try{
+    if(typeof brand==='undefined' || !brand) return null;
+    if(typeof scoreReadiness!=='function' || typeof RETAILER_REGISTRY==='undefined') return null;
+    var sku0 = (typeof skus!=='undefined' && skus[0]) || {};
+    var nameToCode = {'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'};
+    // Unmapped markets are SKIPPED deliberately, never defaulted to 'SE'. Scoring a
+    // Finnish launch against the Swedish registry would ship a wrong number to a buyer
+    // as if it were real. If nothing maps, this returns null and the portal shows
+    // "Not scored" — no score beats a wrong score. Do not restore a default here.
+    var tgtCodes = (brand.targetMarkets||[brand.currentMarket||'Sweden'])
+      .map(function(m){ return nameToCode[m] || null; })
+      .filter(Boolean);
+    var best = 0, bestDims = null;
+    tgtCodes.forEach(function(mc){
+      var ret = RETAILER_REGISTRY.filter(function(r){ return r.market===mc && retailerMatchesBrandTags(r,brand) && !r.futureMarket; });
+      if(!ret.length) return;
+      var rs = scoreReadiness(brand||{}, sku0, mc, (ret[0]&&ret[0].id)||'');
+      if(rs && typeof rs.total==='number' && rs.total > best){ best = rs.total; bestDims = rs.dims || null; }
+    });
+    if(!best) return null;
+    var pct = function(d){
+      if(!d || typeof d.score!=='number' || !d.max) return null;
+      return Math.max(0, Math.min(100, Math.round((d.score / d.max) * 100)));
+    };
+    var out = {};
+    if(bestDims){
+      // Portal dimension names; scoreReadiness' `logistics` is the operational axis.
+      // Its `product` axis has no portal equivalent and is deliberately omitted.
+      var map = { compliance:'compliance', commercial:'commercial', logistics:'operational', brand:'brand' };
+      Object.keys(map).forEach(function(k){
+        var v = pct(bestDims[k]);
+        if(v != null) out[map[k]] = v;
+      });
+    }
+    return { score: Math.min(100, best), dims: out };
+  }catch(e){ return null; }
+}
+
 function readLatestReadinessScore(){
+  var live = computeLiveReadiness();
+  if(live && typeof live.score==='number') return live.score;
   if(typeof savedReports!=='undefined' && savedReports.length){
     var r = savedReports[0] || {};
-    return r.readiness || r.score || null;
+    return r.readiness || r.score || null;   // fallback retained
   }
-  return null;
+  return null;   // null stays null — the portal renders absence, not 0
 }
 
 // Wrap createRetailSubmission to also send to retailer portal (if retailer has an account).
@@ -39057,7 +39151,14 @@ async function runPortalSync(){
   var changed = false;
   var newAlerts = [];
 
-  (res.changes||[]).forEach(function(change){
+  // The proxy returns status-log rows ordered changed_at.DESC (newest first), so applying
+  // them in payload order let the OLDEST change win the final write. Sort ASCENDING by
+  // changedAt so the newest truth lands last. (Field confirmed present: changes[].changedAt.)
+  var orderedChanges = (res.changes||[]).slice().sort(function(a,b){
+    return new Date(a && a.changedAt || 0) - new Date(b && b.changedAt || 0);
+  });
+
+  orderedChanges.forEach(function(change){
     if(!change || !change.submissionId) return;
     if(!change.oldStatus) return; // skip initial 'received' entry — it's the brand's own submit
     var localSub = localSubs.find(function(s){ return s.portalSubmissionId === change.submissionId; });
@@ -39067,6 +39168,18 @@ async function runPortalSync(){
       localSub.status = newBrandStatus;
       localSub.statusChangedAt = change.changedAt;
       changed = true;
+    }
+    // Rejection reason (2-D): the proxy writes reasonDetail into the status-log note.
+    // Category lives on the submission's brand_pack_data.rejectionReason.
+    if(change.newStatus === 'rejected'){
+      var srcSub = (res.submissions||[]).find(function(x){ return x.id === change.submissionId; });
+      var cat = (srcSub && srcSub.rejectionReason && srcSub.rejectionReason.category) || '';
+      var det = change.note || (srcSub && srcSub.rejectionReason && srcSub.rejectionReason.detail) || '';
+      if(cat || det){
+        localSub.rejectionNote     = det;
+        localSub.rejectionCategory = cat;
+        changed = true;
+      }
     }
     newAlerts.push({
       id:           change.id,
@@ -39149,12 +39262,33 @@ function renderPortalStatusAlerts(){
     if(when) html += '<div style="font-family:var(--mono);font-size:.5rem;color:#065F46;opacity:.75;margin-top:.15rem">'+retailEsc(when)+'</div>';
     html +=   '</div>';
     html +=   '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">';
-    html +=     '<button onclick="showPage(\'retail-tracker\')" style="font-family:var(--mono);font-size:.6rem;padding:.3rem .7rem;background:#065F46;color:#fff;border:none;cursor:pointer">View →</button>';
+    html +=     '<button onclick="openPortalAlertTarget(\''+retailEsc(a.submissionId)+'\')" style="font-family:var(--mono);font-size:.6rem;padding:.3rem .7rem;background:#065F46;color:#fff;border:none;cursor:pointer">View →</button>';
     html +=     '<button onclick="dismissPortalAlert(\''+retailEsc(a.id)+'\')" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:#065F46;cursor:pointer;opacity:.75">Dismiss</button>';
     html +=   '</div>';
     html += '</div>';
   });
   return html;
+}
+
+// 2-F — "View →" opens the tracker AND lands on the submission the alert refers to.
+// Alerts carry the PORTAL submission id; local rows key it as portalSubmissionId.
+function openPortalAlertTarget(portalSubmissionId){
+  try{
+    var localSubs = [];
+    try{ localSubs = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[]; }catch(e){ localSubs = []; }
+    var match = localSubs.find(function(s){ return s.portalSubmissionId === portalSubmissionId; });
+    if(match && typeof retailTrackerExpandedId !== 'undefined') retailTrackerExpandedId = match.id;
+    showPage('retail-tracker');
+    if(match){
+      setTimeout(function(){
+        try{
+          var host = document.getElementById('page-retail-tracker');
+          var node = host && host.querySelector('[onclick*="toggleRetailSubmissionExpand(\''+match.id+'\')"]');
+          if(node && node.scrollIntoView) node.scrollIntoView({behavior:'smooth', block:'center'});
+        }catch(e){}
+      }, 120);
+    }
+  }catch(e){ showPage('retail-tracker'); }
 }
 
 function dismissPortalAlert(id){

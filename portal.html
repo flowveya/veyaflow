@@ -409,15 +409,17 @@
     </div>
     <div class="auth-lead">Sign in to review brand submissions from VeyaFlow Verified brands.</div>
 
-    <label class="auth-lbl" for="login-email">Email</label>
-    <input class="auth-input" id="login-email" type="email" autocomplete="email" placeholder="buyer@retailer.com">
+    <form id="login-form" onsubmit="handleLogin(); return false;">
+      <label class="auth-lbl" for="login-email">Email</label>
+      <input class="auth-input" id="login-email" name="email" type="email" autocomplete="email" placeholder="buyer@retailer.com">
 
-    <label class="auth-lbl" for="login-password">Password</label>
-    <input class="auth-input" id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+      <label class="auth-lbl" for="login-password">Password</label>
+      <input class="auth-input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="••••••••">
 
-    <div id="login-error" class="auth-error" style="display:none"></div>
+      <div id="login-error" class="auth-error" style="display:none"></div>
 
-    <button class="auth-submit" id="login-submit" onclick="handleLogin()">Sign in</button>
+      <button class="auth-submit" id="login-submit" type="submit">Sign in</button>
+    </form>
 
     <div class="auth-hint">
       Accounts are created by VeyaFlow admin — there is no self-serve signup. If you need access, contact your VeyaFlow representative.
@@ -580,7 +582,10 @@ function daysAgo(iso){
   if(!iso) return null;
   var d = new Date(iso);
   if(isNaN(d.getTime())) return null;
-  return Math.floor((Date.now() - d.getTime()) / 86400000);
+  // Both sides are epoch ms (UTC). Clamp at 0 so a same-day or clock-skewed
+  // (slightly future) timestamp reads "Today", never "-1 days ago".
+  var diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return diff < 0 ? 0 : diff;
 }
 function scoreColor(score){
   if(score >= 80) return 'var(--green)';
@@ -733,6 +738,9 @@ async function restoreSession(){
     refreshToken = null;
     currentUser = null;
     try { localStorage.removeItem(STORAGE_KEY_SESSION); } catch(ee){}
+    // Don't drop the user on a bare login screen with no explanation.
+    // (The browser's own 401 console line is native and cannot be suppressed.)
+    if(e && e.status === 401) showLoginError('Your session expired. Please sign in again.');
     return false;
   }
 }
@@ -939,11 +947,16 @@ function renderSubmissionCard(s){
   html +=     '<span class="sub-status status-' + esc(s.status) + '">' + esc(STATUS_LABELS[s.status] || s.status) + '</span>';
   html +=   '</div>';
   html +=   '<div class="sub-meta">' + esc(s.category) + ' · ' + esc(s.homeMarket) + ' → ' + esc(s.targetMarket) + '</div>';
+  // Uncomputed score renders as absence, never 0 (scoreColor(null) would read red = "failing").
+  var hasScore = (s.readinessScore != null);
   html +=   '<div class="sub-readiness-row">';
-  html +=     '<div class="sub-score-box" style="color:' + scoreColor(s.readinessScore) + ';background:' + scoreBg(s.readinessScore) + '">' + (s.readinessScore||0) + '</div>';
+  html +=     '<div class="sub-score-box" style="color:' + (hasScore ? scoreColor(s.readinessScore) : 'var(--muted)') + ';background:' + (hasScore ? scoreBg(s.readinessScore) : 'transparent') + '">' + (hasScore ? s.readinessScore : '—') + '</div>';
   html +=     '<div>';
   html +=       '<div style="font-family:var(--serif);font-size:.9rem;color:var(--navy);line-height:1.2">Readiness</div>';
-  html +=       '<div class="sub-score-label">out of 100 · ' + esc(s.verifiedTier||'Verified') + ' tier</div>';
+  // Tier clause renders ONLY on an earned flag — no fallback string (omit-beats-caveat).
+  var tierClause = (s.verified === true && typeof s.verifiedTier === 'string' && s.verifiedTier.trim())
+    ? ' · ' + esc(s.verifiedTier.trim()) + ' tier' : '';
+  html +=       '<div class="sub-score-label">' + (hasScore ? 'out of 100' : 'Not scored') + tierClause + '</div>';
   html +=     '</div>';
   html +=   '</div>';
   html +=   '<div class="sub-date">';
@@ -979,7 +992,9 @@ function renderDetail(){
 
   updateTopbar(
     s.brandName,
-    esc(s.category) + ' · submitted ' + formatDate(s.submittedAt),
+    // NO esc() here: updateTopbar assigns via textContent, which is already safe.
+    // Pre-escaping produced the literal "Skincare &amp; Beauty" in the header.
+    (s.category || '') + ' · submitted ' + formatDate(s.submittedAt),
     '<button class="btn-outline" onclick="goBackToInbox()">← Back to inbox</button>'
   );
 
@@ -995,7 +1010,7 @@ function renderDetail(){
   html +=     '<div class="detail-brand-meta">' + esc(s.category) + ' · Home market: ' + esc(s.homeMarket) + ' · Target: ' + esc(s.targetMarket) + '</div>';
   html +=     '<div class="detail-badges">';
   if(s.verified){
-    html +=     '<span class="detail-badge detail-badge-gold">★ VeyaFlow Verified · ' + esc(s.verifiedTier||'') + '</span>';
+    html +=     '<span class="detail-badge detail-badge-gold">★ VeyaFlow Verified' + (s.verifiedTier ? ' · ' + esc(s.verifiedTier) : '') + '</span>';
   }
   (s.claims||[]).forEach(function(c){
     html +=     '<span class="detail-badge detail-badge-green">' + esc(c) + '</span>';
@@ -1008,19 +1023,27 @@ function renderDetail(){
 
   html +=   '<div class="detail-card">';
   html +=     '<div class="detail-card-title">Readiness breakdown</div>';
-  html +=     '<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.85rem">';
-  html +=       '<div style="font-family:var(--serif);font-size:3rem;line-height:1;color:' + scoreColor(s.readinessScore) + '">' + (s.readinessScore||0) + '</div>';
-  html +=       '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">/ 100</div>';
-  html +=     '</div>';
-  var dims = s.readinessDimensions || {};
-  ['compliance','commercial','operational','brand'].forEach(function(d){
-    var v = dims[d] || 0;
-    html +=     '<div class="dim-row">';
-    html +=       '<div class="dim-label">' + d + '</div>';
-    html +=       '<div class="dim-bar"><div class="dim-bar-fill" style="width:' + Math.min(100,v) + '%;background:' + scoreColor(v) + '"></div></div>';
-    html +=       '<div class="dim-val">' + v + '</div>';
-    html +=     '</div>';
-  });
+  var hasDetailScore = (s.readinessScore != null);
+  if(!hasDetailScore){
+    // Not scored: state the absence, hide the breakdown entirely — no zeroed bars.
+    html +=   '<div style="font-family:var(--serif);font-size:1.35rem;line-height:1.2;color:var(--muted)">Not scored</div>';
+    html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.35rem;line-height:1.5">No readiness score was submitted with this pack.</div>';
+  } else {
+    html +=   '<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.85rem">';
+    html +=     '<div style="font-family:var(--serif);font-size:3rem;line-height:1;color:' + scoreColor(s.readinessScore) + '">' + s.readinessScore + '</div>';
+    html +=     '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">/ 100</div>';
+    html +=   '</div>';
+    var dims = s.readinessDimensions || {};
+    ['compliance','commercial','operational','brand'].forEach(function(d){
+      if(dims[d] == null) return;   // omit dimensions the pack didn't carry
+      var v = dims[d];
+      html +=   '<div class="dim-row">';
+      html +=     '<div class="dim-label">' + d + '</div>';
+      html +=     '<div class="dim-bar"><div class="dim-bar-fill" style="width:' + Math.min(100,v) + '%;background:' + scoreColor(v) + '"></div></div>';
+      html +=     '<div class="dim-val">' + v + '</div>';
+      html +=   '</div>';
+    });
+  }
   html +=   '</div>';
   html += '</div>';
 
@@ -1028,23 +1051,75 @@ function renderDetail(){
     html += renderRejectionBlock(s.rejectionReason);
   }
 
+  // Compliance columns follow the product's REGULATORY FRAMEWORK, not a hardcoded
+  // cosmetics assumption. CPNP is a cosmetics notification and must never head a device row.
+  // Mixed-type submissions render one table PER framework (see report) — no ambiguous
+  // "n/a" cells, each table headed by the columns that actually apply.
+  var FRAMEWORK_COLUMNS = {
+    device: [
+      { label:'CE marking', cell:function(sk){ return sk.ceMarking; } },
+      { label:'EU RP',      cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+    ],
+    cosmetic: [
+      { label:'CPNP',   cell:function(sk){ return sk.cpnp; } },
+      { label:'Claims', cell:function(sk){ return sk.claimsAudited; } },
+      { label:'EU RP',  cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+    ],
+    // Framework not stated: EU RP is required under BOTH frameworks, so it is the only
+    // check that can be honestly asserted without knowing the product type. No CPNP
+    // (cosmetics-only), no CE (device-only) — the gap is labelled, never guessed.
+    unknown: [
+      { label:'EU RP', cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+    ],
+  };
+  var FRAMEWORK_LABELS = { device:'Devices · CE framework', cosmetic:'Cosmetics · EU 1223/2009', unknown:'Product type not specified' };
+  function frameworkOf(sk){
+    var pt = String(sk && sk.productType || '').toLowerCase();
+    if(!pt) return 'unknown';
+    if(pt === 'device' || pt === 'beauty_device' || pt.indexOf('device') !== -1) return 'device';
+    if(pt === 'cosmetic' || pt.indexOf('cosmetic') === 0) return 'cosmetic';
+    return 'unknown';   // unrecognised type — never assume cosmetics
+  }
+  // Brand-level EU RP (payload: brandPack.euResponsible) satisfies the RP check for every
+  // SKU — a per-SKU blank must not show the buyer a ✗ when the brand has an RP on file.
+  var brandRp = (s.euResponsible && s.euResponsible.onFile && s.euResponsible.name) ? String(s.euResponsible.name) : '';
+  var brandRpOnFile = !!brandRp;
+
+  var allSkus = s.skus || [];
+  var groups = {};
+  allSkus.forEach(function(sk){ var f = frameworkOf(sk); (groups[f] = groups[f] || []).push(sk); });
+  var groupKeys = Object.keys(groups);
+
   html += '<div class="detail-card" style="margin-bottom:1rem">';
-  html +=   '<div class="detail-card-title">Products submitted (' + (s.skus||[]).length + ')</div>';
-  html +=   '<table class="sku-tbl">';
-  html +=     '<thead><tr><th>Product</th><th>EAN</th><th>CPNP</th><th>Claims</th><th>EU RP</th><th>RSP</th></tr></thead>';
-  html +=     '<tbody>';
-  (s.skus||[]).forEach(function(sk){
-    html +=   '<tr>';
-    html +=     '<td style="font-weight:500">' + esc(sk.name) + '</td>';
-    html +=     '<td style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">' + esc(sk.ean) + '</td>';
-    html +=     '<td>' + (sk.cpnp ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
-    html +=     '<td>' + (sk.claimsAudited ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
-    html +=     '<td>' + (sk.euRp ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
-    html +=     '<td style="font-family:var(--mono);font-size:.75rem">' + esc(sk.rsp) + '</td>';
-    html +=   '</tr>';
+  html +=   '<div class="detail-card-title">Products submitted (' + allSkus.length + ')</div>';
+  if(brandRp){
+    html += '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.6rem">EU Responsible Person on file: ' + esc(brandRp) + '</div>';
+  }
+  groupKeys.forEach(function(fw){
+    var cols = FRAMEWORK_COLUMNS[fw] || FRAMEWORK_COLUMNS.cosmetic;
+    // Heading shows for every group when types are mixed, and ALWAYS for 'unknown' —
+    // the buyer must see that the framework wasn't stated, not just get a short table.
+    if(groupKeys.length > 1 || fw === 'unknown'){
+      html += '<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:.65rem 0 .3rem">' + esc(FRAMEWORK_LABELS[fw] || fw) + '</div>';
+    }
+    html += '<table class="sku-tbl">';
+    html +=   '<thead><tr><th>Product</th><th>EAN</th>';
+    cols.forEach(function(c){ html += '<th>' + esc(c.label) + '</th>'; });
+    html +=   '<th>RSP</th></tr></thead>';
+    html +=   '<tbody>';
+    groups[fw].forEach(function(sk){
+      html += '<tr>';
+      html +=   '<td style="font-weight:500">' + esc(sk.name) + '</td>';
+      html +=   '<td style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">' + esc(sk.ean) + '</td>';
+      cols.forEach(function(c){
+        html += '<td>' + (c.cell(sk) ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
+      });
+      html +=   '<td style="font-family:var(--mono);font-size:.75rem">' + esc(sk.rsp) + '</td>';
+      html += '</tr>';
+    });
+    html +=   '</tbody>';
+    html += '</table>';
   });
-  html +=     '</tbody>';
-  html +=   '</table>';
   html += '</div>';
 
   if(s.articleTemplate && Object.keys(s.articleTemplate).length){
@@ -1061,7 +1136,7 @@ function renderDetail(){
     html += '</div>';
   }
 
-  html += '<div class="veya-footer-note">This submission was pre-qualified by VeyaFlow. All compliance checks (CPNP, claims audit, EU Responsible Person, EUDR where applicable) were completed by the brand before submission.</div>';
+  html += '<div class="veya-footer-note">Submitted via VeyaFlow — compliance status shown per product above.</div>';
 
   host.innerHTML = html;
 }
@@ -1221,19 +1296,8 @@ async function init(){
   } else {
     showScreen('login');
   }
-  // Allow Enter key to submit login
-  var pw = document.getElementById('login-password');
-  if(pw){
-    pw.addEventListener('keydown', function(ev){
-      if(ev.key === 'Enter'){ ev.preventDefault(); handleLogin(); }
-    });
-  }
-  var em = document.getElementById('login-email');
-  if(em){
-    em.addEventListener('keydown', function(ev){
-      if(ev.key === 'Enter'){ ev.preventDefault(); handleLogin(); }
-    });
-  }
+  // Enter-to-submit is now native to the <form> (1-I); the manual keydown
+  // handlers that used to live here were redundant and have been removed.
 }
 
 init();

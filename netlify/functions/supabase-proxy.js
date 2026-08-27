@@ -123,6 +123,9 @@ function mapSubmissionRow(row) {
     verifiedTier: bp.verifiedTier || '',
     articleTemplate: bp.articleTemplate || {},
     rejectionReason: bp.rejectionReason || null,
+    // Brand-level EU Responsible Person ({name, onFile}) — the portal's RP column
+    // reads this so a per-SKU blank doesn't show ✗ when the brand has an RP on file.
+    euResponsible: bp.euResponsible || null,
     skus: row.sku_data || [],
   };
 }
