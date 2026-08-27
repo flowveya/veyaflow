@@ -1450,6 +1450,20 @@ const ROUTE_RECOVERY={resale:0.35,upcycling:0.15,repair:0.25,foodrescue:0.20,don
 const ROUTE_LABELS={resale:"Recommerce / Resale",upcycling:"Upcycle / Rework",repair:"Refurbish / Repair",foodrescue:"Food Rescue Platform",donation:"Charity Donation",recycling:"Material Recycling",disposal:"Responsible Disposal"};
 const ROUTE_COLORS={resale:"#1E40AF",upcycling:"#86198F",repair:"#5B21B6",foodrescue:"#713F12",donation:"#92400E",recycling:"#065F46",disposal:"#6B7280"};
 
+// ESPR timeline lookup (batch #2). ESPR_TIMELINE is keyed by brand CATEGORY and holds
+// TEXT — it carries no urgency levels and none may be invented. Returns {text} or null.
+// Callers render NOTHING when null: no dot, no blank label, never a green tick.
+// (The old lookup used sku.productType against a category-keyed table and fell back to a
+// non-existent .cosmetic key, so all three sites always rendered green with a blank label.)
+function resolveEsprTimeline(){
+  try{
+    var cats = (typeof getBrandCategories==='function' ? (getBrandCategories()||[]) : []);
+    var cat  = cats[0] || (typeof brand!=='undefined' && brand && brand.category) || '';
+    if(!cat) return null;
+    var text = ESPR_TIMELINE[cat];
+    return text ? { text: text } : null;
+  }catch(e){ return null; }
+}
 const ESPR_TIMELINE={
   "Fashion & Apparel":"EU Textile Destruction Ban: July 19, 2026. Routing is legally required for large companies.",
   "Skincare & Beauty":"ESPR cosmetics packaging requirements: 2027. Article 24 disclosure already active.",
@@ -5119,8 +5133,10 @@ function completeOnboardWithSku(){
     const heroSku = newSkuForm();
     heroSku.name = onboardForm.heroSkuName;
     // Map brand category to SKU productType
-    const _catTypeMap={'Skincare & Beauty':'cosmetic','Wellness & Supplements':'supplement','Food & Beverage':'food','Fashion & Apparel':'garment'};
-    heroSku.productType = onboardForm.heroSkuType||_catTypeMap[onboardForm.category]||'cosmetic';
+    // An unstated type is STORED as unstated (batch #2). Inferring 'cosmetic' from the
+    // brand category is how an LED face mask became a cosmetic in storage (finding #13).
+    // _catTypeMap deleted — no category→type inference at write time.
+    heroSku.productType = onboardForm.heroSkuType||'';
     heroSku.ean = onboardForm.heroSkuEan||'';
     heroSku.rspSEK = (onboardForm.heroSkuRsp||'')
       .replace(/[^0-9.]/g,'')||'';
@@ -6361,6 +6377,34 @@ const BLOCKER_RESOLUTION = {
   socialLow:      {days:90, cost:'variable',       fix:'Content strategy + consistent posting — 10K in 3 months is achievable.'},
 };
 
+// ── Product-type routing: THE single resolver (batch #2, 27 Aug 2026) ──────────
+// One place decides a SKU's regulatory framework. Every live compliance surface routes
+// through here. 'unknown' is a FIRST-CLASS outcome — not an error, and never a synonym
+// for cosmetic. NO brand-category inference lives here: a Skincare & Beauty brand can
+// sell a device, and inferring type from category is exactly how an LED face mask got
+// treated as a cosmetic (test-round finding #13).
+// Returns { framework, stated } — `stated` is true only when the SKU itself carries it.
+function resolveProductFramework(sku){
+  var raw = (sku && typeof sku.productType === 'string') ? sku.productType.trim().toLowerCase() : '';
+  if(!raw) return { framework:'unknown', stated:false };
+  if(raw === 'device' || raw === 'beauty_device' || raw.indexOf('device') !== -1) return { framework:'device', stated:true };
+  if(raw === 'cosmetic' || raw.indexOf('cosmetic') === 0) return { framework:'cosmetic', stated:true };
+  if(raw === 'supplement') return { framework:'supplement', stated:true };
+  if(raw === 'food')       return { framework:'food', stated:true };
+  if(raw === 'textile' || raw === 'garment') return { framework:'textile', stated:true };   // garment normalises to textile
+  if(raw === 'beauty_accessory') return { framework:'beauty_accessory', stated:true };
+  return { framework:'unknown', stated:false };   // unrecognised — never assume cosmetics
+}
+const FRAMEWORK_LABEL = {
+  cosmetic:'Cosmetic · EU 1223/2009',
+  device:'Device · CE framework',
+  supplement:'Supplement',
+  food:'Food',
+  textile:'Textile',
+  beauty_accessory:'Beauty accessory',
+  unknown:'Product type not specified',
+};
+
 function scoreReadiness(brand, sku, marketCode, retailerId){
   const market = MARKET_REGISTRY[marketCode]||MARKET_REGISTRY.DK;
   const retailer = RETAILER_REGISTRY.find(r=>r.id===retailerId)||RETAILER_REGISTRY[0];
@@ -6368,15 +6412,18 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   const greens = [];
   let dims = {};
 
-  // Resolve product category from SKU productType or brand category
-  const catMap = {'Skincare & Beauty':'cosmetic','Wellness & Supplements':'supplement','Food & Beverage':'food','Fashion & Apparel':'textile'};
-  const skuType   = sku&&sku.productType ? sku.productType : (catMap[(getBrandCategories()||[])[0]||brand?.category||'']||'cosmetic');
+  // Framework comes from the SKU alone (batch #2). The old brand-category map inferred
+  // 'cosmetic' from the BRAND category — deleted: it mis-typed devices as cosmetics.
+  // An unstated type yields 'unknown', and every framework flag below is then false.
+  const _fw       = resolveProductFramework(sku);
+  const skuType   = _fw.framework;
+  const isUnknown = skuType==='unknown';
   const isCosm    = skuType==='cosmetic';
   const isDevice  = skuType==='device';
   const isAccessory = skuType==='beauty_accessory';
   const isSupp    = skuType==='supplement';
   const isFood    = skuType==='food';
-  const isTextile = skuType==='textile'||skuType==='garment';
+  const isTextile = skuType==='textile';
 
   // 1. COMPLIANCE (35) — category-aware, never assumes cosmetic
   let comp = 0;
@@ -6442,11 +6489,21 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(sku.gots||sku.oekotex||sku.grs){ comp+=11; greens.push('Textile certification on file (GOTS/OEKO-TEX/GRS)'); }
       else{ blockers.push({id:'textileCertMissing',level:'amber',label:'No textile sustainability certification',impact:'dm, Zalando, and most EU fashion retailers require GOTS or OEKO-TEX.'}); comp+=3; }
 
+    } else if(isUnknown){
+      // Framework not stated: raise NO framework-specific blocker (that would invent a
+      // compliance failure) and award NO framework credit (that would assert unverified
+      // compliance). Only the framework-AGNOSTIC EU RP check runs — required under both
+      // the cosmetics and device frameworks. One amber blocker names the missing input.
+      blockers.push({id:'productTypeUnknown',level:'amber',label:'Product type not set',impact:'Compliance requirements cannot be determined until the product type is set. Set it on the SKU to see the applicable checks.'});
+      if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){ comp+=6; greens.push('EU Responsible Person on file'); }
+
     } else {
       comp += 24;
     }
 
-    // Claims check — uses correct ruleset per category
+    // Claims check — uses correct ruleset per category. SKIPPED when the framework is
+    // unknown: choosing a ruleset would itself be a hardcoded cosmetics assumption.
+    if(!isUnknown){
     const ruleKey = isCosm?'cosmetic':isDevice?'device':isAccessory?'beauty_accessory':isFood?'food':isSupp?'supplement':isTextile?'textile':'cosmetic';
     const activeRules = CLAIMS_RULES[ruleKey]||CLAIMS_RULES.cosmetic;
     const redClaims  = (sku.claims||[]).filter(cl=>{ const r=activeRules[cl.toLowerCase()]; return r&&r.status==='red'; });
@@ -6454,6 +6511,7 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
     if(redClaims.length===0&&amberClaims.length===0){ comp+=11; greens.push('All claims clear for '+market.name); }
     else if(redClaims.length>0){ blockers.push({id:'redClaim',level:'red',label:redClaims.length+' claim'+(redClaims.length>1?'s':'')+' flagged RED for '+market.name,impact:'Must rephrase before pitching — regulatory risk.'}); }
     else if(amberClaims.length>0){ blockers.push({id:'amberClaim',level:'amber',label:amberClaims.length+' claim'+(amberClaims.length>1?'s':'')+' need review for '+market.name,impact:'Amber claims need substantiation or market-specific rephrasing.'}); comp+=5; }
+    }
 
   } else {
     blockers.push({id:'noSku',level:'red',label:'No products yet',impact:'Your compliance score activates once you add a product. <span onclick="showPage(\"skus\")" style="text-decoration:underline;cursor:pointer;color:#991B1B">Add your first product →</span>'});
@@ -13253,8 +13311,12 @@ _atmInitStorage();
 //   - schema.sheets[0].columns[]: populated from the legacy fields[] array
 const _ATM_SEED_TEMPLATES = {
   apotek_hjartat_se: {
-    format: 'xlsx',
-    portalUrl: 'https://leverantor.apotekshjartat.se',
+    // PDX supersedes Excel (AH supplier email Aug 2026 — see RETAILER_REGISTRY
+    // articleNotification). 'portal' is a NEW value in this seed's format vocabulary,
+    // which previously held only 'xlsx' — proposed, not silently invented (see report).
+    format: 'portal',
+    portalUrl: 'https://apotekhjartat.se/leverantor',
+    submissionContact: 'Masterdata.supplier@apotekhjartat.se',  // PDX invite: legal company name + org.nr (registry, AH-PDX batch)
     legacyConfidence: 'veyaflow_verified',
     fields: [
       { label:'Article number (EAN)',             source:'sku.ean' },
@@ -16017,7 +16079,9 @@ function checkComplianceGap(b){
   const euIntent = markets.some(function(m){ return EU_RP_MARKETS.indexOf(m) >= 0; });
   // Cosmetic SKUs present (RP requirement is cosmetics-driven)
   const skuList = Array.isArray(skus) ? skus : [];
-  const cosmeticSkus = skuList.filter(function(s){ return (s.productType||'cosmetic') === 'cosmetic'; }).length;
+  // Only SKUs STATED as cosmetic count — an unstated type is 'unknown', not a cosmetic,
+  // and must not trigger a cosmetics-specific RP banner.
+  const cosmeticSkus = skuList.filter(function(s){ return resolveProductFramework(s).framework === 'cosmetic'; }).length;
 
   const hasGap = activeStage && missingRp && euIntent && cosmeticSkus > 0;
   return {hasGap:hasGap, missingRp:missingRp, euIntent:euIntent, cosmeticSkus:cosmeticSkus};
@@ -16183,9 +16247,12 @@ function generateRpHandoffPayload(rpPartner, prefs){
 
   // Section 2: Product portfolio overview (anonymized — count + categories + ingredient highlights)
   const skuList = Array.isArray(skus) ? skus : [];
-  const cosmeticCount = skuList.filter(function(s){ return (s.productType||'cosmetic') === 'cosmetic'; }).length;
+  const cosmeticCount = skuList.filter(function(s){ return resolveProductFramework(s).framework === 'cosmetic'; }).length;
+  // Unstated types are their OWN bucket, never folded into the cosmetic count — a poisoned
+  // count produces poisoned prompt copy.
+  const unstatedTypeCount = skuList.filter(function(s){ return !resolveProductFramework(s).stated; }).length;
   const totalSkus = skuList.length;
-  const productTypes = skuList.map(function(s){ return s.productType||'cosmetic'; });
+  const productTypes = skuList.map(function(s){ var f=resolveProductFramework(s); return f.stated ? f.framework : 'unstated'; });
   const uniqTypes = productTypes.filter(function(t,i){ return productTypes.indexOf(t) === i; });
   // Ingredient highlights (anonymized — categories of concern, not full INCI)
   const hasInci = skuList.some(function(s){ return s.inci || s.ingredients; });
@@ -16214,8 +16281,9 @@ Target markets: ${uniqMarkets.join(', ')||'(not set)'}
 
 ═══ PRODUCT PORTFOLIO ═══
 Total SKUs: ${totalSkus}
-Cosmetic SKUs (EU CPNP scope): ${cosmeticCount}
-Product types: ${uniqTypes.join(', ')||'cosmetic'}
+Cosmetic SKUs (EU CPNP scope): ${cosmeticCount}${unstatedTypeCount?`
+Products of unstated type (framework not determined): ${unstatedTypeCount}`:''}
+Product types: ${uniqTypes.join(', ')||'not stated'}
 INCI/ingredient lists on file: ${hasInci?'Yes':'No — to be compiled'}
 
 ═══ COMPLIANCE CURRENT STATE (via VeyaFlow) ═══
@@ -17899,6 +17967,13 @@ const FIELD_LABELS = {
 };
 
 const READINESS_FIELDS = {
+  // Framework not stated (batch #2): score ONLY the framework-agnostic identity and
+  // commercial fields. No INCI/CPNP (cosmetics), no CE/DoC (device) — asking for those
+  // before the type is known would invent requirements the product may not be subject to.
+  unknown: [
+    {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
+    {key:'countryOfMfr',weight:1},{key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+  ],
   cosmetic: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
     {key:'shelfLifeMonths',weight:1},{key:'inci',weight:3},{key:'cpnp',weight:3},
@@ -17989,8 +18064,10 @@ const RETAILER_REQS = {
 
 
 function skuReadiness(sku){
-  const type = sku.productType||'cosmetic';
-  const rawFields = READINESS_FIELDS[type]||READINESS_FIELDS.cosmetic;
+  // Unknown framework: fall back to the framework-AGNOSTIC field set rather than
+  // scoring the SKU against cosmetics requirements it may not be subject to.
+  const type = resolveProductFramework(sku).framework;
+  const rawFields = READINESS_FIELDS[type] || READINESS_FIELDS.unknown;
   const fields = rawFields.map(function(f){
     return {key:f.key, label:FIELD_LABELS[f.key]||f.key, weight:f.weight};
   });
@@ -18053,7 +18130,13 @@ function sustainabilityReadiness(sku){
 
 
 function getClaimLight(claim){
-  const productType = skuForm.productType||'cosmetic';
+  // Unknown framework: no claims ruleset can be chosen honestly — every claim is
+  // reported as needing the product type first (amber), not judged against cosmetics rules.
+  const _clFw = resolveProductFramework(skuForm);
+  if(_clFw.framework === 'unknown'){
+    return {light:'amber', note:'Set the product type to see which claim rules apply.'};
+  }
+  const productType = _clFw.framework;
   const rules = CLAIMS_RULES[productType]||CLAIMS_RULES.cosmetic;
   const key = claim.toLowerCase().trim();
   const rule = rules[key];
@@ -19647,8 +19730,8 @@ function renderClaimsSection(){
 
 
 function renderSkuTab2(){
-  const type = skuForm.productType||'cosmetic';
-  const isSkincare = type==='cosmetic';
+  const type = resolveProductFramework(skuForm).framework;
+  const isSkincare = type==='cosmetic';   // false when unstated — no cosmetics fields are assumed
 
   // ── COSMETIC ──────────────────────────────────
   if(type==='cosmetic') return `
@@ -20068,7 +20151,7 @@ function renderSkuEdit(el){
   // in storage (not deleted) so a round-trip back to cosmetic restores the tab.
   // Legacy product types (textile/garment/supplement/food) keep the original label
   // and full tab visibility — out of scope for this fix.
-  const _skuType = skuForm.productType || 'cosmetic';
+  const _skuType = resolveProductFramework(skuForm).framework;
   const _tab2LabelByType = {
     cosmetic:         'Ingredients & Compliance',
     device:           'Compliance & Certification',
@@ -21087,7 +21170,7 @@ function showSkuExport(id){
   if(!sku) return;
   const r = skuReadiness(sku);
   const el = document.getElementById('page-skus');
-  const type = sku.productType||'cosmetic';
+  const type = resolveProductFramework(sku).framework;
 
   const EXPORT_OPTIONS = [
     {
@@ -26580,7 +26663,7 @@ const FIRST_CONTACT = {
   apotek_hjartat_se: {
     confidence: 'veyaflow_verified',
     method: 'Email → supplier portal',
-    route: 'Category manager via leverantor.apotekshjartat.se',
+    route: 'Category manager via apotekhjartat.se/leverantor',
     timing: 'Oct–Nov for spring range. Mar–Apr for autumn range.',
     subjectLine: '[Brand] — [Season] range submission + full compliance documentation ready',
     what_works: [
@@ -29104,7 +29187,7 @@ function bdVal(v, placeholder){
 // read the correct CLAIMS_RULES block; provenance fields come off the same reconciled rule.
 function bdClaimInfo(claim, productType){
   var saved = (typeof skuForm!=='undefined') ? skuForm.productType : undefined;
-  if(typeof skuForm!=='undefined') skuForm.productType = productType||'cosmetic';
+  if(typeof skuForm!=='undefined') skuForm.productType = productType||'';   // persist unstated as '' — never mint 'cosmetic'
   var lit = {light:'amber', note:''};
   try{ lit = getClaimLight(claim); }catch(e){}
   var rules = (CLAIMS_RULES[productType]||CLAIMS_RULES.cosmetic)||{};
@@ -29189,10 +29272,10 @@ async function generateSpecSheetPDF(skuId){
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
     // 3-way productType awareness (was binary device/cosmetic). Gates each section to
     // what genuinely applies — CPNP is cosmetic-only, accessories aren't formulations.
-    const pt = sku.productType || 'cosmetic';
-    const isDevice    = (pt==='device' || pt==='beauty_device');
-    const isAccessory = (pt==='beauty_accessory' || pt==='accessory');
-    const isCosmetic  = !isDevice && !isAccessory;   // default
+    const pt = resolveProductFramework(sku).framework;
+    const isDevice    = (pt==='device');
+    const isAccessory = (pt==='beauty_accessory');
+    const isCosmetic  = (pt==='cosmetic');   // NOT a default — unknown is none of the three
     const typeLabel = isDevice ? 'Device' : (isAccessory ? 'Accessory' : 'Cosmetic');
     pdfHeader(doc, bdVal(sku.name,'[VERIFY] product')+' — Spec Sheet',
       (brand&&brand.name||'')+' · '+typeLabel, '#0E8C8C', pageW);
@@ -33791,7 +33874,7 @@ function dppReadiness(sku){
     if(t==='device') return 'BOM / Materials list';
     if(t==='beauty_accessory' || t==='textile' || t==='garment') return 'Material composition';
     return 'Materials/INCI';
-  })(sku.productType||'cosmetic');
+  })(resolveProductFramework(sku).framework);
 
   const checks = [
     // From SKU data — already captured
@@ -33800,7 +33883,7 @@ function dppReadiness(sku){
     {id:'mfr',       label:'Country of manufacture', done:!!sku.countryOfMfr,       source:'SKU'},
     {id:'cpnp',      label:'CPNP/regulatory ref',done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
     {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
-    {id:'circular',  label:'End-of-life routing',done:!!(sku.productType),           source:'SKU'},
+    {id:'circular',  label:'End-of-life routing — not captured',done:false,          source:'SKU'},
     // DPP-specific gaps (post-Phase-5: now read from SKU canonical storage)
     {id:'carbon',    label:'Carbon footprint',   done:!!(sku.carbonKg||sku.carbonEstimated), source:'DPP'},
     {id:'recycled',  label:'Recycled content %', done:!!(sku.recycledProductPct!==undefined&&sku.recycledProductPct!==''), source:'DPP'},
@@ -33818,7 +33901,7 @@ function dppReadiness(sku){
 // ── Carbon estimator ──────────────────────────────
 
 function estimateCarbon(sku){
-  const type = sku.productType||'cosmetic';
+  const type = resolveProductFramework(sku).framework;
   const net  = parseFloat(sku.netContent)||50;
 
   let base = 0.9; // default
@@ -34233,7 +34316,7 @@ function renderDPP(el){
             <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Your products — DPP status</div>
             ${skus.map(sku=>{
               const r = dppReadiness(sku);
-              const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
+              const espr = resolveEsprTimeline();   // null when no dated entry exists for this brand's category
               const barC = r.pct>=80?'#10B981':r.pct>=50?'#F59E0B':'#EF4444';
               const dppGenerated = !!(dppData[sku.id]?.generatedAt);
               return `
@@ -34241,7 +34324,7 @@ function renderDPP(el){
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">
                     <div style="flex:1;min-width:180px">
                       <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}</div>
-                      <div style="font-family:var(--mono);font-size:.55rem;color:${urgencyColor[espr.urgency]};margin-top:.2rem">${espr.label}</div>
+                      ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.2rem">${espr.text}</div>`:''}
                     </div>
                     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
                       ${dppGenerated?`
@@ -34293,7 +34376,7 @@ function renderDPPFill(el){
   // (was const existing = dppData[...]; const f = existing.fields).
   const r = dppReadiness(sku);
   const carbon = estimateCarbon(sku);
-  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
+  const espr = resolveEsprTimeline();   // null when no dated entry exists for this brand's category
 
   el.innerHTML=`
     <div class="page-wrap">
@@ -34524,7 +34607,7 @@ function renderDPPView(el){
   const dppId = d.dppId||getDPPId(dppActiveSkuId);
   const dppUrl = window.location.origin + '/dpp/' + dppId;
   const versions = d.versions||[];
-  const espr = ESPR_TIMELINE[sku.productType]||ESPR_TIMELINE.cosmetic||{urgency:'green',label:''};
+  const espr = resolveEsprTimeline();   // null when no dated entry exists for this brand's category
   const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
 
   el.innerHTML=`
@@ -34545,7 +34628,7 @@ function renderDPPView(el){
         <div style="background:${r.pct===100?'#ECFDF5':'#FFFBEB'};border:1px solid ${r.pct===100?'#A7F3D0':'#FDE68A'};padding:.75rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
           <div>
             <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${r.pct===100?'#065F46':'#92400E'}">${r.pct===100?'DPP COMPLETE':'DPP IN PROGRESS — '+r.pct+'%'}</div>
-            <div style="font-family:var(--mono);font-size:.55rem;color:${urgencyColor[espr.urgency]};margin-top:.15rem">${espr.label}</div>
+            ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.15rem">${espr.text}</div>`:''}
           </div>
           <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">ID: ${dppId}</div>
         </div>
