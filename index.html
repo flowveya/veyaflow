@@ -1316,7 +1316,7 @@ function saveAddSupplier(){
   // Persist manual suppliers
   try{
     const manual = SUPPLIERS.filter(s=>s.isManual);
-    localStorage.setItem('ns_manual_suppliers', JSON.stringify(manual));
+    persistCritical('ns_manual_suppliers', manual);
   }catch(e){}
   addSupplierOpen = false;
   addSupplierForm = {name:'',contactName:'',contactEmail:'',country:'',type:'',commodity:'',tier:1,eudrScope:false};
@@ -1333,7 +1333,7 @@ function deleteManualSupplier(id){
   if(selectedSupplier?.id===id){ selectedSupplier=null; nudgeResult=null; }
   try{
     const manual = SUPPLIERS.filter(s=>s.isManual);
-    localStorage.setItem('ns_manual_suppliers', JSON.stringify(manual));
+    persistCritical('ns_manual_suppliers', manual);
   }catch(e){}
   renderSuppliers(document.getElementById('page-suppliers'));
 }
@@ -1826,7 +1826,7 @@ function loadState(){
       const isGenuineMulti = cur && cur.length > 1 && cur.indexOf(brand.category) >= 0;
       if(outOfSync && !isGenuineMulti){
         brand.categories = canonical;
-        try{localStorage.setItem('ns_brand', JSON.stringify(brand));}catch(e){}
+        persistCritical('ns_brand', brand)
       }
     }
     if(r) savedReports=safeJsonParse(r)||[];
@@ -1896,7 +1896,7 @@ function loadState(){
 }
 
 function saveBrandState(){
-  try{localStorage.setItem('ns_brand',JSON.stringify(brand));}catch(e){}
+  persistCritical('ns_brand', brand)
   updateSidebarBrand();
   renderRegStrip();
 }
@@ -2007,7 +2007,10 @@ function seedDemoNordlys(){
       descEN: 'At-home LED light-therapy mask — red 633/660 nm, blue 465 nm, NIR 850 nm.',
     },
   ];
-  try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){}
+  // Split (batch #3): one try previously covered BOTH writes, so a throw on ns_brand
+  // silently skipped ns_skus entirely. Each store now verified independently.
+  persistCritical('ns_brand', brand);
+  persistCritical('ns_skus', skus);
 }
 
 // Category colour map for badges
@@ -3961,7 +3964,7 @@ function renderSetupModal(){
   `;
 }
 function saveReportState(){
-  try{localStorage.setItem('ns_reports',JSON.stringify(savedReports));}catch(e){}
+  persistCritical('ns_reports', savedReports)
 }
 function savePageState(key,value){
   try{localStorage.setItem(key,JSON.stringify(value));}catch(e){}
@@ -4183,6 +4186,92 @@ function showSuccess(message){
   t.innerHTML='<span style="flex-shrink:0">✓</span>'+message;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3200);
+}
+
+/* ─── Save integrity (batch #3) ──────────────────────────────────────────────
+   showSuccess had no counterpart: every user-data write sat in a silent catch,
+   so a failed save reported success and the work was gone (test finding #40). */
+
+// Failure toast. Deliberately UNLIKE showSuccess: it does NOT auto-dismiss —
+// a failure the user didn't see is the bug being fixed. Explicit close only.
+function showFailure(message, detail){
+  const ex=document.getElementById('vf-failure-toast'); if(ex) ex.remove();   // replace, never stack
+  const t=document.createElement('div');
+  t.id='vf-failure-toast';
+  t.style.cssText='position:fixed;bottom:1.5rem;right:1.5rem;z-index:10000;background:#7F1D1D;color:#fff;font-family:var(--sans);font-size:.78rem;padding:.75rem 1rem;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:360px;line-height:1.45;border-left:4px solid #FCA5A5';
+  var html='<div style="display:flex;align-items:flex-start;gap:.5rem">';
+  html+='<div style="flex:1"><div style="font-weight:600;margin-bottom:.2rem">'+escapeHtml(String(message||'Save failed'))+'</div>';
+  if(detail) html+='<div style="font-family:var(--mono);font-size:.6rem;opacity:.85;margin-top:.3rem;word-break:break-word">'+escapeHtml(String(detail))+'</div>';
+  html+='</div>';
+  html+='<button onclick="var n=document.getElementById(\'vf-failure-toast\'); if(n) n.remove();" aria-label="Dismiss" style="background:none;border:none;color:#fff;opacity:.8;cursor:pointer;font-size:.9rem;line-height:1;flex-shrink:0;padding:0 0 0 .35rem">×</button>';
+  html+='</div>';
+  t.innerHTML=html;
+  document.body.appendChild(t);   // NO setTimeout — it stays until dismissed
+}
+
+// Cache prefixes eligible for eviction under quota pressure. ALLOWLIST — never a
+// denylist. Deleting user data to make room for user data would be a worse bug than
+// the one this fixes. Prefixes verified against their key builders, not guessed:
+//   ns_comp_  (L14692) · ns_inci_ (L18209) · ns_pkg_ (L18330) · ns_srisk_ (L25673)
+// ns_srisk_dismiss_ shares the ns_srisk_ prefix but is a dismissal flag, so it is
+// explicitly excluded — evicting it would silently un-dismiss alerts.
+const _EVICTABLE_CACHE_PREFIXES = ['ns_comp_','ns_inci_','ns_pkg_','ns_srisk_'];
+const _EVICT_EXCLUDE_PREFIXES  = ['ns_srisk_dismiss_'];
+function _evictCaches(){
+  var evicted=0;
+  try{
+    var candidates=[];
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i); if(!k) continue;
+      if(_EVICT_EXCLUDE_PREFIXES.some(function(x){ return k.indexOf(x)===0; })) continue;
+      if(!_EVICTABLE_CACHE_PREFIXES.some(function(x){ return k.indexOf(x)===0; })) continue;   // allowlist only
+      var ts=0;
+      try{
+        var v=JSON.parse(localStorage.getItem(k)||'{}');
+        ts=Number(v.ts)||Date.parse(v.generatedAt||v.savedAt||'')||0;
+      }catch(e){ ts=0; }
+      candidates.push({key:k, ts:ts});
+    }
+    candidates.sort(function(a,b){ return a.ts-b.ts; });   // oldest first
+    candidates.forEach(function(c){ try{ localStorage.removeItem(c.key); evicted++; }catch(e){} });
+  }catch(e){}
+  return evicted;
+}
+
+// The single write path for user data. Serialises, writes, then VERIFIES by reading
+// back and comparing length (catches a silent truncation as well as a throw).
+// On failure: one cache-eviction pass + one retry, then a persistent, specific toast.
+// Returns true only on a verified write.
+function persistCritical(key, value){
+  var payload;
+  // Strings are stored RAW: ns_session_id and ns_atm_last_verifier are read back with
+  // getItem() and no JSON.parse, so serialising them would corrupt their format.
+  try{ payload = (typeof value === 'string') ? value : JSON.stringify(value); }
+  catch(e){
+    console.error('persistCritical: could not serialise', key, e);
+    showFailure('Your change was NOT saved ('+key+'). Copy your work somewhere safe before continuing.', e && e.message);
+    return false;
+  }
+  function attempt(){
+    localStorage.setItem(key, payload);
+    var back = localStorage.getItem(key);
+    if(back === null || back.length !== payload.length) throw new Error('verification failed: wrote '+payload.length+' chars, read back '+(back===null?'null':back.length));
+    return true;
+  }
+  try{ return attempt(); }
+  catch(firstErr){
+    try{
+      _evictCaches();
+      return attempt();
+    }catch(secondErr){
+      console.error('persistCritical FAILED for', key, secondErr);
+      showFailure(
+        'Your change was NOT saved. It is still on screen, but "'+key+'" in this browser still holds the old version — reloading will lose it. Copy anything you just typed before continuing.',
+        (secondErr && secondErr.message) || String(secondErr)
+      );
+      return false;
+    }
+  }
 }
 
 /* ─── Generation progress ───────────────────────── */
@@ -7929,7 +8018,7 @@ function expandReport(id){
 
 
 function saveMarketPresets(){
-  try{localStorage.setItem('ns_market_presets',JSON.stringify(marketPresets));}catch(e){}
+  persistCritical('ns_market_presets', marketPresets)
 }
 
 function getPreset(market){ return marketPresets[market]||null; }
@@ -12657,11 +12746,11 @@ function _atmInitStorage(){
   let didInit = false;
   try {
     if(localStorage.getItem(ATM_STORAGE_KEY_TEMPLATES) === null){
-      localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, '[]');
+      persistCritical(ATM_STORAGE_KEY_TEMPLATES, []);
       didInit = true;
     }
     if(localStorage.getItem(ATM_STORAGE_KEY_AUDIT) === null){
-      localStorage.setItem(ATM_STORAGE_KEY_AUDIT, '[]');
+      persistCritical(ATM_STORAGE_KEY_AUDIT, []);
       didInit = true;
     }
   } catch(e){
@@ -12706,11 +12795,11 @@ function _atmLoadAudit(){
 
 // ── Internal write-through helpers ────────────────
 function _atmSaveTemplates(){
-  try { localStorage.setItem(ATM_STORAGE_KEY_TEMPLATES, JSON.stringify(_atmTemplates||[])); }
+  try { persistCritical(ATM_STORAGE_KEY_TEMPLATES, _atmTemplates||[]); }
   catch(e){ console.warn('ATM templates save failed:', e); throw e; }
 }
 function _atmSaveAudit(){
-  try { localStorage.setItem(ATM_STORAGE_KEY_AUDIT, JSON.stringify(_atmAudit||[])); }
+  try { persistCritical(ATM_STORAGE_KEY_AUDIT, _atmAudit||[]); }
   catch(e){ console.warn('ATM audit save failed:', e); throw e; }
 }
 
@@ -13921,7 +14010,7 @@ function _atmAdminMarkVerified(retailerId, retailerName){
     lastVerifier || 'Charlotte'
   );
   if(!verifierName) return; // cancelled
-  try { localStorage.setItem('ns_atm_last_verifier', verifierName); } catch(e){}
+  persistCritical('ns_atm_last_verifier', verifierName);
 
   const prev = getCurrentTemplate(retailerId);
   if(!prev){
@@ -13967,7 +14056,7 @@ function _atmAdminUploadTemplate(retailerId, retailerName){
   if(provenance === null) return; // cancelled (empty string OK)
   const verifierName = window.prompt('Verifier name:', lastVerifier || 'Charlotte');
   if(!verifierName) return;
-  try { localStorage.setItem('ns_atm_last_verifier', verifierName); } catch(e){}
+  persistCritical('ns_atm_last_verifier', verifierName);
 
   // File picker: hash the selected file via async _atmHashContent.
   // Note: this is single-purpose — it only captures metadata. Schema
@@ -17037,7 +17126,7 @@ function migrateBrandSchemaV3(){
   if('euRpRenewal' in brand){ delete brand.euRpRenewal; cleaned++; }
 
   brand._schemaVersion = 3;
-  try{localStorage.setItem('ns_brand', JSON.stringify(brand));}catch(e){}
+  persistCritical('ns_brand', brand)
 
   if(name || cleaned){
     console.log(`[migrateBrandSchemaV3] Canonical object: brand.euResponsible={name:${JSON.stringify(name)}, email:${JSON.stringify(email)}, ...}, cleaned ${cleaned} legacy field(s).`);
@@ -17085,7 +17174,7 @@ function migrateBrandSchemaV4(){
   if(!('draftStatus' in brand)){ brand.draftStatus = ''; added++; }
 
   brand._schemaVersion = 4;
-  try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); }catch(e){}
+  persistCritical('ns_brand', brand)
 
   if(added){
     console.log(`[migrateBrandSchemaV4] Added ${added} BIL-extension field(s).`);
@@ -17153,7 +17242,7 @@ function migrateSkuSchemaV2(){
     sku._schemaVersion = 2;
   });
   if(migratedCount > 0){
-    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 2 SKU migration save failed:', e); }
+    try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 2 SKU migration save failed:', e); }
     if(dppDirty && typeof saveDPP === 'function') saveDPP();
     console.log('VeyaFlow SKU Schema Rationalization Phase 2: migrated '+migratedCount+' phantom field reference(s) across '+skus.length+' SKU(s).');
   }
@@ -17213,7 +17302,7 @@ function migrateSkuSchemaV3(){
     sku._schemaVersion = 3;
   });
   if(deletedCount > 0){
-    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 3 SKU migration save failed:', e); }
+    try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 3 SKU migration save failed:', e); }
     console.log('VeyaFlow SKU Schema Rationalization Phase 3: cleaned '+deletedCount+' empty pruned-field key(s) across '+touchedSkus+' SKU(s).');
   }
 }
@@ -17271,7 +17360,7 @@ function migrateSkuSchemaV4(){
     sku._schemaVersion = 4;
   });
   if(backfilledCount > 0){
-    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 4 SKU migration save failed:', e); }
+    try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 4 SKU migration save failed:', e); }
     console.log('VeyaFlow SKU Schema Rationalization Phase 4: backfilled '+backfilledCount+' missing field default(s) across '+touchedSkus+' SKU(s).');
   }
 }
@@ -17307,7 +17396,7 @@ function migrateSkuSchemaV5(){
     touched = true;
   });
   if(touched){
-    try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 4 hotfix V5 save failed:', e); }
+    try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 4 hotfix V5 save failed:', e); }
     if(normalizedCount > 0){
       console.log('VeyaFlow SKU Schema — Phase 4 hotfix V5: normalized '+normalizedCount+' packagingLanguages array→string conversion(s).');
     }
@@ -17386,9 +17475,9 @@ function migrateSkuSchemaV6(){
     if(touched) touchedSkus++;
     sku._schemaVersion = 6;
   });
-  try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 5 SKU migration save failed:', e); }
+  try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 5 SKU migration save failed:', e); }
   if(touchedDpp){
-    try{ localStorage.setItem('ns_dpp', JSON.stringify(dppData)); }catch(e){ console.warn('Phase 5 DPP migration save failed:', e); }
+    try{ persistCritical('ns_dpp', dppData); }catch(e){ console.warn('Phase 5 DPP migration save failed:', e); }
   }
   if(migratedFields > 0){
     console.log('VeyaFlow SKU Schema Rationalization Phase 5: migrated '+migratedFields+' field(s) across '+touchedSkus+' SKU(s) from dppData.fields to canonical SKU storage.');
@@ -17457,9 +17546,9 @@ function migrateSkuSchemaV7(){
     if(touched) repairedSkus++;
     sku._schemaVersion = 7;
   });
-  try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('Phase 5 hotfix V7 SKU save failed:', e); }
+  try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('Phase 5 hotfix V7 SKU save failed:', e); }
   if(touchedDpp){
-    try{ localStorage.setItem('ns_dpp', JSON.stringify(dppData)); }catch(e){ console.warn('Phase 5 hotfix V7 DPP save failed:', e); }
+    try{ persistCritical('ns_dpp', dppData); }catch(e){ console.warn('Phase 5 hotfix V7 DPP save failed:', e); }
   }
   if(repairedFields > 0){
     console.log('VeyaFlow SKU Schema — Phase 5 hotfix V7: REPAIRED '+repairedFields+' field(s) across '+repairedSkus+' SKU(s) stuck at _v:6 (V6 load-order bug). dppData.fields cleaned. SKUs advanced to _v:7.');
@@ -17505,7 +17594,7 @@ function migrateSkuSchemaV8(){
 
     sku._schemaVersion = 8;
   });
-  try{ localStorage.setItem('ns_skus', JSON.stringify(skus)); }catch(e){ console.warn('SKU Schema V8 save failed:', e); }
+  try{ persistCritical('ns_skus', skus); }catch(e){ console.warn('SKU Schema V8 save failed:', e); }
   if(renamed > 0){
     console.log('VeyaFlow SKU Schema V8: renamed sku.moq → sku.manufacturerMoq on '+renamed+' SKU(s). Per Option B (June 2026) — retailer-side MOQ comparison deleted, brand-side field preserved for future CFO View / Vector 4 use.');
   }
@@ -17590,7 +17679,7 @@ function newSkuForm(){
 }
 
 function saveSkus(){
-  try{localStorage.setItem('ns_skus',JSON.stringify(skus));}catch(e){}
+  persistCritical('ns_skus', skus)
 }
 
 // SKU readiness score — what % complete and which retailers are unlocked
@@ -17956,7 +18045,7 @@ const FIELD_LABELS = {
   countryOfMfr:'Country of manufacture', shelfLifeMonths:'Shelf life',
   inci:'INCI list', cpnp:'CPNP number', euResponsible:'EU Responsible Person',
   safetyRef:'Safety Assessment', rspSEK:'RSP (SEK)', rspNOK:'RSP (NOK)', rspISK:'RSP (ISK)', netPriceSEK:'Net price',
-  moq:'MOQ', descEN:'Description (EN)', howToUse:'How to use', texture:'Texture / format', keyBenefit:'Key benefit', differentiation:'What makes it different', modelNo:'Model number',
+  moq:'MOQ', manufacturerMoq:'MOQ', descEN:'Description (EN)', howToUse:'How to use', texture:'Texture / format', keyBenefit:'Key benefit', differentiation:'What makes it different', modelNo:'Model number',
   ceMarking:'CE marking', docOnFile:'Declaration of Conformity',
   voltageInput:'Voltage input', batteryType:'Battery type',
   ukCaMarking:'UK CA marking', materialComposition:'Material composition',
@@ -17967,23 +18056,26 @@ const FIELD_LABELS = {
 };
 
 const READINESS_FIELDS = {
+  // 'moq' -> 'manufacturerMoq' (batch #3): migration V8 renames the field and DELETES
+  // sku.moq on every page load, so the scorer was asking for a key that cannot exist —
+  // "Missing: MOQ" was permanent and unsatisfiable through the UI.
   // Framework not stated (batch #2): score ONLY the framework-agnostic identity and
   // commercial fields. No INCI/CPNP (cosmetics), no CE/DoC (device) — asking for those
   // before the type is known would invent requirements the product may not be subject to.
   unknown: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
-    {key:'countryOfMfr',weight:1},{key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'countryOfMfr',weight:1},{key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   cosmetic: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
     {key:'shelfLifeMonths',weight:1},{key:'inci',weight:3},{key:'cpnp',weight:3},
     {key:'euResponsible',weight:2},{key:'safetyRef',weight:2},
-    {key:'rspSEK',weight:1},{key:'netPriceSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'netPriceSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   device: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'modelNo',weight:1},
     {key:'ceMarking',weight:3},{key:'docOnFile',weight:3},{key:'voltageInput',weight:1},
-    {key:'batteryType',weight:1},{key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'batteryType',weight:1},{key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   // Beauty accessory — added May 2026 to fix incorrect cosmetic-fallback scoring.
   // Pre-fix, beauty_accessory SKUs scored against READINESS_FIELDS.cosmetic, which
@@ -17993,32 +18085,32 @@ const READINESS_FIELDS = {
   beauty_accessory: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
     {key:'countryOfMfr',weight:1},{key:'rspSEK',weight:1},{key:'netPriceSEK',weight:1},
-    {key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   textile: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
     {key:'countryOfMfr',weight:1},{key:'eudrStatus',weight:2},{key:'reachCompliant',weight:2},
-    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   supplement: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'ingredientList',weight:3},
     {key:'servingSize',weight:1},{key:'allergens',weight:2},{key:'novelFoodStatus',weight:2},
-    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   food: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'ingredientList',weight:3},
     {key:'allergens',weight:3},{key:'nutritionLabel',weight:2},{key:'shelfLifeMonths',weight:1},
-    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   garment: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'materialComposition',weight:3},
     {key:'countryOfMfr',weight:1},{key:'eudrStatus',weight:2},{key:'careInstructions',weight:1},
-    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
   home: [
     {key:'name',weight:2},{key:'ean',weight:2},{key:'netContent',weight:1},
     {key:'countryOfMfr',weight:1},{key:'shelfLifeMonths',weight:1},
-    {key:'rspSEK',weight:1},{key:'moq',weight:1},{key:'descEN',weight:1},
+    {key:'rspSEK',weight:1},{key:'manufacturerMoq',weight:1},{key:'descEN',weight:1},
   ],
 };
 
@@ -20114,7 +20206,7 @@ async function submitSkuTypeFeedback(){
   // Local fallback (kept for offline / proxy-failure resilience)
   const existing = safeJsonParse(localStorage.getItem('ns_sku_type_suggestions'), []);
   existing.push({value:v, email:email, ts:new Date().toISOString()});
-  localStorage.setItem('ns_sku_type_suggestions', JSON.stringify(existing));
+  persistCritical('ns_sku_type_suggestions', existing);
   // Disable button while submitting
   if(btn){ btn.disabled = true; btn.textContent = '⟳ Saving…'; }
   try{
@@ -21520,7 +21612,7 @@ function loadClaimsLibrary(){
   try{ return JSON.parse(localStorage.getItem('ns_claims_library')||'[]'); }catch(e){return [];}
 }
 function saveClaimsLibrary(lib){
-  try{ localStorage.setItem('ns_claims_library',JSON.stringify(lib)); }catch(e){}
+  persistCritical('ns_claims_library', lib)
 }
 function addToClaimsLibrary(claim, market, status){
   const lib = loadClaimsLibrary();
@@ -21767,7 +21859,7 @@ function getPIFCheckKey(id){ return 'pif_check_'+id+(skus[0]?.ean||''); }
 
 function togglePIFCheck(id, val){
   claimsState.pifChecks[id] = val;
-  try{ localStorage.setItem('ns_pif_checks', JSON.stringify(claimsState.pifChecks)); }catch(e){}
+  persistCritical('ns_pif_checks', claimsState.pifChecks)
   renderClaims(document.getElementById('page-claims'));
 }
 
@@ -25083,7 +25175,7 @@ function savePitchScore(retailer, scoreData){
   if(!scores[retailer]) scores[retailer] = [];
   scores[retailer].unshift({...scoreData, ts: new Date().toISOString()});
   scores[retailer] = scores[retailer].slice(0, 5); // keep last 5
-  try{ localStorage.setItem('ns_pitch_scores', JSON.stringify(scores)); }catch(e){}
+  persistCritical('ns_pitch_scores', scores)
 }
 
 async function scorePitch(retailerName, market, pitchText){
@@ -26923,7 +27015,7 @@ function loadCRM(){
 }
 
 function saveCRM(){
-  try{ localStorage.setItem('ns_crm', JSON.stringify(crmCards)); }catch(e){}
+  persistCritical('ns_crm', crmCards)
 }
 
 // Route a CRM mutation's re-render: the modal edit surface (Refinement #1) vs the board.
@@ -27458,7 +27550,7 @@ function submitRequestListed(){
   // Store submission in localStorage for Charlotte review
   const submissions = safeJsonParse(localStorage.getItem('ns_listing_requests'), []);
   submissions.push({...f, submittedAt: new Date().toISOString(), status:'pending_review'});
-  localStorage.setItem('ns_listing_requests', JSON.stringify(submissions));
+  persistCritical('ns_listing_requests', submissions);
 
   // Open mailto to Charlotte for immediate notification
   const subject = encodeURIComponent('VeyaFlow Manufacturer Listing Request: '+f.companyName);
@@ -31198,7 +31290,7 @@ function toggleAssetCheck(retailerId, itemId){
   const arr = saved[retailerId];
   const i = arr.indexOf(itemId);
   if(i >= 0) arr.splice(i, 1); else arr.push(itemId);
-  try{ localStorage.setItem('ns_asset_checks', JSON.stringify(saved)); }catch(e){}
+  persistCritical('ns_asset_checks', saved)
   // Re-render whichever surface is active
   const pitchEl  = document.getElementById('asset-checklist-pitch');
   const modalEl  = document.getElementById('vf-asset-modal');
@@ -32013,11 +32105,11 @@ function loadRegulatoryMonitor(){
 
 function saveRegulatoryMonitor(){
   try{
-    localStorage.setItem('ns_reg_monitor', JSON.stringify({
+    persistCritical('ns_reg_monitor', {
       alerts:      regulatoryMonitorState.alerts,
       lastChecked: regulatoryMonitorState.lastChecked,
       settings:    regulatoryMonitorState.settings,
-    }));
+    });
   }catch(e){}
 }
 
@@ -32826,7 +32918,7 @@ function loadRangeReviewPlans(){
   try{ return JSON.parse(localStorage.getItem('ns_rrp')||'{}'); }catch(e){ return {}; }
 }
 function saveRangeReviewPlans(plans){
-  try{ localStorage.setItem('ns_rrp', JSON.stringify(plans)); }catch(e){}
+  persistCritical('ns_rrp', plans)
 }
 
 // Infer next review date from rangeReview text (e.g. "February / August" → next upcoming)
@@ -33764,7 +33856,7 @@ function loadDPP(){
   try{ const d=localStorage.getItem('ns_dpp'); if(d) dppData=JSON.parse(d); }catch(e){}
 }
 function saveDPP(){
-  try{ localStorage.setItem('ns_dpp',JSON.stringify(dppData)); }catch(e){}
+  persistCritical('ns_dpp', dppData)
 }
 
 // ── Publish DPP to Supabase (Option C — Regulator MVP) ──
@@ -34007,14 +34099,14 @@ function csrdAutoFill(){
     if(carbon) answers.scope1 = carbon;
   }
 
-  localStorage.setItem('ns_csrd_answers', JSON.stringify(answers));
+  persistCritical('ns_csrd_answers', answers);
   return answers;
 }
 
 function csrdGetAnswers(){ return safeJsonParse(localStorage.getItem('ns_csrd_answers'), {}); }
 function csrdSaveAnswer(id, val){
   const a = csrdGetAnswers(); a[id]=val;
-  localStorage.setItem('ns_csrd_answers', JSON.stringify(a));
+  persistCritical('ns_csrd_answers', a);
 }
 
 function showCSRDListingPrompt(retailerName){
@@ -35005,7 +35097,7 @@ function getMfrFieldOverride(mfrId, field){
 function setMfrFieldOverride(mfrId, field, value, updatedBy){
   try{
     const record = {value, lastUpdated: new Date().toISOString(), updatedBy: updatedBy||'brand_feedback', confidence:'HIGH'};
-    localStorage.setItem('ns_mfr_field_'+mfrId+'_'+field, JSON.stringify(record));
+    persistCritical('ns_mfr_field_'+mfrId+'_'+field, record);
   }catch(e){}
 }
 function getMfrFieldValue(mfr, field){
@@ -35100,7 +35192,7 @@ function loadMfrFeedback(){
   try{ const r=localStorage.getItem('ns_mfr_feedback'); if(r) mfrFeedbackState=JSON.parse(r); }catch(e){}
 }
 function saveMfrFeedback(){
-  try{ localStorage.setItem('ns_mfr_feedback',JSON.stringify(mfrFeedbackState)); }catch(e){}
+  persistCritical('ns_mfr_feedback', mfrFeedbackState)
 }
 function getFeedbackReportCount(mfrId){
   // Count inaccuracy reports from all sourcing CRM entries for this manufacturer
@@ -35308,7 +35400,7 @@ function submitEscrowWaitlist(){
   try{
     const existing = JSON.parse(localStorage.getItem('ns_escrow_waitlist')||'[]');
     existing.push(entry);
-    localStorage.setItem('ns_escrow_waitlist', JSON.stringify(existing));
+    persistCritical('ns_escrow_waitlist', existing);
   }catch(e){}
 
   // Flag brand profile
@@ -35344,7 +35436,7 @@ function loadReferrals(){
 function saveReferral(entry){
   const list = loadReferrals();
   list.unshift({...entry, id:'ref_'+Date.now(), submittedBy:brand?.name||'', date:new Date().toISOString(), status:'pending'});
-  try{ localStorage.setItem('ns_referrals', JSON.stringify(list.slice(0,50))); }catch(e){}
+  persistCritical('ns_referrals', list.slice(0,50))
 }
 function dismissReferralNudge(){
   try{ localStorage.setItem('ns_referral_nudge_dismissed', new Date().toISOString()); }catch(e){}
@@ -35603,7 +35695,7 @@ function loadSourcingCRM(){
   loadMfrFeedback();
 }
 function saveSourcingCRM(){
-  try{ localStorage.setItem('ns_sourcing_crm',JSON.stringify(sourcingCRM)); }catch(e){}
+  persistCritical('ns_sourcing_crm', sourcingCRM)
 }
 function addToSourcingCRM(mfr, brief){
   const existing = sourcingCRM.find(c=>c.mfrId===mfr.id);
@@ -35950,7 +36042,7 @@ function submitRequestListed(){
   }
   const submissions=safeJsonParse(localStorage.getItem('ns_listing_requests'), []);
   submissions.push({...f,submittedAt:new Date().toISOString(),status:'pending_review'});
-  localStorage.setItem('ns_listing_requests',JSON.stringify(submissions));
+  persistCritical('ns_listing_requests', submissions);
   const subject=encodeURIComponent('VeyaFlow Manufacturer Listing Request: '+f.companyName);
   const body=encodeURIComponent(['New manufacturer listing request.','','Company: '+f.companyName,'Contact: '+f.contactName+' <'+f.contactEmail+'>','Country/City: '+f.country+(f.city?' / '+f.city:''),'Website: '+(f.website||'—'),'Specialisms: '+(f.specialisms||'—'),'Certifications: '+(f.certifications||'—'),'MOQ: '+(f.moq||'—'),'','Review and approve at veyaflow.com.'].join('\n'));
   window.location.href='mailto:support@veyaflow.com?subject='+subject+'&body='+body;
@@ -36832,7 +36924,7 @@ function loadRetailSubmissions(){
   catch(e){ retailSubmissions = []; }
 }
 function saveRetailSubmissions(){
-  try{ localStorage.setItem('ns_retail_submissions', JSON.stringify(retailSubmissions)); }catch(e){}
+  persistCritical('ns_retail_submissions', retailSubmissions)
 }
 
 function loadRetailChecklist(){
@@ -36840,7 +36932,7 @@ function loadRetailChecklist(){
   catch(e){ retailChecklistState = {}; }
 }
 function saveRetailChecklist(){
-  try{ localStorage.setItem('ns_retail_checklist', JSON.stringify(retailChecklistState)); }catch(e){}
+  persistCritical('ns_retail_checklist', retailChecklistState)
 }
 
 function loadRetailPerformance(){
@@ -36848,7 +36940,7 @@ function loadRetailPerformance(){
   catch(e){ retailPerformance = []; }
 }
 function saveRetailPerformance(){
-  try{ localStorage.setItem('ns_retail_performance', JSON.stringify(retailPerformance)); }catch(e){}
+  persistCritical('ns_retail_performance', retailPerformance)
 }
 
 function loadRetailComms(){
@@ -36856,7 +36948,7 @@ function loadRetailComms(){
   catch(e){ retailComms = []; }
 }
 function saveRetailComms(){
-  try{ localStorage.setItem('ns_retail_comms', JSON.stringify(retailComms)); }catch(e){}
+  persistCritical('ns_retail_comms', retailComms)
 }
 
 /* ─── SHARED HELPERS ───────────────────────────── */
@@ -38706,7 +38798,7 @@ function addRetailPerformanceProofPoint(){
   brand.proofPoints = brand.proofPoints || [];
   if(brand.proofPoints.indexOf(pp) === -1){
     brand.proofPoints.push(pp);
-    try{ localStorage.setItem('ns_brand', JSON.stringify(brand)); }catch(e){}
+    persistCritical('ns_brand', brand)
     if(typeof saveBrandState === 'function'){ try{ saveBrandState(); }catch(e){} }
     if(typeof showSuccess === 'function') showSuccess('Added to brand proof points: '+pp);
   } else {
@@ -38948,7 +39040,7 @@ init();
 
 function getSessionId(){
   var sid=localStorage.getItem('ns_session_id');
-  if(!sid){sid='sess_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);localStorage.setItem('ns_session_id',sid);}
+  if(!sid){sid='sess_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);persistCritical('ns_session_id',sid);}
   return sid;
 }
 
@@ -39010,7 +39102,7 @@ if(typeof submitRequestListed==='function'){
       var result=await dbCall('brand.load',{});
       if(result&&result.brand){
         brand=result.brand;
-        try{localStorage.setItem('ns_brand',JSON.stringify(brand));}catch(e){}
+        persistCritical('ns_brand', brand)
         if(typeof updateSidebarBrand==='function') updateSidebarBrand();
         if(typeof renderRegStrip==='function') renderRegStrip();
       }
@@ -39219,7 +39311,7 @@ function loadPortalAlerts(){
   try{ return JSON.parse(localStorage.getItem('ns_portal_alerts')||'[]'); }catch(e){ return []; }
 }
 function persistPortalAlerts(list){
-  try{ localStorage.setItem('ns_portal_alerts', JSON.stringify(list.slice(0,20))); }catch(e){}
+  persistCritical('ns_portal_alerts', list.slice(0,20))
 }
 
 async function runPortalSync(){
@@ -39276,7 +39368,7 @@ async function runPortalSync(){
   });
 
   if(changed){
-    try{ localStorage.setItem('ns_retail_submissions', JSON.stringify(localSubs)); }catch(e){}
+    persistCritical('ns_retail_submissions', localSubs)
     if(typeof retailSubmissions!=='undefined') retailSubmissions = localSubs;
   }
 
