@@ -6445,6 +6445,7 @@ const BLOCKER_RESOLUTION = {
   noRpUK:         {days:21, cost:'1,500–3,000 SEK', fix:'Appoint a UK Responsible Person — several providers offer this service.'},
   ukCMR:          {days:30, cost:'2,000–5,000 SEK', fix:'Commission CMR audit from UK cosmetics consultant.'},
   euRpMissing:    {days:14, cost:'800–2,000 SEK',  fix:'Appoint EU Responsible Person via the RP marketplace, or most safety assessors offer this.'},
+  euRpExpired:    {days:14, cost:'800–2,000 SEK',  fix:'Renew the EU Responsible Person agreement with your existing provider.'},   // figures reused from euRpMissing — not invented
   inciMissing:    {days:7,  cost:'0 SEK',          fix:'Compile INCI list from your formulation — add to PIF.'},
   eanMissing:     {days:3,  cost:'500 SEK',         fix:'Register EAN/GTIN at gs1.se or equivalent national body.'},
   noProof:        {days:0,  cost:'0 SEK',          fix:'Gather your DTC sales data — even estimated figures help.'},
@@ -6523,7 +6524,22 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(market.euMember){
         if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
         else{ blockers.push({id:'cpnpMissing',level:'red',label:'CPNP notification missing',impact:'Blocks all EU pharmacy and beauty retail listings. Required under EU Cosmetics Regulation (EC) 1223/2009.'}); }
-        if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){ comp+=6; greens.push('EU Responsible Person on file'); }
+        if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){
+          // An RP that EXISTS is not the same as an agreement that is CURRENT (finding #50).
+          // Three outcomes, not two:
+          //   no renewalDate / unparseable → treat as present (we do not know it lapsed;
+          //     inventing a blocker from a missing field is the error we keep removing)
+          //   renewalDate in the past      → euRpExpired, AMBER, no +6, no green
+          //   otherwise                    → present, as before
+          // ONE date-comparison implementation in the file: _rpDateExpired. Two
+          // implementations of "is this date past" is the defect being removed, in miniature.
+          var _rpRenew = (brand && brand.euResponsible && brand.euResponsible.renewalDate) || '';
+          if(_rpDateExpired(_rpRenew)){
+            blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_rpRenew+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
+          } else {
+            comp+=6; greens.push('EU Responsible Person on file');
+          }
+        }
         else{ blockers.push({id:'euRpMissing',level:'amber',label:'EU Responsible Person missing',impact:'Required for all EU cosmetics listings.'}); }
         if(sku.inci||sku.ingredients){ comp+=6; greens.push('INCI list on file'); }
         else{ blockers.push({id:'inciMissing',level:'amber',label:'INCI list missing',impact:'Mandatory for EU cosmetics PIF and retail listings.'}); }
@@ -6584,7 +6600,19 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       // compliance). Only the framework-AGNOSTIC EU RP check runs — required under both
       // the cosmetics and device frameworks. One amber blocker names the missing input.
       blockers.push({id:'productTypeUnknown',level:'amber',label:'Product type not set',impact:'Compliance requirements cannot be determined until the product type is set. Set it on the SKU to see the applicable checks.'});
-      if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){ comp+=6; greens.push('EU Responsible Person on file'); }
+      // Same three outcomes as the cosmetic branch (finding #50 ruling, 31 Aug): an RP that
+      // EXISTS is not an agreement that is CURRENT. Untyped SKUs are the population batch #2
+      // made first-class, so a truth fix that skipped them would undo that. This branch keeps
+      // its OWN point value and green wording — only the expiry condition is added, and it
+      // reuses _rpDateExpired rather than repeating the comparison.
+      if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){
+        var _rpRenewU = (brand && brand.euResponsible && brand.euResponsible.renewalDate) || '';
+        if(_rpDateExpired(_rpRenewU)){
+          blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_rpRenewU+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
+        } else {
+          comp+=6; greens.push('EU Responsible Person on file');
+        }
+      }
 
     } else {
       comp += 24;
@@ -16029,6 +16057,12 @@ function renderRpMarketplace(el){
   });
 
   const hasExistingRp = !!(brand.euResponsible && brand.euResponsible.name);
+  // A lapsed agreement must never render in a success colour (finding #50).
+  const _rpExpiredNow = hasExistingRp && _rpDateExpired(brand.euResponsible.renewalDate);
+  const _rpBoxBg     = _rpExpiredNow ? '#FFFBEB' : '#ECFDF5';
+  const _rpBoxBorder = _rpExpiredNow ? '#FCD34D' : '#A7F3D0';
+  const _rpBoxText   = _rpExpiredNow ? '#92400E' : '#065F46';
+  const _rpBoxLabel  = _rpExpiredNow ? 'EU RP agreement expired' : 'EU RP on file';
   const partnerCount = sortedPartners.length;
 
   el.innerHTML = `
@@ -16039,9 +16073,9 @@ function renderRpMarketplace(el){
       </div>
 
       ${hasExistingRp ? `
-        <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.9rem 1.1rem;margin-bottom:1.5rem;font-family:var(--sans);font-size:.82rem;color:#065F46">
-          <strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.25rem">EU RP on file</strong>
-          ${brand.euResponsible.name}${brand.euResponsible.email?` · ${brand.euResponsible.email}`:''}${brand.euResponsible.renewalDate?` · renews ${brand.euResponsible.renewalDate}`:''}
+        <div style="background:${_rpBoxBg};border:1px solid ${_rpBoxBorder};padding:.9rem 1.1rem;margin-bottom:1.5rem;font-family:var(--sans);font-size:.82rem;color:${_rpBoxText}">
+          <strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.25rem">${_rpBoxLabel}</strong>
+          ${brand.euResponsible.name}${brand.euResponsible.email?` · ${brand.euResponsible.email}`:''}${brand.euResponsible.renewalDate?(_rpDateExpired(brand.euResponsible.renewalDate)?` · EXPIRED ${brand.euResponsible.renewalDate}`:` · renews ${brand.euResponsible.renewalDate}`):''}
         </div>` : ''}
 
       ${partnerCount > 0 ? `
@@ -16094,6 +16128,16 @@ function showRpRequirementsInfo(){
   // V1.0 minimal — opens regulatory monitor or external info. Defer to Group 6 polish if needed.
   if(typeof showPage === 'function') showPage('reg_monitor');
 }
+// Date-only comparison shared by the RP page and used to mirror scoreReadiness'
+// euRpExpired test. Unparseable / absent → false (not expired), never a guess.
+function _rpDateExpired(renewalDate){
+  if(!renewalDate) return false;
+  var d = new Date(renewalDate);
+  if(isNaN(d.getTime())) return false;
+  var t = new Date(); t.setHours(0,0,0,0); d.setHours(0,0,0,0);
+  return d < t;
+}
+
 let manualRpForm = {name:'', email:'', address:'', renewalDate:''};
 
 function renderManualRpEntryForm(container){
@@ -25650,7 +25694,10 @@ async function shareBrandPack(regenerate){
     const res = await fetch('/.netlify/functions/share-brand-pack', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({brandPackData, brandId, expiresInDays: null}),
+      // 90 days: outlives a pitch cycle, but a stale compliance snapshot stops being
+      // readable within a quarter. Mechanism verified: share-brand-pack.js computes and
+      // stores expires_at, and get-brand-pack.js 404s on a past expires_at.
+      body: JSON.stringify({brandPackData, brandId, expiresInDays: 90}),
     });
 
     if(!res.ok){
@@ -39215,12 +39262,52 @@ function buildSkuReadiness(skuIds, retailerId, marketCode){
       try{ rs = scoreReadiness(brand||{}, sk, mc, retailerId); }catch(e){ rs = null; }
       if(!rs) return null;   // cannot score honestly → no structure at all
       var bl = (rs.blockers||[]).map(function(b){ return { level:(b&&b.level)||'amber', label:(b&&b.label)||'' }; });
+      // ── Check severity (batch #5) ───────────────────────────────────────────
+      // Severity lives HERE, with scoreReadiness — never in the portal. The portal
+      // renders what it is given; teaching it which checks are serious would
+      // re-implement regulatory knowledge in the wrong place and drift.
+      //
+      // Severity is read off the ACTUAL emitted blocker's level, not a hardcoded
+      // table, which is what makes it market-correct for free: scoreReadiness emits
+      // id 'cpnpMissing' as RED in the EU, AMBER as SCPN in the UK, and RED in CH.
+      var lvlById = {};
+      (rs.blockers||[]).forEach(function(b){
+        if(!b || !b.id) return;
+        // keep the most severe level if an id somehow appears twice
+        if(lvlById[b.id] !== 'red') lvlById[b.id] = b.level;
+      });
+      var fw = resolveProductFramework(sk).framework;
+      var brandRp = !!(typeof brand!=='undefined' && brand && brand.euResponsible && brand.euResponsible.name);
+      function checkState(satisfied, ids){
+        // THE EMITTED BLOCKER IS AUTHORITATIVE (finding #52). The satisfied-test only
+        // speaks when the scorer raised nothing. Checked first, `satisfied` short-circuited
+        // ahead of the blockers, so wherever the two tests read different data the
+        // satisfied-test won and the mark went green: an expired RP (brandRp tests
+        // EXISTENCE, not currency) and a RED claim (satisfied-test reads claimsApproved,
+        // the blocker reads sku.claims) both rendered ✓. Blocker-first is the
+        // single-source property this batch exists for.
+        for(var a=0;a<ids.length;a++){ if(lvlById[ids[a]]==='red')   return 'blocking';  }
+        for(var c=0;c<ids.length;c++){ if(lvlById[ids[c]]==='amber') return 'attention'; }
+        if(satisfied) return 'ok';
+        return 'not_recorded';   // unmet and nothing was raised — NOT a failure
+      }
+      // Only checks that APPLY to this framework are emitted. A device has no cpnp key
+      // at all; a cosmetic has no ceMarking. Omission, never a false value.
+      var checks = {};
+      checks.euRp = checkState(!!(sk.euRp || sk.euRpConfirmed || brandRp), ['euRpMissing','noRpUK','euRpExpired']);
+      if(fw === 'cosmetic'){
+        checks.cpnp   = checkState(!!(sk.cpnp || sk.cpnpRef || sk.cpnpNumber), ['cpnpMissing']);
+        checks.claims = checkState(Array.isArray(sk.claimsApproved) && sk.claimsApproved.length > 0, ['redClaim','amberClaim']);
+      } else if(fw === 'device'){
+        checks.ceMarking = checkState(!!(sk.ceMarking || sk.ceMarked), ['ceMarkingMissing']);
+      }
       out.push({
         name:      sk.name || '',
         ean:       sk.ean || '',
-        framework: resolveProductFramework(sk).framework,
-        ready:     !bl.some(function(b){ return b.level==='red'; }),   // red-only definition
+        framework: fw,
+        ready:     !bl.some(function(b){ return b.level==='red'; }),   // red-only definition — UNCHANGED
         blockers:  bl,
+        checks:    checks,
       });
     }
     return out.length ? out : null;

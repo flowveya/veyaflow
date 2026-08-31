@@ -173,9 +173,15 @@
     displayRetailer = pack.retailer;
   }
   const displayMarket = pack.market || '';
+  // No retailer named → the subtitle renders NOTHING (finding #46). The old fallback
+  // told every reader this was a "Verified brand profile" — a hardcoded string literal
+  // that nothing computed, on a page reached by cold-pitch magic link, and contradicted
+  // by the product's own tier system (Cloud & Glow reads "Unverified · Tier 0 of 3").
+  // Omit-beats-caveat: NO substitute ("Unverified", "pending") — silence, and the
+  // element itself is dropped so no empty line or reserved height remains.
   const subLine = displayRetailer
     ? esc(displayRetailer) + (displayMarket ? ' · ' + esc(displayMarket) : '')
-    : 'Verified brand profile';
+    : '';
 
   // Update page title
   document.title = `${brand.name || 'Brand Pack'} — VeyaFlow`;
@@ -185,7 +191,7 @@
     <div class="vf-cover" style="background:${coverAccent}">
       <div class="vf-cover-prepared">Prepared for</div>
       <div class="vf-cover-brand">${esc(brand.name || '—')}</div>
-      <div class="vf-cover-sub">${subLine}</div>
+      ${subLine ? `<div class="vf-cover-sub">${subLine}</div>` : ''}
       <div class="vf-cover-meta">
         ${brand.category ? `<div class="vf-cover-meta-item"><strong>${esc(brand.category)}</strong>Category</div>` : ''}
         ${brand.currentMarket ? `<div class="vf-cover-meta-item"><strong>${esc(brand.currentMarket)}</strong>Home market</div>` : ''}
@@ -227,7 +233,16 @@
   // read, so an old link cannot resurrect the number. The whole section is gone rather
   // than emptied: no zero, no dash, no "N/A" where a metric used to be.
 
-  wrap.innerHTML = coverHTML + sectionsHTML + skusHTML;
+  // Snapshot date in the footer (finding #47). The cover already carries a "Generated"
+  // meta item; this states what that date MEANS — a buyer holding a six-week-old
+  // compliance snapshot should be able to see that it is six weeks old.
+  const snapshotHTML = created ? `
+    <div class="vf-section" style="border-top:1px solid var(--border);padding-top:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);line-height:1.6">Compliance snapshot generated ${created}. Compliance status can change after this date.</div>
+    </div>
+  ` : '';
+
+  wrap.innerHTML = coverHTML + sectionsHTML + skusHTML + snapshotHTML;
 })();
 
 function esc(str){

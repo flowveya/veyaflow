@@ -1068,7 +1068,18 @@ function renderDetail(){
     html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.35rem;line-height:1.5">No per-product readiness was submitted with this pack.</div>';
   } else {
     html +=   '<div style="font-family:var(--serif);font-size:1.35rem;line-height:1.2;color:var(--navy)">' + detailSum.readyCount + ' of ' + detailSum.total + ' product' + (detailSum.total===1?'':'s') + ' ready</div>';
-    html +=   '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin:.3rem 0 .7rem;line-height:1.5">Ready = no blocking issues for this retailer.</div>';
+    // Non-blocking items counted from the SAME per-SKU checks the table renders.
+  // 'not_recorded' is deliberately EXCLUDED — a thing nobody recorded is not an issue,
+  // and counting it would inflate the number in the opposite direction.
+  var attentionCount = 0;
+  (s.skuReadiness||[]).forEach(function(r){
+    var ch = (r && r.checks) || {};
+    Object.keys(ch).forEach(function(k){ if(ch[k] === 'attention') attentionCount++; });
+  });
+  if(attentionCount){
+    html += '<div style="font-family:var(--sans);font-size:.75rem;color:#B45309;margin-top:.15rem">' + attentionCount + ' item' + (attentionCount===1?'':'s') + ' need' + (attentionCount===1?'s':'') + ' attention</div>';
+  }
+  html +=   '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin:.3rem 0 .7rem;line-height:1.5">Ready = no blocking issues for this retailer.</div>';
     (s.skuReadiness||[]).forEach(function(x){
       // Self-contained: FRAMEWORK_LABELS is declared further down this function (var →
       // hoisted undefined here), so reading it at this point would throw.
@@ -1100,21 +1111,24 @@ function renderDetail(){
   // cosmetics assumption. CPNP is a cosmetics notification and must never head a device row.
   // Mixed-type submissions render one table PER framework (see report) — no ambiguous
   // "n/a" cells, each table headed by the columns that actually apply.
+  // Each column names the check KEY it renders. Severity is NOT computed here — it
+  // arrives per-SKU in skuReadiness[].checks, emitted beside scoreReadiness where the
+  // regulatory knowledge lives. `cell` is the LEGACY fallback only (see renderCheckCell).
   var FRAMEWORK_COLUMNS = {
     device: [
-      { label:'CE marking', cell:function(sk){ return sk.ceMarking; } },
-      { label:'EU RP',      cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+      { label:'CE marking', key:'ceMarking', cell:function(sk){ return sk.ceMarking; } },
+      { label:'EU RP',      key:'euRp',      cell:function(sk){ return sk.euRp || brandRpOnFile; } },
     ],
     cosmetic: [
-      { label:'CPNP',   cell:function(sk){ return sk.cpnp; } },
-      { label:'Claims', cell:function(sk){ return sk.claimsAudited; } },
-      { label:'EU RP',  cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+      { label:'CPNP',   key:'cpnp',   cell:function(sk){ return sk.cpnp; } },
+      { label:'Claims', key:'claims', cell:function(sk){ return sk.claimsAudited; } },
+      { label:'EU RP',  key:'euRp',   cell:function(sk){ return sk.euRp || brandRpOnFile; } },
     ],
     // Framework not stated: EU RP is required under BOTH frameworks, so it is the only
     // check that can be honestly asserted without knowing the product type. No CPNP
     // (cosmetics-only), no CE (device-only) — the gap is labelled, never guessed.
     unknown: [
-      { label:'EU RP', cell:function(sk){ return sk.euRp || brandRpOnFile; } },
+      { label:'EU RP', key:'euRp', cell:function(sk){ return sk.euRp || brandRpOnFile; } },
     ],
   };
   var FRAMEWORK_LABELS = { device:'Devices · CE framework', cosmetic:'Cosmetics · EU 1223/2009', unknown:'Product type not specified' };
@@ -1129,6 +1143,33 @@ function renderDetail(){
   // SKU — a per-SKU blank must not show the buyer a ✗ when the brand has an RP on file.
   var brandRp = (s.euResponsible && s.euResponsible.onFile && s.euResponsible.name) ? String(s.euResponsible.name) : '';
   var brandRpOnFile = !!brandRp;
+
+  // Join the snapshot rows to their per-SKU readiness by EAN, falling back to name.
+  var _readinessByKey = {};
+  (Array.isArray(s.skuReadiness) ? s.skuReadiness : []).forEach(function(r){
+    if(!r) return;
+    if(r.ean)  _readinessByKey['e:'+r.ean]  = r;
+    if(r.name) _readinessByKey['n:'+r.name] = r;
+  });
+  function checksFor(sk){
+    var r = (sk && sk.ean && _readinessByKey['e:'+sk.ean]) || (sk && sk.name && _readinessByKey['n:'+sk.name]) || null;
+    return (r && r.checks) ? r.checks : null;
+  }
+  // Renders ONE cell from a state supplied by the payload. The portal decides nothing
+  // about severity — it only maps state → mark. RED IS REACHABLE ONLY FROM 'blocking'.
+  var CHECK_MARKS = {
+    ok:           '<span class="sku-check">✓</span>',
+    blocking:     '<span class="sku-cross">✗</span>',
+    attention:    '<span style="color:#B45309;font-weight:600" title="Needs attention — does not block this listing">▲</span>',
+    not_recorded: '<span style="color:var(--muted)" title="Not recorded">–</span>',
+  };
+  function renderCheckCell(sk, col){
+    var ch = checksFor(sk);
+    if(ch && col.key && ch[col.key]) return CHECK_MARKS[ch[col.key]] || CHECK_MARKS.not_recorded;
+    // LEGACY fallback (no checks in the payload): satisfied → ✓, otherwise MUTED.
+    // Never red — absence of information must not render as failure.
+    return col.cell(sk) ? CHECK_MARKS.ok : CHECK_MARKS.not_recorded;
+  }
 
   var allSkus = s.skus || [];
   var groups = {};
@@ -1157,7 +1198,7 @@ function renderDetail(){
       html +=   '<td style="font-weight:500">' + esc(sk.name) + '</td>';
       html +=   '<td style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">' + esc(sk.ean) + '</td>';
       cols.forEach(function(c){
-        html += '<td>' + (c.cell(sk) ? '<span class="sku-check">✓</span>' : '<span class="sku-cross">✗</span>') + '</td>';
+        html += '<td>' + renderCheckCell(sk, c) + '</td>';
       });
       html +=   '<td style="font-family:var(--mono);font-size:.75rem">' + esc(sk.rsp) + '</td>';
       html += '</tr>';
@@ -1165,6 +1206,13 @@ function renderDetail(){
     html +=   '</tbody>';
     html += '</table>';
   });
+  // Legend — the three non-✓ states must be distinguishable without guessing.
+  html += '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.5rem;line-height:1.6">'
+       +    '<span class="sku-check">✓</span> on file · '
+       +    '<span class="sku-cross">✗</span> blocks this listing · '
+       +    '<span style="color:#B45309">▲</span> needs attention, does not block · '
+       +    '<span style="color:var(--muted)">–</span> not recorded'
+       +  '</div>';
   html += '</div>';
 
   if(s.articleTemplate && Object.keys(s.articleTemplate).length){
