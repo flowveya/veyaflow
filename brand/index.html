@@ -221,19 +221,13 @@
     </div>
   ` : '';
 
-  // Readiness score
-  const scoreHTML = pack.readinessScore != null ? `
-    <div class="vf-section">
-      <div class="vf-section-title">Market Readiness Score</div>
-      <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:.5rem">
-        <div style="font-family:var(--serif);font-size:1.5rem;font-weight:700;color:${pack.readinessScore>=70?'#065F46':pack.readinessScore>=50?'#92400E':'#991B1B'}">${pack.readinessScore}</div>
-        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">/100</div>
-      </div>
-      <div class="vf-score-bar-wrap"><div class="vf-score-bar" style="width:${pack.readinessScore}%;background:${pack.readinessScore>=70?'#10B981':pack.readinessScore>=50?'#F59E0B':'#EF4444'}"></div></div>
-    </div>
-  ` : '';
+  // Readiness score section REMOVED (batch #4 fixup, finding #44): a blended
+  // brand-level score is banned on buyer-facing surfaces. Packs shared BEFORE this
+  // change still carry readinessScore in their stored JSON — it is deliberately never
+  // read, so an old link cannot resurrect the number. The whole section is gone rather
+  // than emptied: no zero, no dash, no "N/A" where a metric used to be.
 
-  wrap.innerHTML = coverHTML + sectionsHTML + skusHTML + scoreHTML;
+  wrap.innerHTML = coverHTML + sectionsHTML + skusHTML;
 })();
 
 function esc(str){

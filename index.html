@@ -7096,13 +7096,20 @@ function calcVerificationTier(){
   // Readiness score > 70 for at least one market
   const allMktCodes = Object.keys(MARKET_REGISTRY).filter(k=>k!==
     ({'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'}[brand?.currentMarket||'Sweden']||'SE'));
-  const sku0 = skus[0]||{};
-  const hasGoodReadiness = allMktCodes.some(mc=>{
-    const retailersForMarket = RETAILER_REGISTRY.filter(r=>r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket);
-    if(!retailersForMarket.length) return false;
-    const rs = scoreReadiness(brand||{}, sku0, mc, retailersForMarket[0]?.id||'');
-    return rs.total>=70;
-  });
+  // NAMED AGGREGATE (batch #4): EVERY SKU in the catalogue must have ZERO red blockers
+  // in at least one target market. Not an average, not a threshold on a blended total —
+  // a stated condition over a named set. The old test scored skus[0] alone and granted a
+  // brand-wide trust badge from one arbitrary product.
+  // An EMPTY catalogue is false: no products cannot mean ready.
+  const hasGoodReadiness = skus.length>0 && skus.every(sk=>
+    allMktCodes.some(mc=>{
+      const retailersForMarket = RETAILER_REGISTRY.filter(r=>r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket);
+      if(!retailersForMarket.length) return false;
+      let rs = null;
+      try{ rs = scoreReadiness(brand||{}, sk, mc, retailersForMarket[0]?.id||''); }catch(e){ return false; }
+      return !!rs && !(rs.blockers||[]).some(b=>b && b.level==='red');
+    })
+  );
 
   // No unresolved RED claims (check claimsState)
   const noRedClaims = !claimsState.result ||
@@ -25594,15 +25601,14 @@ async function shareBrandPack(regenerate){
   const btn = document.getElementById('share-pack-btn');
   if(btn){ btn.textContent = '⟳ Generating link…'; btn.disabled = true; }
 
-  // Build pack payload — brand profile + SKUs + readiness score + brand pack result sections
+  // Build pack payload — brand profile + SKUs + brand pack result sections.
+  // readinessScore REMOVED (batch #4 fixup, finding #44): this pack is pasted into
+  // pitch emails and read by retailers, so it shipped a blended brand-level score to
+  // buyers — computed from ONE arbitrary product (heroSku) against an ARBITRARY
+  // retailer (retailerId '' fell through to RETAILER_REGISTRY[0]). An aggregate must
+  // name what it aggregates; this named nothing. Absence is the honest interim —
+  // no replacement metric is invented here (the viewer's design is a separate question).
   const heroSku = skus[0]||null;
-  const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'};
-  const mktCode = NAME_TO_CODE[brand?.currentMarket||'Sweden']||'SE';
-  let rsScore = null;
-  try {
-    const rs = scoreReadiness(brand||{}, heroSku||{}, mktCode, '');
-    rsScore = rs.total;
-  } catch(e) {}
 
   // Parse brand pack result sections if available
   const sections = brandPackState.result
@@ -25632,7 +25638,6 @@ async function shareBrandPack(regenerate){
       certifications:(s.certifications||[]).slice(0,6),
       inci: s.inci ? s.inci.slice(0,300) : '',
     })),
-    readinessScore: rsScore,
     sections:       sections.slice(0,6),
     generatedAt:    new Date().toISOString(),
   };
@@ -37580,10 +37585,12 @@ function buildSubmitSnapshot(retailerId, skuIds){
     ? (skus.find(function(s){ return (skuIds||[]).map(String).indexOf(String(s.id))>-1; }) || skus[0])
     : null;
   var marketCode = (function(){ try { return retailerMarketFromId(retailerId) || ''; } catch(e){ return ''; } })();
-  // readiness score at submit. NOTE: scoreReadiness returns {total,...} (verified live) —
-  // the brief said {score}; read total first, score as a defensive fallback. Honest null otherwise.
+  // Readiness at submit is now PER-SKU (batch #4). The old scalar scored skus[0] and
+  // called it the submission's readiness — a number with no referent. readinessScore is
+  // kept in the returned shape as an HONEST NULL (its consumer coerces with Number()),
+  // and the real per-SKU structure travels alongside it.
   var score = null;
-  try { var r = scoreReadiness(brand, sku0, marketCode, retailerId); score = (r && r.total!=null) ? Number(r.total) : (r && r.score!=null ? Number(r.score) : null); } catch(e){ score = null; }
+  var skuReadiness = buildSkuReadiness(skuIds, retailerId, marketCode);
   // per-market claim lights: run the SKU's declared claims (if any) through getClaimLight
   var claimLights = [];
   try {
@@ -37597,7 +37604,8 @@ function buildSubmitSnapshot(retailerId, skuIds){
     openGaps = (g && Array.isArray(g.open)) ? g.open.slice(0,5) : [];
   } catch(e){ openGaps = []; }
   return {
-    readinessScore: score,
+    readinessScore: score,   // always null since batch #4 — no blended score exists
+    skuReadiness:   skuReadiness,
     claimLights:    claimLights,
     openGaps:       openGaps,
     skuCpnpStatus:  (sku0 && (sku0.cpnpNumber || sku0.cpnp)) ? 'on_file' : 'missing',
@@ -39148,33 +39156,23 @@ function buildPortalBrandPack(sub){
     category:    (typeof brand!=='undefined'&&brand&&brand.category) || '',
     homeMarket:  (typeof brand!=='undefined'&&brand&&brand.currentMarket) || '',
     targetMarket:(sub && sub.market) || '',
-    readinessDimensions: {},
+    // readinessDimensions REMOVED (batch #4): the four bars could not arithmetically
+    // produce the headline they sat under (finding #38) because two of five dimensions
+    // were dropped. Dimensions return only as per-SKU checks shown beside what they
+    // aggregate — not in this batch.
     claims: [],
     notes: (sub && sub.notes) || '',
     verified: (typeof brand!=='undefined'&&brand&&brand.verifiedTier) ? true : false,
     verifiedTier: (typeof brand!=='undefined'&&brand&&brand.verifiedTier) || '',
     articleTemplate: {},
+    // Per-SKU readiness replaces the blended score/dimensions (batch #4).
+    skuReadiness: buildSkuReadiness((sub&&sub.skuIds)||[], (sub&&sub.retailerId)||'', (sub&&sub.market)||''),
   };
   // Brand-level EU Responsible Person (2-C) — NAME ONLY. The buyer needs
   // "RP on file: Cosmeservice GmbH", never the RP's address or contact details.
   var _rp = (typeof brand!=='undefined' && brand && brand.euResponsible) || null;
   if(_rp && _rp.name){
     pack.euResponsible = { name: String(_rp.name), onFile: true };
-  }
-  // Readiness dimensions: live computation first (same source as Brand Home's hero),
-  // falling back to the latest saved report. Omitted entirely when neither exists —
-  // the portal hides the breakdown rather than drawing zeroed bars.
-  var _live = (typeof computeLiveReadiness==='function') ? computeLiveReadiness() : null;
-  if(_live && _live.dims && Object.keys(_live.dims).length){
-    pack.readinessDimensions = _live.dims;
-  } else if(typeof savedReports!=='undefined' && savedReports.length){
-    var r = savedReports[0] || {};
-    var d = r.dimensions || r.dims || {};
-    var fallbackDims = {};
-    ['compliance','commercial','operational','brand'].forEach(function(k){
-      if(typeof d[k] === 'number') fallbackDims[k] = d[k];
-    });
-    pack.readinessDimensions = fallbackDims;
   }
   // Claims aggregated across submitted SKUs
   if(typeof skus!=='undefined' && Array.isArray(skus) && skus.length){
@@ -39188,6 +39186,45 @@ function buildPortalBrandPack(sub){
     pack.claims = Object.keys(claimsSet).slice(0,8);
   }
   return pack;
+}
+
+// ── Per-SKU readiness (batch #4) ─────────────────────────────────────────────
+// Readiness is PER-SKU-PER-RETAILER. There is deliberately NO average, total,
+// percentage or blended score anywhere in here or in the payload it feeds: a single
+// brand-level number is a claim with no referent (Strategy ruling, 27 Aug).
+//
+// DEFINITION OF `ready` — do not redefine this silently:
+//   ready === this SKU has ZERO RED blockers for THIS retailer in THIS market.
+//   Amber does NOT block. An 'unknown' framework yields ready:false and surfaces the
+//   existing productTypeUnknown amber blocker by name.
+//
+// If the retailer/market cannot be resolved we return null for the WHOLE structure
+// rather than scoring against a substitute — a wrong referent is worse than no answer.
+function buildSkuReadiness(skuIds, retailerId, marketCode){
+  try{
+    if(!retailerId) return null;
+    var mc = marketCode || (function(){ try{ return retailerMarketFromId(retailerId)||''; }catch(e){ return ''; } })();
+    if(!mc) return null;
+    var localSkus = (typeof skus!=='undefined' && Array.isArray(skus)) ? skus : [];
+    var ids = skuIds || [];
+    var out = [];
+    for(var i=0;i<ids.length;i++){
+      var sk = localSkus.find(function(x){ return String(x.id)===String(ids[i]); });
+      if(!sk) continue;
+      var rs = null;
+      try{ rs = scoreReadiness(brand||{}, sk, mc, retailerId); }catch(e){ rs = null; }
+      if(!rs) return null;   // cannot score honestly → no structure at all
+      var bl = (rs.blockers||[]).map(function(b){ return { level:(b&&b.level)||'amber', label:(b&&b.label)||'' }; });
+      out.push({
+        name:      sk.name || '',
+        ean:       sk.ean || '',
+        framework: resolveProductFramework(sk).framework,
+        ready:     !bl.some(function(b){ return b.level==='red'; }),   // red-only definition
+        blockers:  bl,
+      });
+    }
+    return out.length ? out : null;
+  }catch(e){ return null; }
 }
 
 // Snapshot SKUs in the shape portal.html expects
@@ -39211,59 +39248,10 @@ function buildPortalSkuSnapshot(skuIds){
   }).filter(Boolean);
 }
 
-// Live readiness — the SAME computation Brand Home's hero displays (best score across
-// target markets via scoreReadiness), so the portal shows what the brand sees.
-// scoreReadiness returns dims as {score,max} per dimension with DIFFERENT maxima
-// (compliance 35, commercial 18, logistics 7…), so dims are normalised to 0-100
-// before they leave here — the portal renders them as percentage bars.
-function computeLiveReadiness(){
-  try{
-    if(typeof brand==='undefined' || !brand) return null;
-    if(typeof scoreReadiness!=='function' || typeof RETAILER_REGISTRY==='undefined') return null;
-    var sku0 = (typeof skus!=='undefined' && skus[0]) || {};
-    var nameToCode = {'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'};
-    // Unmapped markets are SKIPPED deliberately, never defaulted to 'SE'. Scoring a
-    // Finnish launch against the Swedish registry would ship a wrong number to a buyer
-    // as if it were real. If nothing maps, this returns null and the portal shows
-    // "Not scored" — no score beats a wrong score. Do not restore a default here.
-    var tgtCodes = (brand.targetMarkets||[brand.currentMarket||'Sweden'])
-      .map(function(m){ return nameToCode[m] || null; })
-      .filter(Boolean);
-    var best = 0, bestDims = null;
-    tgtCodes.forEach(function(mc){
-      var ret = RETAILER_REGISTRY.filter(function(r){ return r.market===mc && retailerMatchesBrandTags(r,brand) && !r.futureMarket; });
-      if(!ret.length) return;
-      var rs = scoreReadiness(brand||{}, sku0, mc, (ret[0]&&ret[0].id)||'');
-      if(rs && typeof rs.total==='number' && rs.total > best){ best = rs.total; bestDims = rs.dims || null; }
-    });
-    if(!best) return null;
-    var pct = function(d){
-      if(!d || typeof d.score!=='number' || !d.max) return null;
-      return Math.max(0, Math.min(100, Math.round((d.score / d.max) * 100)));
-    };
-    var out = {};
-    if(bestDims){
-      // Portal dimension names; scoreReadiness' `logistics` is the operational axis.
-      // Its `product` axis has no portal equivalent and is deliberately omitted.
-      var map = { compliance:'compliance', commercial:'commercial', logistics:'operational', brand:'brand' };
-      Object.keys(map).forEach(function(k){
-        var v = pct(bestDims[k]);
-        if(v != null) out[map[k]] = v;
-      });
-    }
-    return { score: Math.min(100, best), dims: out };
-  }catch(e){ return null; }
-}
-
-function readLatestReadinessScore(){
-  var live = computeLiveReadiness();
-  if(live && typeof live.score==='number') return live.score;
-  if(typeof savedReports!=='undefined' && savedReports.length){
-    var r = savedReports[0] || {};
-    return r.readiness || r.score || null;   // fallback retained
-  }
-  return null;   // null stays null — the portal renders absence, not 0
-}
+// computeLiveReadiness + readLatestReadinessScore DELETED (batch #4). Both produced a
+// blended brand-level number from skus[0] — a claim with no referent — and their only
+// consumers were the payload's readinessScore and readinessDimensions, both now removed.
+// Per-SKU readiness is built by buildSkuReadiness() instead.
 
 // Wrap createRetailSubmission to also send to retailer portal (if retailer has an account).
 // Local row is always saved — portal sync is best-effort. Failures are silent (many
@@ -39280,7 +39268,8 @@ if(typeof createRetailSubmission==='function'){
       portalCall('portal.submission.create', {
         retailerId:     sub.retailerId,
         brandName:      (typeof brand!=='undefined'&&brand&&brand.name) || 'Brand',
-        readinessScore: readLatestReadinessScore(),
+        // readinessScore REMOVED (batch #4) — a blended brand-level number is banned.
+        // Per-SKU readiness travels inside brandPack.skuReadiness instead.
         brandPack:      buildPortalBrandPack(sub),
         skus:           buildPortalSkuSnapshot(sub.skuIds),
       }).then(function(res){

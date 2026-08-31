@@ -108,6 +108,9 @@ function mapSubmissionRow(row) {
     id: row.id,
     brandName: row.brand_name,
     retailerId: row.retailer_id,
+    // readinessScore kept for LEGACY rows only — existing submissions carry it and the
+    // portal needs to distinguish them. New submissions send null; the portal never
+    // renders this number (a blended brand-level score is banned, batch #4).
     readinessScore: row.readiness_score,
     status: row.status,
     submittedAt: row.submitted_at,
@@ -116,12 +119,13 @@ function mapSubmissionRow(row) {
     category: bp.category || '',
     homeMarket: bp.homeMarket || '',
     targetMarket: bp.targetMarket || '',
-    readinessDimensions: bp.readinessDimensions || {},
     claims: bp.claims || [],
     notes: bp.notes || '',
     verified: bp.verified === true,
     verifiedTier: bp.verifiedTier || '',
     articleTemplate: bp.articleTemplate || {},
+    // Per-SKU readiness (batch #4): counts + named blockers, never a blended score.
+    skuReadiness: bp.skuReadiness || null,
     rejectionReason: bp.rejectionReason || null,
     // Brand-level EU Responsible Person ({name, onFile}) — the portal's RP column
     // reads this so a per-SKU blank doesn't show ✗ when the brand has an RP on file.

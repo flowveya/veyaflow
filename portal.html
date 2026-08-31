@@ -562,7 +562,7 @@ var submissionsCache = [];
 var isLoading = false;
 var loadError = null;
 var currentSubmissionId = null;
-var inboxFilter = { status:'', category:'', readinessMin:0, dateRange:'' };
+var inboxFilter = { status:'', category:'', blocking:'', dateRange:'' };
 
 /* ─── UTILITIES ─── */
 function esc(s){
@@ -824,7 +824,9 @@ function getFilteredSubmissions(){
   return submissionsCache.filter(function(s){
     if(inboxFilter.status && s.status !== inboxFilter.status) return false;
     if(inboxFilter.category && s.category !== inboxFilter.category) return false;
-    if(inboxFilter.readinessMin && (s.readinessScore||0) < inboxFilter.readinessMin) return false;
+    // Two-state: All / Has blocking issues. Legacy rows (no skuReadiness) appear under
+    // "All" and are excluded from "blocking" — never silently dropped by a null-as-0 test.
+    if(inboxFilter.blocking === 'blocking' && !submissionHasBlockers(s)) return false;
     if(inboxFilter.dateRange){
       var d = daysAgo(s.submittedAt);
       if(d === null) return false;
@@ -887,11 +889,10 @@ function renderInbox(){
   });
   html +=     '</select>';
   html +=   '</div>';
-  html +=   '<div class="filter-field"><div class="filter-lbl">Readiness ≥</div>';
-  html +=     '<select class="filter-select" onchange="setFilter(\'readinessMin\', parseInt(this.value,10)||0)">';
-  [0,60,70,80,90].forEach(function(v){
-    html +=      '<option value="' + v + '"' + (inboxFilter.readinessMin===v?' selected':'') + '>' + (v===0?'Any':v+'+') + '</option>';
-  });
+  html +=   '<div class="filter-field"><div class="filter-lbl">Products</div>';
+  html +=     '<select class="filter-select" onchange="setFilter(\'blocking\', this.value)">';
+  html +=       '<option value=""' + (inboxFilter.blocking===''?' selected':'') + '>All products</option>';
+  html +=       '<option value="blocking"' + (inboxFilter.blocking==='blocking'?' selected':'') + '>Has blocking issues</option>';
   html +=     '</select>';
   html +=   '</div>';
   html +=   '<div class="filter-field"><div class="filter-lbl">Submitted</div>';
@@ -934,8 +935,32 @@ function setFilter(key, value){
   renderInbox();
 }
 function clearFilters(){
-  inboxFilter = { status:'', category:'', readinessMin:0, dateRange:'' };
+  inboxFilter = { status:'', category:'', blocking:'', dateRange:'' };
   renderInbox();
+}
+
+// ── Per-SKU readiness summary (batch #4) ────────────────────────────────────
+// Counts and worst-case only. NOTHING here averages, totals or percentages across
+// SKUs — a blended brand-level score is banned (Strategy ruling, 27 Aug).
+// Ready = that SKU has no blocking (red) issues for THIS retailer.
+function skuReadinessSummary(s){
+  var list = (s && Array.isArray(s.skuReadiness)) ? s.skuReadiness : null;
+  if(!list || !list.length) return null;               // legacy row → caller renders "Not scored"
+  var total = list.length;
+  var readyCount = list.filter(function(x){ return x && x.ready; }).length;   // a COUNT, not a rate
+  var notReady = list.filter(function(x){ return x && !x.ready; });
+  var worst = null;
+  if(notReady.length){
+    var first = notReady[0];
+    var redBlocker = (first.blockers||[]).filter(function(b){ return b && b.level==='red'; })[0]
+                  || (first.blockers||[])[0] || null;
+    worst = { name: first.name || 'Product', label: (redBlocker && redBlocker.label) || 'Blocking issue', others: notReady.length - 1 };
+  }
+  return { total: total, readyCount: readyCount, worst: worst };
+}
+function submissionHasBlockers(s){
+  var sum = skuReadinessSummary(s);
+  return !!(sum && sum.worst);   // legacy rows (null) are never "blocked" — they are unknown
 }
 
 function renderSubmissionCard(s){
@@ -947,17 +972,27 @@ function renderSubmissionCard(s){
   html +=     '<span class="sub-status status-' + esc(s.status) + '">' + esc(STATUS_LABELS[s.status] || s.status) + '</span>';
   html +=   '</div>';
   html +=   '<div class="sub-meta">' + esc(s.category) + ' · ' + esc(s.homeMarket) + ' → ' + esc(s.targetMarket) + '</div>';
-  // Uncomputed score renders as absence, never 0 (scoreColor(null) would read red = "failing").
-  var hasScore = (s.readinessScore != null);
-  html +=   '<div class="sub-readiness-row">';
-  html +=     '<div class="sub-score-box" style="color:' + (hasScore ? scoreColor(s.readinessScore) : 'var(--muted)') + ';background:' + (hasScore ? scoreBg(s.readinessScore) : 'transparent') + '">' + (hasScore ? s.readinessScore : '—') + '</div>';
-  html +=     '<div>';
-  html +=       '<div style="font-family:var(--serif);font-size:.9rem;color:var(--navy);line-height:1.2">Readiness</div>';
+  // Counts + worst-case, never a score. Legacy rows (no skuReadiness) read "Not scored"
+  // and are NEVER shown their stored blended number — banned whether fresh or historical.
+  var sum = skuReadinessSummary(s);
   // Tier clause renders ONLY on an earned flag — no fallback string (omit-beats-caveat).
   var tierClause = (s.verified === true && typeof s.verifiedTier === 'string' && s.verifiedTier.trim())
     ? ' · ' + esc(s.verifiedTier.trim()) + ' tier' : '';
-  html +=       '<div class="sub-score-label">' + (hasScore ? 'out of 100' : 'Not scored') + tierClause + '</div>';
-  html +=     '</div>';
+  html +=   '<div class="sub-readiness-row">';
+  if(sum){
+    html +=   '<div>';
+    html +=     '<div style="font-family:var(--serif);font-size:.95rem;color:var(--navy);line-height:1.2">' + sum.readyCount + ' of ' + sum.total + ' product' + (sum.total===1?'':'s') + ' ready</div>';
+    if(sum.worst){
+      html +=   '<div class="sub-score-label" style="color:var(--red)">' + esc(sum.worst.name) + ' — ' + esc(sum.worst.label) + (sum.worst.others>0 ? ' · and ' + sum.worst.others + ' other' + (sum.worst.others===1?'':'s') : '') + '</div>';
+    }
+    if(tierClause) html += '<div class="sub-score-label">' + tierClause.replace(/^ · /,'') + '</div>';
+    html +=   '</div>';
+  } else {
+    html +=   '<div>';
+    html +=     '<div style="font-family:var(--serif);font-size:.9rem;color:var(--muted);line-height:1.2">Not scored</div>';
+    if(tierClause) html += '<div class="sub-score-label">' + tierClause.replace(/^ · /,'') + '</div>';
+    html +=   '</div>';
+  }
   html +=   '</div>';
   html +=   '<div class="sub-date">';
   html +=     '<span>Submitted ' + dateLine + '</span>';
@@ -1022,26 +1057,36 @@ function renderDetail(){
   html +=   '</div>';
 
   html +=   '<div class="detail-card">';
-  html +=     '<div class="detail-card-title">Readiness breakdown</div>';
-  var hasDetailScore = (s.readinessScore != null);
-  if(!hasDetailScore){
-    // Not scored: state the absence, hide the breakdown entirely — no zeroed bars.
+  // Product readiness (batch #4). The 3rem headline and the four dimension bars are
+  // GONE: the bars could not arithmetically produce the headline (#38), and a
+  // "COMPLIANCE 100" sat inches above a "CLAIMS ✗" on the same card (#37). An
+  // aggregate must name what it aggregates — so this lists the products themselves.
+  html +=     '<div class="detail-card-title">Product readiness</div>';
+  var detailSum = skuReadinessSummary(s);
+  if(!detailSum){
     html +=   '<div style="font-family:var(--serif);font-size:1.35rem;line-height:1.2;color:var(--muted)">Not scored</div>';
-    html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.35rem;line-height:1.5">No readiness score was submitted with this pack.</div>';
+    html +=   '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.35rem;line-height:1.5">No per-product readiness was submitted with this pack.</div>';
   } else {
-    html +=   '<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.85rem">';
-    html +=     '<div style="font-family:var(--serif);font-size:3rem;line-height:1;color:' + scoreColor(s.readinessScore) + '">' + s.readinessScore + '</div>';
-    html +=     '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">/ 100</div>';
-    html +=   '</div>';
-    var dims = s.readinessDimensions || {};
-    ['compliance','commercial','operational','brand'].forEach(function(d){
-      if(dims[d] == null) return;   // omit dimensions the pack didn't carry
-      var v = dims[d];
-      html +=   '<div class="dim-row">';
-      html +=     '<div class="dim-label">' + d + '</div>';
-      html +=     '<div class="dim-bar"><div class="dim-bar-fill" style="width:' + Math.min(100,v) + '%;background:' + scoreColor(v) + '"></div></div>';
-      html +=     '<div class="dim-val">' + v + '</div>';
+    html +=   '<div style="font-family:var(--serif);font-size:1.35rem;line-height:1.2;color:var(--navy)">' + detailSum.readyCount + ' of ' + detailSum.total + ' product' + (detailSum.total===1?'':'s') + ' ready</div>';
+    html +=   '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin:.3rem 0 .7rem;line-height:1.5">Ready = no blocking issues for this retailer.</div>';
+    (s.skuReadiness||[]).forEach(function(x){
+      // Self-contained: FRAMEWORK_LABELS is declared further down this function (var →
+      // hoisted undefined here), so reading it at this point would throw.
+      var fwLabel = ({device:'Device · CE framework', cosmetic:'Cosmetic · EU 1223/2009',
+                      supplement:'Supplement', food:'Food', textile:'Textile',
+                      beauty_accessory:'Beauty accessory', unknown:'Product type not specified'})[x.framework] || '';
+      html += '<div style="padding:.4rem 0;border-top:1px solid var(--border)">';
+      html +=   '<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:baseline;flex-wrap:wrap">';
+      html +=     '<span style="font-family:var(--sans);font-size:.78rem;color:var(--navy);font-weight:500">' + esc(x.name||'Product') + '</span>';
+      html +=     '<span style="font-family:var(--mono);font-size:.55rem;color:' + (x.ready?'var(--green)':'var(--red)') + '">' + (x.ready?'Ready':'Blocked') + '</span>';
       html +=   '</div>';
+      html +=   '<div style="font-family:var(--mono);font-size:.53rem;color:var(--muted);margin-top:.1rem">' + esc(fwLabel) + '</div>';
+      if(!x.ready){
+        (x.blockers||[]).filter(function(b){ return b && b.level==='red'; }).forEach(function(b){
+          html += '<div style="font-family:var(--sans);font-size:.7rem;color:var(--red);margin-top:.15rem">' + esc(b.label) + '</div>';
+        });
+      }
+      html += '</div>';
     });
   }
   html +=   '</div>';
