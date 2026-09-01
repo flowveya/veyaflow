@@ -203,8 +203,10 @@
   if(identity.name)        identityRows.push(['Product name', esc(identity.name)]);
   if(identity.ean)         identityRows.push(['EAN / barcode', esc(identity.ean), 'mono']);
   if(identity.productType) identityRows.push(['Product type', esc(prettifyProductType(identity.productType))]);
-  if(identity.netContent || identity.netUnit) {
-    identityRows.push(['Net content', esc((identity.netContent || '') + ' ' + (identity.netUnit || '')).trim(), 'mono']);
+  // #71 — the guard accepted netUnit ALONE, so a SKU with a unit and no quantity
+  // rendered "NET CONTENT: g" on a public regulatory record. A unit is not a value.
+  if(identity.netContent !== undefined && identity.netContent !== null && String(identity.netContent).trim() !== '') {
+    identityRows.push(['Net content', esc((String(identity.netContent).trim() + ' ' + (identity.netUnit || '')).trim()), 'mono']);
   }
   if(origin.countryOfMfr)  identityRows.push(['Country of manufacture', esc(origin.countryOfMfr)]);
 
@@ -226,7 +228,11 @@
     regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">CPNP</span><span class="vf-reg-value">${esc(regulatory.cpnp)}</span></div>`);
   }
   if(regulatory.ceMarking) {
-    regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">CE</span><span class="vf-reg-value">${esc(regulatory.ceMarking)}</span></div>`);
+    var _ceRaw = String(regulatory.ceMarking).trim();
+    var _ceAffirmative = /^(yes|true|y|1|ce|ce marked|ce-marked|marked)$/i.test(_ceRaw);
+    regulatoryBadges.push(_ceAffirmative
+      ? `<div class="vf-reg"><span class="vf-reg-label">CE</span><span class="vf-reg-value">CE marked</span></div>`
+      : `<div class="vf-reg"><span class="vf-reg-label">CE</span><span class="vf-reg-value">${esc(_ceRaw)}</span></div>`);
   }
   if(regulatory.novelFoodStatus) {
     regulatoryBadges.push(`<div class="vf-reg"><span class="vf-reg-label">Novel Food</span><span class="vf-reg-value">${esc(regulatory.novelFoodStatus)}</span></div>`);

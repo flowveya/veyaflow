@@ -1472,6 +1472,22 @@ const ESPR_TIMELINE={
   "Food & Beverage":"EU Food Waste Reduction targets active. Surplus food rescue documentation required.",
 };
 
+// ── The canonical home of every published passport (#70) ──────────────────────
+// NEVER derive a passport URL from window.location.origin — the QR then encodes
+// whichever domain the brand happened to be browsing, permanently, on physical
+// packaging. Four sites did exactly that, including the JSON export and the dated
+// PDF declaration. One constant, read everywhere a passport URL is built or shown.
+const DPP_CANONICAL_ORIGIN = 'https://veyaflow.com';
+
+// DNS is not yet pointed at the app — veyaflow.com currently serves a registrar
+// parking page (verified 2 Sep 2026), so a printed QR would send a retailer to an
+// advert inviting them to buy the domain. Flip to true ONLY when
+// veyaflow.com/dpp/<id> loads a real passport, and confirm that before flipping.
+// This is a code rule rather than a note because a convention that has to be
+// remembered is not a control — the same reasoning as the publication gate.
+const DPP_ORIGIN_LIVE = false;
+
+
 const PARTNERS=[
   // ── FASHION & APPAREL ────────────────────────────────────────────────
   {id:1,name:"Sellpy",circularType:"resale",category:"Resale",productCategories:["Fashion & Apparel"],country:"Sweden",markets:["SE","DK","DE","AT","PL","NL"],city:"Stockholm",valueRecoveryRate:0.32,buyback:null,minimumUnits:10,urgencyCapable:false,espr:true,description:"Sweden's largest recommerce platform. Handles seasonal deadstock and overstock. Strong brand partnerships. Operates across 6 EU markets.",contact:"business@sellpy.se",verifiedDate:"2026-04",insiderNote:"Best for fashion brands. Requires clean sellable condition. 3-4 week setup time."},
@@ -16759,7 +16775,7 @@ Framing to use: "typical Step-${routineStep} baskets at this retailer add ~${bas
     'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
   ].join('\n');
 
-  const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. April 2026.
+  const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
 
 BRAND CONTEXT:
 Brand: ${brand.name} | Category: ${brand.category} | Stage: ${brand.stage}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
@@ -16829,7 +16845,20 @@ Do not lead with social following. It is the weakest proof type.`:`No verified c
 ## SECTION 5 — Compliance & Sustainability
 Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict. Never summarise across items as "all documentation current" / "compliance ready" or any blanket completeness/currency assertion — even as a paraphrase.
 If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
-${heroSku&&dppData[heroSku.id]&&dppData[heroSku.id].generatedAt?"Also include: Digital Product Passport: ✓ Generated at veyaflow.com/dpp/"+(dppData[heroSku.id].dppId||"pending")+". Ahead of mandatory ESPR date.":""}
+${(function(){
+  // #68 — three defects in one buyer-facing line. It gated on generatedAt, so a
+  // generated-but-unpublished passport was asserted to a retailer with a checkmark and
+  // a URL returning "not found", automatically, with nobody clicking anything. It
+  // claimed "Ahead of mandatory ESPR date" — the same unearned assertion batch #6
+  // removed from the banner on this very page; ESPR phases in by product group through
+  // delegated acts and there is no single mandatory date. And `|| "pending"` printed
+  // veyaflow.com/dpp/pending as though it were a live address.
+  if(!(heroSku && dppData[heroSku.id])) return "";
+  if(!_dppIsPublished(heroSku.id)) return "";                 // generated is not published
+  var _id = dppData[heroSku.id].dppId;
+  if(!_id) return "";                                          // no id -> no line, never a placeholder URL
+  return "Also include: Digital Product Passport: published at " + DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'') + "/dpp/" + _id + ".";
+})()}
 Language register: ${retailer} compliance team, not brand marketing.
 
 ## SECTION 6 — Basket Economics & Routine Integration
@@ -33963,7 +33992,7 @@ async function publishDPP(skuId){
     : (getSessionId()||'anonymous');
 
   const isUpdate = !!d.publishedVersion;
-  const publicUrl = window.location.origin+'/dpp/'+dppId;
+  const publicUrl = DPP_CANONICAL_ORIGIN+'/dpp/'+dppId;
   const confirmMsg = isUpdate
     ? 'Re-publish DPP for "'+sku.name+'"?\n\nUpdates the public passport at:\n'+publicUrl+'\n\nThe URL stays the same — useful when packaging is already printed.'
     : 'Publish DPP for "'+sku.name+'" to public passport?\n\nA regulator-accessible passport will be created at:\n'+publicUrl+'\n\nThe URL is stable across re-publishes.';
@@ -34753,7 +34782,7 @@ function renderDPPView(el){
   // d retained for DPP publication metadata (.dppId, .versions, .publishedVersion).
   const r = dppReadiness(sku);
   const dppId = d.dppId||getDPPId(dppActiveSkuId);
-  const dppUrl = window.location.origin + '/dpp/' + dppId;
+  const dppUrl = DPP_CANONICAL_ORIGIN + '/dpp/' + dppId;
   const versions = d.versions||[];
   const espr = resolveEsprTimeline();   // null when no dated entry exists for this brand's category
   const urgencyColor = {red:'#EF4444',amber:'#F59E0B',green:'#10B981'};
@@ -34812,14 +34841,25 @@ function renderDPPView(el){
               ${[
                 ['Product',sku.name],
                 ['EAN',sku.ean||'—'],
-                ['Category',sku.productType||'—'],
+                // #74 — printed the raw enum ('device') while the public passport
+                // prettifies the same value. Label comes from PRODUCT_TYPES, the
+                // existing source of truth; legacy types fall back to the raw value.
+                ['Category',(PRODUCT_TYPES.find(function(pt){return pt.id===sku.productType;})||{}).label||sku.productType||'—'],
                 ['Made in',sku.countryOfMfr||'—'],
                 ['Carbon',(sku.carbonKg||sku.carbonEstimated)?(sku.carbonKg||sku.carbonEstimated)+' kg CO₂e'+(sku.carbonEstimated&&!sku.carbonKg?' (est.)':''):'—'],
                 ['Recycled content',sku.recycledProductPct!==undefined?sku.recycledProductPct+'% product / '+(sku.recycledPackagingPct||'0')+'% pack':'—'],
                 ['Recyclability',sku.recyclabilityRating||'—'],
                 ['Take-back',sku.takebackScheme||'—'],
                 ['Certifications',(sku.certifications||[]).join(', ')||'—'],
-                ['CPNP',sku.cpnp||'—'],
+                // #41 survivor — this row rendered CPNP for EVERY framework, so a device
+                // showed the field that does not apply to it and not the one that does.
+                // Routed through the ONE resolver, exactly as dppReadiness now is.
+                (function(){
+                  var _f = resolveProductFramework(sku).framework;
+                  if(_f==='device')   return ['CE marking', sku.ceMarking||'—'];
+                  if(_f==='cosmetic') return ['CPNP', sku.cpnp||'—'];
+                  return ['Regulatory reference', sku.cpnp||sku.ceMarking||sku.novelFoodStatus||'—'];
+                })(),
               ].map(([k,v])=>`
                 <div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.58rem">
                   <span style="color:var(--muted)">${k}</span>
@@ -34837,7 +34877,7 @@ function renderDPPView(el){
             <div style="padding:.85rem;border:1px solid var(--border);text-align:center">
               <div style="font-size:1.2rem;margin-bottom:.3rem">⬛</div>
               <div style="font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.2rem">QR Code</div>
-              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.5rem">PNG + SVG · Print-ready</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.5rem">PNG · 1024px · Print-ready</div>
               <button class="btn-outline" style="width:100%;font-size:.6rem;padding:.4rem" onclick="downloadDPPQR('${dppId}')">↓ Download</button>
             </div>
             <div style="padding:.85rem;border:1px solid var(--border);text-align:center">
@@ -34858,8 +34898,8 @@ function renderDPPView(el){
 
         <!-- Retailer integration note -->
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:.75rem 1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.75rem;color:#1E40AF;line-height:1.6">
-          <strong>Brand Pack integration:</strong> Your DPP link is automatically added to Section 5 (Compliance) of any Brand Pack generated for this product.
-          <span style="font-family:var(--mono);font-size:.6rem;color:#3B82F6;display:block;margin-top:.2rem">veyaflow.com/dpp/${dppId}</span>
+          <strong>Brand Pack integration:</strong> Once this passport is published, its link is included in the compliance section of a Brand Pack — for the pack's hero product only, which is the product the pack is built around. It is not added while the passport is unpublished.
+          <span style="font-family:var(--mono);font-size:.6rem;color:#3B82F6;display:block;margin-top:.2rem">${DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'')}/dpp/${dppId}</span>
         </div>
 
         <!-- Version history -->
@@ -34890,8 +34930,11 @@ function renderDPPQrCode(url){
   const container = document.getElementById('dpp-qr-container');
   if(!container) return;
 
-  // Use qrcode-generator lib from CDN — load lazily
-  if(typeof qrcode === 'undefined'){
+  // qrcodejs (NOT qrcode-generator — similar name, different library) from CDN,
+  // loaded lazily. The global it defines is `QRCode`, capitalised; the old guard
+  // tested `qrcode` lowercase, which this library never defines, so the script tag
+  // was re-appended on every single render.
+  if(typeof QRCode === 'undefined'){
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
     s.onload = ()=>_renderQR(container, url);
@@ -34905,6 +34948,7 @@ function renderDPPQrCode(url){
 function _renderQR(container, url){
   try{
     container.innerHTML = '';
+    container.setAttribute('data-dpp-url', url);   // download re-renders from THIS url (#69/#70)
     new QRCode(container, {
       text: url,
       width: 140, height: 140,
@@ -34913,7 +34957,52 @@ function _renderQR(container, url){
       correctLevel: QRCode.CorrectLevel.Q,
     });
   }catch(e){
-    container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:1rem">QR preview on veyaflow.com</div>';
+    container.innerHTML='<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-align:center;padding:1rem">QR preview on '+DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'')+'</div>';
+  }
+}
+
+// ── ONE publication test (#67) ─────────────────────
+// Batch #6 put this test inside downloadDPPQR only, so the JSON and PDF exports —
+// same panel, same 404 — shipped ungated. One test, three exports, exactly as
+// _rpDateExpired is the one date test. Accepts a skuId OR a dppId.
+// Signal: dppData[skuId].publishedVersion, set by sharePublicDPP.
+function _dppIsPublished(skuIdOrDppId){
+  if(!skuIdOrDppId) return false;
+  var d = (typeof dppData !== 'undefined' && dppData) ? dppData : {};
+  if(d[skuIdOrDppId] && d[skuIdOrDppId].publishedVersion) return true;          // given a skuId
+  var k = Object.keys(d).find(function(x){ return d[x] && d[x].dppId === skuIdOrDppId; });
+  return !!(k && d[k].publishedVersion);                                         // given a dppId
+}
+
+// A refusal must ALWAYS be visible. Batch #6's gate spoke only if showFailure
+// happened to exist; absent it, the button did nothing and said nothing — the
+// silent-disable that spec forbade. Fall back rather than fail quiet.
+function _dppRefuse(title, detail){
+  if(typeof showFailure === 'function'){ showFailure(title, detail); return; }
+  alert(title + '\n\n' + detail);
+}
+
+// 4A — the download must NOT reuse the 140px display canvas (11.9mm at 300dpi,
+// 5.9mm at 600dpi — under the panel's own stated 10mm minimum). Render a second,
+// offscreen instance at print resolution instead. Returns a PNG data URL, or null.
+function _renderQRPrint(url, px){
+  var holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden';
+  document.body.appendChild(holder);
+  try{
+    new QRCode(holder, {
+      text: url,
+      width: px, height: px,
+      colorDark: '#1E3A5F',
+      colorLight: '#FFFFFF',
+      correctLevel: QRCode.CorrectLevel.Q,
+    });
+    var c = holder.querySelector('canvas');
+    return c ? c.toDataURL('image/png') : null;
+  }catch(e){
+    return null;
+  }finally{
+    holder.remove();
   }
 }
 
@@ -34921,32 +35010,52 @@ function downloadDPPQR(dppId){
   // #30 — a print-ready QR for an unpublished passport points at a 404. Artwork can
   // legitimately be laid out early (getDPPId persists the id and the URL is stable
   // across re-publishes), so the id is NOT the problem — printing before publish is.
-  // Gated here, inside the function, so EVERY call path is covered rather than each
-  // button. Signal: dppData[skuId].publishedVersion, set by sharePublicDPP.
-  var _pubSkuId = Object.keys(dppData||{}).find(function(k){ return dppData[k] && dppData[k].dppId === dppId; });
-  var _published = !!(_pubSkuId && dppData[_pubSkuId] && dppData[_pubSkuId].publishedVersion);
-  if(!_published){
+  // Gated inside the function so EVERY call path is covered rather than each button.
+  if(!_dppIsPublished(dppId)){
     // No print-ready file at all — not a watermarked draft, which is the same accident
     // with an extra step. Explain, and offer the action that makes it valid.
-    if(typeof showFailure === 'function'){
-      showFailure(
-        'This passport is not published yet, so the QR code has nothing to point to.',
-        'veyaflow.com/dpp/' + dppId + ' currently returns "not found". Publish the passport first, then download the QR for artwork — the link stays the same afterwards.'
-      );
-    }
+    _dppRefuse(
+      'This passport is not published yet, so the QR code has nothing to point to.',
+      'The passport URL currently returns "not found". Publish the passport first, then download the QR for artwork — the link stays the same afterwards.'
+    );
     return;
   }
-  const canvas = document.querySelector('#dpp-qr-container canvas');
-  if(!canvas){
-    // Fallback SVG with URL text
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="220" viewBox="0 0 200 220"><rect width="200" height="220" fill="white"/><text x="100" y="180" text-anchor="middle" font-family="monospace" font-size="9" fill="#1E3A5F">veyaflow.com/dpp/${dppId}</text><rect x="20" y="20" width="160" height="140" fill="none" stroke="#1E3A5F" stroke-width="2"/><text x="100" y="100" text-anchor="middle" font-family="monospace" font-size="8" fill="#999">QR renders on veyaflow.com</text></svg>`;
-    const a = document.createElement('a');
-    a.href = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
-    a.download = 'dpp-qr-'+dppId+'.svg'; a.click();
+  // #70 — a SECOND condition, not a replacement: the passport may be published while
+  // the canonical domain still does not resolve to it. Printing is the irreversible
+  // step, so it is the one gated here. JSON and PDF are deliberately NOT gated on this
+  // flag — they are filed and re-read, so a URL that starts working later is
+  // recoverable there. A printed carton is not.
+  if(!DPP_ORIGIN_LIVE){
+    _dppRefuse(
+      'This passport is published, but ' + DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'') + ' does not point at it yet.',
+      'The QR would encode ' + DPP_CANONICAL_ORIGIN + '/dpp/' + dppId + ', which today serves the domain registrar\'s parking page — an advert offering the domain for sale — not your passport. A code printed now would send every retailer who scans it to that page, permanently. Point the domain at the app, load the passport there to confirm, then enable QR downloads.'
+    );
+    return;
+  }
+  // Re-render from the SAME url the on-screen QR was built from, rather than
+  // rebuilding it here — one origin construction site, not two (#70).
+  var _container = document.getElementById('dpp-qr-container');
+  var _url = _container ? _container.getAttribute('data-dpp-url') : null;
+  if(!_url){
+    _dppRefuse(
+      'The QR code has not finished rendering, so there is nothing to download yet.',
+      'The QR library may still be loading, or may have failed to load. Reload the page and try again once the code appears on screen.'
+    );
+    return;
+  }
+  var _png = _renderQRPrint(_url, 1024);
+  if(!_png){
+    // No placeholder file. The old fallback shipped a bordered box captioned
+    // "QR renders on veyaflow.com" under a .svg named dpp-qr-<id> — a rectangle
+    // that scans as nothing, handed over as a QR code.
+    _dppRefuse(
+      'The QR code could not be generated, so no file was downloaded.',
+      'Rather than hand you a placeholder image that looks like a QR code but scans as nothing, nothing was produced. Reload the page and try again.'
+    );
     return;
   }
   const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
+  a.href = _png;
   a.download = 'dpp-qr-'+dppId+'.png'; a.click();
 }
 
@@ -34963,7 +35072,7 @@ function buildDPPJson(skuId){
   return {
     "@context": "https://veyaflow.com/dpp/schema/v1",
     "dppId": dppId,
-    "dppUrl": window.location.origin + "/dpp/"+dppId,
+    "dppUrl": DPP_CANONICAL_ORIGIN + "/dpp/"+dppId,
     "generatedBy": "VeyaFlow DPP Generator",
     "generatedAt": d.generatedAt||new Date().toISOString(),
     "version": (d.versions&&d.versions[0]?.version)||"v1.0",
@@ -35009,6 +35118,16 @@ function buildDPPJson(skuId){
 }
 
 function downloadDPPJson(skuId){
+  // #67 — `if(!data) return` is a null guard, not a publication gate. A machine-readable
+  // export is read by retailers and compliance systems as a statement that the record
+  // is live; its own dppUrl field would point at a 404.
+  if(!_dppIsPublished(skuId)){
+    _dppRefuse(
+      'This passport is not published, so the JSON export would describe a record that does not exist.',
+      'The file carries a dppUrl field pointing at the public passport, and that URL currently returns "not found". Anything importing this file would record a live passport where there is none. Publish the passport first.'
+    );
+    return;
+  }
   const data = buildDPPJson(skuId);
   if(!data) return;
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -35021,6 +35140,17 @@ function downloadDPPJson(skuId){
 // ── PDF declaration ────────────────────────────────
 
 async function generateDPPPdf(skuId){
+  // #67 — the worst of the three: the button's own label reads "Compliance document ·
+  // Dated + branded", so this reads as an authored declaration rather than a link.
+  // A dated, branded declaration for a passport that returns 404 is a document that
+  // asserts something untrue on its face.
+  if(!_dppIsPublished(skuId)){
+    _dppRefuse(
+      'This passport is not published, so the declaration would state something that is not yet true.',
+      'The PDF is dated and carries your branding, and it prints the passport URL — which currently returns "not found". A retailer or auditor reading it would take the passport as live. Publish the passport first, then generate the declaration.'
+    );
+    return;
+  }
   const sku = skus.find(s=>s.id===skuId);
   if(!sku) return;
   const d = dppData[skuId]||{fields:{}};
@@ -35110,7 +35240,7 @@ async function generateDPPPdf(skuId){
 
     section('Digital Product Passport');
     row('DPP ID',dppId);
-    row('DPP URL', window.location.origin.replace(/^https?:\/\//,'') + '/dpp/'+dppId);
+    row('DPP URL', DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'') + '/dpp/'+dppId);   // scheme stripped for display, derived from the constant
     row('Generated',new Date(d.generatedAt||Date.now()).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}));
     row('Standard','EU ESPR Digital Product Passport (ESPR Reg. 2024/1781)');
     y+=8;
