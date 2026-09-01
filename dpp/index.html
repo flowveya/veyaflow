@@ -277,13 +277,28 @@
 
   // ── Section: Environmental ──
   const envRows = [];
-  if(env.carbonKg !== undefined && env.carbonKg !== '') {
+  // Carbon: choose the figure FIRST, then label THAT figure (#31).
+  //   carbonKg present            → render it, NO badge (it is measured)
+  //   only carbonEstimated present → render THAT value, WITH the badge
+  //   neither                      → render nothing
+  // Previously the guard tested carbonKg alone, so an estimate-only SKU — the ordinary
+  // path for a brand with no LCA — dropped the whole row silently; and the badge was
+  // emitted from the mere PRESENCE of carbonEstimated, so a measured figure with a
+  // leftover estimate was stamped "Estimated". The badge now describes the number shown.
+  var _carbonValue = null, _carbonIsEstimate = false;
+  if(env.carbonKg !== undefined && env.carbonKg !== '' && env.carbonKg !== null){
+    _carbonValue = env.carbonKg;
+  } else if(env.carbonEstimated !== undefined && env.carbonEstimated !== '' && env.carbonEstimated !== null){
+    _carbonValue = env.carbonEstimated;
+    _carbonIsEstimate = true;
+  }
+  if(_carbonValue !== null) {
     envRows.push(`
       <div class="vf-env-row">
         <div class="vf-env-label">Carbon footprint</div>
         <div>
-          <span class="vf-env-value">${esc(String(env.carbonKg))}</span><span class="vf-env-unit">kg CO₂e</span>
-          ${env.carbonEstimated ? '<span class="vf-env-est">Estimated</span>' : ''}
+          <span class="vf-env-value">${esc(String(_carbonValue))}</span><span class="vf-env-unit">kg CO₂e</span>
+          ${_carbonIsEstimate ? '<span class="vf-env-est" title="Category-average estimate. Replace with verified LCA for full compliance.">Estimated — category average, not a verified LCA</span>' : ''}
         </div>
       </div>
     `);

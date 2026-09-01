@@ -1461,7 +1461,7 @@ function resolveEsprTimeline(){
     var cat  = cats[0] || (typeof brand!=='undefined' && brand && brand.category) || '';
     if(!cat) return null;
     var text = ESPR_TIMELINE[cat];
-    return text ? { text: text } : null;
+    return text ? { text: text, category: cat } : null;   // category carried so per-product renders can scope it (#27)
   }catch(e){ return null; }
 }
 const ESPR_TIMELINE={
@@ -20632,6 +20632,7 @@ function renderSkuEdit(el){
                 </div>
                 <button type="button" class="btn-outline" style="font-size:.58rem;padding:.3rem .6rem" onclick="(function(){const e=estimateCarbon(skuForm);if(e&&e.estimate){skuForm.carbonEstimated=String(e.estimate);renderSkuEdit(document.getElementById('page-skus'));}})()">Use estimate</button>
               </div>
+              ${skuForm.carbonEstimated ? `<div style="font-family:var(--mono);font-size:.55rem;color:#92400E;margin-top:.25rem;line-height:1.5">${(function(){var e=estimateCarbon(skuForm);return e&&e.note?e.note:'';})()} This figure will appear on the public passport, labelled as an estimate.</div>` : ''}
               <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.25rem">
                 Category-average fallback. ESTIMATED_CATEGORY_AVERAGE confidence in DPP exports.
               </div>
@@ -34025,7 +34026,11 @@ function dppReadiness(sku){
     {id:'identity',  label:'Product identity',  done:!!(sku.name&&sku.ean),         source:'SKU'},
     {id:'inci',      label:_materialsLabel,      done:!!(sku.inci||sku.materialComposition||sku.ingredientList), source:'SKU'},
     {id:'mfr',       label:'Country of manufacture', done:!!sku.countryOfMfr,       source:'SKU'},
-    {id:'cpnp',      label:'CPNP/regulatory ref',done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
+    // #41 — the `done` logic is correct (it accepts CE for a device, Novel Food for a
+    // supplement) and is UNCHANGED. Only the LABEL was wrong: an LED face mask showed a
+    // green tick beside "CPNP", which does not apply to devices under EC 1223/2009.
+    // Label derives from the ONE resolver (batch #2); no second resolver introduced.
+    {id:'cpnp',      label:(function(){var _f=resolveProductFramework(sku).framework;return _f==='cosmetic'?'CPNP notification ref':_f==='device'?'CE marking ref':'Regulatory reference';})(),done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
     {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
     {id:'circular',  label:'End-of-life routing — not captured',done:false,          source:'SKU'},
     // DPP-specific gaps (post-Phase-5: now read from SKU canonical storage)
@@ -34436,7 +34441,7 @@ function renderDPP(el){
         <div style="background:var(--accent);padding:.85rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center">
           <div style="flex:1;min-width:200px">
             <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.2rem">ESPR — Ecodesign for Sustainable Products</div>
-            <div style="font-family:var(--sans);font-size:.78rem;color:rgba(255,255,255,.8);line-height:1.5">Every product sold in the EU will require a machine-readable DPP. The QR code on your packaging links to this record.</div>
+            <div style="font-family:var(--sans);font-size:.78rem;color:rgba(255,255,255,.8);line-height:1.5">ESPR introduces Digital Product Passport requirements progressively, by product group, through delegated acts — so the timing for any category depends on its own act. Where a DPP applies, a QR code on the packaging links to a record like this one.</div>
           </div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap">
             ${timeline.filter(([k])=>['garment','device','cosmetic'].includes(k)).map(([k,v])=>`
@@ -34468,7 +34473,7 @@ function renderDPP(el){
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">
                     <div style="flex:1;min-width:180px">
                       <div style="font-family:var(--sans);font-size:.88rem;font-weight:600;color:var(--navy)">${sku.name||'Unnamed product'}</div>
-                      ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.2rem">${espr.text}</div>`:''}
+                      ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.2rem">Brand category (${escapeHtml(espr.category)}): ${espr.text}</div>`:''}
                     </div>
                     <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
                       ${dppGenerated?`
@@ -34496,15 +34501,14 @@ function renderDPP(el){
           </div>
         `}
 
-        <!-- What VeyaFlow captures vs gaps -->
-        <div class="card" style="border-left:3px solid var(--gold)">
-          <div style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:var(--gold);margin-bottom:.5rem">Your VeyaFlow data advantage</div>
-          <div style="font-family:var(--sans);font-size:.75rem;color:#555;line-height:1.6;margin-bottom:.5rem">VeyaFlow already captures ~65% of mandatory DPP fields from your SKU data. The four gaps are sustainability-specific fields most brands haven't documented yet.</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;font-family:var(--mono);font-size:.58rem">
-            ${['Product identity + EAN','INCI / materials list','Country of manufacture','CPNP / CE / regulatory refs','Certifications (COSMOS, GOTS…)','Circular routing (Circular GPS)'].map(f=>`<div style="padding:.3rem .5rem;background:#ECFDF5;color:#065F46">✓ ${f}</div>`).join('')}
-            ${['Carbon footprint (kg CO2e)','Recycled content %','Recyclability declaration','Take-back scheme'].map(f=>`<div style="padding:.3rem .5rem;background:#FEF2F2;color:#991B1B">✗ ${f}</div>`).join('')}
-          </div>
-        </div>
+        <!-- "Data advantage" panel REMOVED (#66). Six green ticks, four red crosses and a
+             "~65%" — every one a string literal computed from nothing. It told a brand their
+             INCI and regulatory refs were captured whether or not those fields held anything,
+             and told them their carbon footprint was missing even when carbonKg was populated.
+             Option 2 (delete) rather than option 1 (compute): this panel sits on the DPP LIST
+             page, which spans the whole catalogue, so a truthful version would need per-field
+             aggregation across SKUs — a different design, not a fix. The real per-SKU coverage
+             is already shown honestly by dppReadiness() on each row below. -->
       </div>
     </div>
   `;
@@ -34772,7 +34776,7 @@ function renderDPPView(el){
         <div style="background:${r.pct===100?'#ECFDF5':'#FFFBEB'};border:1px solid ${r.pct===100?'#A7F3D0':'#FDE68A'};padding:.75rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
           <div>
             <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${r.pct===100?'#065F46':'#92400E'}">${r.pct===100?'DPP COMPLETE':'DPP IN PROGRESS — '+r.pct+'%'}</div>
-            ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.15rem">${espr.text}</div>`:''}
+            ${espr?`<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.15rem">Brand category (${escapeHtml(espr.category)}): ${espr.text}</div>`:''}
           </div>
           <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">ID: ${dppId}</div>
         </div>
@@ -34914,6 +34918,24 @@ function _renderQR(container, url){
 }
 
 function downloadDPPQR(dppId){
+  // #30 — a print-ready QR for an unpublished passport points at a 404. Artwork can
+  // legitimately be laid out early (getDPPId persists the id and the URL is stable
+  // across re-publishes), so the id is NOT the problem — printing before publish is.
+  // Gated here, inside the function, so EVERY call path is covered rather than each
+  // button. Signal: dppData[skuId].publishedVersion, set by sharePublicDPP.
+  var _pubSkuId = Object.keys(dppData||{}).find(function(k){ return dppData[k] && dppData[k].dppId === dppId; });
+  var _published = !!(_pubSkuId && dppData[_pubSkuId] && dppData[_pubSkuId].publishedVersion);
+  if(!_published){
+    // No print-ready file at all — not a watermarked draft, which is the same accident
+    // with an extra step. Explain, and offer the action that makes it valid.
+    if(typeof showFailure === 'function'){
+      showFailure(
+        'This passport is not published yet, so the QR code has nothing to point to.',
+        'veyaflow.com/dpp/' + dppId + ' currently returns "not found". Publish the passport first, then download the QR for artwork — the link stays the same afterwards.'
+      );
+    }
+    return;
+  }
   const canvas = document.querySelector('#dpp-qr-container canvas');
   if(!canvas){
     // Fallback SVG with URL text
