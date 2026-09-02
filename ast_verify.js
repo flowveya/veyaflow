@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// ############################################################################
+// ## SUPERSEDED — DO NOT USE FOR VERIFICATION.                              ##
+// ##                                                                        ##
+// ## Line 18 below is `html.match(/<script>([\s\S]*?)<\/script>/)` — NON-    ##
+// ## GLOBAL, first match only. It parses block 1 (html-lines 1176-39535) and ##
+// ## never touches block 2 (39536-41052), which contains checkState. A clean ##
+// ## exit from this script is a green over 63% of the file, reported as if   ##
+// ## it covered all of it. A check that cannot fail is not a check.          ##
+// ##                                                                        ##
+// ## Use ./verify.sh instead. Its block scan is global and asserts the block ##
+// ## count. This file is retained ONLY until its USER_STATE / TDZ lint is    ##
+// ## ported into verify.js with its own test case, at which point it is      ##
+// ## deleted in that same commit.                                            ##
+// ############################################################################
+
 // VeyaFlow — AST verification check
 // Run after any change touching prompt-context construction, AI generators, or
 // module-level declarations. Flags top-level string-typed declarations that
@@ -12,6 +27,23 @@
 
 const acorn = require('acorn');
 const fs = require('fs');
+
+// Runtime guard. The header comment stops a reader; it does not stop a runner.
+// Anyone invoking this directly must not be able to walk away with a verdict.
+console.error('');
+console.error('  ########################################################################');
+console.error('  ##  SUPERSEDED SCRIPT — parses block 1 ONLY (63% of index.html).      ##');
+console.error('  ##  It cannot see block 2, which contains checkState.                  ##');
+console.error('  ##  Any "CLEAN" it prints is a green over code it never read.          ##');
+console.error('  ##                                                                     ##');
+console.error('  ##  Run ./verify.sh instead.                                           ##');
+console.error('  ########################################################################');
+console.error('');
+if (!process.argv.includes('--i-know-this-is-partial')) {
+  console.error('Refusing to emit a verdict. Re-run with --i-know-this-is-partial only if');
+  console.error('you are porting the USER_STATE lint and need its output for a test case.');
+  process.exit(2);
+}
 
 const path = process.argv[2] || '/home/claude/index.html';
 const html = fs.readFileSync(path, 'utf8');
@@ -80,8 +112,9 @@ for (const node of ast.body) {
 }
 
 if (violations.length === 0) {
-  console.log('AST verification CLEAN — no top-level prompt-context-shaped declarations');
-  console.log('referencing user state.');
+  console.log('PARTIAL — no top-level prompt-context-shaped declarations referencing');
+  console.log('user state IN BLOCK 1. Block 2 was not parsed. This is NOT a clean bill');
+  console.log('for index.html and must not be quoted as one.');
   process.exit(0);
 }
 

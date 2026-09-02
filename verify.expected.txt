@@ -1,0 +1,45 @@
+# VeyaFlow — named digest baselines
+#
+# Values NAMED BY THE CODING LANE. A sha CC reported itself is not sufficient
+# and must never be pasted into this file. When a batch lands, the lane names
+# the new value and it is updated here in the same commit as the change.
+#
+# Format:  <path>  <first 8 hex chars of sha256>
+#
+# Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
+# ---------------------------------------------------------------------------
+
+index.html        a7f44f07
+dpp/index.html    6e946a27
+portal.html       b96423ac
+brand/index.html  1e99d32c
+
+# FULL digests, captured 2 Sep 2026 20:56 CEST at HEAD 649f0ef, on a run whose
+# cross-channel witnesses (line count, block spans, five verbatim lines, three
+# literal counts) were confirmed line-for-line against the coding lane's own
+# Read of the same file. That is the moment to record these: the tree was clean,
+# both channels were proven to be looking at one file, and every prefix above
+# matched. Recording them later would mean capturing at a less-verified moment.
+#
+# Column 2 above stays 8 chars because the comparison in verify.sh is prefix-
+# based. Upgrading that compare to the full 64 — 256 bits instead of 32 — is
+# queued behind the TDZ port and stops 3 and 4. These values are here so the
+# upgrade needs no new capture.
+#
+#   index.html        a7f44f073b3a425669c2054aacc878e8dfb819a6d380b6d582d92d903184b5b5
+#   dpp/index.html    6e946a279f2d43827bfba12a3994ba0400cc4983b658a065dca4760bde21357d
+#   portal.html       b96423ac3c931561ed29329d2864e884467dc8b6605b6c44f8e5fbbb24d2b408
+#   brand/index.html  1e99d32c74b373a46bb02103ed9847ba81749d841c9dc942d012968dd487f775
+#
+# index.html at this digest: 41,054 lines · 2,704,870 bytes · 2 blocks
+
+# Provenance notes carried from §3:
+#   index.html        41,054 lines · 2 inline blocks at html-lines 1176, 39536
+#   dpp/index.html    unchanged since batch #7
+#   portal.html       unchanged since batch #5
+#   brand/index.html  unchanged since batch #5
+#
+# The handoff quotes these as truncated prefixes (a7f44f07…), so this file can
+# only assert 8 hex characters — 32 bits. That is ample against accidental
+# drift and is NOT a tamper check. If a full digest is ever needed, capture it
+# from a tree whose provenance the lane has established, not from a report.
