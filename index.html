@@ -6511,6 +6511,100 @@ const FRAMEWORK_LABEL = {
   unknown:'Product type not specified',
 };
 
+// ── The regime vocabulary, per framework (#53) ────────────────────────────────
+// ONE table: every framework-specific WORD the app uses about a product lives here,
+// keyed by concept. "Responsible Person" is a term of art from the EU cosmetics regime
+// and does not extend to an LED face mask or a jade roller; the same is true of
+// "Safety Assessment" (a CPSR) and "CPNP". Those products carry different obligations,
+// under different law, discharged by possibly different entities.
+// A concept ABSENT for a framework asserts nothing — the caller omits the row.
+// A framework absent entirely (unknown, textile, food, supplement) asserts nothing at
+// all. textile/food/supplement are unreachable from the UI today.
+// NO instrument or article numbers — Strategy ruling 1 Sep 2026, unchanged: a citation
+// goes on a buyer-facing declaration only after the RP has confirmed it, and then as
+// registry data carrying its own source. Getting the entity right and the article wrong
+// is still a false declaration.
+// Device and accessory SHARE the operator label deliberately; do not collapse them into
+// one shared constant. They diverge the moment the RP answers, and a shared constant
+// would make that a refactor instead of a data edit.
+// 'Safety documentation' for an accessory is neutral BY CONSTRUCTION — a jade roller has
+// neither a CPSR nor a CE technical file, and borrowing device vocabulary would repeat
+// the error this batch removes. Declining to name an instrument needs no confirmation.
+const FRAMEWORK_VOCAB = {
+  cosmetic: {
+    operator:     { label:'EU Responsible Person',            field:'euResponsible' },
+    safetyDoc:    { label:'Safety Assessment',                field:'safetyRef' },
+    notification: { label:'CPNP',                             field:'cpnp' },
+  },
+  device: {
+    operator:     { label:'EU-established economic operator', field:'euOperator' },
+    safetyDoc:    { label:'Technical file',                   field:'safetyRef' },
+    notification: null,
+    mark:         { label:'CE marking',                       field:'ceMarking' },
+  },
+  beauty_accessory: {
+    operator:     { label:'EU-established economic operator', field:'euOperator' },
+    safetyDoc:    { label:'Safety documentation',             field:'safetyRef' },
+    notification: null,
+  },
+};
+
+// THE single lookups. Each returns null when the concept is not established for this
+// SKU's framework — including 'unknown', and including a framework that is present but
+// carries no such concept (a device has no notification). Callers MUST handle null by
+// rendering neither label nor row. Identical shape and identical null semantics.
+// `mark` intentionally has NO accessor yet: the DPP PDF's CE row is already gated by
+// resolveProductFramework and works. It sits in the table so the next reader sees the
+// whole vocabulary in one place; wire it when something needs it.
+function _frameworkVocab(sku, concept){
+  var fw = resolveProductFramework(sku).framework;
+  var v  = FRAMEWORK_VOCAB[fw];
+  return (v && v[concept]) || null;
+}
+function getOperatorRegime(sku){     return _frameworkVocab(sku, 'operator'); }
+function getSafetyDocRegime(sku){    return _frameworkVocab(sku, 'safetyDoc'); }
+function getNotificationRegime(sku){ return _frameworkVocab(sku, 'notification'); }
+
+// The single operator-presence-and-currency check. Framework-agnostic: the CALLER
+// supplies the regime and decides points, blockers and greens; this decides only
+// present / expired / absent. Reuses _rpDateExpired — no second date comparison.
+// Three outcomes, per the #50 ruling (31 Aug): an operator that EXISTS is not a
+// mandate that is CURRENT, and a MISSING renewalDate is not evidence of lapse.
+function _operatorStatus(brand, sku, regime){
+  if(!regime || !regime.field) return { state:'no_regime', renewalDate:'' };
+  var f = regime.field;
+  var rec = (brand && brand[f]) || null;
+  var present = !!((sku && sku[f]) || (rec && rec.name));
+  if(!present) return { state:'absent', renewalDate:'' };
+  var renew = (rec && rec.renewalDate) || '';
+  return _rpDateExpired(renew)
+    ? { state:'expired', renewalDate:renew }
+    : { state:'present', renewalDate:renew };
+}
+
+// Display value for a regime. The cosmetic regime keeps each surface's EXISTING source
+// — some surfaces read the per-SKU string, some the brand record — because batch #8
+// changes which LABEL is asserted, not what a cosmetic renders. Non-cosmetic regimes
+// have no per-SKU field and read the brand operator record only.
+// Builds the operator row for a key/value export table. Returns null when the SKU's
+// framework establishes no regime — the caller then omits the row entirely (#53).
+// cosmeticLabel preserves each template's existing (sometimes localised) heading, so a
+// cosmetic SKU's export is byte-identical; a non-cosmetic regime uses the registry label
+// UNTRANSLATED rather than inventing legal terminology in another language.
+function _operatorRow(sku, cosmeticLabel){
+  var reg = getOperatorRegime(sku);
+  if(!reg) return null;
+  return [ (reg.field === 'euResponsible') ? cosmeticLabel : reg.label,
+           _operatorValueFor(brand, sku, reg, sku.euResponsible||'') ];
+}
+
+function _operatorValueFor(brand, sku, regime, cosmeticValue){
+  if(!regime) return '';
+  if(regime.field === 'euResponsible') return cosmeticValue || '';
+  var rec = brand && brand[regime.field];
+  return (rec && rec.name) ? rec.name : '';
+}
+
 function scoreReadiness(brand, sku, marketCode, retailerId){
   const market = MARKET_REGISTRY[marketCode]||MARKET_REGISTRY.DK;
   const retailer = RETAILER_REGISTRY.find(r=>r.id===retailerId)||RETAILER_REGISTRY[0];
@@ -6540,21 +6634,14 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       if(market.euMember){
         if(sku.cpnp||sku.cpnpNumber){ comp+=12; greens.push('CPNP notification on file'); }
         else{ blockers.push({id:'cpnpMissing',level:'red',label:'CPNP notification missing',impact:'Blocks all EU pharmacy and beauty retail listings. Required under EU Cosmetics Regulation (EC) 1223/2009.'}); }
-        if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){
-          // An RP that EXISTS is not the same as an agreement that is CURRENT (finding #50).
-          // Three outcomes, not two:
-          //   no renewalDate / unparseable → treat as present (we do not know it lapsed;
-          //     inventing a blocker from a missing field is the error we keep removing)
-          //   renewalDate in the past      → euRpExpired, AMBER, no +6, no green
-          //   otherwise                    → present, as before
-          // ONE date-comparison implementation in the file: _rpDateExpired. Two
-          // implementations of "is this date past" is the defect being removed, in miniature.
-          var _rpRenew = (brand && brand.euResponsible && brand.euResponsible.renewalDate) || '';
-          if(_rpDateExpired(_rpRenew)){
-            blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_rpRenew+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
-          } else {
-            comp+=6; greens.push('EU Responsible Person on file');
-          }
+        // #50's three outcomes, now via the ONE extracted check (#53/1D). The logic that
+        // used to live here in full is _operatorStatus; the strings and point values below
+        // are unchanged from the two copies it replaces.
+        var _opStC = _operatorStatus(brand, sku, getOperatorRegime(sku));
+        if(_opStC.state === 'expired'){
+          blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_opStC.renewalDate+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
+        } else if(_opStC.state === 'present'){
+          comp+=6; greens.push('EU Responsible Person on file');
         }
         else{ blockers.push({id:'euRpMissing',level:'amber',label:'EU Responsible Person missing',impact:'Required for all EU cosmetics listings.'}); }
         if(sku.inci||sku.ingredients){ comp+=6; greens.push('INCI list on file'); }
@@ -6621,13 +6708,15 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
       // made first-class, so a truth fix that skipped them would undo that. This branch keeps
       // its OWN point value and green wording — only the expiry condition is added, and it
       // reuses _rpDateExpired rather than repeating the comparison.
-      if(sku.euResponsible||(brand&&brand.euResponsible&&brand.euResponsible.name)){
-        var _rpRenewU = (brand && brand.euResponsible && brand.euResponsible.renewalDate) || '';
-        if(_rpDateExpired(_rpRenewU)){
-          blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_rpRenewU+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
-        } else {
-          comp+=6; greens.push('EU Responsible Person on file');
-        }
+      // getOperatorRegime returns null for 'unknown' BY DESIGN, so the field is named
+      // explicitly here rather than routed. This preserves the pre-existing scoring path
+      // verbatim (spec 1D: no string or point value may move) — it is NOT an assertion
+      // that the cosmetic regime applies to an untyped SKU. Flagged in the report.
+      var _opStU = _operatorStatus(brand, sku, {field:'euResponsible'});
+      if(_opStU.state === 'expired'){
+        blockers.push({id:'euRpExpired',level:'amber',label:'EU Responsible Person agreement expired',impact:'The RP agreement lapsed on '+_opStU.renewalDate+'. Renew with your provider — an absent RP is the retailer\'s liability too under EC 1223/2009.'});
+      } else if(_opStU.state === 'present'){
+        comp+=6; greens.push('EU Responsible Person on file');
       }
 
     } else {
@@ -16124,8 +16213,97 @@ function renderRpMarketplace(el){
 
       <!-- Manual RP entry form (H6b — form lives on marketplace page) -->
       <div id="rp-manual-entry-form" style="display:none"></div>
+
+      <!-- EU economic operator (#53/1B) — a SEPARATE mandate from the RP. The same
+           company may hold both, but holding one does not confer the other, and the
+           app cannot tell from the data whether it does. Reading the RP into this slot
+           would remove the wrong LABEL and keep the wrong CLAIM. -->
+      <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+        <h2 style="font-family:var(--serif);font-size:1.3rem;color:var(--navy);margin:0 0 .35rem">EU economic operator</h2>
+        <p style="color:var(--muted);font-family:var(--sans);font-size:.85rem;margin:0 0 1rem">For non-cosmetic products (devices, accessories). May be the same company as your Responsible Person, but the mandate is separate and must be separately agreed.</p>
+        ${(brand && brand.euOperator && brand.euOperator.name) ? `
+          <div style="background:${_rpDateExpired(brand.euOperator.renewalDate)?'#FFFBEB':'#ECFDF5'};border:1px solid ${_rpDateExpired(brand.euOperator.renewalDate)?'#FDE68A':'#A7F3D0'};padding:.9rem 1.1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.82rem;color:${_rpDateExpired(brand.euOperator.renewalDate)?'#92400E':'#065F46'}">
+            <strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.25rem">${_rpDateExpired(brand.euOperator.renewalDate)?'Operator mandate expired':'EU economic operator on file'}</strong>
+            ${brand.euOperator.name}${brand.euOperator.email?` · ${brand.euOperator.email}`:''}${brand.euOperator.renewalDate?(_rpDateExpired(brand.euOperator.renewalDate)?` · EXPIRED ${brand.euOperator.renewalDate}`:` · renews ${brand.euOperator.renewalDate}`):''}
+          </div>` : `
+          <div style="background:#F9FAFB;border:1px solid var(--border);padding:.9rem 1.1rem;margin-bottom:1rem;font-family:var(--sans);font-size:.82rem;color:var(--muted)">
+            No EU economic operator on file. Non-cosmetic products will show &ldquo;— not confirmed&rdquo; on buyer-facing declarations until one is entered.
+          </div>`}
+        <button onclick="openManualOperatorEntry()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">${(brand && brand.euOperator && brand.euOperator.name) ? 'Update economic operator' : 'Enter your economic operator'}</button>
+        <div id="operator-manual-entry-form" style="display:none;margin-top:1rem"></div>
+      </div>
     </div>
   `;
+}
+
+function openManualOperatorEntry(){
+  const formEl = document.getElementById('operator-manual-entry-form');
+  if(!formEl) return;
+  if(formEl.style.display === 'none' || !formEl.style.display){
+    formEl.style.display = 'block';
+    renderManualOperatorEntryForm(formEl);
+    formEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+  } else {
+    formEl.style.display = 'none';
+  }
+}
+
+let manualOperatorForm = {name:'', email:'', address:'', renewalDate:''};
+
+function renderManualOperatorEntryForm(container){
+  if(!container) return;
+  const existing = (brand && brand.euOperator && typeof brand.euOperator === 'object') ? brand.euOperator : {};
+  manualOperatorForm = {
+    name: existing.name||'',
+    email: existing.email||'',
+    address: existing.address||'',
+    renewalDate: existing.renewalDate||'',
+  };
+  container.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--border);padding:1.5rem 1.6rem">
+      <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.9rem">${existing.name?'Update':'Enter'} your EU economic operator</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:.9rem">
+        <div>
+          <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">Operator company name *</label>
+          <input type="text" value="${manualOperatorForm.name}" placeholder="EU-established company" oninput="manualOperatorForm.name=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">Operator email</label>
+          <input type="email" value="${manualOperatorForm.email}" oninput="manualOperatorForm.email=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+        </div>
+      </div>
+      <div style="margin-bottom:.9rem">
+        <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">Operator address</label>
+        <input type="text" value="${manualOperatorForm.address}" placeholder="EU postal address" oninput="manualOperatorForm.address=this.value" style="width:100%;padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+      </div>
+      <div style="margin-bottom:1.1rem">
+        <label style="font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem">Mandate renewal date</label>
+        <input type="date" value="${manualOperatorForm.renewalDate}" oninput="manualOperatorForm.renewalDate=this.value" style="padding:.5rem;font-family:var(--sans);font-size:.82rem;border:1px solid var(--border)">
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button onclick="saveManualOperator()" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">Save operator</button>
+        <button onclick="document.getElementById('operator-manual-entry-form').style.display='none'" style="padding:.55rem 1.1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--muted);border:1px solid var(--border);cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function saveManualOperator(){
+  if(!manualOperatorForm.name || !manualOperatorForm.name.trim()){
+    if(typeof showSuccess === 'function') showSuccess('Operator company name is required');
+    return;
+  }
+  brand.euOperator = {
+    name: manualOperatorForm.name.trim(),
+    email: (manualOperatorForm.email||'').trim(),
+    address: (manualOperatorForm.address||'').trim(),
+    renewalDate: manualOperatorForm.renewalDate||'',
+  };
+  if(typeof saveBrandState === 'function') saveBrandState();
+  if(typeof showSuccess === 'function') showSuccess('EU economic operator saved');
+  if(typeof renderRpMarketplace === 'function'){
+    const el = document.getElementById('page-rp-marketplace');
+    if(el) renderRpMarketplace(el);
+  }
 }
 
 // Stub functions — full definitions in Edit Groups 5 & 6
@@ -16560,8 +16738,21 @@ function renderBrandPack(el){
           <div style="border:1px solid var(--border);padding:.6rem .75rem">
             <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem">Compliance</div>
             ${[
-              [heroSku?.cpnp ? '✓ CPNP notified' : '✗ CPNP', heroSku?.cpnp||'Not set', heroSku?.cpnp?'#065F46':'#991B1B'],
-              [heroSku?.euResponsible ? '✓ EU RP' : '✗ EU RP', heroSku?.euResponsible||'Not set', heroSku?.euResponsible?'#065F46':'#991B1B'],
+              ...( (function(){
+                // #53/1E — the CPNP badge sat beside the operator row routed in 1C, ungated:
+                // one row gated, its neighbour not — the defect this batch exists to remove.
+                var _n = heroSku ? getNotificationRegime(heroSku) : null;
+                if(!_n) return [];
+                var _v = heroSku.cpnp;
+                return [[ _v ? '✓ '+_n.label+' notified' : '✗ '+_n.label, _v||'Not set', _v?'#065F46':'#991B1B' ]];
+              })() ),
+              ...( (function(){
+                // #53 — site beyond the spec's twelve: a per-hero-SKU compliance tile
+                // that badged "EU RP" for any product type.
+                var _r = heroSku ? _operatorRow(heroSku,'EU RP') : null;
+                if(!_r) return [];
+                return [[ (_r[1]?'✓ ':'✗ ')+_r[0], _r[1]||'Not set', _r[1]?'#065F46':'#991B1B' ]];
+              })() ),
               [heroSku?.certifications?.length ? '✓ Certified' : '○ Certifications', heroSku?.certifications?.join(', ')||'None set', heroSku?.certifications?.length?'#065F46':'var(--muted)'],
               [(heroSku?.claims||[]).filter(c=>c).length ? '✓ Claims set' : '○ Claims', (heroSku?.claims||[]).length+' on-pack claims', '#065F46'],
             ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)">
@@ -16769,9 +16960,26 @@ Framing to use: "typical Step-${routineStep} baskets at this retailer add ~${bas
   // (heroSku.cpnp / euResponsible / safetyRef / certifications) so Section 5 can never
   // contradict the snapshot or upgrade an absent item to ✓ (B3).
   const complianceData = [
-    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
-    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
-    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    ...( (function(){
+      var _n = heroSku ? getNotificationRegime(heroSku) : null;
+      if(!_n) return [];
+      return [_n.label+': ' + ((heroSku.cpnp||heroSku.cpnpNumber) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file')];
+    })() ),
+    // #53 — a prompt fed "EU Responsible Person: <the serum's RP>" for a device writes it
+    // into the pack copy as brand-authored prose, which is harder to spot and harder to
+    // retract than a field. Route the label the same way every rendered surface does.
+    (function(){
+      var _r = heroSku ? _operatorRow(heroSku,'EU Responsible Person') : null;
+      return _r ? (_r[0]+': '+(_r[1]||'Not set'))
+                : 'EU operator requirement: product type not set — the applicable requirement cannot be determined.';
+    })(),
+    ...( (function(){
+      // "Safety Assessment" is the CPSR — a cosmetics artifact. The device branch of
+      // scoreReadiness already reads this same field and calls it a technical file.
+      var _sd = heroSku ? getSafetyDocRegime(heroSku) : null;
+      if(!_sd) return [];
+      return [_sd.label+': ' + (heroSku.safetyRef ? heroSku.safetyRef : 'not on file')];
+    })() ),
     'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
   ].join('\n');
 
@@ -16966,9 +17174,20 @@ function renderBrandPackResult(el){
           <div>
             <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Compliance status</div>
             ${[
-              ['CPNP notified',   heroSku?.cpnp?'✓ '+heroSku.cpnp.slice(0,20):'✗ Not set', !!heroSku?.cpnp],
-              ['EU Responsible Person', heroSku?.euResponsible?'✓ '+heroSku.euResponsible.slice(0,25):'✗ Not set', !!heroSku?.euResponsible],
-              ['Safety Assessment', heroSku?.safetyRef?'✓ '+heroSku.safetyRef.slice(0,20):'✗ Not set', !!heroSku?.safetyRef],
+              ...( (function(){
+                var _n = heroSku ? getNotificationRegime(heroSku) : null;
+                if(!_n) return [];
+                return [[_n.label+' notified', heroSku.cpnp?'✓ '+heroSku.cpnp.slice(0,20):'✗ Not set', !!heroSku.cpnp]];
+              })() ),
+              ...( (function(){
+                var _r=heroSku?_operatorRow(heroSku,'EU Responsible Person'):null;
+                return _r ? [[_r[0], _r[1]?'✓ '+String(_r[1]).slice(0,25):'✗ Not set', !!_r[1]]] : [];
+              })() ),
+              ...( (function(){
+                var _sd = heroSku ? getSafetyDocRegime(heroSku) : null;
+                if(!_sd) return [];
+                return [[_sd.label, heroSku.safetyRef?'✓ '+heroSku.safetyRef.slice(0,20):'✗ Not set', !!heroSku.safetyRef]];
+              })() ),
               ['Certifications', heroSku?.certifications?.length?'✓ '+heroSku.certifications.slice(0,2).join(', '):'None set', !!heroSku?.certifications?.length],
             ].map(([l,v,ok])=>`
               <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
@@ -21465,7 +21684,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['Artikelnummer',        sku.articleNo||''],
         ['INCI-förteckning',     sku.inci||''],
         ['CPNP-nummer',          sku.cpnp||''],
-        ['Ansvarig person EU',   sku.euResponsible||''],
+        ...( (function(){var _r=_operatorRow(sku,'Ansvarig person EU'); return _r?[_r]:[];})() ),
         ['Säkerhetsbedömning ref',sku.safetyRef||''],
         ['Rekommenderat pris SEK',sku.rspSEK||''],
         ['Hållbarhet (månader)', sku.shelfLifeMonths||''],
@@ -21483,7 +21702,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['EAN-kode',             sku.ean||''],
         ['INCI',                 sku.inci||''],
         ['CPNP',                 sku.cpnp||''],
-        ['EU Ansvarlig person',  sku.euResponsible||''],
+        ...( (function(){var _r=_operatorRow(sku,'EU Ansvarlig person'); return _r?[_r]:[];})() ),
         ['Vejledende pris DKK',  sku.rspDKK||''],
         ['Holdbarhed (mdr)',     sku.shelfLifeMonths||''],
         ['PAO (mdr)',            sku.paoMonths||''],
@@ -21522,7 +21741,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['EAN-13',               sku.ean||''],
         ['INCI list',            sku.inci||''],
         ['CPNP/SCPN number',     sku.cpnp||''],
-        ['EU/UK Responsible Person', sku.euResponsible||''],
+        ...( (function(){var _r=_operatorRow(sku,'EU/UK Responsible Person'); return _r?[_r]:[];})() ),
         ['Safety Assessment ref',sku.safetyRef||''],
         ['RSP GBP',              sku.rspGBP||''],
         ['Shelf life (months)',  sku.shelfLifeMonths||''],
@@ -21542,7 +21761,8 @@ function exportForRetailer(skuId, retailer, format, fileExt){
       ['Country of manufacture',sku.countryOfMfr||''],['Shelf life (months)',sku.shelfLifeMonths||''],
       ['PAO (months)',sku.paoMonths||''],['INCI list',sku.inci||''],
       ['Contains fragrance',sku.hasFrag?'Yes':'No'],['Allergens',sku.allergens||''],
-      ['pH',sku.ph||''],['CPNP number',sku.cpnp||''],['EU Responsible Person',sku.euResponsible||''],
+      ['pH',sku.ph||''],['CPNP number',sku.cpnp||''],
+      ...( (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?[_r]:[];})() ),
       ['Safety Assessment ref',sku.safetyRef||''],['Certifications',(sku.certifications||[]).join('; ')],
       ['Claims',(sku.claims||[]).join('; ')],['RSP SEK',sku.rspSEK||''],['RSP DKK',sku.rspDKK||''],
       ['RSP GBP',sku.rspGBP||''],['RSP EUR',sku.rspEUR||''],
@@ -21585,7 +21805,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
     `Contains fragrance: ${sku.hasFrag?'Yes':'No'}`,
     sku.allergens ? `Allergens:          ${sku.allergens}` : '',
     `CPNP/SCPN:          ${sku.cpnp||''}`,
-    `EU Responsible Person: ${sku.euResponsible||''}`,
+    (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?`${_r[0]}: ${_r[1]}`:'';})(),
     `Safety Assessment:  ${sku.safetyRef||''}`,
     (sku.certifications||[]).length ? `Certifications:     ${sku.certifications.join(', ')}` : '',
     (sku.claims||[]).length ? `Claims:             ${sku.claims.join(', ')}` : '',
@@ -24885,9 +25105,22 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
   // differentiator — is included at every stage, honesty-constrained to real status only.
   const _pitchStage = pitchForm.stage||'cold';
   const _pitchCompliance = [
-    'CPNP: ' + ((heroSku && (heroSku.cpnp||heroSku.cpnpNumber)) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file'),
-    'EU Responsible Person: ' + ((heroSku && heroSku.euResponsible) ? heroSku.euResponsible : 'Not set'),
-    'Safety Assessment: ' + ((heroSku && heroSku.safetyRef) ? heroSku.safetyRef : 'not on file'),
+    ...( (function(){
+      var _n = heroSku ? getNotificationRegime(heroSku) : null;
+      if(!_n) return [];
+      return [_n.label+': ' + ((heroSku.cpnp||heroSku.cpnpNumber) ? (heroSku.cpnp||heroSku.cpnpNumber) : 'not on file')];
+    })() ),
+    // #53 — same routing as the Brand Pack prompt, same reason.
+    (function(){
+      var _r = heroSku ? _operatorRow(heroSku,'EU Responsible Person') : null;
+      return _r ? (_r[0]+': '+(_r[1]||'Not set'))
+                : 'EU operator requirement: product type not set — the applicable requirement cannot be determined.';
+    })(),
+    ...( (function(){
+      var _sd = heroSku ? getSafetyDocRegime(heroSku) : null;
+      if(!_sd) return [];
+      return [_sd.label+': ' + (heroSku.safetyRef ? heroSku.safetyRef : 'not on file')];
+    })() ),
     'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
   ].join('\n');
   const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
@@ -29513,9 +29746,21 @@ async function generateSpecSheetPDF(skuId){
 
     sectionTitle('Regulatory status');
     if(isCosmetic) row('CPNP notification', sku.cpnp);   // CPNP = cosmetic notification (1223/2009) — N/A to devices/accessories
+    // #53 — the CPNP row above was gated and the operator row directly beneath it was not,
+    // so a device printed "EU Responsible Person: <the serum's RP>" on a filed document.
+    // The label now comes from the framework registry; nothing is appended to it.
+    const _opRegD = getOperatorRegime(sku);
     const rp = brand && brand.euResponsible;
-    row('EU Responsible Person', (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '— not provided');
-    if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate);
+    if(_opRegD){
+      var _opValD = _operatorValueFor(brand, sku, _opRegD, (rp&&rp.name) ? (rp.name+(rp.email?' · '+rp.email:'')) : '');
+      row(_opRegD.label, _opValD || (_opRegD.field==='euResponsible' ? '— not provided' : '— not confirmed'));
+      // Renewal belongs to whichever mandate was just named, never to the other one.
+      var _opRecD = brand && brand[_opRegD.field];
+      if(_opRegD.field==='euResponsible'){ if(rp&&rp.renewalDate) row('RP agreement renewal', rp.renewalDate); }
+      else if(_opRecD && _opRecD.renewalDate){ row('Operator mandate renewal', _opRecD.renewalDate); }
+    } else {
+      row('EU operator requirement', 'Product type not set — the applicable EU operator requirement cannot be determined.');
+    }
 
     // ── Integrity stamp (Part 5): SHA-256 fingerprint over the canonical SOURCE DATA
     //    (sku snapshot + claim verdicts + RP) — NOT the timestamp, so identical data
@@ -30155,9 +30400,20 @@ async function generateBrandPackPDF(){
     if(heroSku){
       y = pdfSectionHeader(doc, 'Compliance Status', margin, y, pageW);
       const compRows = [
-        ['CPNP', heroSku.cpnp||heroSku.cpnpNumber||'Not filed', !!(heroSku.cpnp||heroSku.cpnpNumber)],
-        ['EU Responsible Person', heroSku.euResponsible||'Not set', !!heroSku.euResponsible],
-        ['Safety Assessment', heroSku.safetyRef||'Not set', !!heroSku.safetyRef],
+        ...( (function(){
+          var _n = getNotificationRegime(heroSku);
+          if(!_n) return [];
+          return [[_n.label, heroSku.cpnp||heroSku.cpnpNumber||'Not filed', !!(heroSku.cpnp||heroSku.cpnpNumber)]];
+        })() ),
+        ...( (function(){
+          var _r=_operatorRow(heroSku,'EU Responsible Person');
+          return _r ? [[_r[0], _r[1]||'Not set', !!_r[1]]] : [];
+        })() ),
+        ...( (function(){
+          var _sd = getSafetyDocRegime(heroSku);
+          if(!_sd) return [];
+          return [[_sd.label, heroSku.safetyRef||'Not set', !!heroSku.safetyRef]];
+        })() ),
         ['Certifications', (heroSku.certifications||[]).join(', ')||'None', !!(heroSku.certifications?.length)],
       ];
       compRows.forEach(([l,v,ok])=>{
@@ -35061,6 +35317,23 @@ function downloadDPPQR(dppId){
 
 // ── JSON export ────────────────────────────────────
 
+// Framework-scoped compliance fields for the JSON export (#53). Returns only the keys
+// the SKU's framework actually carries; the operator key is named by the regime, so a
+// device never emits euResponsiblePerson and a cosmetic never emits an operator field
+// it has no mandate for. Unknown framework emits neither — no claim in either direction.
+function _dppFwFields(sku){
+  var out = {};
+  var fw = resolveProductFramework(sku).framework;
+  if(fw === 'cosmetic') out.cpnp = sku.cpnp||null;
+  if(fw === 'device')   out.ceMarking = sku.ceMarking||null;
+  var reg = getOperatorRegime(sku);
+  if(reg){
+    out[reg.field === 'euResponsible' ? 'euResponsiblePerson' : 'euEconomicOperator'] =
+      _operatorValueFor(brand, sku, reg, sku.euResponsible||'') || null;
+  }
+  return out;
+}
+
 function buildDPPJson(skuId){
   const sku = skus.find(s=>s.id===skuId);
   if(!sku) return null;
@@ -35106,9 +35379,10 @@ function buildDPPJson(skuId){
       "certifications": sku.certifications||[],
     },
     "compliance": {
-      "cpnp": sku.cpnp||null,
-      "ceMarking": sku.ceMarking||null,
-      "euResponsiblePerson": sku.euResponsible||null,
+      // #53 — the machine-readable export asserted the cosmetic regime for every product.
+      // Fields a framework does not carry are omitted rather than nulled: a null CPNP on a
+      // device reads as "notified: no", which is a claim about a duty that does not exist.
+      ...( _dppFwFields(sku) ),
       "safetyReference": sku.safetyRef||null,
     },
     "endOfLife": {
@@ -35233,9 +35507,18 @@ async function generateDPPPdf(skuId){
 
     section('Compliance & Certifications');
     row('Certifications',(sku.certifications||[]).join(', ')||'—');
-    row('CPNP reference',sku.cpnp||'—');
-    row('CE marking',sku.ceMarking?'Yes':'—');
-    row('EU Responsible Person',sku.euResponsible||'—');
+    // #53 mirror defect — CPNP and CE both printed unconditionally, so a cosmetic got a
+    // CE row and a device got a CPNP row. Same failure, both directions; routed together
+    // because splitting them would leave the surface half-true.
+    var _fwP = resolveProductFramework(sku).framework;
+    if(_fwP==='cosmetic') row('CPNP reference',sku.cpnp||'—');
+    if(_fwP==='device')   row('CE marking',sku.ceMarking?'Yes':'—');
+    var _opRegP = getOperatorRegime(sku);
+    if(_opRegP){
+      row(_opRegP.label, _operatorValueFor(brand, sku, _opRegP, sku.euResponsible||'') || '— not confirmed');
+    } else {
+      row('EU operator requirement','Product type not set — the applicable EU operator requirement cannot be determined.');
+    }
     y+=4;
 
     section('Digital Product Passport');
@@ -38223,6 +38506,14 @@ function retailTemplateResolveSource(source, sku, brandObj, manualFields){
     return {type: brandObj && brandObj.name ? 'auto' : 'missing', value: (brandObj && brandObj.name) || ''};
   }
   if(source === 'brand.euResponsible'){
+    // #53/1F — the LABEL on this column is the retailer's own ('EU Responsible Person'
+    // in Apotek Hjärtat's submission format) and is not ours to rename. The VALUE is
+    // ours: filling that column with the cosmetics RP for a device sends the same false
+    // assertion, wearing a retailer's label instead of ours.
+    // 'empty' (not 'missing') deliberately: 'missing' renders "Missing — fix in SKU",
+    // which would tell the brand to appoint an RP for a product that needs no RP.
+    var _reg = (typeof getOperatorRegime === 'function') ? getOperatorRegime(sku) : null;
+    if(!_reg || _reg.field !== 'euResponsible') return {type:'empty', value:''};
     var rp = brandObj && brandObj.euResponsible && brandObj.euResponsible.name;
     return {type: rp ? 'auto' : 'missing', value: (typeof rp==='string' ? rp : '')};
   }
