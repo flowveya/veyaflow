@@ -1,3 +1,23 @@
 node_modules/
 .DS_Store
 .claude/
+
+# The canonical daily log and its plain-text export. Strategy owns the .docx; the
+# .txt exists so the coding lane can READ it without a shell. Both are a working
+# exchange between lanes — NOT platform content.
+#
+# Never committed, for two reasons. `publish = "."` in netlify.toml makes the repo
+# root the public web root (#99), so a tracked copy would serve both lanes' full
+# history at a guessable URL. And keeping them untracked means `git status` stays
+# clean, so an accidental `git add .` cannot pick them up.
+#
+# Both live in docs/ alongside docs/daily-log/, which IS committed — the day entries
+# the coding lane writes are platform-adjacent record; the canonical log is not.
+#
+# Re-export the .txt whenever the .docx is merged: File → Save As → Plain Text,
+# into docs/, same filename. Nothing else to do.
+#
+# No leading slash on these patterns, so they match at any depth — moving the files
+# to another folder does not un-ignore them.
+VeyaFlow_Daily_Log.docx
+VeyaFlow_Daily_Log.txt
