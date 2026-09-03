@@ -9,10 +9,24 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        3ff93df4
+index.html        be86c431
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved 3ff93df4 → be86c431 on 3 Sep 2026, batch #9 third shipment
+# (target market field: placeholder option, no retailers until a market is chosen,
+# a market guard before the retailer guard, and the ||'Denmark' prompt fallback
+# removed). NAMED BY THE LANE after reading all four sites at the bytes and
+# confirming a uniform +17 shift below line 16674 with nothing above it moved.
+#   after   be86c431c632557aeb50eaa546b75a1a637ab8fc6a79d5a8788b9c6fccd39c2b
+#           41,100 lines · 2,708,821 bytes · 2 blocks (1176, 39582)
+#
+# STILL LIVE ELSEWHERE, unfixed: generateBizCasePDF carries the same defects —
+# bizCaseState.market||'Denmark' (15814, the prompt) and ||'Market' (30531, the
+# PDF), with no placeholder and no guard. L25938 holds a fourth copy of the
+# split(/^## /m) preamble defect in the magic-link path. Three functions, one
+# copied pattern; today fixed one.
 
 # index.html moved 844d3887 → 3ff93df4 on 3 Sep 2026, batch #9 second shipment
 # (#96A title stripping, #96B preamble drop, #97 placeholder omission). NAMED BY
