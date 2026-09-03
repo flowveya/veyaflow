@@ -16671,7 +16671,10 @@ function renderBrandPack(el){
     Netherlands:      ['Etos','Kruidvat','Douglas NL','Ici Paris XL'],
     France:           ['Sephora FR','Monoprix','Galeries Lafayette Beauté','Marionnaud'],
   };
-  const retailers = PACK_RETAILERS[brandPackState.market||'Denmark']||PACK_RETAILERS.Denmark;
+  // The dropdown defaulted to Denmark's retailers whenever market was empty, which is
+  // what made the unset screen look coherent: "Select market…" over a Danish list, and a
+  // user able to pick a Danish retailer with no market set. No market, no retailers.
+  const retailers = brandPackState.market ? (PACK_RETAILERS[brandPackState.market]||[]) : [];
   const heroSku = skus.length>0?skus[0]:null;
   const cover = BRAND_PACK_COVERS[brandPackState.retailer]||{accent:'#1E3A5F'};
 
@@ -16693,6 +16696,7 @@ function renderBrandPack(el){
         <div class="grid-2">
           <div class="field"><label class="lbl">Target market</label>
             <select onchange="brandPackState.market=this.value;brandPackState.retailer='';renderBrandPack(document.getElementById('page-brandpack'))">
+              <option value="">Select market…</option>
               ${PACK_MARKETS.map(m=>`<option${brandPackState.market===m?' selected':''}>${m}</option>`).join('')}
             </select>
           </div>
@@ -16898,6 +16902,16 @@ function honestyFlagCopy(kind, list){
 }
 
 async function generateBrandPack(){
+  // Market first: the retailer list is derived from it, so asking for the retailer
+  // before the market asks for a choice the user cannot yet make. Same shape and
+  // styling as the retailer guard below — one error mechanism, not two.
+  if(!brandPackState.market){
+    const sel1 = document.getElementById('bp-market-err')||document.createElement('div');
+    sel1.id='bp-market-err'; sel1.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
+    sel1.textContent='Select a target market above first.';
+    const btn2=document.getElementById('bp-generate-btn'); if(btn2?.parentElement&&!document.getElementById('bp-market-err')) btn2.parentElement.insertBefore(sel1, btn2);
+    return;
+  }
   if(!brandPackState.retailer){
     const sel2 = document.getElementById('bp-retailer-err')||document.createElement('div');
     sel2.id='bp-retailer-err'; sel2.style.cssText='font-family:var(--mono);font-size:.6rem;color:#991B1B;margin-top:.3rem';
@@ -16909,7 +16923,10 @@ async function generateBrandPack(){
   renderBrandPack(document.getElementById('page-brandpack'));
 
   const retailer = brandPackState.retailer;
-  const market = brandPackState.market||'Denmark';
+  // No fallback. The guard above makes this unreachable when empty; leaving `||'Denmark'`
+  // meant that any future bypass of the guard would silently feed Denmark to the PROMPT
+  // while the PDF omitted the market — the DENMARK/Market contradiction in one document.
+  const market = brandPackState.market;
   const cover = BRAND_PACK_COVERS[retailer]||{tone:'professional',accent:'#1E3A5F'};
   const heroSku = skus.length>0?sanitiseSkuForRetailer(skus[0]):null; // sanitised
   const intel = getRelevantIntel((getBrandCategories()||[])[0]||brand?.category||'Skincare & Beauty', market, retailer);
