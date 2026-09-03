@@ -9,10 +9,29 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        a7f44f07
+index.html        3ff93df4
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved 844d3887 → 3ff93df4 on 3 Sep 2026, batch #9 second shipment
+# (#96A title stripping, #96B preamble drop, #97 placeholder omission). NAMED BY
+# THE LANE after reading all three edits at the bytes and confirming a uniform
+# +17 shift below line 30300 with nothing above it moved. #96C — extending
+# stripMd for horizontal rules and pipe tables — was DELIBERATELY HELD: the
+# catman prompt instructs the model to emit pipe tables, so the change would
+# move Business Case output, and stripMd is shared.
+#   after   3ff93df4ce60cf322a0e35d292a135533f56de41c868ad67cfc25cd0752a2428
+#           41,083 lines · 2,707,508 bytes · 2 blocks (1176, 39565)
+
+# index.html moved a7f44f07 → 844d3887 on 3 Sep 2026, batch #9 finding #95
+# (computed value column in the Brand Pack compliance rows). NAMED BY THE LANE
+# after reading the edit at the bytes and confirming the shift pattern: a
+# uniform +12 on every line below the insertion point and nothing above it
+# moved. CC reported the same value; that was not what made it proceedable.
+#   before  a7f44f073b3a425669c2054aacc878e8dfb819a6d380b6d582d92d903184b5b5
+#   after   844d3887ccc22c15679fad5c79d7e60e174a52fe3b9526d4aa6ffa2528f4558d
+#           41,066 lines · 2,705,805 bytes · 2 blocks (1176, 39548)
 
 # FULL digests, captured 2 Sep 2026 20:56 CEST at HEAD 649f0ef, on a run whose
 # cross-channel witnesses (line count, block spans, five verbatim lines, three
