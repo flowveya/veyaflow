@@ -42,57 +42,200 @@
 #
 # These MUST stay above the `/*` catch-all below — rules are evaluated in order.
 #
-# NOT YET COMPLETE: scoped from what is known to be committed, not from
-# `git ls-files`. Anything tracked at the repo root and not listed here is still
-# public. Finish the sweep before treating #99 as closed.
+# Scoped from `git ls-files` on 2 Sep 2026 — every tracked file that is not one
+# of the four app surfaces. THE FOUR THAT STAY PUBLIC, deliberately:
+#   index.html · portal.html · dpp/index.html · brand/index.html
+# Function INVOCATION is unaffected: functions are called at /.netlify/functions/*
+# (leading dot), which is a different path from the /netlify/* static route
+# blocked below. Verified 2 Sep that both an exact path and a splat rule work.
+#
+# WHEN YOU ADD A TRACKED FILE TO THE REPO ROOT, IT IS PUBLIC UNTIL YOU ADD A RULE
+# HERE. That is the weakness of blocking by enumeration and the reason the real
+# fix is to move the app into its own directory and set `publish` to it, making
+# public the exception rather than the default. Until then this list is a control
+# that depends on someone remembering.
+
+# ── The lane's own documents ──
+[[redirects]]
+  from = "/CODING_STATUS.md"
+  to = "/index.html"
+  status = 404
+  force = true
 
 [[redirects]]
-  from   = "/CODING_STATUS.md"
-  to     = "/index.html"
+  from = "/veyaflow-specs/*"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
+
+# ── Verification harness ──
+[[redirects]]
+  from = "/verify.js"
+  to = "/index.html"
+  status = 404
+  force = true
 
 [[redirects]]
-  from   = "/veyaflow-specs/*"
-  to     = "/index.html"
+  from = "/verify.sh"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
 
 [[redirects]]
-  from   = "/db/*"
-  to     = "/index.html"
+  from = "/verify.expected.txt"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
 
 [[redirects]]
-  from   = "/verify.js"
-  to     = "/index.html"
+  from = "/verify.baseline.json"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
 
 [[redirects]]
-  from   = "/verify.sh"
-  to     = "/index.html"
+  from = "/ast_verify.js"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
+
+# ── Schema, build and deploy configuration ──
+[[redirects]]
+  from = "/db/*"
+  to = "/index.html"
+  status = 404
+  force = true
 
 [[redirects]]
-  from   = "/verify.expected.txt"
-  to     = "/index.html"
+  from = "/netlify.toml"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
+
+# Function SOURCE is published as static files because the functions directory
+# sits inside the publish directory, which it does only because `publish = "."`.
+# Two rules, deliberately: on 2 Sep `/netlify/*` alone did not take, and it was
+# not established whether the deploy had landed or the pattern does not match.
+# The more specific form uses the same shape as `/veyaflow-specs/*`, which IS
+# proven to work on this site. Blocking these cannot affect the functions
+# themselves — they are invoked at /.netlify/functions/* (leading dot), verified
+# 2 Sep by publishing a DPP to v3 with the first of these rules already live.
+[[redirects]]
+  from = "/netlify/functions/*"
+  to = "/index.html"
+  status = 404
+  force = true
 
 [[redirects]]
-  from   = "/verify.baseline.json"
-  to     = "/index.html"
+  from = "/netlify/*"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
 
 [[redirects]]
-  from   = "/ast_verify.js"
-  to     = "/index.html"
+  from = "/package.json"
+  to = "/index.html"
   status = 404
-  force  = true
+  force = true
+
+[[redirects]]
+  from = "/package-lock.json"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.gitignore"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# ── Stray root-level function copy (tracked, unlike the other five) ──
+[[redirects]]
+  from = "/supabase-proxy.js"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# ── Harness and pipeline scripts ──
+[[redirects]]
+  from = "/BIL_F2_latency_harness_v2.js"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/bil_extraction_pipeline_b5.js"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# ── Internal planning documents ──
+[[redirects]]
+  from = "/DELIVERABLES_MANIFEST.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow_Coding_Continuation_Brief_June3_2026.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow_Design_Tokens_Locked_v4.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow_Roadmap_v1.spec.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# Filenames containing spaces are blocked in both raw and percent-encoded form,
+# because it is not worth guessing which one Netlify matches against.
+[[redirects]]
+  from = "/Design to Coding Handoff Checklist.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/Design%20to%20Coding%20Handoff%20Checklist.md"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# ── Design and roadmap sketches ──
+# JUDGEMENT CALL: these are internal artefacts, not app routes, so they are
+# blocked. If any of them has been shared with someone by URL, that link dies
+# when this deploys — say so and the rule comes out.
+[[redirects]]
+  from = "/VeyaFlow_Handoff_Checklist_v1.html"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow_Roadmap_v1.html"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow Landing Sketch v1.html"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/VeyaFlow%20Landing%20Sketch%20v1.html"
+  to = "/index.html"
+  status = 404
+  force = true
 
 # Friendly 404 page
 [[redirects]]
