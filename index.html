@@ -30299,12 +30299,29 @@ async function generateBrandPackPDF(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
     const pageW=210, pageH=297, margin=14, contentW=pageW-margin*2;
-    const retailer = brandPackState.retailer||'Retailer';
-    const market = brandPackState.market||'Market';
+    // #97 — `||'Retailer'` / `||'Market'` printed the placeholder AS DATA: the pack told
+    // the buyer the target market was "Market", in the cover line, the running subheader
+    // of all ten pages and the Brand Snapshot row. That is a false statement about the
+    // brand's commercial intent, not a cosmetic gap. Omit-beats-caveat: the segment and
+    // its separator are dropped, never replaced with 'Not set' on ten running headers.
+    const retailer = (brandPackState.retailer && String(brandPackState.retailer).trim()) ? String(brandPackState.retailer).trim() : '';
+    const market   = (brandPackState.market   && String(brandPackState.market).trim())   ? String(brandPackState.market).trim()   : '';
+    // Header/cover segments, joined so an unset value takes its separator with it.
+    const _packScope = [retailer, market].filter(Boolean).join(' · ');
     const cover = BRAND_PACK_COVERS[retailer]||{accent:'#1E3A5F'};
     const heroSku = skus[0]||null;
-    const sections = (brandPackState.result||'').split(/^## /m).filter(s=>s.trim().length>10).map(s=>{
-      const lines=s.split('\n'); return {title:lines[0].replace(/SECTION \d+ — /,'').trim(), body:stripMd(lines.slice(1).join('\n').trim())};
+    // #96B — split() returns everything BEFORE the first '## ' as element 0. The model
+    // opens with a document title ('# CLOUD & GLOW — BRAND PACK FOR LYKO'), which is over
+    // ten characters, so it survived the filter and became a section with a '#' title and
+    // an empty body — the hash-prefixed heading over a blank page seen on page 3 of every
+    // pack. slice(1) drops it BY DEFINITION: text before the first section marker is
+    // preamble, not a section. The length>10 threshold is left alone — raising it would
+    // silently drop a real short section instead.
+    // #96A — the title was never passed through stripMd while the body always was, so a
+    // title line keeping its '#' was then drawn at heading size by pdfHeader and collided
+    // with the running header. Same shared helper, not a second stripper.
+    const sections = (brandPackState.result||'').split(/^## /m).slice(1).filter(s=>s.trim().length>10).map(s=>{
+      const lines=s.split('\n'); return {title:stripMd(lines[0].replace(/SECTION \d+ — /,'').trim()), body:stripMd(lines.slice(1).join('\n').trim())};
     });
 
     // ── PAGE 1: Cover ──
@@ -30327,7 +30344,7 @@ async function generateBrandPackPDF(){
     pdfSetFont(doc, 'body');
     doc.setFontSize(10);
     doc.setTextColor(200,210,220);
-    doc.text(`Prepared for ${retailer} · ${market}`, margin, 82);
+    if(_packScope) doc.text(`Prepared for ${_packScope}`, margin, 82);
     // Date
     doc.text(new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}), margin, 90);
     // VeyaFlow logo area (bottom of cover — on white band)
@@ -30346,7 +30363,7 @@ async function generateBrandPackPDF(){
 
     // ── PAGE 2: Brand Overview ──
     doc.addPage();
-    pdfHeader(doc, `${brand?.name||'Brand'} — Brand Pack`, `${retailer} · ${market} · ${brand?.category||''}`, cover.accent, pageW);
+    pdfHeader(doc, `${brand?.name||'Brand'} — Brand Pack`, [retailer, market, brand?.category||''].filter(Boolean).join(' · '), cover.accent, pageW);
     let y = 38;
 
     // Brand snapshot 2-col
@@ -30355,7 +30372,7 @@ async function generateBrandPackPDF(){
     const snapRows=[
       ['Category', brand?.category||'—'],
       ['Home market', brand?.currentMarket||'—'],
-      ['Target market', market],
+      ['Target market', market || '— not set'],
       ['Stage', brand?.stage||'—'],
       ['Website', brand?.website||'—'],
     ];
@@ -30441,7 +30458,7 @@ async function generateBrandPackPDF(){
     // ── AI CONTENT PAGES ──
     sections.forEach((section, idx)=>{
       doc.addPage();
-      pdfHeader(doc, section.title, `${brand?.name||'Brand'} · ${retailer} · ${market}`, cover.accent, pageW);
+      pdfHeader(doc, section.title, [brand?.name||'Brand', retailer, market].filter(Boolean).join(' · '), cover.accent, pageW);
       let sy = 40;
       if(/basket|routine/i.test(section.title||'')){
         pdfSetFont(doc,'small'); doc.setTextColor(127,160,162); // --ink-mute
@@ -30469,7 +30486,7 @@ async function generateBrandPackPDF(){
       pdfFooter(doc, idx+3, sections.length+2, pageW, pageH);
     });
 
-    const filename = `VeyaFlow_BrandPack_${(brand?.name||'brand').replace(/\s+/g,'_')}_${retailer.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const filename = `VeyaFlow_BrandPack_${(brand?.name||'brand').replace(/\s+/g,'_')}${retailer?'_'+retailer.replace(/\s+/g,'_'):''}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(filename);
   } catch(err){
     const cl = classifyApiError(err);
