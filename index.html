@@ -30417,8 +30417,20 @@ async function generateBrandPackPDF(){
         ['Certifications', (heroSku.certifications||[]).join(', ')||'None', !!(heroSku.certifications?.length)],
       ];
       compRows.forEach(([l,v,ok])=>{
+        // #95 — the value column was hardcoded at margin+38 (~107.7pt, ~24 chars of
+        // helvetica bold 8pt). Batch #8 introduced a 31-character label,
+        // 'EU-established economic operator', which overran it and printed
+        // "EU-established economic opNot set" on a shipped pack. Measure the label and
+        // push the value out only when it does not fit.
+        // Math.max keeps the 38 floor: every label that already fitted lands on exactly
+        // the pixel it lands on today, so the cosmetic path is unchanged BY CONSTRUCTION
+        // rather than by inspection. A wider fixed column would fix the overlap and move
+        // every correct row with it.
         pdfSetFont(doc,'label'); doc.setTextColor(120,120,120); doc.text(l,margin,y);
-        pdfSetFont(doc,'body'); doc.setTextColor(ok?5:153, ok?95:27, ok?70:27); doc.text((ok?'✓ ':'')+String(v).slice(0,45), margin+38, y);
+        // Measured while the LABEL font is still active — getTextWidth is font-dependent,
+        // so taking this after pdfSetFont(doc,'body') would measure the wrong face.
+        var _labelW = doc.getTextWidth(l);
+        pdfSetFont(doc,'body'); doc.setTextColor(ok?5:153, ok?95:27, ok?70:27); doc.text((ok?'✓ ':'')+String(v).slice(0,45), margin + Math.max(38, _labelW + 2), y);
         y+=5.5;
       });
       y+=3;
