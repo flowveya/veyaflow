@@ -29,6 +29,71 @@
   to     = "/brand/index.html"
   status = 200
 
+# ── Internal documents are NOT part of the website (finding #99, 2 Sep 2026) ──
+# `publish = "."` above makes the REPO ROOT the web root, so every tracked file
+# is fetchable by name. On 2 Sep the spec archive, the coding lane's backlog and
+# the verification harness were committed and went live within minutes —
+# including a paragraph describing ~13 RLS-enabled tables with zero policies and
+# session_id as an unexpiring bearer value. Confirmed by loading
+# veyaflow.netlify.app/CODING_STATUS.md in a browser.
+#
+# `force = true` is what makes these beat the static file. WITHOUT IT NETLIFY
+# SERVES THE FILE THAT EXISTS and these rules do nothing.
+#
+# These MUST stay above the `/*` catch-all below — rules are evaluated in order.
+#
+# NOT YET COMPLETE: scoped from what is known to be committed, not from
+# `git ls-files`. Anything tracked at the repo root and not listed here is still
+# public. Finish the sweep before treating #99 as closed.
+
+[[redirects]]
+  from   = "/CODING_STATUS.md"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/veyaflow-specs/*"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/db/*"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/verify.js"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/verify.sh"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/verify.expected.txt"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/verify.baseline.json"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
+[[redirects]]
+  from   = "/ast_verify.js"
+  to     = "/index.html"
+  status = 404
+  force  = true
+
 # Friendly 404 page
 [[redirects]]
   from   = "/*"
