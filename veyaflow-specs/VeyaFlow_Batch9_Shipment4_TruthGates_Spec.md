@@ -17,6 +17,20 @@ index.html   sha256   be86c431c632557aeb50eaa546b75a1a637ab8fc6a79d5a8788b9c6fcc
 **This is a value I am naming.** Branch `f2b-async`, at `d831a18`. Anything else: stop,
 report, wait.
 
+### BASELINE FOR ITEM 6 — different, because items 1–5 have shipped
+
+Items 1–5 were applied, verified and committed on 4 Sep as `62aaa80` (code) and
+`145d386` (baseline). **Item 6 starts from the post-shipment tree:**
+
+```
+index.html   sha256   ef786f2a2987ee22582b82f5a9c528b822cd7067fea18011fc1d0f64122c69c2
+             short    ef786f2a
+             41,254 lines · 2,718,898 bytes · 2 inline <script> blocks (1176, 39736)
+```
+
+**This is a value I am naming.** If you are picking this spec up for item 6 only, that is
+your baseline — not `be86c431`.
+
 ---
 
 ## WHY THESE FIVE TOGETHER
@@ -201,6 +215,75 @@ while working; #108 is the sweep and it is a separate batch. Do not fix them her
 
 ---
 
+## ITEM 6 — remove SECTION 5 from the Brand Pack prompt
+
+**Added by Strategy 4 Sep, after the gate refused its first pack.** This is not a
+separate shipment: the whole purpose of this shipment is to let a Brand Pack leave the
+house again. Shipping the gate without removing section 5 means **no pack can ever
+leave**, and the shipment fails at its own purpose. Same change, same delivery.
+
+### Why no wording survives
+
+The section 5 prompt is already hardened — *"Render ONLY the items in the COMPLIANCE DATA
+block… NEVER render it as ✓, 'Confirmed', 'Complete', or 'substantiated', and NEVER invent
+dates, audit results, or substantiation."* It produced a fabricated Swedish operator
+registration anyway. That is §0 demonstrated, not disputed.
+
+But the gate does not fire on fabrication — **it fires on vocabulary**, and the same
+section instructs: *"briefly note what the status means operationally — what the retailer
+should confirm, what remains outstanding."* That cannot be written without regulatory
+vocabulary. Even a perfectly honest line — *"Certifications: none on file; retailer should
+request LVD/EMC/RoHS documentation"* — carries three blocked terms.
+
+**Section 5 is regulatory prose by construction.** No rewording survives the gate,
+because the gate is correctly catching the category.
+
+### The fix
+
+Delete `## SECTION 5 — Compliance & Sustainability` (currently **17158–17175**) from the
+prompt. Renumber sections 6 and 7 to 5 and 6. The `Digital Product Passport: published
+at …` line at **17173** goes with it.
+
+Note the section number is cosmetic in output — `title:lines[0].replace(/SECTION \d+ — /,'')`
+strips it — but renumber anyway so the prompt does not present the model with a gap.
+
+### THE REMOVAL IS NOT LOSSLESS — and this must not be recorded as if it were
+
+Section 5 carried **two** things:
+
+1. **A prose duplicate of page two's verified rows.** This goes without cost; page two
+   already carries it, built from saved data.
+2. **A translation** — what the status means *operationally*, what the retailer should
+   confirm, what remains outstanding. **This does not exist in the verified rows.** Per §8
+   of the AI direction it is not decoration; it is *the product*: the brand thinks in
+   products, the retailer thinks in articles, and the translation between them is what
+   VeyaFlow is for.
+
+**Calling the whole section a duplicate would silently close a capability by renaming
+it.** It is not being deleted, it is being moved off a surface that cannot carry it.
+
+**It goes in the queue as a STRUCTURED FIELD** — one open item per compliance row,
+carrying `not_recorded` via `checkState`, which is where a question about regulatory
+status belonged from the start. **Never as generated text again.** Record it in
+`CODING_STATUS.md` as an owed capability, not as a removed section.
+
+### #103 IS NOT CLOSED BY THIS
+
+Removing 17173 removes **one occurrence**, not the class. `DPP_CANONICAL_ORIGIN` is read
+at **ten** sites, including the DPP PDF's own `section('Digital Product Passport')` at
+**35724**. #103 stays open until the surface is swept.
+
+*Correction to the ruling's evidence, checked at the bytes:* Strategy cited a second
+occurrence "appended to the prompt at L16832, outside `complianceData`". That line in the
+current tree is a regex inside `_COMPLIANCE_CERTAINTY_PATTERNS`, and no second
+`Digital Product Passport: published at` exists anywhere in the prompt. The reference is
+from a pre-shift tree. **The conclusion stands on the ten read sites instead.**
+
+**And the line gets no new home while the domain is parked.** Do not relocate it into the
+verified rows.
+
+---
+
 ## OUT OF SCOPE — report only
 
 - **The fourth and fifth copies of the preamble defect.** `renderBrandPackResult` at
@@ -233,7 +316,13 @@ report each separately, so a failure in one can be isolated without unpicking th
 5. **Item 4:** the full list of multi-section document generators, and the token cost of
    the Brand Pack prompt against the 1400 ceiling.
 6. **Item 5:** before/after Document ID for one unchanged SKU.
-7. Anything noticed and not fixed.
+7. **Item 6:** the exact prompt lines removed; confirmation that sections 6 and 7 were
+   renumbered; and that **no** compliance content was relocated into another section or
+   into the verified rows. Moving it would defeat the removal.
+8. **Item 6:** every other place the prompt still asks for regulatory content, if any.
+   The gate refusing a pack after this change would mean the vocabulary is entering from
+   a section nobody scouted.
+9. Anything noticed and not fixed.
 
 ---
 
