@@ -64,19 +64,31 @@ certification · CE mark · declaration of conformity · notified body · techni
 substantiation / substantiated · Responsible Person · economic operator · CPNP · GPSR ·
 MDR · LVD · EMC · RoHS · WEEE · REACH.
 
-**Two things this must get right, and they pull against each other:**
+**It applies to ALL AI prose, not the compliance section.** *"Registered as a Swedish
+operator"* appeared in **Brand Overview**. A section-scoped check misses it.
 
-1. It applies to **all AI prose**, not the compliance section. *"Registered as a Swedish
-   operator"* appeared in **Brand Overview**. A section-scoped check misses it.
-2. Honest *questions* are not claims. *"Buyer must confirm whether the mask falls under
-   MDR, GPSR, or cosmetic classification"* is correct and must survive. A flat
-   vocabulary match kills it.
+### THE GATE DOES NOT TRY TO TELL A CLAIM FROM A QUESTION — Strategy, 3 Sep
 
-**Report before implementing which of these you can distinguish reliably.** If you cannot
-separate a claim from a question with confidence, say so — Strategy's ruling covers that
-case explicitly: *"hellre ett tunnare dokument som är sant än ett rikare som ljuger"*, so
-the answer is to remove the prose from compliance-bearing surfaces, not to ship a
-detector that guesses.
+The lane raised the obvious difficulty: the gate must catch *"complies with GPSR"* while
+sparing *"Buyer must confirm whether the mask falls under GPSR"* — a claim and a question,
+identical vocabulary. **Strategy ruled that the gate does not attempt the distinction, and
+the reasoning matters more than the rule:**
+
+> A detector that separates assertion from question is making a **semantic judgement on
+> exactly the surface where we have just ruled the model may not judge.** A gate that
+> guesses is formulating.
+
+So: **if prose on a compliance-bearing surface contains regulatory vocabulary at all, it
+does not render there.** No exceptions, no cleverness, no confidence threshold.
+
+**The meaning is not lost, and this is the part to understand before implementing.**
+*"The buyer must confirm whether the mask falls under GPSR"* **is not prose** — it is a
+`not_recorded` in the verified rows. It is an open item with a `checkState`, which is
+where a question about regulatory status belonged from the beginning. The gate does not
+delete that question; it moves it to the surface that can carry it honestly.
+
+**Do not build a claim/question classifier. Do not add a confidence score. Do not ship a
+list of exceptions.** Any of those reintroduces the judgement this ruling removes.
 
 ---
 
@@ -130,6 +142,15 @@ prompt asks for across its five sections, and what ceiling would fit them. **Do 
 it in this shipment** — that changes generation cost and output length on every document
 and needs its own before/after. Report the number.
 
+**Known in advance, so nobody reads it as a regression (Strategy, 3 Sep):** if the ceiling
+is the cause, **this gate will block packs that previously rendered.** That is the correct
+outcome, not a fault — it converts a silent defect into a visible blocker. It also means
+the ceiling work is the **next** shipment, not "sometime".
+
+**Conditional ruling, decided on your measurement and not before:** the choice between
+raising the ceiling and generating section-by-section with a per-section budget is made
+**on the number you report in 4b**. Report the measurement; do not pick the approach.
+
 **Scope — and this is the part most likely to be got wrong.** The check must **not** live
 in one generator. Brand Pack, `generateBizCasePDF` and the magic-link path all generate,
 and only Brand Pack was touched today. A check in one of them repeats exactly the copied-
@@ -168,6 +189,16 @@ vocabulary and the regime printed on the page all change, because those route th
 once a document has gone to a real retailer — which this shipment enables. Report the
 before/after ID for one unchanged SKU so the change is evidenced rather than assumed.
 
+**#108 — the boolean is an instance of a pattern, not a one-off (Strategy, 3 Sep).**
+This is the **third** time a boolean stands proxy for a regime: `isCosmetic` at L29517
+(CPNP gated, EU RP not), `isCosmetic` in `runLabelScan` (#87 — dead but still readable),
+and now `dev:isDevice` in `_ssCanon`. **Standing instruction: a surviving boolean regime
+proxy is a finding on sight**, and the class is fixed as a family rather than one at a
+time — this error type comes from reasoning that ran out, not from carelessness.
+
+**In this shipment, fix only `_ssCanon`.** Report any other boolean-regime-proxy you pass
+while working; #108 is the sweep and it is a separate batch. Do not fix them here.
+
 ---
 
 ## OUT OF SCOPE — report only
@@ -195,8 +226,10 @@ report each separately, so a failure in one can be isolated without unpicking th
 1. sha256 before editing; confirm it matched `be86c431`.
 2. Before/after for every changed line, grouped by item.
 3. **Item 1:** whether making those patterns global affects anything else (`lastIndex`).
-4. **Item 2:** whether you can reliably separate a regulatory *claim* from a regulatory
-   *question*. An honest "no" is the more useful answer.
+4. **Item 2:** the vocabulary list you implemented, and every place AI prose reaches a
+   compliance-bearing surface. **Do not report on claim-versus-question** — that
+   distinction is ruled out of the gate; report instead whether any surface you found
+   cannot be gated without also removing legitimate non-regulatory prose.
 5. **Item 4:** the full list of multi-section document generators, and the token cost of
    the Brand Pack prompt against the 1400 ceiling.
 6. **Item 5:** before/after Document ID for one unchanged SKU.
