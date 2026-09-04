@@ -17094,13 +17094,11 @@ BRAND CONTEXT:
 Brand: ${brand.name} | Category: ${brand.category} | Stage: ${brand.stage}${productTypesPromptCtx?'\n'+productTypesPromptCtx:''}
 USP: ${brand.usp||'[see brand description]'}
 Price point: ${heroSku?.rspSEK?heroSku.rspSEK+' SEK':brand.pricePoint||'Premium'}
-${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.certifications?.length?' | Certs: '+heroSku.certifications.join(', '):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
+${heroSku?`Hero SKU: ${heroSku.name}${heroSku.inci?' | INCI: '+heroSku.inci.slice(0,150):''}${heroSku.claims?.length?' | Claims: '+heroSku.claims.join(', '):''}`:'' }
 
 VERIFIED COMMERCIAL PROOF (use exactly — do not estimate differently):
 ${proofPoints||'NO VERIFIED COMMERCIAL PROOF AVAILABLE. Do NOT invent, estimate, or project any revenue, units, repeat rate, review score, social following, press mention, sell-through, velocity, or basket figure. Omit all such numbers. Write qualitative positioning only.'}
 
-COMPLIANCE DATA (render EXACTLY — do not upgrade a missing item to present):
-${complianceData}
 
 WHOLESALE / MARGIN TERMS (brand-set): ${(brand.marginStructure&&String(brand.marginStructure).trim())?String(brand.marginStructure).trim()+' — indicative, subject to confirmation':'not on file — say commercial terms are "to be discussed"; do NOT invent a margin or wholesale figure'}
 
@@ -17113,7 +17111,7 @@ Non-negotiables: ${retailerEntry.nonNegotiable||''}
 ${posMap}
 ${basketData}
 
-Generate the Brand Pack in 7 sections. HARD RULES:
+Generate the Brand Pack in 6 sections. HARD RULES:
 - Tone: buyer briefing note, not brand brochure. No mission statements.
 - Every section is written for a BUYER, not a consumer.
 - Use ## for section headers.
@@ -17137,8 +17135,6 @@ P3: Describe what Year 1 success looks like at ${retailer} QUALITATIVELY — ran
 ## SECTION 2 — Product Highlights
 For ${heroSku?heroSku.name:brand.name+' hero SKU'}:
 - RSP only — do NOT state a net-to-retailer price or margin %; none is on file. Note commercial terms are "to be discussed."
-- Key claims with compliance status (Green/Amber/Red) for ${market}
-- Certifications
 - Basket position: Step X of routine — pairs naturally with [product types]
 ${hasProof?'- Reference the verified sell-through / units figures as provided — do NOT derive a units/store/week velocity projection unless that exact figure is in the data':'(Omit any velocity / units-per-store projection — no verified home-market data exists; do not invent one)'}
 
@@ -17155,32 +17151,13 @@ Tier 3: Social and press signals
 Reference the verified numbers EXACTLY as provided. NEVER perform arithmetic on them: no derived, allocated, projected, or estimated figures of any kind — no percentages, shares, splits, per-retailer/per-store/per-period breakdowns, run-rates, or velocity benchmarks that are not verbatim in the verified data. NEVER attribute any figure, growth, or "success" to a specific retailer, channel, or time period unless a figure for THAT retailer/channel/period is itself in the verified data. If asked to characterise performance at ${retailer} and no ${retailer}-specific data exists, say plainly that retailer-level performance data is not yet on file — never estimate it.
 Do not lead with social following. It is the weakest proof type.`:`No verified commercial data exists for this brand. Do NOT fabricate transactions, repeat rates, review scores, social following, or press mentions, and do NOT project a velocity benchmark. State plainly that commercial proof points are available on request once added to the brand profile, OR omit this section. NEVER invent Tiers or numbers.`}
 
-## SECTION 5 — Compliance & Sustainability
-Render ONLY the items in the COMPLIANCE DATA block above, each with its EXACT status. For EACH, briefly note what the status means operationally (what the retailer should confirm, what remains outstanding) — factually, NOT as a risk verdict. Never summarise across items as "all documentation current" / "compliance ready" or any blanket completeness/currency assertion — even as a paraphrase.
-If an item is "Not set" / "not on file" / "None", say so plainly — NEVER render it as ✓, "Confirmed", "Complete", or "substantiated", and NEVER invent dates, audit results, or substantiation. Do NOT claim a claim is "verified" or "substantiated" unless the data above says so.
-${(function(){
-  // #68 — three defects in one buyer-facing line. It gated on generatedAt, so a
-  // generated-but-unpublished passport was asserted to a retailer with a checkmark and
-  // a URL returning "not found", automatically, with nobody clicking anything. It
-  // claimed "Ahead of mandatory ESPR date" — the same unearned assertion batch #6
-  // removed from the banner on this very page; ESPR phases in by product group through
-  // delegated acts and there is no single mandatory date. And `|| "pending"` printed
-  // veyaflow.com/dpp/pending as though it were a live address.
-  if(!(heroSku && dppData[heroSku.id])) return "";
-  if(!_dppIsPublished(heroSku.id)) return "";                 // generated is not published
-  var _id = dppData[heroSku.id].dppId;
-  if(!_id) return "";                                          // no id -> no line, never a placeholder URL
-  return "Also include: Digital Product Passport: published at " + DPP_CANONICAL_ORIGIN.replace(/^https?:\/\//,'') + "/dpp/" + _id + ".";
-})()}
-Language register: ${retailer} compliance team, not brand marketing.
-
-## SECTION 6 — Basket Economics & Routine Integration
+## SECTION 5 — Basket Economics & Routine Integration
 ${basketData}
 Use the basket uplift numbers provided. This is the category manager argument.
 Frame as: "At ${retailer}, a Step ${routineStep} purchase correlates with X${basket.currency} additional basket spend."
 Explain WHY this brand drives adjacent purchases — what it signals to the consumer about their routine.
 
-## SECTION 7 — Next Steps
+## SECTION 6 — Next Steps
 Exactly 3 items:
 1. Range review meeting ask — reference ${retailerEntry.rangeReviewCycle?retailerEntry.rangeReviewCycle.join(' or '):'upcoming'} review dates with a specific deadline
 2. Sample send — logistics detail (how many SKUs, ship within X days, to which office/portal)
