@@ -40269,31 +40269,23 @@ var FEEDBACK_LOOP_PROMPTS = {
     }
   },
   // Trigger 3 — sell-through < 40% for 3 consecutive months → delisting risk
-  sell_through_low: {
-    build: function(ctx){
-      // ctx: { brandName, skuName, retailerName, market, category, months, percentages }
-      var avg = Math.round(ctx.percentages.reduce(function(a,b){ return a+b; }, 0) / ctx.percentages.length);
-      return [
-        { role:'user', content:
-          'You are a senior retail-account strategist. A brand has 3 consecutive months of weak sell-through at a retailer and faces real delisting risk.\n' +
-          'Write a brief diagnosis + concrete action plan in EXACTLY this format (no preamble, no closing):\n\n' +
-          'DIAGNOSIS: <2 sentences naming the most likely causes from these standard buckets — pricing vs category, in-store placement/visibility, lack of promotional support, packaging/shelf-presence, product-market fit. Pick the 1-2 most plausible given the data and brand context. Plain language, no hedging.>\n\n' +
-          'ACTIONS:\n' +
-          '1. <Specific next step the brand can take this month>\n' +
-          '2. <Specific next step within 30 days>\n' +
-          '3. <Specific next step if the first two don\'t move the number>\n\n' +
-          'Each action max 15 words. Concrete and operational, not generic. ~80 words total.\n\n' +
-          'Brand: ' + (ctx.brandName||'This brand') + '\n' +
-          'Product: ' + (ctx.skuName||'A product') + '\n' +
-          'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
-          'Category: ' + (ctx.category||'') + '\n' +
-          'Months of data: ' + ctx.months.join(', ') + '\n' +
-          'Sell-through per month: ' + ctx.percentages.map(function(p){ return p+'%'; }).join(', ') + '\n' +
-          'Average sell-through: ' + avg + '% (delisting threshold typically <40% sustained)'
-        }
-      ];
-    }
-  },
+  // #110 — THE sell_through_low BUILDER IS GONE, NOT TRIMMED. Strategy ruled 4 Sep:
+  // five candidate causes are INDISTINGUISHABLE FROM A SINGLE NUMBER, and no wording
+  // makes a diagnosis derivable from data that does not contain it. It handed the model
+  // a menu (pricing / placement / promo / packaging / fit), told it to choose with
+  // `no hedging`, then built three operational ACTIONS on the choice — the invention
+  // compounding into advice, written to drafted_content and into the registry.
+  // ACTIONS left with the DIAGNOSIS: advice built on an invented cause inherits it.
+  // The unsourced `delisting threshold typically <40% sustained` left too — 40 is a
+  // hardcoded trigger constant in this file, not a registry entry with a source, and
+  // "typically" upgraded it into an industry norm nobody established.
+  // What remains is deterministic — the number, and its direction across the series —
+  // so THERE IS NOTHING FOR A MODEL TO DO: the card computes and renders it directly.
+  // Asking a model to restate figures the app already holds is the same error as
+  // asking it to restate claim verdicts. Real diagnosis is a layer-3 capability and
+  // sits behind closing the outcome loop; it has no data to stand on today.
+  // The five buckets survive as STATIC content in the card — never generated, never
+  // ranked, never attached to this SKU's figures. The lie was in the connection.
   // Trigger 4 — buyer reorder logged → proof point + next-market hint
   reorder: {
     build: function(ctx){
@@ -40749,16 +40741,8 @@ async function ensureEventDraft(eventId){
         months:       ev.context?.months       || [],
         percentages:  ev.context?.percentages  || [],
       });
-    } else if(ev.trigger_type === 'sell_through_low' && FEEDBACK_LOOP_PROMPTS.sell_through_low){
-      messages = FEEDBACK_LOOP_PROMPTS.sell_through_low.build({
-        brandName:    ev.context?.brandName    || (brand && brand.name) || '',
-        skuName:      ev.sku_name              || '',
-        retailerName: ev.retailer_name         || '',
-        market:       ev.market                || '',
-        category:     ev.context?.category     || '',
-        months:       ev.context?.months       || [],
-        percentages:  ev.context?.percentages  || [],
-      });
+    // #110 — sell_through_low deliberately has NO branch: it generates no draft at all.
+    // messages stays null and the guard below returns before any model call.
     } else if(ev.trigger_type === 'reorder' && FEEDBACK_LOOP_PROMPTS.reorder){
       messages = FEEDBACK_LOOP_PROMPTS.reorder.build({
         brandName:     ev.context?.brandName    || (brand && brand.name) || '',
@@ -40786,10 +40770,9 @@ async function ensureEventDraft(eventId){
       console.warn('queuedCallAPI not available — skipping draft');
       return null;
     }
-    // Length budget: short for proof points, longer for diagnoses
-    var maxTokens = (ev.trigger_type === 'sell_through_low') ? 350
-                  : (ev.trigger_type === 'reorder')          ? 250
-                  : 200;
+    // Length budget: short for proof points. The 350 that used to sit here for
+    // sell_through_low went with its builder (#110).
+    var maxTokens = (ev.trigger_type === 'reorder') ? 250 : 200;
     var response = await queuedCallAPI(messages, maxTokens);
     var text = (typeof response === 'string') ? response.trim() : '';
     if(!text) return null;
@@ -40868,8 +40851,11 @@ async function loopEventResolve(eventId){
   var ev = loopEvents.find(function(e){ return e.id === eventId; });
   if(!ev) return;
   var ok = window.confirm(
+    // #110 — the middle sentence is DELETED, not reworded. It described a workflow that
+    // no longer exists: there is no generated diagnosis to have reviewed and no
+    // recommendations to have acted on. Any rewrite would invent a new description of
+    // what resolving means, which is the same error one level up.
     'Mark this delisting-risk alert as resolved?\n\n' +
-    'This means you\'ve reviewed the diagnosis and either acted on the recommendations, accepted the risk, or the issue has been addressed by the retailer.\n\n' +
     'The alert will be removed from Brand Home but kept in history.'
   );
   if(!ok) return;
@@ -40997,22 +40983,29 @@ function _renderSellThroughLowCard(ev){
   var months = (ev.context && ev.context.months) || [];
   var pcts   = (ev.context && ev.context.percentages) || [];
   var avg    = (ev.context && ev.context.averagePct) || 0;
-  var draft  = ev.drafted_content || '';
-  var hasDraft = !!draft;
-  if(!hasDraft && !ev._drafting){
-    setTimeout(function(){ ensureEventDraft(ev.id); }, 100);
+  // #110 — NO DRAFT IS FETCHED OR RENDERED. This card no longer calls ensureEventDraft:
+  // the builder is gone and there is nothing for a model to say here. Everything below
+  // is computed from the figures the app already holds.
+  // DIRECTION, only when a series exists — two or more points. With one point there is
+  // no direction and none is asserted.
+  var _dir = '';
+  if(pcts.length >= 2){
+    var _first = Number(pcts[0]), _last = Number(pcts[pcts.length-1]);
+    if(isFinite(_first) && isFinite(_last)){
+      _dir = (_last > _first) ? 'rising across the period'
+           : (_last < _first) ? 'falling across the period'
+           : 'flat across the period';
+    }
   }
-  // Render the diagnosis + actions block. The AI returns "DIAGNOSIS: ...\n\nACTIONS:\n1. ...\n2. ...\n3. ..." — display verbatim (escaping HTML).
-  var draftHtml = '';
-  if(hasDraft){
-    var escaped = _retailEscSafe(draft);
-    // Lightweight formatting: bold the labels for readability
-    escaped = escaped.replace(/^DIAGNOSIS:/m, '<strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:#991B1B">DIAGNOSIS</strong>');
-    escaped = escaped.replace(/^ACTIONS:/m,   '<strong style="font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:#991B1B">ACTIONS</strong>');
-    // Convert newlines to <br>
-    escaped = escaped.replace(/\n/g, '<br>');
-    draftHtml = escaped;
-  }
+  // The five buckets, STATIC. Identical for every SKU at every retailer — which is why
+  // they are labelled as questions the brand checks, not as a finding about this product.
+  // Saying so in the copy is the point: a generic list reads as a diagnosis the moment
+  // it sits under a specific number without disclaiming the connection.
+  var _BUCKETS = ['Pricing against the category',
+                  'In-store placement and visibility',
+                  'Promotional support',
+                  'Packaging and shelf presence',
+                  'Product-market fit'];
   var html = '';
   html += '<div style="background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;padding:.9rem 1.15rem;margin-bottom:.75rem">';
   html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap">';
@@ -41020,11 +41013,15 @@ function _renderSellThroughLowCard(ev){
   html +=       '<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:#991B1B;margin-bottom:.25rem">⚠ Delisting risk</div>';
   html +=       '<div style="font-family:var(--serif);font-size:1.02rem;color:#7F1D1D;line-height:1.3;margin-bottom:.35rem">' + _retailEscSafe(ev.sku_name || 'Your product') + ' · ' + avg + '% avg sell-through at ' + _retailEscSafe(ev.retailer_name || 'retailer') + '</div>';
   html +=       '<div style="font-family:var(--mono);font-size:.56rem;color:#991B1B;opacity:.85;margin-bottom:.55rem">3 months below 40% · ' + _retailEscSafe(months.join(' · ')) + ' · ' + pcts.map(function(p){ return p+'%'; }).join(' / ') + '</div>';
-  if(hasDraft){
-    html +=     '<div style="background:#fff;border:1px dashed #FCA5A5;padding:.6rem .8rem;font-family:var(--sans);font-size:.74rem;color:#7F1D1D;line-height:1.6">' + draftHtml + '</div>';
-  } else {
-    html +=     '<div style="background:#fff;border:1px dashed #FCA5A5;padding:.55rem .75rem;font-family:var(--mono);font-size:.62rem;color:#991B1B;opacity:.6;letter-spacing:.04em">Drafting diagnosis & action plan…</div>';
-  }
+  // The measured facts, and nothing else asserted about them.
+  html +=       '<div style="background:#fff;border:1px dashed #FCA5A5;padding:.6rem .8rem;font-family:var(--sans);font-size:.74rem;color:#7F1D1D;line-height:1.6">';
+  html +=         'Average sell-through ' + _retailEscSafe(String(avg)) + '%' + (_dir ? ', ' + _dir : '') + '.';
+  html +=         '<div style="font-family:var(--mono);font-size:.62rem;color:#991B1B;opacity:.85;margin-top:.5rem;letter-spacing:.04em">WHAT TO CHECK</div>';
+  html +=         '<div style="font-family:var(--sans);font-size:.72rem;color:#7F1D1D;opacity:.9;line-height:1.5;margin-bottom:.35rem">These are the standard places weak sell-through comes from. They are the same five for every product \u2014 the figures above cannot tell you which one applies here, so this is a checklist, not a finding.</div>';
+  html +=         '<ul style="margin:0;padding-left:1.1rem;font-family:var(--sans);font-size:.74rem;color:#7F1D1D;line-height:1.6">';
+  _BUCKETS.forEach(function(b){ html += '<li>' + _retailEscSafe(b) + '</li>'; });
+  html +=         '</ul>';
+  html +=       '</div>';
   html +=     '</div>';
   html +=     '<div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;min-width:110px">';
   html +=       '<button onclick="loopEventResolve(\'' + _retailEscSafe(ev.id) + '\')" style="font-family:var(--mono);font-size:.62rem;padding:.4rem .75rem;background:#7F1D1D;color:#fff;border:none;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Resolve</button>';

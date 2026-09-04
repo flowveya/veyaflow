@@ -9,10 +9,48 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        f66c76fd
+index.html        38dd86a5
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved f66c76fd → 38dd86a5 on 4 Sep 2026 — #110 ITEM 3, the
+# sell_through_low rebuild, AND THE TRUTH DEFECT ITEM 3 CREATED IN ITS OWN SHIPMENT.
+#   after   38dd86a54c0bb01cae6b5fd31caef13c20730e2a9def6debac4b18e4de9bf56e
+#           41,290 lines · 2,721,537 bytes · 2 blocks
+# NAMED BY THE LANE after reading the edits at the bytes, and from an INDEPENDENT
+# `shasum -a 256` on Charlotte's machine — not from verify.sh's own digest line,
+# which is the same channel as the GREEN it is being used to confirm.
+#
+# 8ffeecbb IS NOT A BASELINE AND MUST NEVER BE TREATED AS ONE. It is in the reflog.
+# It is the tree where FEEDBACK_LOOP_PROMPTS.sell_through_low was gone and
+# loopEventResolve still asked the brand to confirm "you've reviewed the diagnosis
+# and either acted on the recommendations" — a window.confirm, so the app asked them
+# to ASSERT it. The gap between f66c76fd and 38dd86a5 is deliberate, not a skipped
+# entry. Two edits, one shipment, one named value.
+#
+# ITEM 3 (40272, 40744, 41017): the builder is GONE, NOT TRIMMED — nothing survives
+# the deletion, because five candidate causes are indistinguishable from a single
+# percentage. The five buckets return as STATIC content carrying their own
+# disclaimer: "They are the same five for every product — the figures above cannot
+# tell you which one applies here, so this is a checklist, not a finding." That
+# sentence states the ABSENCE OF THE CONNECTION, which is where Strategy located the
+# lie: the same five sentences are honest as a help panel and dishonest as a
+# generated diagnosis.
+#
+# THE CONFIRM DIALOG (40853–40860): the middle sentence is DELETED, not reworded,
+# and a comment records why the gap is deliberate so a later reader does not fill
+# it. A rewrite would have invented a new description of what resolving means —
+# the same error one level up from the one this batch removed.
+#
+# HOW THE DEFECT WAS CAUGHT, AND WHY NO GATE COULD HAVE CAUGHT IT: verify.js has no
+# way to know that a confirm dialog's copy depends on a prompt builder 500 lines away
+# in a different function. It was caught because CC reported its own collateral
+# instead of reporting the item complete. That is author-≠-verifier working in the
+# direction it normally fails. Set against #95 — a visibly broken PDF that passed
+# every gate we had — the two data points agree: the byte battery catches drift and
+# regression, and has never once caught a truth defect. It is not what protects us
+# here. Do not let a GREEN be read as one.
 
 # index.html moved d186db18 → f66c76fd on 4 Sep 2026 — #110 items 1 and 2, the
 # events-surface fabrication instructions. +6 lines, ALL IN BLOCK 2 (1,515 → 1,521
