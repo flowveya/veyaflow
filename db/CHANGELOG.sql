@@ -64,3 +64,54 @@ alter function public.set_updated_at() set search_path = public;
 -- 2026-08-15: Supabase project resumed after free-tier auto-pause
 --   (root cause of the supabase-proxy 500 outage; zero code changes).
 -- 2026-08-25: buyer@matas.dk sessions revoked (backup-file tokens dead).
+
+-- ── 2026-09-04 · #110 item 4 — invented causality removed from loop_events ──
+-- FIRST DATA CORRECTION IN THIS FILE. Every entry above changes schema or
+-- permissions. This one changes a stored value, and it is recorded here for the
+-- reason §6.2 demands of the product itself: a change to a record that carries
+-- consequence must say who changed it, when, and on what basis. A silent cleanup
+-- of a poisoned record is the failure the product exists to prevent, performed
+-- on ourselves.
+--
+-- THE COUNT BEFORE CORRECTION, WHICH IS ITSELF THE DATUM (Strategy, 4 Sep):
+--   rows_total          2
+--   rows_with_content   2
+--   invented_causality  1     <- corrected by the statement below
+--
+-- Read that as 1 of 2, not as "one row". The loop_events registry — the
+-- self-improving outcome substrate of §4 and §8.4, the thing ranked above the
+-- Brand Pack fabrications because "a poisoned registry learns the wrong thing
+-- permanently and carries it to the next customer" — contains two rows in total.
+-- One clean (sell_through_high, the grounded builder), one invented. The ranking
+-- was argued from principle and the principle stands; nobody counted first, and
+-- the magnitude was assumed for a full working day.
+--
+-- IT ALSO CAPS A HYPOTHESIS PERMANENTLY. The observation that the clean builder's
+-- Matas draft was accepted while the fabricating builder's Lyko draft was not is
+-- logged as a hypothesis, not a finding. Those two drafts are now known to be the
+-- entire dataset: n=1 per arm. No existing data can promote it.
+--
+-- THE ROW: Lyko rejection, 27 Aug. context->>'reason' was empty; drafted_content
+-- asserted three causes ("inadequate margin structure, oversaturated category
+-- positioning, or insufficient brand differentiation"). The prompt instructed it
+-- (index.html:40334 before the #110 fix), so this is not model drift.
+--
+-- WHY THE LITERAL not_recorded AND NOT NULL OR '': a blanked field is
+-- indistinguishable from one that was never written. "We removed an invention
+-- here" and "nothing was ever generated" must stay distinguishable.
+--
+-- KNOWN AND ACCEPTED: the loop-event card renders drafted_content directly and
+-- has no handling for this sentinel, so the row now displays the raw string
+-- not_recorded. checkState's four-state treatment covers the compliance surface
+-- only. Bringing the events surface to the same handling is follow-up work.
+--
+-- PREDICATE IDENTITY: the WHERE clause below is character-identical to the one
+-- that produced invented_causality = 1. UPDATE 1 is therefore proof that exactly
+-- what was measured is what was corrected — no dedupe_key transcription can
+-- widen or miss it.
+update public.loop_events
+set drafted_content = 'not_recorded',
+    updated_at = now()
+where trigger_type = 'rejection'
+  and drafted_content is not null and drafted_content <> ''
+  and nullif(trim(context->>'reason'), '') is null;

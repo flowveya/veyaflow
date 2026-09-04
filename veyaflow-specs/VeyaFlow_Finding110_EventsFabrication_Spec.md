@@ -29,7 +29,16 @@ report, wait.
 
 ## THE EVIDENCE
 
-Live record, `events` table, Lyko rejection 27 Aug:
+Live record, `public.loop_events` table, Lyko rejection 27 Aug:
+
+**TABLE NAME CORRECTED 4 Sep.** This spec said `events` in three places, including the item 4
+database instruction. There is no `events` table — `select … from events` returns
+`42P01: relation "events" does not exist`. The name was carried from the label on the JSON
+dump and never checked against the source, in a spec whose subject is asserting things the
+data does not support. Confirmed two ways: `index.html:40245` and `:41151` both say
+`loop_events`, and `information_schema.tables ilike '%event%'` returns exactly one
+application table, `public.loop_events`. Item 4 is an instruction to write to a database;
+had it been run as an `UPDATE` rather than a `SELECT`, the error is what stopped it.
 
 ```
 "context": { "reason": "", ... }
@@ -216,7 +225,7 @@ Items 1, 2 and **3** are edits — item 3 was report-first, CC answered, Strateg
 it is now an implement. Items 4 and 5 are reports. Do not edit anything under items 4–5.
 
 **Item 4 is Charlotte's, not CC's** — it is a database change, and those are hers alone
-via the Supabase SQL Editor. CC has no read path to the `events` table (no credentials, no
+via the Supabase SQL Editor. CC has no read path to the `public.loop_events` table (no credentials, no
 network, no local copy) and must report **NOT FOUND** rather than estimate the count. A
 number invented for the report about invented causality would be the finding committed
 inside its own remedy.
