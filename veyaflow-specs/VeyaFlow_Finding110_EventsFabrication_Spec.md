@@ -89,9 +89,15 @@ decide it — report it.**
 
 ---
 
-## ITEM 3 — `sell_through_low`, line 40280 — REPORT-FIRST, DO NOT EDIT
+## ITEM 3 — `sell_through_low`, line 40280 — IMPLEMENT (was report-first; Strategy ruled)
 
-This one cannot be fixed by deletion, and that is why it is not an edit.
+**Superseded 4 Sep.** This was sent as report-first; CC returned the four answers and
+Strategy ruled on them. **It is now an implement.** The heading and STOP block below were
+carried over unchanged when the ruling was inserted — the same failure as
+`Generate the Brand Pack in 7 sections` surviving the renumbering to six, in the spec that
+records that failure. Corrected here.
+
+This one cannot be fixed by deletion, and that is why it is a rebuild rather than a trim.
 
 ```
 DIAGNOSIS: <2 sentences naming the most likely causes from these standard buckets —
@@ -161,8 +167,15 @@ Editor**, with the change appended to `db/CHANGELOG.sql`. Never from code.
 **the measure of how much of the registry substrate is poisoned**. Log the number; do not
 merely fix the rows. Then:
 
-- the field is zeroed to **`not_recorded`**, not blanked and not rewritten
+- the field is zeroed to the **literal string `not_recorded`** — **not `NULL`, not `''`**.
+  `checkState` already treats `not_recorded` as first-class, and a blanked field is
+  indistinguishable from one that was never written. The distinction between "we removed
+  an invention here" and "nothing was ever generated" is the whole point.
 - **the correction is registered in `db/CHANGELOG.sql`** rather than disappearing quietly
+- **the changelog entry records the COUNT BEFORE correction, not only the statement.**
+  The number is the datum — how much of the substrate was poisoned — and it becomes
+  unrecoverable the moment the rows are fixed. Losing it would mean correcting the record
+  without recording what was corrected, which is the failure §6.2 names.
 
 That is the same principle §6.2 demands of the product: a change to a record that carries
 consequence must say who changed it, when, and on what basis. A silent cleanup of a
@@ -199,8 +212,14 @@ typical, likely, probable or standard without a source.
 
 ## STOP. NO COMMIT.
 
-Items 1 and 2 are edits. Items 3, 4 and 5 are reports. Do not edit anything under items
-3–5.
+Items 1, 2 and **3** are edits — item 3 was report-first, CC answered, Strategy ruled, and
+it is now an implement. Items 4 and 5 are reports. Do not edit anything under items 4–5.
+
+**Item 4 is Charlotte's, not CC's** — it is a database change, and those are hers alone
+via the Supabase SQL Editor. CC has no read path to the `events` table (no credentials, no
+network, no local copy) and must report **NOT FOUND** rather than estimate the count. A
+number invented for the report about invented causality would be the finding committed
+inside its own remedy.
 
 ---
 

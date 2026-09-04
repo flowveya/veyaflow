@@ -9,10 +9,32 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        d186db18
+index.html        f66c76fd
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved d186db18 → f66c76fd on 4 Sep 2026 — #110 items 1 and 2, the
+# events-surface fabrication instructions. +6 lines, ALL IN BLOCK 2 (1,515 → 1,521
+# content lines), which is where the events surface lives; block 1 untouched.
+#   after   f66c76fd2f4c70094a3096c4e60e8865214ec7b29bbb7e4c62960edab8ef03fb
+#           41,293 lines · 2,721,114 bytes · 2 blocks (1176, 39769)
+#
+# ITEM 1, rejection builder (40334): the clause "suggest the most likely
+# category-level cause" is replaced — not merely deleted — with an explicit
+# prohibition: "say so plainly and stop. Do NOT suggest, infer or speculate about a
+# cause the retailer did not state." The empty field now reads "(not provided by
+# retailer)" in the prompt rather than blank. Better than the spec asked for.
+# ITEM 2, reorder builder (40306): "Mention specifically why the timing matters"
+# removed; the model holds no data about the next market.
+#
+# HOW THIS BASELINE WAS ESTABLISHED, because the process mattered more than the
+# value: CC STOPPED rather than proceed on its own sha, correctly invoking the
+# 31 Aug rule against itself — "including when I am confident, and especially
+# then." Items 1 and 2 had been applied a turn earlier and I had never byte-verified
+# them or named a digest. The lane verified both edits at the bytes, and the value
+# above comes from an INDEPENDENT `shasum -a 256` on Charlotte's machine, not from
+# CC's report and not from the battery's own line.
 
 # index.html moved 7ebd1ac4 → d186db18 on 4 Sep 2026 — the completeness gate gets
 # its own refusal panel instead of borrowing the API-failure channel. +56 lines.
