@@ -40303,7 +40303,7 @@ var FEEDBACK_LOOP_PROMPTS = {
         { role:'user', content:
           'A retail buyer has reordered with increased volume. Write TWO short paragraphs (4 sentences total max, ~50 words):\n\n' +
           'PARAGRAPH 1 — Proof-point sentence the brand can paste into a pitch (sales-ready, plain commercial language, no hype).\n' +
-          'PARAGRAPH 2 — One-sentence next-market hint suggesting the brand pitch ' + (ctx.nextMarket||'a similar market') + ' while this proof is fresh. Mention specifically why the timing matters.\n\n' +
+          'PARAGRAPH 2 — One-sentence next-market hint suggesting the brand pitch ' + (ctx.nextMarket||'a similar market') + ' while this proof is fresh.\n\n' +   // #110 — 'Mention specifically why the timing matters' removed: the model holds no data about the next market, so specificity there can only be invented
           'Format: paragraph 1, blank line, paragraph 2. No preamble, no labels.\n\n' +
           'Brand: ' + (ctx.brandName||'This brand') + '\n' +
           'Product: ' + (ctx.skuName||'A product') + '\n' +
@@ -40325,7 +40325,13 @@ var FEEDBACK_LOOP_PROMPTS = {
         { role:'user', content:
           'A retailer rejected this brand\'s submission. Extract the operational learning a future-pitch should encode.\n' +
           'Output 1-2 sentences (max 35 words). No commiseration, no advice, no preamble. Just the lesson — what changes for the next pitch to ' + (ctx.retailerName||'this retailer') + ' or similar retailers.\n' +
-          'If no specific reason was given, say so plainly and suggest the most likely category-level cause for this retailer type.\n\n' +
+          // #110 — the second clause ('suggest the most likely category-level cause for
+          // this retailer type') is deleted. It instructed invention INTO THE OUTCOME
+          // RECORD: the Lyko row carries three causes written to drafted_content while
+          // context.reason is empty. Nothing is lost — "Lyko rejected without stating a
+          // reason" IS the record, and per §8.2 the silence is the asset. A hedged version
+          // would be the same invention wearing a qualifier, so there is no replacement.
+          'If no specific reason was given, say so plainly and stop. Do NOT suggest, infer or speculate about a cause the retailer did not state.\n\n' +
           'Brand: ' + (ctx.brandName||'This brand') + '\n' +
           'Retailer: ' + (ctx.retailerName||'The retailer') + (ctx.market ? ' · ' + ctx.market : '') + '\n' +
           'Category: ' + (ctx.category||'') + '\n' +
