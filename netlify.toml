@@ -68,6 +68,24 @@
   status = 404
   force = true
 
+# docs/ — the coding lane's day entries (docs/daily-log/*.md), committed and
+# therefore served without this rule. ADDED 3 SEP AFTER THE FACT: the 24 rules
+# above were scoped from `git ls-files` earlier the same day, hours before docs/
+# existed, so 2026-09-03.md — which names the RLS gap and the session_id bearer
+# value — was publicly fetchable from the moment it was pushed. #99 recurred
+# within four hours, through the structure created to fix the logging problem,
+# exactly as the comment above predicted. That is the argument for the
+# publish-directory restructure rather than for a 25th rule.
+#
+# The canonical log itself (docs/VeyaFlow_Daily_Log.docx and .txt) is safe by a
+# stronger mechanism: it is gitignored, so it is never committed and therefore
+# never deployed. This rule protects the files that ARE tracked.
+[[redirects]]
+  from = "/docs/*"
+  to = "/index.html"
+  status = 404
+  force = true
+
 # ── Verification harness ──
 [[redirects]]
   from = "/verify.js"
