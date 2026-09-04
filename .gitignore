@@ -21,3 +21,19 @@ node_modules/
 # to another folder does not un-ignore them.
 VeyaFlow_Daily_Log.docx
 VeyaFlow_Daily_Log.txt
+
+# #111, 4 Sep 2026 — local-only working files. Ignored so `git status` is clean
+# again and an accidental `git add -A` cannot publish them. They are already
+# absent from the remote, so this changes nothing about what deploys.
+#
+# WHY IT MATTERS HERE SPECIFICALLY: publish = "." (#99) makes the repo root the
+# public web root, so anything committed at root is served at a guessable URL —
+# these .js files would be served as readable source, not executed.
+_untracked_backup/
+anthropic-proxy.js
+get-brand-pack.js
+get-dpp.js
+share-brand-pack.js
+share-dpp.js
+VeyaFlow_Nav_5Group_Reskin_v1.html
+brandhome_pass2_sketch.html
