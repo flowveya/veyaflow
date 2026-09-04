@@ -77,7 +77,15 @@ const SINGLE_DEFINITION = [
 // Call-site counts the handoff states outright.
 const FIXED_CALLSITES = {
   _operatorStatus: 2,   // §3: 1 definition, 2 call sites
-  _dppIsPublished: 4,   // §3: 1 definition / 4 call sites
+  // §3 recorded "1 definition / 4 call sites — the publication gate". Reduced to 3 on
+  // 4 Sep 2026 by batch #9 shipment 4 item 6: the fourth call gated the passport line
+  // inside the Brand Pack prompt's SECTION 5, and that section was removed because it
+  // was regulatory prose by construction. The three survivors are batch #7's export
+  // gates — QR, JSON, PDF — which are the gate's actual job. The definition is intact.
+  // THIS IS A CHANGED ARCHITECTURAL CONTRACT, not a drifted count: the handoff §3 table
+  // and CODING_STATUS.md both record 4 and must be corrected, or the next lane reads a
+  // stale invariant and stops on a phantom.
+  _dppIsPublished: 3,
 };
 
 // Names that must NOT exist. `normalizeBrandRP` was invented by the coding lane

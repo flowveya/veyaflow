@@ -9,10 +9,40 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        ef786f2a
+index.html        7ebd1ac4
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved ef786f2a → 7ebd1ac4 on 4 Sep 2026, batch #9 shipment 4 ITEM 6:
+# SECTION 5 removed from the Brand Pack prompt, sections renumbered 1–6, the
+# COMPLIANCE DATA label and ${complianceData} injection removed, and SECTION 2's
+# two regulatory instruction lines plus the Certs: fragment deleted. −23 lines.
+# NAMED BY THE LANE after reading every change at the bytes.
+#   after   7ebd1ac4a79a1f013cef5369e174b8df2bf255f969146af7a900c430c09c3aea
+#           41,231 lines · 2,716,813 bytes · 2 blocks (1176, 39713)
+#
+# HOW COMPLETION WAS ESTABLISHED, and this is the part worth copying:
+# three successive passes each removed "the last site asking for regulatory
+# content" and each was wrong. The fourth read _REGULATORY_STATUS_VOCAB OUT OF
+# THE SOURCE and ran all 19 patterns across all 78 prompt lines. One hit — the
+# COMPLIANCE HONESTY prohibition at 17122, which stays because the gate scans
+# OUTPUT, never the prompt. Zero instruction lines. A terminating check, not
+# another patch.
+#
+# CAVEAT KEPT ON THE RECORD: 17122 opens "state each compliance item's EXACT
+# status only", which read alone is an instruction. It is inert because no
+# compliance data is injected any more. If a pack is ever refused with no other
+# candidate, that clause is where to look.
+#
+# #103 WENT 10 → 9, NOT CLOSED: DPP_CANONICAL_ORIGIN now has 9 RAW read sites,
+# including the DPP PDF's own section('Digital Product Passport'). One occurrence
+# of the class removed. The line got no new home while the domain is parked.
+#
+# §3 CONTRACT CHANGED: _dppIsPublished is 1 definition / 3 call sites, not 4.
+# The fourth gated the removed passport line. verify.js FIXED_CALLSITES updated
+# from 4 to 3 — a hard-coded contract, so no recapture would have cleared it.
+# The handoff §3 table still says 4 and is stale.
 
 # index.html moved be86c431 → ef786f2a on 4 Sep 2026, batch #9 shipment 4 —
 # THE TRUTH GATES. Five items: the regulatory-prose gate (#106), #107's counter,
