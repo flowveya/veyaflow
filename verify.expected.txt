@@ -9,10 +9,36 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        7ebd1ac4
+index.html        d186db18
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved 7ebd1ac4 → d186db18 on 4 Sep 2026 — the completeness gate gets
+# its own refusal panel instead of borrowing the API-failure channel. +56 lines.
+#   after   d186db186fcc4d99538654c6969e4f3807d39bdaf68b8db982ce1281a66edd65
+#           41,287 lines · 2,720,447 bytes · 2 blocks (1176, 39769)
+#
+# WHY: #105 fired on the FIRST live pack after shipment 4 — a 200 came back with
+# 2.8 kB after 19.73s and the response was cut short. The gate correctly refused a
+# severed document. But the message it had carefully written was passed to
+# classifyApiError, which matched nothing and substituted "An unexpected error
+# occurred… contact support." BOTH HALVES OF THAT WERE FALSE: it was entirely
+# expected, and there is nothing to support. The gate now sets `INCOMPLETE:` and
+# both surfaces render their own panel; the `ERROR:` path still routes real API
+# failures through classifyApiError.
+#
+# AND A TRUTH DEFECT IN THE FIX'S OWN COPY, caught before it shipped: the new panel
+# read "generating again USUALLY produces a complete pack" — an unmeasured frequency
+# claim, on a panel that exists because the app stopped asserting what it cannot
+# evidence, in a shipment whose own report says nothing counts how often the gate
+# fires. Replaced on both surfaces with a statement of mechanism: "The text was cut
+# off as it was written, not by anything in your data. Generating again produces a
+# different draft."
+#
+# OWED, NOT DELIVERED: nothing measures how often the gate fires. A brand can loop
+# on Generate again with no signal reaching us that the ceiling work is urgent.
+# Belongs with the 4b ruling on ceiling-versus-section-budget.
 
 # index.html moved ef786f2a → 7ebd1ac4 on 4 Sep 2026, batch #9 shipment 4 ITEM 6:
 # SECTION 5 removed from the Brand Pack prompt, sections renumbered 1–6, the
