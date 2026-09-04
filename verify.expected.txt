@@ -9,10 +9,64 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        38dd86a5
+index.html        4a3a2e98
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved 38dd86a5 → 4a3a2e98 on 4 Sep 2026 — #110 item 5 first half,
+# ITEM A: the reorder builder's invented input. +17 lines.
+#   after   4a3a2e982ebc75ba3104de8aac697e6a217be5b61d96b2adb1beee21801c0a0b
+#           41,307 lines · 2,722,881 bytes · 2 blocks
+# NAMED BY THE LANE after reading 40289–40328 at the bytes and confirming the
+# `||'a similar market'` fallback survives only as comment text, from an
+# INDEPENDENT shasum on Charlotte's machine.
+#
+# THE DEFECT: when ctx.nextMarket was empty, the prompt printed `Next market to
+# consider: (not set)` in the data block while instructing the model to suggest
+# pitching "a similar market" — one it had to choose from nothing. The rejection
+# builder's defect relocated. A fallback that invents its own input is a second
+# scheme, the same shape as ||'Denmark' (3 Sep) and the #93 typeof guard.
+#
+# THE FIX IS STRUCTURAL, NOT INSTRUCTED: `_nextMarket` (40305) trims before
+# testing, and a ternary at 40308 selects one of two whole prompts. Paragraph 2,
+# its fallback, the format line, the sentence budget AND the data line all move
+# together. The empty branch cannot emit a market because no instruction and no
+# field mentions one — not because it is told not to.
+#
+# TWO THINGS CC DID BEYOND THE RULING, BOTH RIGHT, BOTH RULED IN AFTER THE FACT:
+# 1. Removed the data line. The lane's spec named the paragraph and the fallback
+#    and left `(not set)` visible. A field printed with no instruction referring
+#    to it is a dangling invitation, and dangling context is what got filled last
+#    time. The lane under-specified; CC caught it.
+# 2. Added a prohibition to the empty branch's format line rather than deleting
+#    only. Mirrors item 1, where the replacement beat the bare deletion. It is
+#    grounded, not asserted: "none is on file" is true by construction in the
+#    branch it appears in.
+#
+# TRIM WAS NOT IN THE RULING EITHER: '   ' now counts as unset. The lane's ruling
+# would have left whitespace passing the guard.
+#
+# DELIBERATELY KEPT: 'while this proof is fresh' (40311). The reorder has just
+# happened, so the proof is fresh — the clause is grounded, not a decay claim.
+#
+# OPEN, FROM CC'S ITEM B REPORT, RULED INTO THE NEXT SHIPMENT:
+#   B1 `Output 1-2 sentences (max 35 words)` (40336) spans both branches of the
+#      rejection builder. A 1–2 sentence budget invites padding "no reason was
+#      given" into something longer, and padding a null result is where invention
+#      re-enters. Moves with the branch, as item A's budget did.
+#   B2 `or similar retailers` (40336) generalises a stated reason from one
+#      retailer to a class — an inference the record does not contain. THIS IS
+#      #110's SHAPE ON THE POPULATED PATH, which is new: every prior instance was
+#      generation into an EMPTY field. The class is wider than we had it.
+#
+# LATENT, RECORDED, NOT SHIPPED: loopEventAccept (40811) would show "Could not
+# draft content — try again" for a sell_through_low event — a transient-failure
+# message for a trigger that will never produce a draft. Unreachable today: that
+# card renders only loopEventResolve, verified at the bytes. #89/Circular-GPS
+# precedent — any future Accept button on this card is gated on fixing it first.
+#
+# STILL UNSCANNED BY BOTH LANES: the render half, 40700–41040.
 
 # index.html moved f66c76fd → 38dd86a5 on 4 Sep 2026 — #110 ITEM 3, the
 # sell_through_low rebuild, AND THE TRUTH DEFECT ITEM 3 CREATED IN ITS OWN SHIPMENT.
