@@ -14892,6 +14892,11 @@ Full 3-year total: LOW — HIGH | Payback: X months from first listing`
 
     try{
       const text = await callAPI([{role:"user",content:mod.prompt}], 1400);
+      // #105 — each module becomes a section of the Market Entry Report PDF, so a severed
+      // module is a severed section. Throw into this loop's existing catch rather than
+      // pushing partial content.
+      const _modIncomplete = generationIncompleteReason(text);
+      if(_modIncomplete) throw new Error('Section "'+mod.title+'" was cut short. '+_modIncomplete);
       completedSections.push({title:mod.title, content:text, confidence:mod.confidence||''});
 
       // Show sections as they complete
@@ -15985,6 +15990,13 @@ ${verificationLine}`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}],1400);
+    const _bcIncomplete = generationIncompleteReason(text);
+    if(_bcIncomplete){
+      bizCaseState.generating=false;
+      bizCaseState.result='ERROR:The business case was not produced because the response was cut short. '+_bcIncomplete+' Nothing partial is shown. Try again.';
+      renderBizCase(document.getElementById('page-bizcase'));
+      return;
+    }
     bizCaseState.result=text;
     bizCaseState.generating=false;
     bizCaseState.timestamp=new Date().toISOString();
@@ -16803,32 +16815,32 @@ const PITCH_AI_BLOCKLIST = [
 // Compliance-CERTAINTY assertions that must never appear unless the provided data
 // block backs them (flag-never-certify, applied to generated prose). Heuristic; tunable.
 const _COMPLIANCE_CERTAINTY_PATTERNS = [
-  /(?<!\bnot\s)(?<!\bnot\syet\s)(?<!un)\bverified\b/i,
-  /\bsubstantiated?\b/i,
-  /\bfully\s+compliant\b/i,
-  /\bcompliance\s+(?:confirmed|complete)\b/i,
-  /full[^.\n]{0,40}certification/i,
-  /✓\s*confirmed/i,
-  /claims?\s+audit\s*(?:result)?\s*[:=]?\s*(?:✓|complete|passed|confirmed)/i,
-  /\bclinically\s+(?:proven|substantiated)\b/i,
+  /(?<!\bnot\s)(?<!\bnot\syet\s)(?<!un)\bverified\b/ig,
+  /\bsubstantiated?\b/ig,
+  /\bfully\s+compliant\b/ig,
+  /\bcompliance\s+(?:confirmed|complete)\b/ig,
+  /full[^.\n]{0,40}certification/ig,
+  /✓\s*confirmed/ig,
+  /claims?\s+audit\s*(?:result)?\s*[:=]?\s*(?:✓|complete|passed|confirmed)/ig,
+  /\bclinically\s+(?:proven|substantiated)\b/ig,
   // Stage 2.1 — assurance-PHRASE class (multi-word verdicts the single-token list misses).
   // Kept tight: honest status like "appointment in progress" / "not on file" must NOT match.
-  /\bno\s+regulatory\s+risk\b/i,
-  /\b(?:retailer|buyer|you)\s+(?:hold|holds|carry|carries|bear|bears)\s+no\s+(?:regulatory\s+)?risk\b/i,
-  /\bmay\s+stock\s+without\s+delay\b/i,
-  /\bwithout\s+regulatory\s+(?:delay|risk|liability)\b/i,
-  /\bcompliance\s+(?:structure\s+)?is\s+(?:set|established|complete|in\s+place)\b/i,
-  /\b(?:device\s+)?compliance\s+is\s+established\b/i,
-  /\bfully\s+(?:notified|registered|documented)\b/i,
-  /\bzero\s+(?:regulatory\s+)?(?:risk|liability)\b/i,
-  /\bno\s+(?:import|onboarding|audit)\s+(?:hold|risk|delay)\b/i,
+  /\bno\s+regulatory\s+risk\b/ig,
+  /\b(?:retailer|buyer|you)\s+(?:hold|holds|carry|carries|bear|bears)\s+no\s+(?:regulatory\s+)?risk\b/ig,
+  /\bmay\s+stock\s+without\s+delay\b/ig,
+  /\bwithout\s+regulatory\s+(?:delay|risk|liability)\b/ig,
+  /\bcompliance\s+(?:structure\s+)?is\s+(?:set|established|complete|in\s+place)\b/ig,
+  /\b(?:device\s+)?compliance\s+is\s+established\b/ig,
+  /\bfully\s+(?:notified|registered|documented)\b/ig,
+  /\bzero\s+(?:regulatory\s+)?(?:risk|liability)\b/ig,
+  /\bno\s+(?:import|onboarding|audit)\s+(?:hold|risk|delay)\b/ig,
   // Stage 2.1.1 — "documentation/docs current" family. Anchored on compliance/doc context
   // so benign "current premium tier" / "current stock levels" do NOT false-flag (tested).
-  /\b(?:all\s+)?(?:compliance\s+)?documentation\s+(?:is\s+)?current\b/i,
-  /\b(?:compliance\s+)?docs?\s+(?:are\s+)?current\b/i,
-  /\ball\s+compliance\s+(?:documentation|docs?|paperwork)\b/i,
-  /\bcompliance\s+(?:documentation|paperwork)\s+(?:current|complete|in\s+order|handled|sorted)\b/i,
-  /\beverything\s+(?:is\s+)?(?:in\s+order|handled|current|sorted|squared\s+away)\b/i,
+  /\b(?:all\s+)?(?:compliance\s+)?documentation\s+(?:is\s+)?current\b/ig,
+  /\b(?:compliance\s+)?docs?\s+(?:are\s+)?current\b/ig,
+  /\ball\s+compliance\s+(?:documentation|docs?|paperwork)\b/ig,
+  /\bcompliance\s+(?:documentation|paperwork)\s+(?:current|complete|in\s+order|handled|sorted)\b/ig,
+  /\beverything\s+(?:is\s+)?(?:in\s+order|handled|current|sorted|squared\s+away)\b/ig,
 ];
 
 // Shared post-gen scanner. Returns the claim-shaped tokens in `text` NOT traceable to
@@ -16866,7 +16878,12 @@ function extractUnsourcedClaims(text, allowed, allowedComplianceText){
     /\b[\d,]{2,}\s?(?:SEK|DKK|NOK|EUR|GBP|kr)\b/gi,
   ];
   numPatterns.forEach(re=>{ let m; while((m=re.exec(text))!==null){ const tok=(m[0]||'').trim(); if(tok && !traceable(tok)) push(tok); } });
-  _COMPLIANCE_CERTAINTY_PATTERNS.forEach(re=>{ const m=text.match(re); if(m){ const tok=m[0].trim(); if(!compOk.includes(tok.toLowerCase())) push(tok); } });
+  // #107 — these patterns carried /i and no /g, and String.match on a NON-global regex
+  // returns only the first hit. A claim repeated five times was flagged once. Now /g and
+  // iterated exactly as numPatterns above. Safe on lastIndex: this array has exactly one
+  // reader (here), and exec-until-null resets lastIndex to 0 on the terminating call, so
+  // no state survives between invocations. Never use .test()/.match() on these constants.
+  _COMPLIANCE_CERTAINTY_PATTERNS.forEach(re=>{ let m; while((m=re.exec(text))!==null){ const tok=(m[0]||'').trim(); if(tok && !compOk.includes(tok.toLowerCase())) push(tok); } });
   return flags;
 }
 
@@ -16890,9 +16907,80 @@ function verifyPitchProof(bodyText, allowedNumbers, allowedComplianceText){
 
 // B4 — post-gen verify for a Brand Pack. complianceData = the EXACT block fed to the
 // prompt (a status present there is allowed; an upgraded ✓ on an absent item is not).
+// ── #105 · generation completeness — ONE check, every multi-section generator ──
+// Three generations, three truncations, always the final section: `positions at **Step`,
+// `| Step`, and worst `veyaflow.com/dpp/vf-1` — a severed passport URL inside a compliance
+// section, an assertion leading nowhere with nobody having clicked. Better no document
+// than a severed one.
+// Deliberately SHARED: Brand Pack, Business Case and the Market Entry Report all build
+// multi-section documents from a callAPI response, and a check living in one of them is
+// the copied-pattern problem that produced #96, #97 and #104.
+// Returns a human-readable reason, or '' when the response looks complete.
+// Signals in the spec's order of reliability.
+function generationIncompleteReason(text){
+  if(!text) return 'The model returned nothing.';
+  const t = String(text).trim();
+  if(!t) return 'The model returned nothing.';
+  if(t.startsWith('ERROR:')) return '';                     // handled by the error path
+  // 1 — unterminated markdown construct
+  const bold = (t.match(/\*\*/g)||[]).length;
+  if(bold % 2 !== 0) return 'A bold marker was left unclosed, which means the response stopped mid-sentence.';
+  const lastLine = t.split('\n').filter(l=>l.trim()).pop() || '';
+  if(/^\s*\|/.test(lastLine) && !/\|\s*$/.test(lastLine)) return 'The final table row is unclosed, which means the response stopped mid-table.';
+  // 2 — final line with no terminal punctuation (lists and table rows terminate legitimately)
+  if(!/^\s*[|\-*•#]/.test(lastLine) && !/[.!?:)\]"'’”]\s*$/.test(lastLine)) {
+    return 'The last line ends mid-sentence: “' + lastLine.slice(-60) + '”.';
+  }
+  // 3 — a severed URL is the worst case and can survive the tests above
+  if(/https?:\/\/\S*$/.test(lastLine) || /veyaflow\.com\/\S*$/.test(lastLine)) {
+    if(!/[.!?]\s*$/.test(lastLine)) return 'The response ends inside a URL, which would print a link that goes nowhere.';
+  }
+  return '';
+}
+
+// ── #106 · regulatory-status vocabulary — a FAIL-CLOSED gate, not a blocklist ──
+// _COMPLIANCE_CERTAINTY_PATTERNS enumerates CERTAINTY phrasings and so fails open on
+// whatever nobody listed: the model wrote "is registered as a Swedish operator" and
+// "complies with GPSR" plainly, hedging nothing, and missed the certainty list entirely.
+// Extending that list is a prompt instruction in different clothes. This is the inverse:
+// AI prose may contain NO regulatory-status vocabulary at all. The deterministic rows on
+// page 2 are the only regulatory claims the document is permitted to make.
+// This CANNOT separate a claim from a question — see the report. It blocks both, by
+// design: a detector that guesses is the thing Strategy's ruling forbids.
+const _REGULATORY_STATUS_VOCAB = [
+  /\bregistrations?\b/ig, /\bregistered\b/ig,
+  /\bcompli(?:es|ant|ance)\b/ig,
+  /\bcertif(?:ied|ication|icates?)\b/ig,
+  /\bCE\s+mark(?:ed|ing)?\b/ig,
+  /\bdeclaration\s+of\s+conformity\b/ig,
+  /\bnotified\s+body\b/ig,
+  /\btechnical\s+file\b/ig,
+  /\bsubstantiat(?:ed|ion)\b/ig,
+  /\bResponsible\s+Person\b/ig,
+  /\beconomic\s+operator\b/ig,
+  /\bCPNP\b/ig, /\bGPSR\b/ig, /\bMDR\b/ig, /\bLVD\b/ig, /\bEMC\b/ig,
+  /\bRoHS\b/ig, /\bWEEE\b/ig, /\bREACH\b/ig,
+];
+
+// Returns the distinct regulatory terms present in AI prose. Applies to the WHOLE
+// response, not the compliance section — "registered as a Swedish operator" appeared in
+// Brand Overview, and a section-scoped check would have missed it.
+function _regulatoryVocabHits(text){
+  if(!text) return [];
+  const seen = [], lower = [];
+  _REGULATORY_STATUS_VOCAB.forEach(re=>{
+    let m; while((m=re.exec(text))!==null){
+      const tok=(m[0]||'').trim(); if(!tok) continue;
+      if(lower.indexOf(tok.toLowerCase())===-1){ lower.push(tok.toLowerCase()); seen.push(tok); }
+    }
+  });
+  return seen;
+}
+
 function verifyBrandPackProof(text, allowedNumbers, complianceData){
   const flags = extractUnsourcedClaims(text, allowedNumbers, complianceData);
-  return { clean: flags.length===0, flagged: flags };
+  const regulatory = _regulatoryVocabHits(text);
+  return { clean: flags.length===0 && regulatory.length===0, flagged: flags, regulatory: regulatory };
 }
 
 // Shared FLAG copy (STRATEGY may swap). kind: 'pitch'|'pack'.
@@ -17102,6 +17190,15 @@ NEVER write "please don't hesitate to contact us."`;
 
   try{
     const text = await callAPI([{role:'user',content:prompt}], 1400);
+    // #105 — refuse a severed document before it can render or export.
+    const _incomplete = generationIncompleteReason(text);
+    if(_incomplete){
+      brandPackState.generating = false;
+      brandPackState.result = 'ERROR:The pack was not produced because the response was cut short. ' + _incomplete + ' Nothing partial is shown — a severed document is worse than none. Try again.';
+      brandPackState.verify = null;
+      renderBrandPack(document.getElementById('page-brandpack'));
+      return;
+    }
     brandPackState.result = text;
     brandPackState.generating = false;
     brandPackState.timestamp = new Date().toISOString();
@@ -17135,14 +17232,49 @@ function renderBrandPackResult(el){
     return {title: lines[0].replace(/SECTION \d+ — /,'').trim(), body: lines.slice(1).join('\n').trim()};
   });
 
-  // B4 — surface the honesty flag above the rendered pack (and the PDF path, separately).
-  const _bpFlag = (brandPackState.verify && !brandPackState.verify.clean)
-    ? `<div style="background:#FBEAE7;border:1px solid #B32A1F;border-left:3px solid #B32A1F;padding:.7rem .9rem;margin-bottom:.85rem;font-family:var(--mono);font-size:.62rem;color:#B32A1F;line-height:1.6">${honestyFlagCopy('pack', brandPackState.verify.flagged)}</div>`
-    : '';
+  // ── #56 · GATE, NOT WARN (Strategy ruling 3 Sep) ──────────────────────────────
+  // The flag printed on buyer-facing covers for days while packs kept generating. A flag
+  // the buyer sees that does not stop the document is worse than no flag: it shows the
+  // customer our internal uncertainty and ships the document anyway. An unclean verify
+  // now stops the pack rendering and stops it exporting; the brand sees what was flagged
+  // and can correct the data and regenerate.
+  if(brandPackState.verify && !brandPackState.verify.clean){
+    const _f = brandPackState.verify.flagged||[];
+    const _r = brandPackState.verify.regulatory||[];
+    el.innerHTML = `
+      <div class="page-wrap">
+        <div class="card" style="border-left:3px solid #B32A1F">
+          <div class="section-tag" style="color:#B32A1F">Pack withheld</div>
+          <div style="font-family:var(--sans);font-size:.88rem;color:var(--navy);line-height:1.6;margin-bottom:.75rem">
+            This pack was not produced. The draft contained statements VeyaFlow cannot evidence from your data, and a document a buyer files has to be one you can stand behind line by line.
+          </div>
+          ${_r.length?`
+            <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:.6rem .8rem;margin-bottom:.6rem;line-height:1.6">
+              <strong>Regulatory status written as prose:</strong> ${_r.map(escapeHtml).join(', ')}.<br>
+              Regulatory status belongs only in the verified rows on page 2, which are built from your saved data. Prose asserting it cannot be checked.
+            </div>`:''}
+          ${_f.length?`
+            <div style="font-family:var(--mono);font-size:.62rem;color:#B32A1F;background:#FBEAE7;border:1px solid #B32A1F;padding:.6rem .8rem;margin-bottom:.6rem;line-height:1.6">
+              <strong>Claims VeyaFlow did not source:</strong> ${_f.map(escapeHtml).join(', ')}.<br>
+              Add these figures to your brand profile or products so they trace to entered data, then regenerate.
+            </div>`:''}
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.85rem">
+            <button class="btn-primary" style="width:auto;padding:.5rem 1rem;font-size:.7rem" onclick="brandPackState.result=null;brandPackState.verify=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Correct and regenerate</button>
+            <button class="btn-outline" style="width:auto;padding:.5rem 1rem;font-size:.7rem" onclick="showPage('home')">Edit brand profile</button>
+            <button class="btn-outline" style="width:auto;padding:.5rem 1rem;font-size:.7rem" onclick="showPage('skus')">Edit products</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // #56 — the warn-banner that used to sit here is GONE, not left conditional. It was the
+  // warn half of warn-vs-gate: an unclean verify now returns above and never reaches this
+  // line, so the ternary was dead — and a dead [FLAG_COPY emitter is one gate-removal away
+  // from being live again. The gate panel above is the only place a flag is now shown.
 
   el.innerHTML=`
     <div class="page-wrap">
-      ${_bpFlag}
       <div class="topbar">
         <div>
           <div class="page-title">Brand Pack</div>
@@ -29788,9 +29920,21 @@ async function generateSpecSheetPDF(skuId){
             com:sku.countryOfMfr||'', sl:sku.shelfLifeMonths||'', dev:isDevice, model:sku.modelNo||'',
             volt:sku.voltageInput||'', ce:sku.ceMarking||'', doc:sku.docOnFile||'', mat:sku.materialComposition||'',
             inci:sku.inci||'', rsp:(function(){var r={};BD_RSP_KEYS.forEach(function(k){if(sku[k]!=null&&sku[k]!=='')r[k]=sku[k];});return r;})(),
-            moq:sku.moq||'', lead:sku.leadDays||'' },
+            moq:sku.moq||'', lead:sku.leadDays||'',
+            // #93 — almost the whole Regulatory status section sat OUTSIDE the fingerprint
+            // the footer advertises, while the device's ce/doc sat inside it. A serum sheet
+            // showing CPNP-2025-0231233 carried the same Document ID as the version with no
+            // CPNP at all. The mechanism was never wrong; the field list was.
+            cpnp:sku.cpnp||'', safety:sku.safetyRef||'', skuRp:sku.euResponsible||'',
+            certs:(sku.certifications||[]).slice().sort(),
+            // The payload carried only the `dev` boolean, so cosmetic → beauty_accessory
+            // left isDevice false and the ID unmoved, while the operator row, the vocabulary
+            // and the regime printed on the page all changed — those route through
+            // resolveProductFramework. Hash the RESOLVED FRAMEWORK, not the boolean.
+            fw:resolveProductFramework(sku).framework },
       claims: claims.map(function(c){ var i=bdClaimInfo(c,sku.productType); return {c:c,l:i.light}; }),
-      rp:(brand&&brand.euResponsible&&brand.euResponsible.name)||'' });
+      rp:(brand&&brand.euResponsible&&brand.euResponsible.name)||'',
+      rpRenew:(brand&&brand.euResponsible&&brand.euResponsible.renewalDate)||'' });
     var _ssHash=''; try{ _ssHash=await _atmHashContent(_ssCanon); }catch(e){}
     var _ssId=(_ssHash && _ssHash!=='unavailable') ? _ssHash.slice(0,12) : 'unavailable';
 
@@ -30309,6 +30453,18 @@ function pdfTable(doc, headerCells, bodyRows, x, y, maxW){
 // ── Brand Pack PDF ────────────────────────────────
 
 async function generateBrandPackPDF(){
+  // #56 — the export is the copy that reaches the buyer, so the gate lives here too and
+  // not only on the render path. Belt and braces deliberately: the render gate could be
+  // bypassed by any future caller of this function.
+  if(brandPackState.verify && !brandPackState.verify.clean){
+    if(typeof _dppRefuse === 'function'){
+      _dppRefuse(
+        'This pack was withheld, so there is no PDF to export.',
+        'The draft contained statements VeyaFlow cannot evidence from your data. Correct the data and regenerate — the on-screen panel lists exactly what was flagged.'
+      );
+    }
+    return;
+  }
   const btn = event?.target;
   if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
   try{
@@ -30370,13 +30526,11 @@ async function generateBrandPackPDF(){
     doc.text('Generated by VeyaFlow · veyaflow.com', pageW/2, pageH-15, {align:'center'});
     doc.setTextColor(180,180,180);
     doc.text('Confidential — not for distribution', pageW/2, pageH-9, {align:'center'});
-    // B4 — honesty flag on the cover (white band) when the verify pass flagged claims.
-    // The PDF is what reaches the buyer, so the flag MUST surface here, not just on screen.
-    if(brandPackState.verify && !brandPackState.verify.clean){
-      pdfSetFont(doc, 'body'); doc.setFontSize(9);
-      doc.setTextColor(179,42,31); // #B32A1F
-      pdfWrap(doc, honestyFlagCopy('pack', brandPackState.verify.flagged), margin, pageH*0.68+14, contentW, 4.6);
-    }
+    // #56 — the [FLAG_COPY: …] annotation used to print HERE, on the buyer-facing cover.
+    // An unclean pack no longer reaches this function at all (gate at the top), so the
+    // annotation has nothing to report; and an internal QA token on a cover is the exact
+    // failure the ruling ends. Removed rather than left conditional — a conditional would
+    // put it back the moment the gate above is bypassed.
 
     // ── PAGE 2: Brand Overview ──
     doc.addPage();
