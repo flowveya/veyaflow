@@ -15993,7 +15993,8 @@ ${verificationLine}`;
     const _bcIncomplete = generationIncompleteReason(text);
     if(_bcIncomplete){
       bizCaseState.generating=false;
-      bizCaseState.result='ERROR:The business case was not produced because the response was cut short. '+_bcIncomplete+' Nothing partial is shown. Try again.';
+      // #105 — same reasoning as the Brand Pack: a refusal is not an API failure.
+      bizCaseState.result='INCOMPLETE:'+_bcIncomplete;
       renderBizCase(document.getElementById('page-bizcase'));
       return;
     }
@@ -16009,6 +16010,30 @@ ${verificationLine}`;
 
 function renderBizCaseResult(el){
   const result = bizCaseState.result||'';
+  // #105 — see renderBrandPackResult: a refusal renders its own message.
+  if(result.startsWith('INCOMPLETE:')){
+    const _why = result.replace('INCOMPLETE:','').trim();
+    el.innerHTML = `
+      <div class="page-wrap">
+        <div class="card" style="border-left:3px solid #B32A1F">
+          <div class="section-tag" style="color:#B32A1F">Business case not produced</div>
+          <div style="font-family:var(--sans);font-size:.88rem;color:var(--navy);line-height:1.6;margin-bottom:.75rem">
+            The business case was cut short before it finished, so nothing was produced. A document that stops mid-sentence is worse than no document — a category manager cannot tell which part is missing.
+          </div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:.6rem .8rem;margin-bottom:.6rem;line-height:1.6">
+            <strong>What was detected:</strong> ${escapeHtml(_why)}
+          </div>
+          <div style="font-family:var(--sans);font-size:.8rem;color:var(--muted);line-height:1.6">
+            The text was cut off as it was written, not by anything in your data. Generating again produces a different draft.
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.85rem">
+            <button class="btn-primary" style="width:auto;padding:.5rem 1rem;font-size:.7rem" onclick="bizCaseState.result=null;bizCaseState.generating=false;renderBizCase(document.getElementById('page-bizcase'))">← Generate again</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
   if(result.startsWith('ERROR:')){
     const errMsg = result.replace('ERROR:','');
     const cl = classifyApiError({message:errMsg});
@@ -17171,7 +17196,11 @@ NEVER write "please don't hesitate to contact us."`;
     const _incomplete = generationIncompleteReason(text);
     if(_incomplete){
       brandPackState.generating = false;
-      brandPackState.result = 'ERROR:The pack was not produced because the response was cut short. ' + _incomplete + ' Nothing partial is shown — a severed document is worse than none. Try again.';
+      // #105 — INCOMPLETE:, not ERROR:. classifyApiError exists to interpret an API
+      // FAILURE; this is a deliberate refusal that already carries its own explanation,
+      // and handing it to a classifier would reword a decision we made into a diagnosis
+      // of something that did not happen.
+      brandPackState.result = 'INCOMPLETE:' + _incomplete;
       brandPackState.verify = null;
       renderBrandPack(document.getElementById('page-brandpack'));
       return;
@@ -17195,6 +17224,33 @@ function renderBrandPackResult(el){
   const heroSku = skus.length>0?skus[0]:null;
   const basket = BASKET_DATA[brandPackState.retailer]||BASKET_DATA.default;
   const result = brandPackState.result||'';
+
+  // #105 — a completeness refusal renders its OWN message. It is not an API failure and
+  // must not be routed through classifyApiError, which would replace the reason we know
+  // with a guess at a network or quota fault that never occurred. Same shape as the #56
+  // withhold panel: what happened, why, what to do.
+  if(result.startsWith('INCOMPLETE:')){
+    const _why = result.replace('INCOMPLETE:','').trim();
+    el.innerHTML = `
+      <div class="page-wrap">
+        <div class="card" style="border-left:3px solid #B32A1F">
+          <div class="section-tag" style="color:#B32A1F">Pack not produced</div>
+          <div style="font-family:var(--sans);font-size:.88rem;color:var(--navy);line-height:1.6;margin-bottom:.75rem">
+            The pack was cut short before it finished, so nothing was produced. A document that stops mid-sentence is worse than no document — a buyer cannot tell which part is missing.
+          </div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:.6rem .8rem;margin-bottom:.6rem;line-height:1.6">
+            <strong>What was detected:</strong> ${escapeHtml(_why)}
+          </div>
+          <div style="font-family:var(--sans);font-size:.8rem;color:var(--muted);line-height:1.6">
+            The text was cut off as it was written, not by anything in your data. Generating again produces a different draft.
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.85rem">
+            <button class="btn-primary" style="width:auto;padding:.5rem 1rem;font-size:.7rem" onclick="brandPackState.result=null;brandPackState.verify=null;brandPackState.generating=false;renderBrandPack(document.getElementById('page-brandpack'))">← Generate again</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
 
   if(result.startsWith('ERROR:')){
     const errMsg = result.replace('ERROR:','');
