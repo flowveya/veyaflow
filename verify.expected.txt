@@ -9,10 +9,40 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        be86c431
+index.html        ef786f2a
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved be86c431 → ef786f2a on 4 Sep 2026, batch #9 shipment 4 —
+# THE TRUTH GATES. Five items: the regulatory-prose gate (#106), #107's counter,
+# #105's shared completeness check across all three multi-section generators,
+# #93's _ssCanon field list, and #56 as a GATE rather than a warning.
+# NAMED BY THE LANE after reading the load-bearing edits at the bytes and
+# confirming the shift pattern: nothing above 14894 moved, then +12 by 16327,
+# +149 by 17380, +154 by 35425 — monotonic, matching five insertion points.
+#   after   ef786f2a2987ee22582b82f5a9c528b822cd7067fea18011fc1d0f64122c69c2
+#           41,254 lines · 2,718,898 bytes · 2 blocks (1176, 39736)
+#
+# TWO THINGS THIS SHIPMENT ESTABLISHES, both permanent from here:
+# 1. Document IDs now cover the regulatory section AND the resolved framework.
+#    Every ID the app produces changed once, deliberately, while nothing had
+#    been issued. The serum moved 5836261e14ab → 3af3865024a8. Removing the
+#    typeof guard moved NOTHING (the true branch and the direct call hash
+#    identically) — what it removed was a second scheme: on a legacy SKU the
+#    branches diverge, garment→textile giving 7b4c57fa949f against the raw
+#    fallback's ef47bf94286f. Two IDs for one product, decided by a hoisting
+#    accident.
+# 2. resolveProductFramework re-baselined 19 → 20 call sites. The new call is
+#    the one _ssCanon needs and the only one; verified at 29934 before the
+#    recapture was authorised.
+#
+# CAVEAT ON THAT GREEN, so it is not read as more than it is: verify.baseline.json
+# was recaptured from this tree, so the BASELINE DRIFT section compared the tree
+# against a snapshot of itself and could not fail. The digest, block-count, parse
+# and cross-file checks are unaffected and carry the weight. Queued: verify.js
+# should record the digest a baseline was captured from and mark that section
+# VACUOUS when it matches.
 
 # index.html moved 3ff93df4 → be86c431 on 3 Sep 2026, batch #9 third shipment
 # (target market field: placeholder option, no retailers until a market is chosen,
