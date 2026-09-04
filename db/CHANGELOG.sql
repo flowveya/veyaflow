@@ -106,9 +106,38 @@ alter function public.set_updated_at() set search_path = public;
 -- only. Bringing the events surface to the same handling is follow-up work.
 --
 -- PREDICATE IDENTITY: the WHERE clause below is character-identical to the one
--- that produced invented_causality = 1. UPDATE 1 is therefore proof that exactly
--- what was measured is what was corrected — no dedupe_key transcription can
--- widen or miss it.
+-- that produced invented_causality = 1, so the write cannot reach a row the
+-- measurement did not count.
+--
+-- BUT THE CODING LANE FIRST CLAIMED MORE THAN THAT AND WAS WRONG, recorded here
+-- because the error is instructive. The claim was that re-running the count after
+-- the update would return 0, making the statement self-proving. IT CANNOT. The
+-- sentinel 'not_recorded' is itself non-null and non-empty, so a corrected row
+-- STILL SATISFIES the predicate. The count reads 1 before and 1 after, forever.
+-- That is a check that cannot fail — the exact defect verify.js exists to prevent,
+-- authored by the lane, into the post-condition of the shipment about checks that
+-- cannot fail. Third instance in one day (the others: grep -l matching
+-- process.env.API_KEY as if it were a secret; a spec guard counting a comment as
+-- a call site).
+--
+-- WHAT ACTUALLY VERIFIED IT was reading the rows rather than asking a question
+-- with one possible answer:
+--   c8d5b017 sell_through_high Matas  original text intact, updated_at 2026-04-27
+--   2d6169af rejection         Lyko   'not_recorded',      updated_at 2026-09-04
+--                                                                    18:29:42Z
+-- That check fails in both directions: it catches an update that did nothing AND
+-- an update that also hit the clean control row.
+--
+-- ORDERING DEFECT, OURS: this entry was committed (83d04f2) BEFORE the statement
+-- was executed. For the interval between that commit and the execution, the file
+-- asserted a database change that had not happened — in a file whose header says
+-- "Statements were executed by Charlotte in the SQL Editor." Corrected forward by
+-- executing, not by rewriting history. The rule this establishes: the changelog
+-- entry and the commit go in AFTER the statement runs and its effect is read back.
+--
+-- FOR NEXT TIME: add `returning id` to a corrective UPDATE. It prints the rows it
+-- touched, so the statement evidences its own effect instead of depending on a
+-- separate check that may not be capable of failing.
 update public.loop_events
 set drafted_content = 'not_recorded',
     updated_at = now()
