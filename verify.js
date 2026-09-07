@@ -72,6 +72,10 @@ const SINGLE_DEFINITION = [
   'persistCritical',
   'DPP_CANONICAL_ORIGIN',
   'DPP_ORIGIN_LIVE',
+  // Time axis step 1 — the single write path for confirmation stamps.
+  '_appendStamp',
+  'CHECKLIST_STAMP_KEY',
+  'CONFIRMATION_STAMP_KEY',
 ];
 
 // Call-site counts the handoff states outright.
@@ -86,6 +90,11 @@ const FIXED_CALLSITES = {
   // and CODING_STATUS.md both record 4 and must be corrected, or the next lane reads a
   // stale invariant and stops on a phantom.
   _dppIsPublished: 3,
+  // Time axis step 1 (7 Sep 2026). THREE write sites, and the count is the contract:
+  // toggleRetailChecklistItem, saveManualRp, saveManualOperator. A fourth call means a
+  // new confirmation surface was stamped without a ruling; adding one is a spec decision,
+  // not an implementation detail, so a floating count would not be a contract.
+  _appendStamp: 3,
 };
 
 // Names that must NOT exist. `normalizeBrandRP` was invented by the coding lane
@@ -364,6 +373,43 @@ Object.keys(FIXED_CALLSITES).forEach(name => {
       ' (html-lines ' + c.join(', ') + ')' + suffix);
   }
 });
+
+// ── TIME AXIS STEP 1 — WRITE-ONLY GATE ──────────────────────────────────────
+// "Renders nothing" must be a CANNOT, not a MUST-NOT. Without this, the first person who
+// wants a "last confirmed" chip adds one in good faith and nothing stops them.
+// The contract has three parts, and all three must hold:
+//   1. each key LITERAL is quoted exactly once — its const declaration, nowhere else
+//   2. each key CONSTANT is referenced only inside _appendStamp (1 ref each per write
+//      site it serves; the literal itself is not a reference)
+//   3. localStorage.getItem of either key appears ONLY inside _appendStamp, which is a
+//      read-modify-write, not a read site
+// A render of a stamp would have to break one of these to exist.
+section('TIME AXIS — CONFIRMATION STAMPS ARE WRITE-ONLY (capture-only shipment)');
+{
+  const STAMP_KEYS = ['ns_retail_checklist_stamps', 'ns_confirmation_stamps'];
+  STAMP_KEYS.forEach(k => {
+    const quoted = (html.match(new RegExp("'" + k + "'|\"" + k + "\"", 'g')) || []).length;
+    if (quoted === 1) line('PASS', k + ' — 1 quoted occurrence (its const declaration only)');
+    else if (quoted === 0) line('NOT FOUND', k + ' — key absent; the capture shipment is not in this tree');
+    else line('FAIL', k + ' — ' + quoted + ' quoted occurrences, expected 1. A second quote means the key is being read or written outside _appendStamp.');
+    // A getItem of the key by LITERAL is the read that must never exist.
+    const direct = (html.match(new RegExp("getItem\\(\\s*['\"]" + k + "['\"]", 'g')) || []).length;
+    if (direct === 0) line('PASS', k + ' — 0 direct getItem() by literal');
+    else line('FAIL', k + ' — ' + direct + ' direct getItem() by literal; this key is write-only');
+  });
+  // The stamp map must never reach a render. Any of these names inside a render/HTML
+  // path would mean step 1 grew a UI, which is explicitly out of scope until the data
+  // has existed long enough to reason about.
+  const renderLeak = (html.match(/(?:innerHTML|html\s*\+=)[^\n]*(?:CHECKLIST_STAMP_KEY|CONFIRMATION_STAMP_KEY|_appendStamp)/g) || []).length;
+  if (renderLeak === 0) line('PASS', 'no stamp identifier appears in an innerHTML or html+= line');
+  else line('FAIL', renderLeak + ' render line(s) reference a stamp identifier — capture-only was violated');
+  // Not evictable: _evictCaches is an allowlist, and widening it would silently make
+  // unbackfillable history droppable under quota pressure.
+  const evictList = (html.match(/const _EVICTABLE_CACHE_PREFIXES\s*=\s*\[([^\]]*)\]/) || [])[1] || '';
+  const widened = /ns_retail|ns_confirmation/.test(evictList);
+  if (!widened) line('PASS', '_EVICTABLE_CACHE_PREFIXES does not match either stamp key (allowlist: ' + evictList.trim() + ')');
+  else line('FAIL', '_EVICTABLE_CACHE_PREFIXES was widened to cover a stamp key — history could be evicted under quota pressure');
+}
 
 section('NAMES THAT MUST NOT EXIST');
 MUST_NOT_EXIST.forEach(name => {

@@ -16388,6 +16388,9 @@ function saveManualOperator(){
     renewalDate: manualOperatorForm.renewalDate||'',
   };
   if(typeof saveBrandState === 'function') saveBrandState();
+  // Same reasoning as the RP above: the mandate's renewal date is re-enterable, the date
+  // the brand confirmed it is not.
+  _appendStamp(CONFIRMATION_STAMP_KEY, 'brand', 'euOperator', { at: new Date().toISOString() });
   if(typeof showSuccess === 'function') showSuccess('EU economic operator saved');
   if(typeof renderRpMarketplace === 'function'){
     const el = document.getElementById('page-rp-marketplace');
@@ -16473,6 +16476,12 @@ function saveManualRp(){
     renewalDate: manualRpForm.renewalDate||'',
   };
   if(typeof saveBrandState === 'function') saveBrandState();
+  // Time axis — the app has always known when the RP agreement EXPIRES (renewalDate) and
+  // has never known when the brand TOLD US it existed. The expiry is re-enterable from
+  // the document; the confirmation date is not reconstructable from anything.
+  // Stamped in the parallel map, NOT as a field on brand.euResponsible — batch #8 fixed
+  // that object's shape exactly and this shipment does not move it.
+  _appendStamp(CONFIRMATION_STAMP_KEY, 'brand', 'euResponsible', { at: new Date().toISOString() });
   // Clear gap dismissal so banner logic re-evaluates (RP now present → gap closes)
   try{ localStorage.removeItem('ns_rpGapDismissed'); }catch(e){}
   if(typeof showSuccess === 'function') showSuccess('EU Responsible Person saved');
@@ -39329,6 +39338,43 @@ function renderRetailChecklist(el){
   el.innerHTML = html;
 }
 
+// ── TIME AXIS, STEP 1 — CAPTURE ONLY ──────────────────────────────────────────
+// Data we do not capture today cannot be backfilled. Deferring a FEATURE costs waiting
+// time; deferring COLLECTION destroys the option permanently — nobody can build our
+// customers' past. So the stamp is written now and read by nothing.
+//
+// WRITE-ONLY IS A CANNOT, NOT A MUST-NOT. verify.js asserts a fixed occurrence count for
+// both key constants and for _appendStamp, so a future read site fails the battery before
+// it reaches review. Do not add a getItem of these keys outside _appendStamp, and do not
+// reference them from a render function — the gate will stop you, by design.
+//
+// WHY A PARALLEL MAP AND NOT A FIELD ON THE BOOLEAN: retailChecklistState[key][reqId] is
+// a bare bool the renderer reads as truthy (`if(autoDone || state[r.id])`). Turning it
+// into {done, at} would make EVERY object truthy — including {done:false} — and a brand's
+// entire compliance checklist would silently render as complete. The existing read path
+// never sees this map, and that is the reason this is safe rather than merely careful.
+//
+// NOT EVICTABLE: _evictCaches is an ALLOWLIST over _EVICTABLE_CACHE_PREFIXES
+// ['ns_comp_','ns_inci_','ns_pkg_','ns_srisk_']. Neither key matches, so neither is ever
+// a candidate. Unbackfillable history cannot be silently dropped under quota pressure.
+const CHECKLIST_STAMP_KEY    = 'ns_retail_checklist_stamps';
+const CONFIRMATION_STAMP_KEY = 'ns_confirmation_stamps';
+
+// APPEND-ONLY. The spec sketched a bare ISO string per requirement, but that cannot
+// represent an UNTICK: a stamp that only survives while the box is ticked is not a record
+// of what happened. Each entry carries the resulting state, so a tick and an untick are
+// both history and are distinguishable. Nothing is ever removed or overwritten.
+// The getItem here is a read-modify-write inside the single writer — it is not a read
+// site in the sense the gate forbids, and it is the only getItem of either key.
+function _appendStamp(storageKey, groupKey, itemKey, entry){
+  var map = {};
+  try{ map = JSON.parse(localStorage.getItem(storageKey)||'{}') || {}; }catch(e){ map = {}; }
+  if(!map[groupKey] || typeof map[groupKey] !== 'object') map[groupKey] = {};
+  if(!Array.isArray(map[groupKey][itemKey])) map[groupKey][itemKey] = [];
+  map[groupKey][itemKey].push(entry);
+  persistCritical(storageKey, map);   // inherits the write-then-read-back verification
+}
+
 function toggleRetailChecklistItem(reqId){
   loadRetailChecklist();
   var stateKey = retailChecklistSelRetailer+'::'+retailChecklistSelSku;
@@ -39336,6 +39382,10 @@ function toggleRetailChecklistItem(reqId){
   s[reqId] = !s[reqId];
   retailChecklistState[stateKey] = s;
   saveRetailChecklist();
+  // Stamped HERE and only here — this is the human toggle. The other source on this row
+  // is autoDone from r.autoCheck, which the APP derived; stamping that would record that
+  // a person confirmed something nobody confirmed.
+  _appendStamp(CHECKLIST_STAMP_KEY, stateKey, reqId, { at: new Date().toISOString(), done: !!s[reqId] });
   renderPage('retail-checklist');
 }
 

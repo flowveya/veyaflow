@@ -9,11 +9,80 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        0190c726
+index.html        9eb3da69
 dpp/index.html    6e946a27
 portal.html       beaa72b8
 brand/index.html  1e99d32c
 netlify/functions/supabase-proxy.js  78c4f6a2
+
+# index.html moved 0190c726 → 9eb3da69 on 7 Sep 2026 — TIME AXIS STEP 1, the
+# confirmation stamp. +79 lines. CAPTURE ONLY: renders nothing, reasons about nothing.
+#   after   9eb3da6917ba6ec516a846006f27d5579418edb730636a2d1fc5b9589c9c71e7
+#           41,507 lines · 50 gates (was 40)
+# NAMED BY THE LANE after reading 16393, 16484, 39359–39390 at the bytes, INDEPENDENT
+# shasum. portal.html and supabase-proxy.js UNCHANGED.
+#
+# WHY THIS OUTRANKED EVERYTHING ELSE IN THE QUEUE (Strategy, 7 Sep):
+#   "Nothing new is built before evidence" stands. But CAPTURE and RENDERING are not the
+#   same thing, and the difference is ASYMMETRIC: deferring a feature costs waiting time,
+#   deferring collection destroys the option permanently. Collection that cannot be
+#   backfilled may precede evidence. Anything that renders or reasons about it may not.
+#   The stamp passes. A "last confirmed" chip does not. A staleness flag definitely does
+#   not.
+# Every day without the stamp was a day of history that can never be reconstructed. The
+# thesis is that the history accrues in real time and cannot be migrated in — nobody can
+# build our customers' past, and until today we were not building it either.
+#
+# THREE WRITE SITES, ALL HUMAN CONFIRMATIONS: toggleRetailChecklistItem (39388),
+# saveManualRp (16484), saveManualOperator (16393). saveSkus and saveBrandState stay OUT
+# — bulk writes, not a discrete yes; stamping them would record "the brand pressed save"
+# as though it meant "the brand confirmed this fact".
+# CC's argument carried the RP pair into scope and it is the sharpest in the report: the
+# app already knows when the RP agreement EXPIRES and has never known when the brand TOLD
+# US IT EXISTED. The expiry is re-enterable from the document; the confirmation date is
+# reconstructable from nothing.
+#
+# THE TRAP, AVOIDED BY CONSTRUCTION: retailChecklistState[key][reqId] is a bare bool read
+# as truthy (`if(autoDone || state[r.id])`). Turning it into {done,at} would make EVERY
+# object truthy — a brand's entire compliance checklist silently complete. The stamp
+# therefore lives in a PARALLEL map the existing read path cannot see. autoDone is never
+# stamped: it is derived, and stamping it would record that a person confirmed something
+# nobody confirmed.
+#
+# THE LANE'S SPEC WAS SELF-CONTRADICTORY AND CC CAUGHT IT. The sketch said
+# {reqId:"<ISO>"} while implement 3 demanded the untick be recorded — those cannot both
+# hold, because a bare string cannot say which direction a toggle went and overwriting
+# produces exactly the "survives only while ticked" record the spec rejected. The value
+# is now an APPEND-ONLY array of {at, done}. Nothing is removed or overwritten.
+#
+# THE GATE — because "write-only" must be a CANNOT, not a MUST-NOT. Strategy's decision
+# filter, applied to the spec itself: when a rule is phrased as "must not", ask whether it
+# can be phrased as "cannot". Six assertions: 1 quoted occurrence per stamp key (its const
+# only), 0 getItem-by-literal each, no stamp identifier in any innerHTML/html+= line, and
+# _EVICTABLE_CACHE_PREFIXES does not match either key. Plus _appendStamp:3 in
+# FIXED_CALLSITES — A FOURTH CONFIRMATION SURFACE FAILS THE BATTERY UNTIL STRATEGY RULES
+# ON IT. This is the first shipment whose gate constrains FUTURE shipments rather than
+# fixing a defect in this one.
+#
+# EVICTION, ANSWERED BEFORE EDITING: _evictCaches is ALLOWLIST-ONLY —
+# _EVICTABLE_CACHE_PREFIXES = ['ns_comp_','ns_inci_','ns_pkg_','ns_srisk_'] and anything
+# not matching is `continue`d. Neither stamp key is ever a candidate, and any new key is
+# non-evictable BY DEFAULT. No exemption needed; the design already inverts the risk. CC
+# gated the allowlist anyway, beyond spec, because it is one edit from being wrong.
+#
+# DRIFT AUTHORISED AFTER READING THE SITE: persistCritical 53 → 54, the new call inside
+# _appendStamp (39375), required by implement 1. verify.baseline.json edited BY HAND for
+# that one value rather than recaptured — a recapture would silently absorb any OTHER
+# drift alongside the one verified, which is the VACUOUS-baseline problem already queued.
+# Same discipline as resolveProductFramework 19→20 in #93.
+#
+# LIMITS STATED, NOT SMOOTHED OVER: the gate counts literals, so a computed key
+# ('ns_retail'+'_checklist_stamps') defeats it. It stops the HONEST ACCIDENT — the person
+# who wants a chip and adds one in good faith — which is the failure mode the rule was
+# written for. And _appendStamp has NO CAP: a cap discards unbackfillable history, which
+# is the one thing this shipment exists to prevent. Both are open decisions, not
+# oversights, and both belong to Strategy alongside retention — triggered by #63, not by
+# anything today.
 
 # index.html moved 48fe2758 → 0190c726 on 7 Sep 2026 — #122 and #127, NUMBERS THAT
 # ASSERT WHAT WAS NEVER MEASURED. Three items, one class; two found by using the app,
