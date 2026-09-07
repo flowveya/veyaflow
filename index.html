@@ -38207,7 +38207,10 @@ function renderRetailAddSubmissionForm(){
   });
   var totalCount = candidates.length + otherRetailers.length;
 
-  var html = '<div style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
+  // #112 — id is the scroll target for openAddRetailSubmission. The form is emitted
+  // after the pipeline summary, the aggregated rejection view, Pattern Intelligence
+  // and the Brand Outcome Dashboard, so it opens several hundred pixels below the fold.
+  var html = '<div id="retail-tracker-add-form" style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">';
   html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">New submission</div>';
   html += '<button onclick="closeAddRetailSubmission()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>';
@@ -38280,6 +38283,17 @@ function openAddRetailSubmission(){
   retailTrackerAddOpen = true;
   retailTrackerAddForm = {retailerId:'', skuIds:[], contactName:'', contactEmail:'', notes:''};
   renderPage('retail-tracker');
+  // #112 — the form opened below the fold and the page did not move, so the button read
+  // as doing nothing and the user's next action was to click it again. Scroll lives HERE,
+  // on the open path, not in the renderer: ordinary navigation to this page must not move.
+  // setTimeout because renderPage only builds the markup — the node does not exist until
+  // it returns. Same idiom and same 80ms as the readiness panel (L7109) and the target-
+  // retailers picker (L31200); block:'start' puts the heading at the top with the fields
+  // below it, which is what a form about to be filled needs.
+  setTimeout(function(){
+    var el = document.getElementById('retail-tracker-add-form');
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 80);
 }
 
 function closeAddRetailSubmission(){
@@ -39648,7 +39662,10 @@ function renderRetailComms(el){
 function renderRetailCommsAddForm(retailerList){
   var f = retailCommsAddForm;
   if(!f.date) f.date = new Date().toISOString().slice(0,10);
-  var html = '<div style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
+  // #112 — id is the scroll target for openAddRetailComms. This form sits high on the
+  // page today, so the defect here is LATENT rather than visible — one content block
+  // above it and it behaves like the tracker's. Fixed on the same terms regardless.
+  var html = '<div id="retail-comms-add-form" style="background:#fff;border:1px solid var(--gold);padding:1.1rem 1.2rem;margin-bottom:1rem">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">';
   html += '<div style="font-family:var(--serif);font-size:1rem;color:var(--navy)">Log new entry</div>';
   html += '<button onclick="closeAddRetailComms()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>';
@@ -39703,6 +39720,13 @@ function openAddRetailComms(){
   retailCommsAddOpen = true;
   retailCommsAddForm = {retailerId: retailCommsSelRetailer||'', date:new Date().toISOString().slice(0,10), type:'email_sent', contactName:'', summary:'', nextAction:'', nextActionDate:'', attachmentNote:''};
   renderPage('retail-comms');
+  // #112 — same defect, same fix, applied even though this form sits high on the page
+  // today: a control that happens to be above the fold is one content block away from not
+  // being. Identical idiom to openAddRetailSubmission so the two cannot drift apart.
+  setTimeout(function(){
+    var el = document.getElementById('retail-comms-add-form');
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 80);
 }
 
 function closeAddRetailComms(){

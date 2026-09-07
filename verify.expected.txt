@@ -9,10 +9,72 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        4a3a2e98
+index.html        e2b148d4
 dpp/index.html    6e946a27
 portal.html       b96423ac
 brand/index.html  1e99d32c
+
+# index.html moved 4a3a2e98 → e2b148d4 on 7 Sep 2026 — #112, the add-submission
+# button that opens a form below the fold. +24 lines. FIRST FINDING FOUND BY USING
+# THE APP rather than by reading it.
+#   after   e2b148d4463922c0bcd669d8af04e198bd8a89ab3886ba8d84734ac49c88f09a
+#           41,331 lines · 2,724,663 bytes · 2 blocks
+# NAMED BY THE LANE after reading both call sites at the bytes, from an INDEPENDENT
+# shasum on Charlotte's machine.
+#
+# THE DEFECT: openAddRetailSubmission set a flag and called renderPage. The form's
+# markup is emitted after the pipeline summary, the aggregated rejection view,
+# Pattern Intelligence and the Brand Outcome Dashboard, so it opened several
+# hundred pixels below the fold and the viewport never moved. The button worked and
+# looked broken — the user's next action is to click it again.
+#
+# NOT A TRUTH DEFECT. Recorded here under the SIBLING rule: the pattern occurs
+# twice (openAddRetailSubmission 38279, openAddRetailComms 39703 at the old
+# baseline) and fixing only the reported instance is the narrow-anchor error that
+# has bitten this lane nine times. The comms form is LATENT rather than visibly
+# broken — it sits high on its page today — and was fixed on identical terms
+# anyway, using the same idiom so the two cannot drift apart.
+#
+# MECHANISM MATCHED, NOT INVENTED: id + scrollIntoView deferred 80ms, which is
+# already the file's idiom at 7109 (readiness panel) and 31200 (retailer picker).
+# block:'start' not 'center' — a form is filled top-down. Scroll-on-open is
+# STRUCTURAL: the call lives in the open functions, not the renderers, so ordinary
+# navigation cannot trigger it.
+#
+# A FALSE CLAIM IN AN OTHERWISE EXEMPLARY REPORT, recorded because of its shape.
+# CC wrote that the spec guessed the comms heading as `Log communication` and that
+# the tree says `Log new entry` — "a small drift between spec and bytes, no
+# consequence". The spec contains no heading guess: zero occurrences, grepped. CC
+# described a discrepancy between a document and the code by inventing the
+# document's half. Consequence nil; the shape is a confident checkable claim,
+# wrong, phrased in the reassuring direction. CC's reports are the channel this
+# lane verifies through, so a false statement about a spec is the same class as a
+# false digest.
+#
+# OPEN, RULED INTO A SECOND SHIPMENT (both need ids that do not exist yet):
+#   FOCUS. .focus() scrolls as a side effect using instant positioning, which cuts
+#     across an in-flight smooth scroll — a race, not a design. The file already
+#     resolves this at retailScrollToManualField (37704): scroll, then focus at
+#     400ms against a ~300ms smooth scroll. focus({preventScroll:true}) is better
+#     if it holds against target browsers — a check, not a guess. Needs first-field
+#     ids on both forms.
+#   CLOSE — THE INVERSE DEFECT. Browsers preserve scroll OFFSET, not scroll ANCHOR.
+#     Closing a several-hundred-pixel form shifts everything below it up into those
+#     pixels, so the user is left looking at Pattern Intelligence having closed a
+#     form. Symmetric fix: scroll back to the button that opened it. Needs an id on
+#     the + NEW SUBMISSION button.
+#
+# ESCALATED TO DESIGN, AND THE FIX IS SUPERSEDABLE: scrolling compensates at
+# runtime for a layout decision, on two pages, in both directions. Rendering the
+# form adjacent to its button, or as an overlay, removes both compensations at
+# once. Shipped anyway because the defect is live and users hit it now. If DESIGN
+# rules for adjacency or an overlay, this is SUPERSEDED rather than extended — the
+# ids stay useful, the scroll calls come out.
+#
+# NOTICED: the two form containers were BYTE-IDENTICAL before this change — same
+# opening <div style="…border:1px solid var(--gold)…">, distinguishable only by a
+# heading three lines later. That is how a future edit lands on the wrong form.
+# The ids incidentally fix it.
 
 # index.html moved 38dd86a5 → 4a3a2e98 on 4 Sep 2026 — #110 item 5 first half,
 # ITEM A: the reorder builder's invented input. +17 lines.
