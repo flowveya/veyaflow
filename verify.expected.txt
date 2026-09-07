@@ -11,8 +11,74 @@
 
 index.html        e2b148d4
 dpp/index.html    6e946a27
-portal.html       b96423ac
+portal.html       beaa72b8
 brand/index.html  1e99d32c
+
+# portal.html moved b96423ac → beaa72b8 on 7 Sep 2026 — #113, brand claims rendered
+# to the buyer in the success palette. FIRST MOVE ON portal.html SINCE BATCH #5.
+#   after   beaa72b85e853dab6cae4d29413fc15e131999e3ee8a2b71bd20e0beb13cd237
+# NAMED BY THE LANE after reading 1044–1071 at the bytes, from an INDEPENDENT
+# shasum. index.html UNCHANGED at e2b148d4 — this shipment touches one surface.
+#
+# THE DEFECT: (s.claims||[]) rendered as .detail-badge-green — #ECFDF5/#065F46, the
+# same success palette as the ✓ in the compliance table twenty lines below. Six
+# brand-DECLARED items read to a retail buyer as findings. The page then
+# contradicted itself: six green badges above, CLAIMS "–" (not recorded) below,
+# same brand, same submission, same screen. Found by USING the portal, not reading it.
+#
+# THE FIX IS A SUBTRACTION: base .detail-badge only, coloured from existing tokens
+# (--cream/--navy/--border), plus a legend matching the compliance table's own
+# discipline at 1209 — "Declared by the brand · not verified by VeyaFlow. Per-product
+# status is in the compliance table below." NO state treatment invented: green/amber/
+# red badges are DESIGN's and would need the payload fixed first. .detail-badge-green
+# now has 0 live uses; the CSS rule at 257 was LEFT IN PLACE — removing a token is a
+# design decision, and it may be wanted once state actually reaches this surface.
+#
+# THE LANE'S SPEC PRESCRIBED THE WRONG REMEDY, AND CC'S REPORT IS WHAT CAUGHT IT.
+# The spec asserted "the state exists and the surface throws it away", on the strength
+# of seeing claimLights computed in buildSubmitSnapshot. The connection was never
+# checked. pack.claims is built from sk.certifications + sk.claimsApproved;
+# claimLights is computed over sku0.claims — DIFFERENT ARRAYS. Plumbing the payload
+# would have attached lights to items not on the badge row, and string-matching them
+# would be a guess. Same error as the retracted ESPR_TIMELINE/DPP-filter claim:
+# asserting a CONNECTION between two things each separately observed. Caught before
+# shipping only because the author reported against the spec instead of executing it.
+# claimLights occurrences in portal.html: 0. In supabase-proxy.js: 0.
+#
+# #116 — ★ VeyaFlow Verified IS DEAD, AND THE DEAD STATE IS WHAT PROTECTS US.
+# Line 1048 reads s.verified/s.verifiedTier, sourced from brand.verifiedTier
+# (index.html 39888–39889, two reads, never assigned, never migrated). The real
+# machinery is calcVerificationTier() at 7220, reading brand?.verificationTier — a
+# DIFFERENT PROPERTY NAME. So the badge never renders. REPAIRING THAT NAME WOULD SHIP
+# "★ VeyaFlow Verified · Tier 2" IN GOLD TO A BUYER, on a value the brand typed into
+# an admin prompt() at 7529 — the function's own comment says "Tier 2+ is manually
+# granted". Tier 1 is computed and rigorous; tiers 2 and 3 are not computed at all.
+# NOT TOUCHED. This is a landmine for exactly the kind of tidy-up commit that looks
+# like housekeeping. What our own verification mark means is STRATEGY'S CALL.
+#
+# #115 — getClaimLight resolves the framework from GLOBAL EDITING STATE:
+# resolveProductFramework(skuForm) while the claim comes from sku0. At submit time it
+# can resolve against a different product than the claim belongs to. claimLights is
+# therefore unreliable EVEN ONCE PLUMBED, and must be fixed before anything depends
+# on it.
+#
+# #117 — pack.claims is .slice(0,8). A brand with nine certifications silently loses
+# the rest, with no indication to the brand or the buyer.
+#
+# FAIL-CLOSED AND CORRECT, recorded as the counter-example: getClaimLight returns
+# {light:'amber', note:'Unknown claim — verify per target market before use'} for an
+# unrecognised claim, and amber for EVERY claim when the framework is 'unknown'
+# rather than falling back to cosmetics rules. Both right. Both discarded before
+# reaching the buyer.
+#
+# SMOKE STEP 3 IN THE SPEC WAS WRONG and CC said so: it expected "a submission whose
+# claims are all genuinely satisfied renders exactly as before". No claim on this
+# surface is known-satisfied — the portal has no lights — so every badge changes.
+# Replacement invariant: a submission with ZERO claims renders no badge row and no
+# legend.
+#
+# UNREVIEWED BY DESIGN, flagged not hidden: the legend line uses a -.65rem top margin
+# to sit under .detail-badges' own 1rem bottom margin.
 
 # index.html moved 4a3a2e98 → e2b148d4 on 7 Sep 2026 — #112, the add-submission
 # button that opens a form below the fold. +24 lines. FIRST FINDING FOUND BY USING
@@ -331,7 +397,7 @@ brand/index.html  1e99d32c
 # Provenance notes carried from §3:
 #   index.html        41,054 lines · 2 inline blocks at html-lines 1176, 39536
 #   dpp/index.html    unchanged since batch #7
-#   portal.html       unchanged since batch #5
+#   portal.html       unchanged since batch #5  [SUPERSEDED 7 Sep 2026 — #113]
 #   brand/index.html  unchanged since batch #5
 #
 # The handoff quotes these as truncated prefixes (a7f44f07…), so this file can

@@ -1047,10 +1047,27 @@ function renderDetail(){
   if(s.verified){
     html +=     '<span class="detail-badge detail-badge-gold">★ VeyaFlow Verified' + (s.verifiedTier ? ' · ' + esc(s.verifiedTier) : '') + '</span>';
   }
+  // #113 — THESE BADGES CARRY NO STATE, SO THEY MAY NOT WEAR THE SUCCESS PALETTE.
+  // .detail-badge-green is #ECFDF5/#065F46 — the same visual language as the ✓ in the
+  // compliance table below, which made six brand-declared items read to a buyer as
+  // findings. The page then contradicted itself: six green badges above, CLAIMS "–"
+  // (not recorded) below, same brand, same screen.
+  // The per-claim lights DO exist (getClaimLight, fail-closed to amber on an unknown
+  // claim) but they never reach this surface — see the report. Nothing here knows any
+  // claim's state, so no claim may be rendered as established. Neutral is not a
+  // downgrade; it is the only thing the data supports.
+  // Base .detail-badge only, coloured from existing tokens (--cream/--navy/--border).
+  // NO state treatment is invented here: green/amber/red badges are DESIGN's, and would
+  // need the payload fixed first.
   (s.claims||[]).forEach(function(c){
-    html +=     '<span class="detail-badge detail-badge-green">' + esc(c) + '</span>';
+    html +=     '<span class="detail-badge" style="background:var(--cream);color:var(--navy);border:1px solid var(--border)">' + esc(c) + '</span>';
   });
   html +=     '</div>';
+  // Same legend discipline as the compliance table (L1209): a buyer must not have to
+  // guess what a badge asserts. This row asserts declaration, not verification.
+  if((s.claims||[]).length){
+    html +=   '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin:-.65rem 0 1rem;line-height:1.6">Declared by the brand · not verified by VeyaFlow. Per-product status is in the compliance table below.</div>';
+  }
   if(s.notes){
     html +=   '<div style="font-family:var(--sans);font-size:.85rem;color:#444;line-height:1.6;padding:.85rem 1rem;background:var(--cream);border-left:3px solid var(--gold)">' + esc(s.notes) + '</div>';
   }
