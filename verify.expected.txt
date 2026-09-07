@@ -9,10 +9,75 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        e2b148d4
+index.html        e1f68ca1
 dpp/index.html    6e946a27
 portal.html       beaa72b8
 brand/index.html  1e99d32c
+
+# index.html moved e2b148d4 → e1f68ca1 on 7 Sep 2026 — #118, NaN reaching the DOM.
+# +34 lines. A CLASS SWEEP, not an instance fix: the reported NaN was never
+# reproduced (no console errors; a DOM query for leaf nodes containing NaN returned
+# nothing minutes later). The class was removed instead, so the defect is gone
+# whether or not the site that produced it is ever identified. Same method that
+# terminated the regulatory-vocabulary whack-a-mole on 4 Sep.
+#   after   e1f68ca17b898bac9bc90554b70b4b0435d507b71d955cd8a6b0d2250e47bb52
+#           41,365 lines
+# NAMED BY THE LANE after reading 4859–4879 at the bytes, from an INDEPENDENT shasum.
+# portal.html UNCHANGED at beaa72b8.
+#
+# THE COUNT, WHICH IS THE FINDING: 19 date-arithmetic sites enumerated from source.
+#   11  accidentally safe — NaN loses every comparison and is falsy, so `<`/`>`/`||`
+#       and truthiness excluded it. NOT ONE because anyone checked.
+#    1  already correct (isNaN guard)
+#    1  partially guarded (absent date caught, unparseable not)
+#    6  LIVE DEFECTS — NaN reached a rendered string:
+#       daysUntil 4853→4868 `NaNd` · getTrialDaysLeft 4639→4685 `NaN days remaining`
+#       renderBrandHomeAlert 31346→31357 · calendar strip 33373 · event label 33432
+#       · retailer window 34081
+# 11 of 18 behaving by accident IS the condition under which the other 6 survive for
+# months. That ratio is why the class had to be swept rather than the instance chased.
+#
+# THE CATCH THE SPEC'S OWN RULE WOULD HAVE MISSED, and only running it found:
+# new Date(null) is a VALID date — the epoch. So null passed Number.isFinite, Math.max
+# floored the huge negative, and an ABSENT deadline rendered "0d": a stated zero days
+# for a deadline nobody recorded. The spec said "never render 0, zero is a measurement"
+# and the guard the spec specified would have rendered exactly that. daysUntil now
+# tests null/undefined/'' explicitly BEFORE parsing.
+#
+# FIXED AT THE FUNCTION, not at call sites — one definition serving many callers is
+# where a guard belongs; patching callers is the narrow-anchor error. Returns null
+# rather than NaN so a caller cannot silently arithmetic on it. fmtNum(n,suffix) added
+# for the six render decisions: FORMATTING ONLY, so it cannot become a second date
+# implementation beside daysUntil and daysSinceIso.
+#
+# THE REFERENCE IMPLEMENTATION WAS ALREADY IN THE FILE: daysSinceIso (37724) does
+# `if(isNaN(t)) return null`. Six functions away from the ones that lacked it.
+# portal.html:587 does it correctly too. dpp/index.html and brand/index.html do not
+# contain the class at all — no date arithmetic, nothing to guard. No edit warranted
+# on any of the three; none touched.
+#
+# GUARDS DELIBERATELY NOT ADDED, because a check that cannot fail is the defect this
+# lane exists to prevent: Math.round(r.marginMin*100) at 12784/12815/36459 reads
+# RETAILER_REGISTRY — 158 entries, 0 missing marginMin, 0 missing marginMax, parsed
+# to establish it rather than assumed. 14891 divides by modules.length inside a loop
+# over modules. 23889 is literal prose. Five sites already guarded by ||/?/typeof —
+# adding Number.isFinite beside them would be a second scheme for one decision.
+#
+# #119 RAISED — computed percentages on USER-SUPPLIED MONEY: 3961, 6758, 7061, 15212,
+# 15266, 15860. Different input class from unreadable dates, and the em dash may be
+# WRONG for some: a margin of 0% is a real answer where a missing RSP is not. Per-site
+# judgement, so a shipment rather than a sweep. Correctly held back.
+#
+# #120 RAISED, AND IT MATTERS MORE THAN THE NaN DID — ABSENCE RENDERED AS A VERDICT:
+# 13403 renders an unreadable date as RED staleness; fieldConfidence renders it as
+# LOW; 26057 renders it as "· today". Same root, worse output. NaN is VISIBLY broken
+# so a user distrusts it; "red", "LOW" and "today" are PLAUSIBLE so a user believes
+# them. The dangerous output is not the one that looks wrong. Both fieldAge and
+# fieldConfidence have an intended null contract that NaN slips past.
+#
+# RULED WITH #120: daysUntil's sort comparators (4862, 33337) now subtract nulls,
+# which coerce to 0, putting UNDATED rows FIRST in a soonest-first list — urgency
+# asserted from an absence. Undated must sort LAST.
 
 # portal.html moved b96423ac → beaa72b8 on 7 Sep 2026 — #113, brand claims rendered
 # to the buyer in the success palette. FIRST MOVE ON portal.html SINCE BATCH #5.
