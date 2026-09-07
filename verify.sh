@@ -64,7 +64,12 @@ fi
 # ---- digests ---------------------------------------------------------------
 echo ""
 echo "== DIGESTS ================================================================="
-FILES="index.html dpp/index.html portal.html brand/index.html"
+# #126, 7 Sep 2026 — supabase-proxy.js added. It decides whether a write LANDS:
+# loop.upsert is insert-if-absent, and loop.update carries a field whitelist that
+# excludes `context`. Those two facts settled #114a, and this harness had never
+# compared the file. A tracked surface list that omits the write layer cannot see the
+# difference between "the client sent it" and "the row changed".
+FILES="index.html dpp/index.html portal.html brand/index.html netlify/functions/supabase-proxy.js"
 EXPECTED_FILE="verify.expected.txt"
 
 for f in $FILES; do

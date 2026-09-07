@@ -9,10 +9,65 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        a1756c3b
+index.html        48fe2758
 dpp/index.html    6e946a27
 portal.html       beaa72b8
 brand/index.html  1e99d32c
+netlify/functions/supabase-proxy.js  78c4f6a2
+
+# index.html moved a1756c3b → 48fe2758 on 7 Sep 2026 — #114a, the portal poll sending
+# a blank rejection reason. +18/−1. FOUND BY USING THE APP: the loop had recorded FOUR
+# rejections across eleven days and ZERO reasons, telling the brand "No specific reason
+# was given" every time — including the time she gave one.
+#   after   48fe2758068e96918b9cb1becb98016aae2b990a1a6758cdca44b02ced7a2d76
+#           41,428 lines
+# NAMED BY THE LANE after reading 41375–41394 at the bytes, INDEPENDENT shasum.
+#
+# THE FIX: the poll's `reason: ''` was accompanied by a comment claiming the portal's
+# details were "not pulled in this version". THE COMMENT WAS FALSE. The sync twenty
+# lines earlier (40209–40213) already reads rejectionReason.category/.detail off the
+# payload onto the local submission as rejectionCategory/rejectionNote — which is the
+# very storage `post` is re-read from. The reason was in hand and discarded one
+# function later. It is now resolved through OUTCOME_REASON_TAXONOMY, THE SAME TABLE
+# THE CAPTURE FLOW USES, so a portal reason and a brand-entered reason read identically
+# downstream instead of one being a code and the other a sentence.
+#
+# THE LANE'S SPEC HAD THE MECHANISM WRONG, AND THE WAY IT WAS WRONG IS THE RECORD:
+# it reported "the portal poll ERASES the reason". THERE IS NO ERASURE. loop.upsert in
+# supabase-proxy.js is INSERT-IF-ABSENT — it returns isNew:false and never writes — so
+# it is FIRST-WRITER-WINS. The poll simply gets there first (every 60s, and on
+# page-show) and the capture flow's later write is silently discarded. `context` is not
+# even in loop.update's whitelist, so NO client path can write a reason into an existing
+# row. The updated_at timestamps the lane read as "the poll rewriting rows" are moved by
+# the loop_events_touch_updated_at DB TRIGGER, which fires only on real UPDATEs —
+# drafted_content/accepted/dismissed/resolved.
+#
+# THE LANE ASSERTED A MECHANISM FROM FOUR TIMESTAMPS AND TWO CALL SITES WITHOUT READING
+# THE LAYER THAT DECIDES WHAT A WRITE DOES. Fifth instance this week of the same move —
+# verify the parts, assert the join (DPP filter · claimLights · #121's shared-array
+# premise · #123's chain description · this). AND IT HAD TEETH: the spec would have
+# shipped a merge guard in upsertLoopEvent protecting against an overwrite THAT CANNOT
+# HAPPEN — a check that cannot fail, authored by the lane, in the fourth shipment where
+# it named that defect in someone else's work.
+#
+# IMPLEMENTS 2 AND 3 WERE NOT WRITTEN, CORRECTLY: re-logging is already a no-op at the
+# proxy and `source` cannot be relabelled, so a client-side dedupe or source guard would
+# each have been another check that cannot fail.
+#
+# #126 RAISED — THE HARNESS CANNOT SEE THE FILE THAT DECIDES WHETHER A WRITE LANDS.
+# supabase-proxy.js is not one of the four tracked surfaces. It holds loop.upsert's
+# insert-if-absent semantics and loop.update's whitelist; it settled this finding, and
+# verify.sh has never compared it. Baseline added below.
+#
+# #114c — THE REMAINING HALF, needs the proxy: a portal rejection with NO structured
+# reason still creates a blank row, and a brand who later types the real reason loses
+# it, because context is not updatable. Fix is loop.upsert merging non-empty incoming
+# context fields over empty stored ones, or loop.update whitelisting context.
+#
+# OPEN, NOT ASSUMED BENIGN: row 4 (27 Aug rejection) has updated_at of 7 Sep 12:02:45.
+# The lane's #110 item 4 UPDATE was 4 Sep, and ensureEventDraft early-returns because
+# drafted_content is 'not_recorded' (truthy). Something wrote that row today and we do
+# not know what.
 
 # index.html moved e1f68ca1 → a1756c3b on 7 Sep 2026 — #120, ABSENCE RENDERED AS A
 # VERDICT. +46 lines. Raised by CC under #118's "noticed, not fixed", and it outranks

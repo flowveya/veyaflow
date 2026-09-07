@@ -41371,12 +41371,29 @@ if(typeof runPortalSync === 'function'){
       var post = JSON.parse(localStorage.getItem('ns_retail_submissions')||'[]')||[];
       post.forEach(function(s){
         if(s.status === 'rejected' && !rejectedBefore[s.id]){
+          // #114a — this sent a HARDCODED EMPTY reason, and the comment claimed the
+          // portal's details were "not pulled in this version". They ARE pulled: the sync
+          // above (40205-40213) reads rejectionReason.category/.detail off the payload and
+          // writes them onto the local submission as rejectionCategory/rejectionNote, which
+          // is what `post` is re-read from. The reason was in hand and thrown away one
+          // function later. Structural, not corrective: the blank now cannot leave the
+          // client, rather than being repaired after it lands (#110 item A).
+          // The category code is resolved through the SAME taxonomy the capture flow uses
+          // (OUTCOME_REASON_TAXONOMY), so a portal reason and a brand-entered reason read
+          // identically downstream instead of one being a code and the other a sentence.
+          var _rjCat  = s.rejectionCategory || '';
+          var _rjNote = s.rejectionNote     || '';
+          var _rjLabel = _rjCat
+            ? ((typeof OUTCOME_REASON_TAXONOMY !== 'undefined' && OUTCOME_REASON_TAXONOMY[_rjCat] && OUTCOME_REASON_TAXONOMY[_rjCat].label) || _rjCat)
+            : '';
+          var _rjReason = _rjLabel && _rjNote ? (_rjLabel + ' — ' + _rjNote)
+                        : (_rjLabel || _rjNote || '');
           logRejectionLoopEvent({
             submissionId: s.id,
             retailerId:   s.retailerId   || '',
             retailerName: s.retailerName || '',
             market:       s.market       || '',
-            reason:       '', // Portal rejection_reasons may have details — not pulled in this version
+            reason:       _rjReason,
             source:       'portal',
           });
         }
