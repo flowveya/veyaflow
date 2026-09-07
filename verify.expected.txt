@@ -9,11 +9,48 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        48fe2758
+index.html        0190c726
 dpp/index.html    6e946a27
 portal.html       beaa72b8
 brand/index.html  1e99d32c
 netlify/functions/supabase-proxy.js  78c4f6a2
+
+# index.html moved 48fe2758 → 0190c726 on 7 Sep 2026 — #122 and #127, NUMBERS THAT
+# ASSERT WHAT WAS NEVER MEASURED. Three items, one class; two found by using the app,
+# one introduced by this lane in #118.
+#   after   0190c7263883240c2cd23bd1c8ec05084070e2a09f35c0e66315df25f950e640
+# NAMED BY THE LANE after reading 39265–39279 and 4432–4461 at the bytes, from an
+# INDEPENDENT shasum. portal.html and supabase-proxy.js UNCHANGED.
+#
+# #127 — the Supplier Audit nav badge was a LITERAL `2`. It said 2 forever, whatever the
+# data did, while the badge above it (savedReports.length) and the two below it (stale
+# submissions, unseen portal updates) are all computed. A user reading that nav had no
+# way to tell which numbers meant anything, which devalued the three that did. Deleted,
+# not recomputed — inventing a computation to justify an existing badge is reasoning
+# backwards from the decoration to the data.
+#
+# #122 — the Listing Checklist rendered NaN% and a RED bar for 156 OF 158 RETAILERS.
+# LISTING_REQUIREMENTS holds two keys, so reqs is [] for everyone else and 0/0 = NaN
+# landed in three places at once: visible "NaN%", red (NaN loses both comparisons), and
+# width:NaN% as invalid CSS. THE FIX IS THE EMPTY STATE, NOT A GUARD — guarding would
+# render "0%" and a red bar, a tidier version of the same lie, because 0% asserts nothing
+# complete out of a real total and there is no total. This is #63 surfacing as a colour.
+#
+# AND IT PROVES #118 DID NOT TERMINATE. That shipment enumerated 16 percentage renders,
+# declared the class removed, and this lane wrote that into this file and committed it.
+# 39258 is a percentage render and was missed. The record was wrong; CC's report on WHY
+# the scan missed it matters more than the fix, because whatever the reason is, other
+# sites may have been missed the same way.
+#
+# TWO GUARDS OF OUR OWN REMOVED: 33499 and 34154, both added in #118, neither able to
+# fire — ev.days comes from rows past addEvent's isNaN early return, and openDate is
+# built with ||1 fallbacks. A guard that cannot fire asserts a check nobody performs.
+# Fifth naming of that defect this week, twice now in the lane's own work.
+#
+# BLOCKED THE NEXT SHIPMENT, CORRECTLY: CC refused to start the time-axis stamp against
+# an unverified working tree. Procedurally right (0190c726 was a sha CC reported itself)
+# and mechanically right — #122's empty state sits immediately beside
+# toggleRetailChecklistItem, so one diff would have made neither separately verifiable.
 
 # index.html moved a1756c3b → 48fe2758 on 7 Sep 2026 — #114a, the portal poll sending
 # a blank rejection reason. +18/−1. FOUND BY USING THE APP: the loop had recorded FOUR
@@ -179,6 +216,25 @@ netlify/functions/supabase-proxy.js  78c4f6a2
 # to establish it rather than assumed. 14891 divides by modules.length inside a loop
 # over modules. 23889 is literal prose. Five sites already guarded by ||/?/typeof —
 # adding Number.isFinite beside them would be a second scheme for one decision.
+#
+# ── CORRECTION, APPENDED 7 Sep 2026 (#122). THIS ENTRY OVERSTATED ITS COVERAGE. ──
+# The claim above that the NaN-to-DOM class "was removed" is WRONG. It was not.
+# renderRetailChecklist rendered `NaN%`, a RED bar and `width:NaN%` for 156 of 158
+# retailers — LISTING_REQUIREMENTS holds two keys, so reqs is [] and 0/0 is NaN — and
+# #118's sweep walked straight past it.
+# WHY THE SWEEP MISSED IT, which is the useful part: the scan was LINE-SCOPED. It
+# required Math.round(...), a division, and a '%' ON THE SAME LINE. At 39285 the
+# computation is `var pct = Math.round((doneCount/reqs.length)*100);` and the '%' render
+# is four lines later. Every site that computes a percentage into a variable and renders
+# it elsewhere was invisible to it.
+# RE-RUN CROSS-LINE, the corrected scan finds 12 such sites. ELEVEN ARE SAFE and were
+# checked rather than assumed: NORWAY_CUSTOMS_CHECKLIST.length and CSRD_QUESTIONS.length
+# are constant arrays; 31948 guards with `total ?`; 14654 with `rsp>0&&netPrice>0`;
+# 21245 returns early on `if(!rsp||!net)`; 39535 hard-blocks on `delivered <= 0`;
+# 40385 needs two months to run. ONE was the defect, and it is fixed in this shipment.
+# THE LESSON IS ABOUT SWEEPS, NOT ABOUT NaN: a line-scoped regex cannot see a class
+# whose two halves sit on different lines, and reporting such a sweep as terminating the
+# class is the same defect as a badge that overstates its own measurement.
 #
 # #119 RAISED — computed percentages on USER-SUPPLIED MONEY: 3961, 6758, 7061, 15212,
 # 15266, 15860. Different input class from unreadable dates, and the em dash may be

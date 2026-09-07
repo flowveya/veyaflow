@@ -4432,7 +4432,13 @@ function buildNav(){
       html+='<span class="nav-ico">'+n.icon+'</span>';
       html+='<span class="nav-name">'+n.label+'</span>';
       if(n.id==='home'&&savedReports.length>0) html+='<span class="nav-badge">'+savedReports.length+'</span>';
-      if(n.id==='suppliers') html+='<span class="nav-badge">2</span>';
+      // #127 — a hardcoded <span class="nav-badge">2</span> lived here. It said 2 forever,
+      // whatever the data did, sitting between savedReports.length above and the tracker's
+      // computed staleness below — both real. A decorative number beside two measured ones
+      // devalues the measured ones, because a reader cannot tell which is which.
+      // DELETED, not recomputed: inventing a computation to justify an existing badge is
+      // reasoning backwards from the decoration to the data. Supplier Audit gets a badge
+      // when there is something to count.
       if(n.id==='retail-tracker'){
         try{
           var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
@@ -4483,7 +4489,9 @@ function buildNav(){
         mobHtml+='<div class="m-li'+(n.parked?' parked':'')+(currentPage===n.id?' on':'')+'" onclick="closeMobMenu();showPage(\''+n.id+'\')">';
         mobHtml+='<span class="ic">'+n.icon+'</span><span class="nm">'+n.label+'</span>';
         if(n.id==='home'&&savedReports.length>0) mobHtml+='<span class="m-badge">'+savedReports.length+'</span>';
-        if(n.id==='suppliers') mobHtml+='<span class="m-badge">2</span>';
+        // #127 — the MOBILE sibling of the deleted desktop badge. The spec named only the
+      // desktop one; leaving this would ship the fix half-applied and the nav would still
+      // read "2" beside Supplier Audit on a phone. Same literal, same ruling.
         if(n.id==='retail-tracker'){
           try{
             var subs=safeJsonParse(localStorage.getItem('ns_retail_submissions')||'[]',[])||[];
@@ -33488,8 +33496,10 @@ function renderComplianceCalendar(){
       <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.35rem">${month}</div>
       ${evs.map(ev=>{
         const c = COLOR[ev.color];
-        // #118 — ev.days+'d' printed "NaNd" for an unparseable event date.
-        const daysLabel = !Number.isFinite(ev.days)?'—':ev.days===0?'Today':ev.days===1?'Tomorrow':ev.days+'d';
+        // #118's guard REMOVED here (#122 shipment): it could not fire. `ev` comes from
+        // byMonth, built from `events`, and addEvent returns early on isNaN(d) — so ev.days
+        // is always finite. A check that cannot fail asserts a check nobody performs.
+        const daysLabel = ev.days===0?'Today':ev.days===1?'Tomorrow':ev.days+'d';
         return `
           <div style="background:${c.bg};border:1px solid ${c.border};border-left:3px solid ${c.left};padding:.55rem .75rem;margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
             <div style="display:flex;align-items:flex-start;gap:.5rem;flex:1;min-width:0">
@@ -34103,6 +34113,9 @@ function renderSeasonalCalendar(el){
       var p=String(win.buyingWindowOpen||'01-01').split('-').map(Number);
       var openDate=new Date(year, (p[0]||1)-1, p[1]||1);
       if(openDate<now) openDate=new Date(year+1, (p[0]||1)-1, p[1]||1);
+      // #118's render guard on daysToOpen was REMOVED (#122 shipment): openDate is built
+      // with `||1` fallbacks on both parts, so a malformed buyingWindowOpen still yields a
+      // valid Date and daysToOpen is always finite. The guard could not fire.
       var daysToOpen=Math.ceil((openDate-now)/86400000);
       if(daysToOpen<0||daysToOpen>365) return; // 12-month horizon
       all.push(Object.assign({}, win, {openDate:openDate, daysToOpen:daysToOpen, retailerId:rid, retailerName:intel.retailerName}));
@@ -34138,7 +34151,7 @@ function renderSeasonalCalendar(el){
       var sub=fmtMD(w.submissionDeadline); if(sub) bits.push('Submit by '+escapeHtml(sub));
       // Row action → Article Templates (live). openSeasonalPitch's 'pitch' target is launch-parked; revisit seasonal pre-fill post-launch.
       body+='<div class="row" onclick="showPage(\'retail-templates\')">'+
-        '<div class="when"><div class="d">'+(Number.isFinite(w.daysToOpen)?w.daysToOpen+'<span style="font-size:13px">d</span>':'—')+'</div><div class="u">'+fmtDate(w.openDate)+'</div></div>'+
+        '<div class="when"><div class="d">'+w.daysToOpen+'<span style="font-size:13px">d</span></div><div class="u">'+fmtDate(w.openDate)+'</div></div>'+
         '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(w.retailerName||w.retailerId)+' — '+escapeHtml(w.name||'')+'</span></div>'+
           '<div class="meta"><span class="certainty '+(confirmed?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(confirmed?CHECK:QCLOCK)+'</svg>'+(confirmed?'Confirmed cadence':'Cadence not yet confirmed')+'</span>'+
           bits.map(function(b){ return '<span class="dot"></span><span>'+b+'</span>'; }).join('')+
@@ -39247,6 +39260,22 @@ function renderRetailChecklist(el){
     html +=   '<span style="font-weight:600">' + retailEsc(skuTypeMeta.label) + '</span>';
     html +=   '<span style="margin-left:auto;font-family:var(--mono);font-size:.55rem;color:#1E40AF;opacity:.7">Checklist tailored to this type</span>';
     html += '</div>';
+  }
+
+  // #122 — LISTING_REQUIREMENTS holds two keys (apotek_hjartat_se, matas_dk) against 158
+  // registry retailers, so for 156 of them `reqs` is [] and 0/0 gave NaN. That landed in
+  // THREE places at once: "NaN%" as visible text, a RED bar because NaN loses both
+  // comparisons, and width:NaN% as invalid CSS — a completion verdict on a checklist that
+  // does not exist. This is #63 (only 2 of ~28 registry retailers have a requirements
+  // list) surfacing as a colour.
+  // THE FIX IS THE EMPTY STATE, NOT A GUARD. Guarding the number would render "0%" and a
+  // red bar, which is a tidier version of the same lie: 0% asserts nothing complete out of
+  // a real total, and there is no total. Say what is true — there is no list yet.
+  if(!reqs.length){
+    html += '<div class="card" style="padding:1.5rem;text-align:center;font-family:var(--sans);font-size:.85rem;color:var(--muted)">No listing requirements are on file for this retailer yet, so there is nothing to check off. Requirements are added per retailer as they are confirmed.</div>';
+    html += '</div></div>';
+    el.innerHTML = html;
+    return;
   }
 
   // Progress
