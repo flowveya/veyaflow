@@ -9,10 +9,72 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        e1f68ca1
+index.html        a1756c3b
 dpp/index.html    6e946a27
 portal.html       beaa72b8
 brand/index.html  1e99d32c
+
+# index.html moved e1f68ca1 → a1756c3b on 7 Sep 2026 — #120, ABSENCE RENDERED AS A
+# VERDICT. +46 lines. Raised by CC under #118's "noticed, not fixed", and it outranks
+# #118: NaN is VISIBLY broken so a user distrusts it; LOW, red and "· today" are
+# PLAUSIBLE so a user believes them. Same manufactured finding as the Lyko rejection
+# inventing causes into an empty reason field — except arithmetic did it rather than a
+# model, so no prompt sweep would ever have caught it.
+#   after   a1756c3bc195fc7d7cde7488948e57e4ff1e8fa19dc20bf78c6de1026c2c5d70
+#           41,411 lines
+# NAMED BY THE LANE after reading 35856–35885 at the bytes, INDEPENDENT shasum.
+# portal.html UNCHANGED at beaa72b8.
+#
+# THE RULE, recorded above fieldAge where a reader arrives at the class:
+#   AN ABSENCE MAY NEVER BE RENDERED AS A JUDGMENT — not as a colour, not as a
+#   confidence level, not as a relative time, not as a position in a ranked list.
+#
+# THE DEEPEST DEFECT WAS NOT A NaN BUG. fieldConfidence had `if(days===null) return
+# 'LOW'` — deliberate, on its own line. "We have no date" and "this data is over 180
+# days old" produced the SAME RED VERDICT. Three states where there must be four; the
+# missing one is not_recorded, which this app already knows how to express (checkState,
+# the portal compliance legend, and #110 item 4 writing the literal string into the DB
+# rather than blanking a field). NOT_RECORDED now returns var(--muted) — the file's
+# established neutral, 752 uses. NO fourth colour invented.
+#
+# ALSO: getTemplateStaleness's unreadable date fell through to layer1='red'; it now
+# leaves layer1 at its own existing 'unverified'. The magic-link surface printed
+# "· today" for a date it could not read — a plain false statement — and now uses
+# 'Generation date not recorded', wording its own sibling branch already had. In all
+# three cases the vocabulary for absence WAS PRESENT and simply was not reached.
+#
+# SORT RULING APPLIED: daysUntil returning null made undated rows sort FIRST in a
+# soonest-first list — urgency asserted from an absence, this finding's own shape
+# introduced by its predecessor's fix. Undated now sorts LAST, both comparators.
+#
+# THE SIBLING COUNT: 22 candidates, 2 false positives, 3 fixed here, ~11 provably
+# finite, 6 LIVE. THE PATTERN IS THE FINDING, more than the six sites are:
+#   THE FINAL `else` OF A COMPARISON CHAIN IS WHERE ABSENCE LANDS, and whichever
+#   verdict sits there gets asserted — sometimes the worst, sometimes the best, never
+#   "unknown".
+#
+# 33293 SHIPS NEXT, and it is HALF-FIXED BY THIS SHIPMENT — which is worse than
+# untouched. Its `days` field was made null-safe for SORTING here, so the row now
+# sorts correctly and still colours itself GREEN from an absence. Green is the INVERSE
+# hazard and the worse one: red reads as a problem to check, green reads as checked
+# and fine. The sort now implies the colour was considered.
+#
+# OBSERVABILITY, STATED HONESTLY RATHER THAN MARKED PASSED: fieldConfidence and
+# CONFIDENCE_COLOR have ZERO callers — 1 occurrence each, their own definitions. Smoke
+# steps 1 and 2 are unrunnable today. KEPT ANYWAY, and that is the ruling: whoever
+# wires them later inherits four states instead of writing three. Dead code encoding a
+# truth rule is a liability only if it is wrong.
+#
+# THE ONE OBSERVABLE CHANGE: fieldAge's single live caller is manufacturer scoring,
+# where an UNREADABLE date awarded score+=3 of 40 freshness points while an ABSENT date
+# scored 0. Garbage scored higher than nothing. Both are 0 now.
+#
+# FOR DESIGN: CONFIDENCE_COLOR now mixes raw hex with one var() value. Resolving that
+# means hex-ing the neutral or tokenising the other three — a design call.
+#
+# #119 STILL OPEN — percentages on user-supplied money (3961, 6758, 7061, 15212,
+# 15266, 15860 at e1f68ca1). The em dash may be WRONG there: 0% is a real answer where
+# a missing RSP is not.
 
 # index.html moved e2b148d4 → e1f68ca1 on 7 Sep 2026 — #118, NaN reaching the DOM.
 # +34 lines. A CLASS SWEEP, not an instance fix: the reported NaN was never

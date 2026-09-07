@@ -4885,7 +4885,14 @@ function renderRegStrip(){
   if(!strip) return;
   if(!brand){strip.style.display='none';strip.innerHTML='';return;}
   const relevant=regDeadlinesForBrand()
-    .sort((a,b)=>daysUntil(a.deadline)-daysUntil(b.deadline))
+    // #120 — daysUntil returns null for an undated row (#118); null coerces to 0, so
+    // undated rows sorted FIRST in a soonest-first list — urgency asserted from an
+    // absence. An item with no deadline is not urgent: undated sorts LAST.
+    .sort((a,b)=>{ const x=daysUntil(a.deadline), y=daysUntil(b.deadline);
+                   if(x===null && y===null) return 0;
+                   if(x===null) return 1;
+                   if(y===null) return -1;
+                   return x-y; })
     .slice(0,2);
   if(!relevant.length){strip.style.display='none';strip.innerHTML='';return;}
   strip.style.display='flex';
@@ -13428,10 +13435,20 @@ function getTemplateStaleness(retailerId){
   if(verifiedAt){
     const ms = Date.now() - new Date(verifiedAt).getTime();
     days = Math.floor(ms / (1000 * 60 * 60 * 24));
-    if(days < 0) days = 0;
-    if(days <= ATM_STALENESS_GREEN_DAYS) layer1 = 'green';
-    else if(days <= ATM_STALENESS_AMBER_DAYS) layer1 = 'amber';
-    else layer1 = 'red';
+    // #120 — an UNREADABLE verifiedAt produced NaN, which failed `days<0`, `<=GREEN` and
+    // `<=AMBER` and fell through to RED: a staleness verdict derived from a date we could
+    // not read. 'unverified' is this function's own not-recorded state (it is the initial
+    // value, and the no-template return uses it), so the null contract was intended here
+    // too — NaN simply slipped past it, exactly as it did in fieldAge.
+    if(!Number.isFinite(days)){
+      days = null;
+      // layer1 stays 'unverified'
+    } else {
+      if(days < 0) days = 0;
+      if(days <= ATM_STALENESS_GREEN_DAYS) layer1 = 'green';
+      else if(days <= ATM_STALENESS_AMBER_DAYS) layer1 = 'amber';
+      else layer1 = 'red';
+    }
   }
   // ── Layer 2: outcome-based + manual flag ────────
   let layer2 = false;
@@ -26083,7 +26100,12 @@ function renderMagicLinkCard(){
     var ms = Date.now() - new Date(brand.magicLinkGeneratedAt).getTime();
     var days = Math.floor(ms / (1000*60*60*24));
     var dateStr = new Date(brand.magicLinkGeneratedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    ageDisplay = 'Generated ' + dateStr + (days > 0 ? ' · ' + days + 'd ago' : ' · today');
+    // #120 — a plain false statement, not a wrong colour: an unreadable timestamp failed
+    // `days > 0` and printed "· today", asserting the link was generated today when we do
+    // not know when it was. Falls back to the wording the else-branch below already uses.
+    ageDisplay = Number.isFinite(days)
+      ? 'Generated ' + dateStr + (days > 0 ? ' · ' + days + 'd ago' : ' · today')
+      : 'Generation date not recorded';
   } else {
     ageDisplay = 'Generation date not recorded';
   }
@@ -33365,7 +33387,13 @@ function renderComplianceCalendarPage(el){
   // Single canonical source, filtered by brand category + market (shared with the banner).
   var rows = regDeadlinesForBrand()
     .map(function(r){ return Object.assign({}, r, {days: daysUntil(r.deadline)}); })
-    .sort(function(a,b){ return a.days - b.days; });
+    // #120 — same ruling as the deadline bar: undated last, never first.
+    .sort(function(a,b){
+      if(a.days===null && b.days===null) return 0;
+      if(a.days===null) return 1;
+      if(b.days===null) return -1;
+      return a.days - b.days;
+    });
 
   // urgency thresholds (90d split — matches the mockup's 71-amber / 102-pend; confirm w/ Design)
   function urg(days){
@@ -35825,18 +35853,36 @@ function getMfrTier(id){ return MFR_LISTING_TIERS[id]||'free'; }
 // ── Per-field timestamps (Supabase-ready schema) ──
 // Structure: {value, lastUpdated, updatedBy, confidence}
 // Confidence: HIGH = <3mo, MEDIUM = 3-6mo, LOW = >6mo
+// ── #120 · AN ABSENCE MAY NEVER BE RENDERED AS A JUDGMENT ──────────────────────
+// Not as a colour, not as a confidence level, not as a relative time, not as a
+// position in a ranked list. Where the app has no data it says so, and "no data" must
+// be visually distinct from every real verdict — ESPECIALLY the worst one.
+// NaN is visibly broken so a user distrusts it; LOW, red and "· today" are plausible,
+// so a user believes them. That is why this outranks #118: same manufactured finding
+// as the Lyko rejection inventing causes into an empty reason field, except arithmetic
+// did it rather than a model, so no prompt sweep would ever have caught it.
 function fieldAge(dateStr){
   if(!dateStr) return null;
-  return Math.floor((Date.now() - new Date(dateStr)) / (1000*60*60*24));
+  // #120 — the !dateStr guard caught ABSENCE but not GARBAGE: a non-empty string Date
+  // cannot read yielded NaN, which passes `!==null` at every caller.
+  var _n = Math.floor((Date.now() - new Date(dateStr)) / (1000*60*60*24));
+  return Number.isFinite(_n) ? _n : null;
 }
 function fieldConfidence(dateStr){
   const days = fieldAge(dateStr);
-  if(days===null) return 'LOW';
+  // #120 — FOUR states where there were three. `if(days===null) return 'LOW'` made
+  // "we have no date" and "this data is over 180 days old" the same red verdict: the
+  // app stated low confidence about data it never had. NOT_RECORDED is first-class
+  // here for the same reason checkState treats it as first-class.
+  if(days===null) return 'NOT_RECORDED';
   if(days<90) return 'HIGH';
   if(days<180) return 'MEDIUM';
   return 'LOW';
 }
-const CONFIDENCE_COLOR = {HIGH:'#10B981', MEDIUM:'#F59E0B', LOW:'#EF4444'};
+// NOT_RECORDED deliberately does NOT get a fourth invented colour: var(--muted) is this
+// file's established neutral for an absent value (752 uses). It must never be the red
+// LOW carries — that is the whole finding.
+const CONFIDENCE_COLOR = {HIGH:'#10B981', MEDIUM:'#F59E0B', LOW:'#EF4444', NOT_RECORDED:'var(--muted)'};
 
 // Live overrides stored in localStorage — keyed by mfrId_field
 // [NEEDS BACKEND]: In production, these live in Supabase supplier_data table
