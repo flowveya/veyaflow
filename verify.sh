@@ -114,11 +114,16 @@ echo "== ONE-EDIT-AT-A-TIME ====================================================
 if [ -d .git ]; then
   CHANGED=$(git status --porcelain -- $FILES 2>/dev/null | wc -l | tr -d ' ')
   CHANGED=${CHANGED:-0}
+  # #126 — count is DERIVED from FILES, not written as a literal. The label said
+  # "4 tracked HTML surfaces" while the gate already iterated five, and one of the
+  # five is not HTML. A gate whose message contradicts its own behaviour is how a
+  # future reader mis-reads a FAIL.
+  NFILES=$(echo $FILES | wc -w | tr -d ' ')
   if [ "$CHANGED" -le 1 ]; then
-    echo "PASS      | $CHANGED of the 4 tracked HTML surfaces modified"
+    echo "PASS      | $CHANGED of the $NFILES tracked surfaces modified"
   else
-    echo "FAIL      | $CHANGED HTML surfaces modified at once — §2 allows one edit to"
-    echo "          | index.html at a time. Verify them separately or split the batch."
+    echo "FAIL      | $CHANGED tracked surfaces modified at once — §2 allows one edit"
+    echo "          | at a time. Verify them separately or split the batch."
     RC=1
   fi
 else
