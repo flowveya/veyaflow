@@ -32433,7 +32433,12 @@ function calcBrandESGScore(retailerId){
   const esg = RETAILER_ESG[retailerId];
   if(!esg) return null;
   const sku = skus[0]||null;
-  const certs = [...(sku?.certifications||[]), ...(brand?.certifications?.map(c=>c.name||c)||[])].map(c=>(c||'').toLowerCase());
+  // #3c — BOTH halves normalised. The brand half was tolerated by a hand-rolled
+  // `c.name||c`; the sku half was raw, and an object entry is TRUTHY, so `(c||'')` passed
+  // it straight through and `.toLowerCase()` threw. The `||''` guard is dropped with it:
+  // the reader guarantees non-empty strings, so it could no longer fire — a check that
+  // cannot fail. `.toLowerCase()` stays; it is doing real work.
+  const certs = [...normalizeCertifications(sku?.certifications), ...normalizeCertifications(brand?.certifications)].map(c=>c.toLowerCase());
   const w = esg.esgWeight;
   let score = 0;
 
@@ -32472,7 +32477,12 @@ function checkMandatoryESG(retailerId){
   const esg = RETAILER_ESG[retailerId];
   if(!esg) return [];
   const sku = skus[0]||null;
-  const certs = [...(sku?.certifications||[]), ...(brand?.certifications?.map(c=>c.name||c)||[])].map(c=>(c||'').toLowerCase());
+  // #3c — BOTH halves normalised. The brand half was tolerated by a hand-rolled
+  // `c.name||c`; the sku half was raw, and an object entry is TRUTHY, so `(c||'')` passed
+  // it straight through and `.toLowerCase()` threw. The `||''` guard is dropped with it:
+  // the reader guarantees non-empty strings, so it could no longer fire — a check that
+  // cannot fail. `.toLowerCase()` stays; it is doing real work.
+  const certs = [...normalizeCertifications(sku?.certifications), ...normalizeCertifications(brand?.certifications)].map(c=>c.toLowerCase());
 
   return esg.mandatoryRequirements.map(req=>{
     let met = false;
@@ -32525,7 +32535,8 @@ function renderESGModal(retailerId){
   const failedMandatory = mandatoryChecks.filter(r=>r.required && !r.met);
 
   const sku = skus[0]||null;
-  const certs = [...(sku?.certifications||[]), ...(brand?.certifications?.map(c=>c.name||c)||[])];
+  // #3c — both halves normalised; see calcBrandESGScore for the reasoning.
+  const certs = [...normalizeCertifications(sku?.certifications), ...normalizeCertifications(brand?.certifications)];
   const prefCerts = esg.preferredCertifications||[];
   const matchedPref = prefCerts.filter(pc=>certs.some(bc=>(bc||'').toLowerCase().includes((pc||'').toLowerCase().split(' ')[0])));
   const missingPref  = prefCerts.filter(pc=>!certs.some(bc=>(bc||'').toLowerCase().includes((pc||'').toLowerCase().split(' ')[0])));

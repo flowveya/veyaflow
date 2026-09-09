@@ -9,12 +9,78 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        eb829955
+index.html        6d4d09b7
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved eb829955 → 6d4d09b7 on 9 Sep 2026 — TIME AXIS STEP 7, EXPAND PHASE 3c.
+# THE EXPAND PHASE IS COMPLETE. Five surfaces tolerate all three certification shapes;
+# portal.html never needed it.
+#   after   6d4d09b707228e89f99b68ae2b7b2ed3fe7374ebe98283e329ff4295afa245f7
+# NAMED BY THE LANE after reading 32434–32438 at the bytes, INDEPENDENT shasum. Five other
+# surfaces UNCHANGED; 1 of 6 modified; copy gate still three surfaces, 2269 bytes.
+#
+# THE GAP 3b LEFT WAS THE LANE'S SCOPE DEFINITION, NOT CC'S ENUMERATION. 32436/32475/32528
+# spread sku?.certifications RAW into a merged array, and an object entry is TRUTHY, so
+# `(c||'')` passed it through and `.toLowerCase()` THREW. They fell outside 3b's scope
+# because the lane wrote it as "reads that produce a DISPLAYED OR PROMPT STRING" — these
+# produce a MATCHING ARRAY. STANDING CORRECTION: THE SHAPE MUST BE THE OPERATION PERFORMED
+# ON THE FIELD, NOT THE DESTINATION OF THE RESULT. It is also what makes the publish/persist
+# sites fall out cleanly — excluded by destination ON PURPOSE, not by oversight.
+#
+# THE EVIDENCE: 160 comparisons — 10 sku shapes × 8 brand shapes × 2 expression forms,
+# three-way against a pre-edit capture. 60 identical, 100 differ, and REACHABLE DIFFERENCES:
+# ZERO. Reachability stated per side rather than assumed — sku is written only by
+# toggleSkuCert from a hardcoded list; brand HAS NO WRITER IN THE FILE AT ALL (it arrives
+# from the seed at 1980 and onboarding at 5338) and is already the object form.
+# TODAY'S CODE THROWS IN 38 OF 80 COMBINATIONS at the two .toLowerCase() sites. After the
+# change, none throws. Expand closes that ahead of the writer, which is the phase's purpose.
+#
+# THE `||''` GUARD DROPPED: the reader's contract is that every element is a non-empty
+# string, so it cannot fire. .toLowerCase() stays and does real work — the comparison
+# downstream is case-insensitive.
+#
+# REPORT 1 ANSWERED BEFORE ANY EDIT, AS INSTRUCTED. 26228 PUBLISHES — shareBrandPack's
+# brandPackData goes to fetch('/.netlify/functions/share-brand-pack') at 26245–26251. 34761
+# PERSISTS — csrdAutoFill folds it into answers.certifications and
+# persistCritical('ns_csrd_answers', …) at 34802. BOTH TO MIGRATE, NEITHER TOUCHED.
+#
+# AND 34761 HAS TWO UNNAMED SIBLINGS THE SPEC MISSED: 34759 (sku0?.certifications) and
+# 34760 (skus.flatMap(s=>s.certifications||[])). All three feed ONE persisted string, so
+# they MUST MOVE AS A UNIT — normalising the brand half of a value whose sku half stays raw
+# is the exact defect this migration exists to close.
+#
+# THE ACCURATE COMPLETION STATEMENT IS CC'S, NOT THE LANE'S. The spec's phrasing — "none
+# except the expiryDate consumers and the writer" — OMITTED THE FIVE PUBLISH/PERSIST SITES.
+# They are still RAW READS. Correct: "none except the expiryDate consumers, the writer and
+# its editor, and the five sites that publish or persist."
+#
+# THE BOUNDARY IS NOW VISIBLE IN THE CODE AND UNMARKED — A TRAP. 33362 (buildComplianceEvents)
+# and 33514 (.some(c=>c.expiryDate)) MUST stay raw: they read a field the reader deliberately
+# DISCARDS, and brand.certifications is already the object form so they already work. They sit
+# THREE LINES from sites that just moved, with nothing in the file saying why. A future sweep
+# would "finish the job" and break the Compliance Calendar. THE EPITAPH GOES IN WITH MIGRATE,
+# where those sites either get the comment or get the second accessor.
+#
+# THE READER ANSWERS "WHAT ARE THEY CALLED", NEVER "WHAT DO WE KNOW ABOUT THEM." A second
+# accessor returning the OBJECT form is a migrate-phase design question with two existing
+# consumers already waiting for it — and it is where Strategy's validity-rendering ruling
+# will land. The question is no longer abstract; it is a named function that does not exist.
+#
+# #131 APPEARED TWICE IN TWO SHIPMENTS. Six export locales (3b), then 32436/32475 —
+# calcBrandESGScore and checkMandatoryESG, BYTE-IDENTICAL, confirmed by string comparison
+# rather than by eye. In both cases ONE sed WITH AN EXACT COUNT was what proved it, and that
+# is the gate shape: ASSERT THE EXPECTED COUNT OF AN EXPRESSION rather than trusting
+# near-copies to stay in step. It can fail, so it earns its place. Ships with #131.
+#
+# THE MIGRATE SET, PROPERLY SIZED: five publish/persist sites (34592, 35734, 26233, 26228,
+# and the csrdAutoFill trio 34759/34760/34761 as one unit) plus the writer and its four
+# skuForm readers (20356, 20449/20450, 20662/20663, 20704/20705, 21283–21286). UNLIKE
+# EVERYTHING SINCE THE SCOUT, THAT SHIPMENT IS NOT BEHAVIOUR-NEUTRAL BY CONSTRUCTION — its
+# evidence must be a judgement about what SHOULD change, not a proof that nothing did.
 
 # index.html moved 8fd343de → eb829955 on 9 Sep 2026 — TIME AXIS STEP 6, EXPAND PHASE 3b:
 # the read-to-display sites. TWENTY-TWO SITES, NOT THE EIGHTEEN THE LANE LISTED.
