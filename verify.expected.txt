@@ -9,12 +9,70 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        5461416e
+index.html        914f549c
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 5461416e → 914f549c on 9 Sep 2026 — #141, THE ADD PRODUCTS SCREEN.
+# Both emojis removed; the VeyaFlow template promoted to RECOMMENDED; the retailer-template
+# line demoted to a secondary sentence.
+#   after   914f549c76ed881db466f8d6e80cc75d4f7210054e72ba800f8d435dfca0b7d3
+#
+# NAMED AFTER THE FACT, AND THE PROCESS FAILED — RECORDED HERE RATHER THAN TIDIED AWAY.
+# Commit 9a88b4f carries this work under the message "#134: nanomaterials and CMR no longer
+# declared None unasked … name 5461416e" — the PREVIOUS shipment's message, and a digest the
+# file does not have. Three rules were skipped: the lane never named the value before the
+# commit, verify.expected.txt recorded 5461416e while the tree held 914f549c (so verify.sh
+# would FAIL its own digest check), and CC's three reports were never delivered.
+# Same class as the mislabelled commit 39b7725 on 3 Sep. CORRECTED FORWARD, no rewriting —
+# 9a88b4f's message stays wrong in the history and this entry is what makes it findable.
+#
+# THE WORK ITSELF IS SOUND AND WAS BYTE-VERIFIED AFTERWARDS, by reading the whole diff:
+#   📂 (20005) and ✏️ (20011) removed — canon already forbids emoji in
+#   UI, so this was ENFORCEMENT, not a new decision. Both were written as UNICODE ESCAPES,
+#   so a search for emoji glyphs would not have found them.
+#   A new top card — "Start from the VeyaFlow template", RECOMMENDED, wired to
+#   downloadSkuTemplate() — replaces the old bottom-of-screen "Need a template?" footer.
+#   "Upload a file" loses its RECOMMENDED badge and its Apotek/Matas subtitle, gaining
+#   "Already filled a retailer's template? Upload it."
+#
+# PART B IS HALF-DONE. Line 20023 STILL reads "Retailer templates: Upload an existing Apotek
+# Hjärtat or Matas Excel file — columns recognised automatically" in the green
+# Accepted-formats box. The headline moved; the box below it still leads with the retailer
+# claim. Owed.
+#
+# THREE REPORTS OWED AND ONE OF THEM GATES A WHOLE BUILD:
+#   (1) the emoji sweep count across all four HTML surfaces, WITH THE SEARCH TERMS STATED;
+#   (2) WHETHER SKUs AND BRAND DATA MIRROR TO THE SERVER AT ALL — persistCritical is
+#       localStorage with a read-back; loop events reach Supabase via the proxy; nothing
+#       else has been checked. This decides how far behind the gate DOCUMENT UPLOAD sits,
+#       and Strategy has ruled that the document half must not precede durability: a lost
+#       text field can be rewritten, a lost CPSR may be the customer's only copy.
+#   (3) every other place naming Apotek Hjärtat or Matas in user-facing copy — those two
+#       appear wherever the product needs to look capable (LISTING_REQUIREMENTS 2 of 158,
+#       printable checklists, the importer). The count is the finding.
+#
+# THE CLAIM ITSELF IS TRUE AND #142 WAS WITHDRAWN. RETAILER_TEMPLATES (19835) really does map
+# Apotek Hjärtat's Swedish column names. THE LANE ASSERTED ITS ABSENCE FROM AN INCOMPLETE
+# GREP — having reported L34732 correctly two days earlier as "an absence, not a clearance".
+# STANDING RULE ADOPTED: a negative result is reported as "NOT FOUND, WITH THESE SEARCHES",
+# never as "does not exist". Asserting absence is the hardest claim there is.
+#
+# THE STRUCTURAL FINDING UNDERNEATH THE SCREEN, and it is the week's largest: THE IMPORTER
+# CARRIES THE COMMERCIAL RECORD AND STOPS EXACTLY WHERE THE DOSSIER BEGINS. SKU_FIELDS
+# (19811) is 21 columns — name, EAN, article, net content, country, shelf life, INCI, CPNP
+# number, EU RP, six RSP currencies, net price, MOQ, lead time, two descriptions. NONE of
+# #135's five blockers is importable: no nanomaterials, no CMR, no safety assessor, no PIF
+# reference, no safety assessment ref. The CPNP helper marks 14 required; the importer can
+# carry 4. THAT GAP IS #135, and the importer and the write path are ONE piece of work.
+# Strategy: the codebase is display-first and the importer is spreadsheet-first — one
+# observation. The product built everything fillable from a sheet and nothing requiring a
+# document or a judgement. It explains the 64% wall, the seven blockers, the five unfillable
+# fields and #109 at once — and it means THE FRONT DOOR IS THE LEAST-BUILT PART, contrary to
+# what the surface suggests.
 
 # index.html moved c8a754f2 → 5461416e on 9 Sep 2026 — #134, "None" DECLARED FOR
 # NANOMATERIALS AND CMR SUBSTANCES, UNASKED. TWO LINES, SHIPPED ALONE.
