@@ -411,6 +411,60 @@ section('TIME AXIS — CONFIRMATION STAMPS ARE WRITE-ONLY (capture-only shipment
   else line('FAIL', '_EVICTABLE_CACHE_PREFIXES was widened to cover a stamp key — history could be evicted under quota pressure');
 }
 
+// ── CANONICAL CERTIFICATION READER — THE COPIES MUST NOT DIVERGE ────────────
+// There is no module system here: separate HTML files with inline scripts, so the
+// reader exists once per surface. #128 was decided on exactly this hazard — a
+// duplicated file diverged and the copy that rotted was the one nobody overwrote.
+//
+// THIS GATE CAN FAIL, which is why it earns its place: alter one character of any
+// copy and the battery refuses. Contrast #128's must-not-exist gate, correctly
+// declined because it could never fail.
+//
+// Located by BANNER TEXT and closing brace, never by line number — witness lines
+// pinned to fixed numbers degrade after every edit (3 Sep, already in the log).
+// Compares EVERY surface carrying the banner, not a hardcoded pair, so a third copy
+// landing in index.html at phase 3 is checked automatically. A gate that silently
+// checked two of three copies would be worse than none.
+section('CANONICAL CERTIFICATION READER — BYTE-IDENTICAL ACROSS SURFACES');
+{
+  const BANNER = '// \u2500\u2500 CANONICAL CERTIFICATION READER';
+  const SURFACES = ['index.html', 'dpp/index.html', 'portal.html', 'brand/index.html'];
+  const copies = [];
+  SURFACES.forEach(rel => {
+    const fp = path.join(ROOT, rel);
+    if (!fs.existsSync(fp)) return;
+    const src = fs.readFileSync(fp, 'utf8');
+    const i = src.indexOf(BANNER);
+    if (i < 0) return;                        // surface does not carry the reader
+    const j = src.indexOf('\nfunction normalizeCertifications(raw){', i);
+    const k = j < 0 ? -1 : src.indexOf('\n}\n', j);
+    if (j < 0 || k < 0) {
+      line('FAIL', rel + ' — carries the reader banner but no complete normalizeCertifications() follows it');
+      return;
+    }
+    copies.push({ rel: rel, text: src.slice(i, k + 3) });
+  });
+  if (copies.length === 0) {
+    line('NOT FOUND', 'canonical certification reader — no surface carries the banner');
+  } else if (copies.length === 1) {
+    line('INFO', 'canonical reader present on 1 surface (' + copies[0].rel + ') — nothing to compare yet');
+  } else {
+    const ref = copies[0];
+    let diverged = 0;
+    copies.slice(1).forEach(c => {
+      if (c.text !== ref.text) {
+        diverged++;
+        line('FAIL', c.rel + ' — reader DIVERGED from ' + ref.rel +
+          ' (' + c.text.length + ' bytes vs ' + ref.text.length + '); copies must be byte-identical');
+      }
+    });
+    if (!diverged) {
+      line('PASS', 'canonical reader byte-identical across ' + copies.length +
+        ' surfaces (' + copies.map(c => c.rel).join(', ') + '; ' + ref.text.length + ' bytes each)');
+    }
+  }
+}
+
 section('NAMES THAT MUST NOT EXIST');
 MUST_NOT_EXIST.forEach(name => {
   const n = (identRefs[name] || 0);

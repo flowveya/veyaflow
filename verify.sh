@@ -69,7 +69,13 @@ echo "== DIGESTS ===============================================================
 # excludes `context`. Those two facts settled #114a, and this harness had never
 # compared the file. A tracked surface list that omits the write layer cannot see the
 # difference between "the client sent it" and "the row changed".
-FILES="index.html dpp/index.html portal.html brand/index.html netlify/functions/supabase-proxy.js"
+# #130, 9 Sep 2026 — share-dpp.js added. It decides what a published passport CONTAINS:
+# DPP_PUBLIC_FIELDS builds the section shape the viewer reads, and DPP_CONDITIONAL_GATING
+# decides which sections survive publish. Reading it settled a false report that the
+# Certifications section was dead — the nesting the viewer reads is created HERE. A tracked
+# surface list that omits the layer shaping a published, shareable record cannot see the
+# difference between "the client sent it" and "the buyer receives it". Same finding as #126.
+FILES="index.html dpp/index.html portal.html brand/index.html netlify/functions/supabase-proxy.js netlify/functions/share-dpp.js"
 EXPECTED_FILE="verify.expected.txt"
 
 for f in $FILES; do

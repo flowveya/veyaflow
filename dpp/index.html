@@ -272,11 +272,22 @@
   ` : '';
 
   // ── Section: Certifications ──
-  const certificationsHTML = certs.length ? `
+  // #129 — NORMALISE ONCE, then guard, count and render from the SAME array. Previously
+  // the count came from `certs` while the badges came from a hand-rolled ternary, so a
+  // nameless entry — an object with expiryDate and no name — rendered an EMPTY badge and
+  // was still counted: "Certifications (3)" above two visible badges and one blank, on a
+  // published passport. That is #127's class (a number not backed by what it claims) and
+  // #113's (a badge asserting more than the data supports), on the most permanent surface
+  // the product has. LATENT, not live — today's writer emits no nameless entry — and the
+  // canonical reader closes it as a side effect, because dropping an unnamed entry is
+  // already its contract. Behaviour-identical against today's data, strictly better
+  // against data we can now write.
+  const certNames = normalizeCertifications(certs);
+  const certificationsHTML = certNames.length ? `
     <div class="vf-section">
-      <div class="vf-section-title">Certifications (${certs.length})</div>
+      <div class="vf-section-title">Certifications (${certNames.length})</div>
       <div style="margin-top:.25rem">
-        ${certs.map(c => `<span class="vf-cert">${esc(typeof c === 'string' ? c : (c.name || ''))}</span>`).join('')}
+        ${certNames.map(c => `<span class="vf-cert">${esc(c)}</span>`).join('')}
       </div>
     </div>
   ` : '';
@@ -349,6 +360,46 @@
 
   wrap.innerHTML = coverHTML + identityHTML + compositionHTML + regulatoryHTML + certificationsHTML + environmentalHTML + footerMetaHTML;
 })();
+
+// ── CANONICAL CERTIFICATION READER — EXPAND PHASE, time axis step 3 ──────────
+// COPY THIS FUNCTION VERBATIM to every surface that reads certifications, comments
+// and whitespace included. The three copies must be byte-identical so a diff between
+// surfaces is a meaningful check — #128 was decided on exactly this hazard: a
+// duplicated file diverged, and the copy that rotted was the one nobody overwrote.
+//
+// Normalises THREE shapes to string[], because all three exist in the wild today:
+//   ['COSMOS Organic','Ecocert']   the common case — unchanged
+//   'COSMOS Organic, Ecocert'      legacy bare string (index.html:29957/29962 already
+//                                  test Array.isArray and fall back to it)
+//   [{name:'COSMOS Organic', …}]   the target form — brand.certifications is ALREADY
+//                                  this shape and readers hand-roll c.name||c today
+//
+// CONTRACT, and each clause is load-bearing:
+//   • Returns string[] ALWAYS — never null, never undefined, never a mixed array.
+//     esc() would render an object as [object Object] on a buyer-facing page.
+//   • ORDER IS PRESERVED EXACTLY. _ssCanon sorts a normalised array into the hashed
+//     Document ID; if normalisation reordered, that hash would move for every SKU.
+//     Not this surface's concern — but it is this reader's contract, defined here.
+//   • An entry with no usable name is DROPPED, not emitted empty. An empty badge is a
+//     certification asserted with no name.
+//   • PURE. No DOM, no storage, no dates. It normalises a shape; it does not interpret
+//     one. It deliberately does NOT read validUntil/verifiedDate — tolerating the shape
+//     is expand; rendering what the shape carries is a later phase and its own ruling.
+function normalizeCertifications(raw){
+  if(raw === null || raw === undefined) return [];
+  var list = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',') : []);
+  var out = [];
+  for(var i = 0; i < list.length; i++){
+    var entry = list[i];
+    var name;
+    if(typeof entry === 'string') name = entry;
+    else if(entry && typeof entry === 'object') name = entry.name || entry.label || '';
+    else name = '';
+    name = String(name).trim();
+    if(name) out.push(name);
+  }
+  return out;
+}
 
 function esc(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

@@ -10,10 +10,56 @@
 # ---------------------------------------------------------------------------
 
 index.html        9eb3da69
-dpp/index.html    6e946a27
+dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
+netlify/functions/share-dpp.js       500806f0
+
+# dpp/index.html moved 6e946a27 → e4809761 on 9 Sep 2026 — TIME AXIS STEP 4, EXPAND
+# PHASE 2, plus the COPY GATE. FIRST MOVE ON dpp/index.html SINCE BATCH #7. All four
+# other surfaces UNCHANGED; 1 of 5 modified. 51 gates (was 50).
+#   after   e480976126cb980ab8d248d651c9f60e3be27a33274d59494d8778e602a29714
+# NAMED BY THE LANE after reading 172–177 and 275–279 at the bytes, INDEPENDENT shasum.
+#
+# THE COPY WAS NOT RETYPED. CC extracted the reader from brand/index.html
+# PROGRAMMATICALLY — banner text → function opening → next closing brace — wrote it to a
+# scratch file and inserted that file's contents. No transcription step existed, so no
+# transcription error was possible. 2269 bytes both sides, identical digest.
+#
+# THE GATE WAS SEEN TO FAIL. It scans every HTML surface, keeps those carrying the banner,
+# and compares extracted text — located by banner and closing brace, NEVER by line number
+# (witness lines pinned to fixed numbers degrade after every edit, 3 Sep). A third copy in
+# index.html at phase 3 is picked up automatically; no hardcoded pair. A surface carrying
+# the banner without a complete function is its own FAIL, so a half-paste cannot pass.
+# PROOF OF FAILURE: one space added inside the reader → FAIL, 2269 vs 2270 bytes; reverted;
+# back to PASS. A gate never seen to fail is a gate nobody knows works — and this lane has
+# now written two that could not fail.
+#
+# #129 CLOSED, AND IT IS A DIFFERENCE, NOT A PASS. The old hand-rolled reader at 279 —
+# `esc(typeof c === 'string' ? c : (c.name || ''))` — rendered a NAMELESS entry as an EMPTY
+# <span class="vf-cert"></span> while certs.length counted it, so the heading could say
+# "Certifications (3)" above two visible badges. The count and the badges now read ONE
+# normalised array and cannot disagree by construction. Byte-identical on 5 of 6 probes;
+# the sixth DIFFERS deliberately and that difference is the fix.
+#
+# THE LANE'S PATTERN IS THE LANE'S, NOT ONE PERSON'S. CC reported the Certifications
+# section as DEAD — that payload.certifications.certifications reads a nesting level the
+# writer never creates — having read publishDPP (the client) and get-dpp.js (the read path)
+# but NOT share-dpp.js, THE LAYER THAT BUILDS IT. share-dpp.js:27–35 reshapes the flat
+# payload into sections via DPP_PUBLIC_FIELDS, where the section `certifications` contains
+# a field `certifications`. THE NESTING IS DELIBERATE AND LINE 177 IS CORRECT. Same error
+# the lane made five times and on #114a: verify the parts, assert the join — recorded here
+# on the same day the log named it as the lane's own. #130 does not become that finding.
+#
+# AND THE CHECK SURFACED A LIVE MIGRATION CONSTRAINT: share-dpp.js:41 gates the section on
+# `Array.isArray(p.certifications) && length > 0`. A LEGACY BARE COMMA-SEPARATED STRING
+# FAILS Array.isArray AND THE ENTIRE SECTION IS SILENTLY DROPPED AT PUBLISH — no error, no
+# partial render, an absent section. Whatever converts legacy rows must run BEFORE publish.
+#
+# #130 RAISED — share-dpp.js decides what a published passport CONTAINS (the section shape
+# and the gating) and the harness has never compared it. Identical finding to #126 on a
+# different file, and it stayed invisible to both lanes until it settled a false report.
 
 # brand/index.html moved 1e99d32c → fc6c0586 on 9 Sep 2026 — TIME AXIS STEP 3, EXPAND
 # PHASE 1. FIRST MOVE ON brand/index.html SINCE BATCH #5. index.html, dpp/index.html,
