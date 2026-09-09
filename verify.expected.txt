@@ -9,12 +9,87 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        c8a754f2
+index.html        5461416e
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved c8a754f2 → 5461416e on 9 Sep 2026 — #134, "None" DECLARED FOR
+# NANOMATERIALS AND CMR SUBSTANCES, UNASKED. TWO LINES, SHIPPED ALONE.
+#   after   5461416e60ab5c0e9b50a6ada0692d490baed339d3672f32d4cd711facb4babc
+# NAMED BY THE LANE after reading 19423–19424 and 19301 at the bytes, INDEPENDENT shasum.
+# Five other surfaces UNCHANGED; 1 of 6 modified; 57 gates.
+#
+# STRATEGY: ITS OWN SEVERITY CLASS, NOT MERELY FIRST IN THE QUEUE. Nanomaterials and CMR
+# are the two categories under EC 1223/2009 carrying the strictest notification
+# requirements. A false "None" on a surface that feeds a CPNP notification is not a product
+# defect — IT IS AN INCORRECT STATEMENT ON ITS WAY INTO A REGULATORY FILING. Everything
+# else on the board damages trust; this could lead a customer to file an untrue declaration.
+#
+# THE FIX WAS TO MAKE TWO LINES CONSISTENT WITH SEVENTEEN SIBLINGS. Nineteen object literals
+# in the file carry `filled:`; ALL NINETEEN are in this one array; seventeen derive it from
+# their value and these two set it unconditionally. After this shipment the count of
+# non-derived `filled:` is ZERO. A PAIR, NOT A PATTERN — the `done:` shape was checked too
+# (40 objects, 12 done:false asserting nothing, 3 done:true all async-loading flags).
+#
+# THE NUMBER GETS WORSE ON PURPOSE AND WAS MEASURED FROM BOTH SETS OF BYTES, NOT COMPUTED:
+# the CPNP readiness ceiling falls 64% → 50% (9/14 → 7/14), and the seed cosmetic SKU 57% →
+# 43%. THE BANNER ALSO CROSSES A THRESHOLD — readyPct>=60 selects amber — so the panel goes
+# amber → red. Not compensated for. Strategy's gate point 7: a pilot that hits a wall at 64%
+# has a worse experience than one meeting an honestly empty product. #135 inherits a
+# MEASURED ceiling of 50%, not the 64% it was scoped against.
+#
+# THE CONTROL IN SMOKE STEP 3 IS THE STRONGEST EVIDENCE IN THE REPORT: a SKU that DOES carry
+# nano and CMR values scores 64% before AND 64% after — identical. That proves the drop comes
+# only from the unasked case, which no amount of reasoning about the diff could establish.
+# 17 of 17 other rows byte-identical on {value, filled, required, hint, cell}.
+#
+# REPORT 2 DECIDED THE FIX'S SHAPE AND WAS DONE BEFORE EDITING. The renderer keys off
+# f.value, NOT f.filled: an unfilled field renders "⚠ Missing — add in My Products" in red
+# italic plus a red ✗ row. NOT a blank, and it says THE OPPOSITE of "None" — so the sibling
+# treatment was sufficient and no not_recorded string was invented.
+#
+# THE RESIDUAL, NAMED RATHER THAN LEFT: that remediation copy is ITSELF UNTRUE. There is no
+# nanomaterials or CMR input in My Products (#133: no writer, any channel). This shipment
+# converts A FALSE REGULATORY DECLARATION into A FALSE NAVIGATION HINT — a large net
+# improvement and the right trade — but by the standing rule that a false claim can be
+# phrased as an instruction, the copy is now what is left. It belongs to the write path.
+#
+# #139 RAISED, AND IT IS BIGGER THAN #134. THE CPNP HELPER IS GATED ON BRAND CATEGORY, NOT
+# PRODUCT FRAMEWORK. Line 19301, inside the per-SKU loop:
+#   getBrandCategories().some(c=>c.includes('Skincare')||c.includes('Beauty'))
+# openCPNPModal and renderCPNPModal contain ZERO references to resolveProductFramework and
+# ZERO to .productType — counted on the AST. So every SKU of a beauty brand gets an
+# EU-cosmetics CPNP notification helper, DEVICE AND ACCESSORY INCLUDED, complete with an INCI
+# row. THE SHIPPED SEED DEMONSTRATES IT: brand category 'Skincare & Beauty', two SKUs, one
+# cosmetic and one device — the device gets the helper.
+# THIS IS #108'S SHAPE ON A REGULATORY SURFACE: a brand-level scalar standing in for a
+# product-level regime. resolveProductFramework exists so that `unknown` is first-class and
+# cosmetic is never a default, and this surface never calls it.
+#
+# EXPOSURE, SETTLED BY VERIFICATION RATHER THAN BY PREMISE. Strategy assessed it as zero
+# because the catalogue is device and accessory. THE HYPOTHESIS DOES NOT SURVIVE on two
+# independent grounds: the catalogue contains a cosmetic SKU (the portal shows "Cloud & Glow
+# Face Serum · Cosmetic · EU 1223/2009" with CPNP on file), AND a device-only catalogue would
+# not have avoided the surface anyway, because the framework resolver is never consulted.
+# Strategy accepted the correction and downgraded on the DERIVATION while the CONCLUSION
+# held — no cosmetic product is on the market today, so no filing is pending. SECOND
+# SELF-CORRECTION IN TWO HOURS under the rule they adopted the same evening: Strategy states
+# claims about runtime behaviour as HYPOTHESES until the lane verifies them.
+#
+# ALSO NOTICED: brand.euResponsible.phone is a FOURTH dead read on this surface (RP phone) —
+# manualRpForm writes name, email, address, renewalDate and no phone. It sat outside #133's
+# scope because it hangs off a NESTED object, which is a limit of that sweep worth knowing.
+# #135 should count it.
+#
+# THE TIMING IS WORTH RECORDING. #134 was found by a sweep aimed at something else and fixed
+# THE DAY BEFORE the product it would have harmed became the priority. The face tape is a
+# real, blocked cosmetic product, and #135's five unfillable required fields — nanomaterials,
+# CMR, safety assessor, PIF reference, country of manufacture — ARE ITS BLOCKERS. Had it
+# moved first, the surface offering to prepare its CPNP notification would have declared
+# "Nanomaterials present: None" about a product whose dossier is the actual problem.
 
 # index.html moved 6d4d09b7 → c8a754f2 on 9 Sep 2026 — TIME AXIS STEP 8, MIGRATE 1: the
 # record accessor. MIGRATE IS FOUR SHIPMENTS, NOT ONE — M1 the accessor and ruling 5's gate

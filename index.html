@@ -19420,8 +19420,8 @@ function renderCPNPModal(skuId, view){
     {section:'C. Formulation',fields:[
       {portal:'INCI ingredient list',     value: (sku.inci||sku.ingredients||'').slice(0,200)+(((sku.inci||sku.ingredients)||'').length>200?'…':''),filled:!!(sku.inci||sku.ingredients),required:true},
       {portal:'Frame formulation ref.',   value: sku.frameFormulation||sku.formulationRef||'',filled:!!(sku.frameFormulation||sku.formulationRef),required:false,hint:'If using manufacturer frame formulation, add their reference number'},
-      {portal:'Nanomaterials present',    value: sku.nanomaterials||'None',         filled:true,                            required:true},
-      {portal:'CMR substances present',   value: sku.cmrSubstances||'None confirmed',filled:true,                          required:true},
+      {portal:'Nanomaterials present',    value: sku.nanomaterials||'',             filled:!!sku.nanomaterials,             required:true},
+      {portal:'CMR substances present',   value: sku.cmrSubstances||'',             filled:!!sku.cmrSubstances,             required:true},
     ]},
     {section:'D. Physical properties',fields:[
       {portal:'pH value',                 value: sku.ph||'',                        filled:!!sku.ph,                        required:false, hint:'Required for products pH <3 or >10'},
