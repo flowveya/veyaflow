@@ -220,7 +220,7 @@
             ${sku.ean  ? `<div class="vf-sku-field">EAN <strong>${esc(sku.ean)}</strong></div>` : ''}
             ${sku.rspSEK ? `<div class="vf-sku-field">RSP <strong>${esc(String(sku.rspSEK))} SEK</strong></div>` : ''}
             ${sku.netContent ? `<div class="vf-sku-field">Net <strong>${esc(String(sku.netContent))} ${esc(sku.netUnit||'')}</strong></div>` : ''}
-            ${(sku.certifications||[]).length ? `<div style="margin-top:.35rem">${sku.certifications.map(c=>`<span class="vf-cert">${esc(c)}</span>`).join('')}</div>` : ''}
+            ${normalizeCertifications(sku.certifications).length ? `<div style="margin-top:.35rem">${normalizeCertifications(sku.certifications).map(c=>`<span class="vf-cert">${esc(c)}</span>`).join('')}</div>` : ''}
           </div>
         `).join('')}
       </div>
@@ -244,6 +244,46 @@
 
   wrap.innerHTML = coverHTML + sectionsHTML + skusHTML + snapshotHTML;
 })();
+
+// ── CANONICAL CERTIFICATION READER — EXPAND PHASE, time axis step 3 ──────────
+// COPY THIS FUNCTION VERBATIM to every surface that reads certifications, comments
+// and whitespace included. The three copies must be byte-identical so a diff between
+// surfaces is a meaningful check — #128 was decided on exactly this hazard: a
+// duplicated file diverged, and the copy that rotted was the one nobody overwrote.
+//
+// Normalises THREE shapes to string[], because all three exist in the wild today:
+//   ['COSMOS Organic','Ecocert']   the common case — unchanged
+//   'COSMOS Organic, Ecocert'      legacy bare string (index.html:29957/29962 already
+//                                  test Array.isArray and fall back to it)
+//   [{name:'COSMOS Organic', …}]   the target form — brand.certifications is ALREADY
+//                                  this shape and readers hand-roll c.name||c today
+//
+// CONTRACT, and each clause is load-bearing:
+//   • Returns string[] ALWAYS — never null, never undefined, never a mixed array.
+//     esc() would render an object as [object Object] on a buyer-facing page.
+//   • ORDER IS PRESERVED EXACTLY. _ssCanon sorts a normalised array into the hashed
+//     Document ID; if normalisation reordered, that hash would move for every SKU.
+//     Not this surface's concern — but it is this reader's contract, defined here.
+//   • An entry with no usable name is DROPPED, not emitted empty. An empty badge is a
+//     certification asserted with no name.
+//   • PURE. No DOM, no storage, no dates. It normalises a shape; it does not interpret
+//     one. It deliberately does NOT read validUntil/verifiedDate — tolerating the shape
+//     is expand; rendering what the shape carries is a later phase and its own ruling.
+function normalizeCertifications(raw){
+  if(raw === null || raw === undefined) return [];
+  var list = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',') : []);
+  var out = [];
+  for(var i = 0; i < list.length; i++){
+    var entry = list[i];
+    var name;
+    if(typeof entry === 'string') name = entry;
+    else if(entry && typeof entry === 'object') name = entry.name || entry.label || '';
+    else name = '';
+    name = String(name).trim();
+    if(name) out.push(name);
+  }
+  return out;
+}
 
 function esc(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

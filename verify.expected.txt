@@ -12,8 +12,88 @@
 index.html        9eb3da69
 dpp/index.html    6e946a27
 portal.html       beaa72b8
-brand/index.html  1e99d32c
+brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
+
+# brand/index.html moved 1e99d32c → fc6c0586 on 9 Sep 2026 — TIME AXIS STEP 3, EXPAND
+# PHASE 1. FIRST MOVE ON brand/index.html SINCE BATCH #5. index.html, dpp/index.html,
+# portal.html and the proxy all UNCHANGED; 1 of 5 modified.
+#   after   fc6c0586e209f6c67e48d8b770da3e9a2aafa1006647db13beab136d3937da73
+# NAMED BY THE LANE after reading 223 and 272–286 at the bytes, INDEPENDENT shasum.
+#
+# EXPAND → MIGRATE → CONTRACT, ONE SURFACE PER SHIPMENT. Strategy REFUSED an exception
+# to §2's one-edit rule for the certification migration, on the meta-rule written the
+# same morning applied to Strategy's own side: an exception for "a coordinated migration"
+# turns a structural guard into a procedural one — the label becomes available to anyone
+# who believes their change is coordinated, and the guard survives only while someone
+# remembers not to abuse it. AND THE SEQUENCING MAKES VERIFICATION STRONGER: the expand
+# phase is behaviour-neutral, so every step is a DIFF TEST rather than a judgement. The
+# sequencing is not a tax the migration pays; it is what makes it verifiable at all.
+#
+# THE BOUNDARY, A RULE AND NOT A SCOPE NOTE: a brand's own certifications and our
+# reference data about third parties MUST NOT share a schema, now or ever. A brand's
+# certification on a buyer-facing document is THE BRAND'S LEGAL EXPOSURE; our registry
+# entry about a manufacturer is OUR EDITORIAL CLAIM carrying a confidence level. Share a
+# schema and something eventually renders a research_verified third-party fact with
+# brand-confirmed authority — invisible, because both would be well-formed.
+#
+# SEQUENCE CORRECTED BEFORE ANY EDIT: the scout proposed the proxy as expand step 1. The
+# proxy is NOT IN THE MIGRATION — its single certifications (247) is inside a manufacturer
+# LISTING APPLICATION, third-party data, which the scout's own population table classified
+# correctly while its proposed sequence did not. Found by reading the line. Revised order:
+# brand/index.html (1 site) → dpp/index.html (3) → index.html (45, split). portal.html has
+# ZERO occurrences — it receives pack.claims, built FROM certifications, which is why #113
+# was a claims problem and not a certifications one.
+#
+# THE MIGRATION IS FINISHING A HALF-DONE ONE, NOT STARTING ONE. brand.certifications is
+# ALREADY the object form and already carries expiryDate; six readers already hand-roll
+# `c.name || c`; buildComplianceEvents already raises calendar events from cert.expiryDate
+# and renderComplianceCalendar gates a whole panel on `.some(c => c.expiryDate)`. None of
+# it was ruled on or recorded. That is how a codebase acquires two schemas without anyone
+# deciding to have two.
+#
+# THREE SHAPES, NOT TWO — the lane's spec was wrong. index.html:29957/29962 test
+# Array.isArray and fall back to a bare comma-separated string, so that form exists in the
+# wild. normalizeCertifications handles string[], string, and the object form.
+#
+# BEHAVIOUR-NEUTRALITY MEASURED, NOT ASSERTED: the old expression's output was captured to
+# disk BEFORE the edit, then old and new were evaluated against six inputs and compared
+# three ways — old vs new, and both vs the pre-edit capture. 6/6 byte-identical. The
+# three-way form matters: a two-way comparison can be satisfied by an error common to both
+# expressions. Escaping and the empty branch are both covered.
+#
+# esc() CANNOT RECEIVE A NON-STRING, proven by 11 probes including null, 42, {}, nested
+# arrays and whitespace-only entries — all dropped rather than stringified. So
+# [object Object] on a buyer-facing page is UNREACHABLE, and so is an empty
+# <span class="vf-cert"></span>. Order preserved: [{name:"Z"},"A",{name:"M"}] → Z,A,M.
+#
+# ORDER PRESERVATION IS A CONTRACT SET HERE FOR A SURFACE THREE STEPS AWAY: _ssCanon
+# (30028) does `certs:(sku.certifications||[]).slice().sort()` and hashes the result into
+# the DOCUMENT ID. If normalisation reordered, every ID in the app would move — #93's
+# one-time cost re-paid, silently. _ssCanon must go through the reader, and it ships with
+# its own before/after ID evidence.
+#
+# RULED — THE TARGET FORM USES expiryDate, NOT validUntil. The lane's spec named
+# validUntil; the field that EXISTS is expiryDate, already written and already consumed by
+# two functions. Introducing a synonym would create two fields meaning one thing, inside
+# the migration that exists to end exactly that. The name is uglier than the lane would
+# choose; that is not a reason. A rename is a separate decision with its own migration.
+#
+# THE READER LIVES IN THREE COPIES and must stay BYTE-IDENTICAL — separate HTML files, no
+# module system. #128 was decided the same afternoon on this hazard. The gate cannot exist
+# with one copy; it lands with dpp/index.html in phase 2, comparing the reader's source
+# text extracted BY COMMENT BANNER AND CLOSING BRACE, never by line number — witness lines
+# pinned to fixed numbers degrade after every edit (3 Sep). That gate CAN fail, which is
+# why it is worth building and #128's must-not-exist gate was correctly declined.
+#
+# PLACEMENT FOR PHASE 3, CC's reasoning better than the lane's: beside
+# normalizeNumericProof at 4928 in BLOCK ONE — before the EARLIEST read (7119,
+# renderExpansionSequencer), not near the riskiest site (_ssCanon at 30028, 22,000 lines
+# later). The lane would have anchored on risk; the constraint is reach.
+#
+# INHERITED, NOT INTRODUCED: the reader's .split(',') cannot represent a legacy cert whose
+# name contains a comma. That form was already lossy. It becomes a decision in the MIGRATE
+# phase — whether such a name is recoverable or must be flagged for human review.
 
 # index.html moved 0190c726 → 9eb3da69 on 7 Sep 2026 — TIME AXIS STEP 1, the
 # confirmation stamp. +79 lines. CAPTURE ONLY: renders nothing, reasons about nothing.
