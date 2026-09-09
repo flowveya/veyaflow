@@ -9,12 +9,77 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        9eb3da69
+index.html        8fd343de
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 9eb3da69 → 8fd343de on 9 Sep 2026 — TIME AXIS STEP 5, EXPAND PHASE 3a:
+# _ssCanon and the reader's third copy. ONE SITE, SHIPPED ALONE ON PURPOSE — 44 other
+# certification sites in this file could have ridden along safely, and _ssCanon would then
+# have been verified in a diff where nobody was looking only at it.
+#   after   8fd343de9d80bf17dfb89639e00d9be85e6f6e87c82f443fcf55b6f3505fd34c
+# NAMED BY THE LANE after reading 30013–30037 at the bytes, INDEPENDENT shasum.
+# Five other surfaces UNCHANGED; 1 of 6 modified.
+#
+# WHY THIS LINE IS THE HIGHEST-CONSEQUENCE ONE IN THE MIGRATION: everywhere else a mistake
+# shows as a visibly wrong string. Here it shows as EVERY PREVIOUSLY-ISSUED SPEC SHEET
+# BECOMING SILENTLY UNREPRODUCIBLE — #93's one-time cost re-paid, with no symptom.
+#   certs:(sku.certifications||[]).slice().sort()  →  certs: normalizeCertifications(...).sort()
+#
+# THE EVIDENCE: eight inputs, three-way compared (old vs new vs a PRE-EDIT capture), with
+# the SHA-256 Document ID computed for each. SEVEN identical, ONE MOVED — a certification
+# name carrying LEADING OR TRAILING WHITESPACE. The reader trims; .slice().sort() did not,
+# and a padded entry sorted first because space precedes letters.
+#
+# REPORTED AS A DIFFERENCE, NOT FOLDED INTO THE PASS — and traced before concluding.
+# sku.certifications has EXACTLY ONE WRITER: toggleSkuCert (21283), pushing from a
+# hardcoded literal list with no padded element. No free-text input, no CSV import, no
+# autofill, no parse path. The parsed./nlParsed. sites are manufacturer SEARCH FILTERS —
+# third-party population, never assigned to a SKU. The moved case is UNREACHABLE, so every
+# reachable Document ID is unchanged and the shipment stands.
+#
+# .slice() DROPPED, and the reasoning is the lane's own standard: the reader builds a fresh
+# array per call and returns it directly, so .sort() cannot mutate caller state. Keeping the
+# copy would assert a defence against an aliasing hazard the contract already forecloses —
+# the "check that cannot fail" shape declined five times this week. The guarantee is WRITTEN
+# in the reader's banner rather than implied by a redundant call.
+#
+# THE LANE'S SPEC WAS WRONG ABOUT THE FAILURE MODE. It said the latent bare-string crash sat
+# OUTSIDE the try. It sits outside the INNER try around _atmHashContent but INSIDE the outer
+# one at 29920, whose catch alerts "Could not generate spec sheet". So the failure was a
+# VISIBLE REFUSAL, not a silent crash — and refusal-versus-silence is the distinction this
+# lane keeps insisting on. Not reachable either way: the single writer forecloses it. The
+# Array.isArray fallbacks at 29997/30002 are DEFENSIVE, NOT EVIDENTIAL — someone anticipated
+# the form rather than observed it.
+#
+# THE COPY GATE SAID THREE, UNADJUSTED. Written to scan every surface carrying the banner
+# rather than a hardcoded pair, so the third copy was picked up automatically. Extracted
+# programmatically again — banner → opening → closing brace → scratch file → insert — so no
+# transcription step existed in which an error could occur. 2269 bytes on all three.
+# Placed at 4952 beside normalizeNumericProof, block one, ahead of the earliest read (7119).
+#
+# HASH COVERAGE ESTABLISHED, NOT ASSUMED: `certs` is the ONLY hashed field touching
+# certifications (whole _ssCanon literal scanned for /cert/i — one hit). Five callers of
+# _atmHashContent: two hash raw file bytes, and _lsCanon (29942, the LINE SHEET Document ID)
+# hashes {n,d,rsp,ean,moq,lead} and does NOT touch certifications. No other document type
+# carries this requirement; none is unscheduled.
+#
+# THE READER NORMALISES CONTENT, NOT ONLY SHAPE — and this belongs in the MIGRATE spec as a
+# stated property rather than a rediscovery. Trimming is correct: a padded name and its
+# trimmed form denote the same certification. But IF THE MIGRATE PHASE ADDS A FREE-TEXT
+# CERTIFICATION WRITER, PADDED INPUT WILL HASH DIFFERENTLY THAN THE SAME NAME WOULD HAVE
+# BEFORE TODAY. The banner's "normalises a shape, does not interpret one" is now slightly
+# narrower than the behaviour; a clarifying line is folded in whenever the reader is next
+# opened for another reason, not paid for with a three-copy shipment of its own.
+#
+# THE CHECK NOBODY COULD RUN FROM THE FILE: the live Cloud & Glow catalogue is in
+# localStorage. CC's evidence covers the seed SKUs (neither declares certifications) plus
+# eight synthetic shapes. SMOKE STEP 1 — an old spec sheet's footer Document ID against a
+# freshly generated one for the same SKU — is the only test that closes this, and it is
+# Charlotte's.
 
 # dpp/index.html moved 6e946a27 → e4809761 on 9 Sep 2026 — TIME AXIS STEP 4, EXPAND
 # PHASE 2, plus the COPY GATE. FIRST MOVE ON dpp/index.html SINCE BATCH #7. All four
