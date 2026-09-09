@@ -7156,12 +7156,12 @@ function renderExpansionSequencer(){
             ◉ NL Preventative Wellness trend — Dutch consumers are EU's highest adopters. ${(brand?.category||'').includes('Beauty')&&skus.some&&skus.some(s=>s.productType==='device')?'LED devices over-index. Lead with Preventative Wellness framing at Vitaminstore.':'Supplements and wellness devices over-index vs EU average. Vitaminstore is the recommended first NL listing.'}
           </div>
         `:''}
-        ${m.marketCode==='DE'&&(brand?.category||'').includes('Beauty')&&(sku?.certifications||[]).some(c=>c.toLowerCase().includes('cosmos'))?`
+        ${m.marketCode==='DE'&&(brand?.category||'').includes('Beauty')&&normalizeCertifications(sku&&sku.certifications).some(c=>c.toLowerCase().includes('cosmos'))?`
           <div style="background:#ECFDF5;border:1px solid #A7F3D0;padding:.4rem .65rem;margin-top:.4rem;font-family:var(--mono);font-size:.57rem;color:#065F46">
             ✓ COSMOS certified — qualifies for dm Naturkosmetik expedited listing review. Bypass the standard clean beauty queue. Submit July for January 2027 reset.
           </div>
         `:''}
-        ${m.marketCode==='DE'&&(brand?.category||'').includes('Beauty')&&!((sku?.certifications||[]).some(c=>c.toLowerCase().includes('cosmos')))?`
+        ${m.marketCode==='DE'&&(brand?.category||'').includes('Beauty')&&!(normalizeCertifications(sku&&sku.certifications).some(c=>c.toLowerCase().includes('cosmos')))?`
           <div style="background:#FFFBEB;border:1px solid #FDE68A;padding:.4rem .65rem;margin-top:.4rem;font-family:var(--mono);font-size:.57rem;color:#92400E">
             ⚑ Germany: claims review required before DE market entry. Budget 3–6 weeks + EUR 2,000–6,000.
           </div>
@@ -16895,7 +16895,7 @@ function renderBrandPack(el){
                 if(!_r) return [];
                 return [[ (_r[1]?'✓ ':'✗ ')+_r[0], _r[1]||'Not set', _r[1]?'#065F46':'#991B1B' ]];
               })() ),
-              [heroSku?.certifications?.length ? '✓ Certified' : '○ Certifications', heroSku?.certifications?.join(', ')||'None set', heroSku?.certifications?.length?'#065F46':'var(--muted)'],
+              [normalizeCertifications(heroSku&&heroSku.certifications).length ? '✓ Certified' : '○ Certifications', normalizeCertifications(heroSku&&heroSku.certifications).join(', ')||'None set', normalizeCertifications(heroSku&&heroSku.certifications).length?'#065F46':'var(--muted)'],
               [(heroSku?.claims||[]).filter(c=>c).length ? '✓ Claims set' : '○ Claims', (heroSku?.claims||[]).length+' on-pack claims', '#065F46'],
             ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)">
               <div style="font-family:var(--sans);font-size:.72rem;color:var(--muted)">${l}</div>
@@ -17211,7 +17211,7 @@ Framing to use: "typical Step-${routineStep} baskets at this retailer add ~${bas
       if(!_sd) return [];
       return [_sd.label+': ' + (heroSku.safetyRef ? heroSku.safetyRef : 'not on file')];
     })() ),
-    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+    'Certifications: ' + (normalizeCertifications(heroSku && heroSku.certifications).join(', ') || 'None'),
   ].join('\n');
 
   const prompt = `You are creating a buyer-facing Brand Pack for ${brand.name||'the brand'} targeting ${retailer} in ${market}. ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}.
@@ -17471,7 +17471,7 @@ function renderBrandPackResult(el){
                 if(!_sd) return [];
                 return [[_sd.label, heroSku.safetyRef?'✓ '+heroSku.safetyRef.slice(0,20):'✗ Not set', !!heroSku.safetyRef]];
               })() ),
-              ['Certifications', heroSku?.certifications?.length?'✓ '+heroSku.certifications.slice(0,2).join(', '):'None set', !!heroSku?.certifications?.length],
+              ['Certifications', (function(){var _c=normalizeCertifications(heroSku&&heroSku.certifications);return _c.length?'✓ '+_c.slice(0,2).join(', '):'None set';})(), normalizeCertifications(heroSku&&heroSku.certifications).length>0],
             ].map(([l,v,ok])=>`
               <div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)">
                 <div style="font-family:var(--sans);font-size:.73rem;color:var(--muted)">${l}</div>
@@ -21380,7 +21380,7 @@ async function generateRetailerAssets(skuId){
   renderPage('skus');
 
   const masterDesc = sku.descEN || sku.descSV || `${sku.name||'Product'}. ${(sku.claims||[]).join('. ')}${sku.inci?' Key ingredients: '+sku.inci.split(',').slice(0,5).join(', '):''}`.trim();
-  const brandCtx = `Brand: ${brand?.name||''}. Category: ${brand?.category||''}. Certifications: ${(sku.certifications||[]).join(', ')||'none'}.`;
+  const brandCtx = `Brand: ${brand?.name||''}. Category: ${brand?.category||''}. Certifications: ${normalizeCertifications(sku.certifications).join(', ')||'none'}.`;
 
   const results = {};
 
@@ -21975,7 +21975,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['Nettovikt/volym',      `${sku.netContent||''} ${sku.netUnit||''}`],
         ['Tillverkningsland',    sku.countryOfMfr||''],
         ['Ledtid (dagar)',       sku.leadDays||''],
-        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Certifieringar',       normalizeCertifications(sku.certifications).join('; ')],
         ['Påståenden',           (sku.claims||[]).join('; ')],
         ['Beskrivning SV',       sku.descSV||''],
         ['Beskrivning EN',       sku.descEN||''],
@@ -21991,7 +21991,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['PAO (mdr)',            sku.paoMonths||''],
         ['Oprindelsesland',      sku.countryOfMfr||''],
         ['Leveringstid (dage)',  sku.leadDays||''],
-        ['Certifikater',         (sku.certifications||[]).join('; ')],
+        ['Certifikater',         normalizeCertifications(sku.certifications).join('; ')],
         ['Påstande',             (sku.claims||[]).join('; ')],
         ['Beskrivelse EN',       sku.descEN||''],
         ['Beskrivelse DA',       sku.descDA||''],
@@ -22004,7 +22004,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['PAO',                  sku.paoMonths||''],
         ['Hållbarhet',           sku.shelfLifeMonths||''],
         ['Nettovikt',            `${sku.netContent||''} ${sku.netUnit||''}`],
-        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Certifieringar',       normalizeCertifications(sku.certifications).join('; ')],
         ['Produktbeskrivning SV',sku.descSV||''],
         ['Produktbeskrivning EN',sku.descEN||''],
       ],
@@ -22016,7 +22016,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['RSP SEK',              sku.rspSEK||''],
         ['Hållbarhet (mån)',     sku.shelfLifeMonths||''],
         ['Tillverkningsland',    sku.countryOfMfr||''],
-        ['Certifieringar',       (sku.certifications||[]).join('; ')],
+        ['Certifieringar',       normalizeCertifications(sku.certifications).join('; ')],
         ['Beskrivning',          sku.descSV||sku.descEN||''],
       ],
       'Boots UK': [
@@ -22031,7 +22031,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['PAO (months)',         sku.paoMonths||''],
         ['Country of manufacture',sku.countryOfMfr||''],
         ['Lead time (days)',     sku.leadDays||''],
-        ['Certifications',       (sku.certifications||[]).join('; ')],
+        ['Certifications',       normalizeCertifications(sku.certifications).join('; ')],
         ['Claims',               (sku.claims||[]).join('; ')],
         ['Description EN',       sku.descEN||''],
       ],
@@ -22046,7 +22046,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
       ['Contains fragrance',sku.hasFrag?'Yes':'No'],['Allergens',sku.allergens||''],
       ['pH',sku.ph||''],['CPNP number',sku.cpnp||''],
       ...( (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?[_r]:[];})() ),
-      ['Safety Assessment ref',sku.safetyRef||''],['Certifications',(sku.certifications||[]).join('; ')],
+      ['Safety Assessment ref',sku.safetyRef||''],['Certifications',normalizeCertifications(sku.certifications).join('; ')],
       ['Claims',(sku.claims||[]).join('; ')],['RSP SEK',sku.rspSEK||''],['RSP DKK',sku.rspDKK||''],
       ['RSP GBP',sku.rspGBP||''],['RSP EUR',sku.rspEUR||''],
       ['RSP NOK',sku.rspNOK||''],['RSP ISK',sku.rspISK||''],
@@ -22090,7 +22090,7 @@ function exportForRetailer(skuId, retailer, format, fileExt){
     `CPNP/SCPN:          ${sku.cpnp||''}`,
     (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?`${_r[0]}: ${_r[1]}`:'';})(),
     `Safety Assessment:  ${sku.safetyRef||''}`,
-    (sku.certifications||[]).length ? `Certifications:     ${sku.certifications.join(', ')}` : '',
+    normalizeCertifications(sku.certifications).length ? `Certifications:     ${normalizeCertifications(sku.certifications).join(', ')}` : '',
     (sku.claims||[]).length ? `Claims:             ${sku.claims.join(', ')}` : '',
     ``,
     `COMMERCIAL`,
@@ -25404,7 +25404,7 @@ IMPORTANT: All 3 variants must lead with the seasonal opportunity and format mat
       if(!_sd) return [];
       return [_sd.label+': ' + (heroSku.safetyRef ? heroSku.safetyRef : 'not on file')];
     })() ),
-    'Certifications: ' + ((heroSku && heroSku.certifications && heroSku.certifications.length) ? heroSku.certifications.join(', ') : 'None'),
+    'Certifications: ' + (normalizeCertifications(heroSku && heroSku.certifications).join(', ') || 'None'),
   ].join('\n');
   const _pitchArchetypes = [{name:'Direct & Commercial', rule:'numbers first, no brand story'}];
   if(_pitchStage==='warm' || _pitchStage==='followup') _pitchArchetypes.push({name:'Brand Story-Led', rule:'founder origin in one sentence, then commercial'});
@@ -29994,12 +29994,15 @@ async function generateSpecSheetPDF(skuId){
       row('CE marking', sku.ceMarking===true ? 'Yes' : (sku.ceMarking ? String(sku.ceMarking) : '— not provided'));
       row('Declaration of Conformity', sku.docOnFile ? 'On file' : '— not provided');
       row('Material composition', sku.materialComposition);
-      row('Certifications', Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications);
+      // #3b — the Array.isArray ternary was DEFENSIVE, not evidential (established in 3a:
+      // toggleSkuCert is the only writer and pushes strings into an array). The reader
+      // handles all three shapes, so the branch became a check that cannot fail.
+      row('Certifications', normalizeCertifications(sku.certifications).join(', '));
     } else if(isAccessory){
       // Accessory = physical, non-formulated → materials, not INCI; no device-electrical rows.
       sectionTitle('Materials & specification');
       row('Material composition', sku.materialComposition);
-      var _acCerts = Array.isArray(sku.certifications) ? sku.certifications.join(', ') : sku.certifications;
+      var _acCerts = normalizeCertifications(sku.certifications).join(', ');
       if(_acCerts!=null && _acCerts!=='') row('Certifications', _acCerts);
     } else {
       sectionTitle('Formulation');
@@ -30741,7 +30744,7 @@ async function generateBrandPackPDF(){
           if(!_sd) return [];
           return [[_sd.label, heroSku.safetyRef||'Not set', !!heroSku.safetyRef]];
         })() ),
-        ['Certifications', (heroSku.certifications||[]).join(', ')||'None', !!(heroSku.certifications?.length)],
+        ['Certifications', normalizeCertifications(heroSku.certifications).join(', ')||'None', normalizeCertifications(heroSku.certifications).length>0],
       ];
       compRows.forEach(([l,v,ok])=>{
         // #95 — the value column was hardcoded at margin+38 (~107.7pt, ~24 chars of
@@ -34671,7 +34674,7 @@ function dppReadiness(sku){
     // green tick beside "CPNP", which does not apply to devices under EC 1223/2009.
     // Label derives from the ONE resolver (batch #2); no second resolver introduced.
     {id:'cpnp',      label:(function(){var _f=resolveProductFramework(sku).framework;return _f==='cosmetic'?'CPNP notification ref':_f==='device'?'CE marking ref':'Regulatory reference';})(),done:!!(sku.cpnp||sku.ceMarking||sku.novelFoodStatus), source:'SKU'},
-    {id:'certs',     label:'Certifications',     done:!!(sku.certifications&&sku.certifications.length>0), source:'SKU'},
+    {id:'certs',     label:'Certifications',     done:normalizeCertifications(sku.certifications).length>0, source:'SKU'},
     {id:'circular',  label:'End-of-life routing — not captured',done:false,          source:'SKU'},
     // DPP-specific gaps (post-Phase-5: now read from SKU canonical storage)
     {id:'carbon',    label:'Carbon footprint',   done:!!(sku.carbonKg||sku.carbonEstimated), source:'DPP'},
@@ -35461,7 +35464,7 @@ function renderDPPView(el){
                 ['Recycled content',sku.recycledProductPct!==undefined?sku.recycledProductPct+'% product / '+(sku.recycledPackagingPct||'0')+'% pack':'—'],
                 ['Recyclability',sku.recyclabilityRating||'—'],
                 ['Take-back',sku.takebackScheme||'—'],
-                ['Certifications',(sku.certifications||[]).join(', ')||'—'],
+                ['Certifications',normalizeCertifications(sku.certifications).join(', ')||'—'],
                 // #41 survivor — this row rendered CPNP for EVERY framework, so a device
                 // showed the field that does not apply to it and not the one that does.
                 // Routed through the ONE resolver, exactly as dppReadiness now is.
@@ -35861,7 +35864,7 @@ async function generateDPPPdf(skuId){
     y+=4;
 
     section('Compliance & Certifications');
-    row('Certifications',(sku.certifications||[]).join(', ')||'—');
+    row('Certifications',normalizeCertifications(sku.certifications).join(', ')||'—');
     // #53 mirror defect — CPNP and CE both printed unconditionally, so a cosmetic got a
     // CE row and a device got a CPNP row. Same failure, both directions; routed together
     // because splitting them would leave the surface half-true.
@@ -36615,7 +36618,7 @@ function buildBriefContext(mfr){
     usp: brand?.usp||'—',
     skuName: safeSku?.name||'[Product name]',
     skuType: sku?.productType||'—',
-    certifications: safeSku?.certifications?.join(', ')||'none specified',
+    certifications: normalizeCertifications(safeSku&&safeSku.certifications).join(', ')||'none specified',
     rsp: safeSku?.rspSEK?safeSku.rspSEK+' SEK':'—',
     moqNeeded: safeSku?.manufacturerMoq||'—',
     leadDays: safeSku?.leadDays||'—',
@@ -40126,7 +40129,7 @@ function buildPortalBrandPack(sub){
     (sub&&sub.skuIds||[]).forEach(function(sid){
       var sk = skus.find(function(x){ return String(x.id)===String(sid); });
       if(!sk) return;
-      (sk.certifications||[]).forEach(function(c){ claimsSet[c]=1; });
+      normalizeCertifications(sk.certifications).forEach(function(c){ claimsSet[c]=1; });
       (sk.claimsApproved||[]).forEach(function(c){ claimsSet[c]=1; });
     });
     pack.claims = Object.keys(claimsSet).slice(0,8);

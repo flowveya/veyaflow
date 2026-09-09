@@ -9,12 +9,81 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        8fd343de
+index.html        eb829955
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 8fd343de → eb829955 on 9 Sep 2026 — TIME AXIS STEP 6, EXPAND PHASE 3b:
+# the read-to-display sites. TWENTY-TWO SITES, NOT THE EIGHTEEN THE LANE LISTED.
+#   after   eb8299557005ae16cfb2f3d44ac7dd390133c5a5f031fd02915bf9f047a1041f
+# NAMED BY THE LANE after reading 7159/7164 at the bytes, INDEPENDENT shasum. Five other
+# surfaces UNCHANGED; 1 of 6 modified. Copy gate still three surfaces, 2269 bytes — this
+# shipment added no copy. normalizeCertifications now appears 24 times in the file.
+#
+# THE LANE'S ENUMERATION MISSED FOUR OF TWENTY-TWO — EIGHTEEN PERCENT — AND THE SPEC IS
+# WHAT CAUGHT IT. Scope was defined BY SHAPE with an instruction to enumerate
+# independently and report what the lane missed, rather than as a line list to work
+# through. Missed: 7159 and 7164 (renderExpansionSequencer), 16898 (renderBrandPack),
+# 36618 (buildBriefContext).
+#   7159/7164 ARE THE HIGHEST-RISK OF THE FOUR: `.some(c => c.toLowerCase()…)` THROWS on
+#   an object entry rather than rendering wrong, and they gate a CONTRADICTORY PAIR of
+#   panels, so a throw takes out the whole market row. Had this been a line list, they
+#   would have shipped in migrate against a writer that produces objects.
+# STANDING: SCOPE BY SHAPE, NEVER BY LINE LIST.
+#
+# THE EVIDENCE: 13 distinct expression shapes × 11 inputs = 143 comparisons, three-way
+# (old vs new vs a PRE-EDIT capture). 60 differences, EVERY ONE confined to an input that
+# cannot occur today. On every REACHABLE input the output is byte-identical.
+#
+# THE ONE APPARENT REACHABLE DIFFERENCE, TRACED TO GROUND RATHER THAN EXPLAINED AWAY:
+# site F returned undefined/null from the old ternary and returns '' now — but row() passes
+# through bdVal, which maps undefined, null AND '' to the identical '— not provided'. A
+# difference in the EXPRESSION that is not a difference in the OUTPUT, proven at the
+# consumer. Its sibling at 30002 skips the row either way, same outcome by a different route.
+#
+# WHAT THE UNREACHABLE COLUMNS SHOW ABOUT TODAY'S CODE: the bare-string form THROWS at 11
+# of 13 shapes — an exception, not a wrong value — and the object form renders
+# [object Object] at 12. Both were live hazards the moment a second writer appeared.
+# Expand closes them AHEAD of the writer, which is the phase's entire purpose.
+#
+# 34674 CHANGES BEHAVIOUR AND IS UNREACHABLE: an array of only unusable entries was `true`
+# (length>0) and is now `false`. Reported as a difference, not a pass. When it becomes
+# reachable it is a FIX — a readiness row reading "done" because the array had length while
+# every entry was unnamed is #127's class, a boolean not backed by what it claims.
+#
+# 40129 — THE RISK RAN THE OPPOSITE WAY FROM THE LANE'S CONCERN. The spec asked for proof
+# that normalisation does not REMOVE a buyer-facing badge (pack.claims is what the portal
+# renders; #113 was a claims problem). Byte-identical on all reachable inputs — and on
+# unreachable ones it REMOVES keys like "[object Object]" and "42" that would have rendered
+# as literal badge text to a retailer. Normalisation PROTECTS that surface.
+#
+# NOTHING IN SCOPE REACHES STORAGE, PUBLICATION OR A HASH — each destination checked
+# individually. The sites that DO publish or persist are excluded and named: 34592, 35734
+# (DPP payloads), 26233 (shareBrandPack magic-link payload), 34756/34757 (csrdAutoFill,
+# persisted to ns_csrd_answers and mixing brand?.certifications — 3c AND a persist site).
+#
+# 20356 CLASSIFIED → MIGRATE. It reads skuForm.certifications, not sku, inside
+# generateSkuDesc's prompt. Same reasoning as the editor's includes tests: skuForm is
+# written by toggleSkuCert, so it moves WITH the writer. THE MIGRATE SPEC NOW HAS FIVE
+# SITES TO MOVE TOGETHER, not the writer alone — toggleSkuCert, the three editor includes
+# tests (20449/20662/20704), and the description prompt.
+#
+# USEFUL ORDERING FACT FOR MIGRATE: 26233's payload feeds brand/index.html, which phase 1
+# already made tolerant — so publishing the object form is safe on that surface BEFORE
+# migrate touches it.
+#
+# #131 RAISED — THE SIX EXPORT LOCALES ARE IDENTICAL BY LUCK, NOT BY GATE. All six are
+# ['<label>', normalizeCertifications(...).join('; ')] differing only in the label. ONE sed
+# replaced all six with an exact-count assertion of 6, WHICH IS ONLY POSSIBLE BECAUSE NOBODY
+# HAS HAND-EDITED ONE. Six near-copies with no check is the #128 shape, in the moment before
+# it stops being true. Not fixed here.
+#
+# NOTICED: renderExpansionSequencer computes the same .some(…'cosmos') twice, once positive
+# and once negated, so the reader is called four times per market row. Pure and cheap; a
+# double negation that would read better as one local. 3c-adjacent tidy, not this shipment's.
 
 # index.html moved 9eb3da69 → 8fd343de on 9 Sep 2026 — TIME AXIS STEP 5, EXPAND PHASE 3a:
 # _ssCanon and the reader's third copy. ONE SITE, SHIPPED ALONE ON PURPOSE — 44 other
