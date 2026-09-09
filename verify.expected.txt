@@ -9,12 +9,102 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        914f549c
+index.html        80555dcc
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 914f549c → 80555dcc on 9 Sep 2026 — #141 PART B, one line, plus the
+# three owed reports. NAMED BEFORE THE COMMIT, which is the process fix for what went wrong
+# on 9a88b4f.
+#   after   80555dccd90119286eb5d48679e0abef203c75e20bb5d67ce201b411646a488b
+#           41,611 lines · 57 gates · 1 of 6 modified
+#
+# THE LINE: "Upload an existing Apotek Hjärtat or Matas Excel file — columns recognised
+# automatically" → "Apotek Hjärtat and Matas column names are recognised automatically."
+# The imperative goes, the capability stays. It had also become a more prominent duplicate
+# of the secondary line now inside the upload card. DESIGN may still overrule the wording.
+#
+# ── REPORT 1 — THE EMOJI SWEEP. 101 occurrences, 99 remain, ALL IN index.html.
+# dpp/index.html, portal.html and brand/index.html: 0 — reported as NOT FOUND, WITH THESE
+# SEARCHES, per the standing rule adopted the same evening. Two channels: every character
+# tested against \p{Emoji} then split on \p{Emoji_Presentation} with a U+FE0F lookahead, and
+# every \uXXXX decoded with surrogate pairs recombined — the second is the channel that hides
+# from a glyph search, and where BOTH of #141's lived. TWO MORE ARE STILL ESCAPED: ⚡
+# (27358) and 💡 (27365). Heaviest: 🔴×8 ⏰×6 🔒×6 ⛔×6 🟢×5 ⭐×4, plus a block of 15
+# at 5139–5255. The criterion is Emoji_Presentation rather than CC's own judgement line, SO
+# THE 99 IS CHECKABLE; ⬛ (35553) and ⚪ (8579) sit ON the boundary as status dots beside
+# 🔴🟢🟡 and are flagged for a joint ruling rather than decided unilaterally.
+#
+# ── REPORT 2 — DURABILITY. MORE SURVIVES THAN LOOP EVENTS, AND THE GAP IS NOT WHERE THE
+# LANE LOOKED. persistCritical verifies the write landed IN THIS BROWSER — read-back, length
+# compare, evict-and-retry, and it TELLS THE USER on failure. That is a real guarantee about
+# quota and corruption and NOT a guarantee about durability. A SECOND, WEAKER TIER exists:
+# savePageState is a bare setItem in a try{}catch(e){} with an EMPTY CATCH — 9 form keys,
+# silent on quota failure, the opposite contract on the same screens (#146).
+#   SURVIVES A BROWSER WIPE: brand (brand.save on all 18 saveBrandState calls; brand.load on
+#   boot) · loop events (server-authoritative) · BIL rows · portal submissions PARTLY — the
+#   row lives server-side, the local record does not come back.
+#   DOES NOT SURVIVE: sourcingCRM · mfr field overrides · listing submissions · SKUS ·
+#   everything else.
+#
+# #143 — THE CATALOGUE DOES NOT SURVIVE. saveSkus is never mirrored and NO SKU ACTION EXISTS
+# IN THE PROXY AT ALL. SKU data reaches a server only as a side effect of publishing a DPP or
+# creating a portal submission — partial projections of an explicit user action. The
+# product's most-used data lives in one browser.
+#
+# #144 — FOUR PROXY ACTIONS ARE IMPLEMENTED AND CALLED BY NOTHING: crm.load, field.load,
+# listing.list, crm.delete — 0 occurrences on any of the four surfaces. THREE OF THEM ARE
+# EXACTLY THE READ-BACKS that would make sourcingCRM, field overrides and listing submissions
+# durable. THE DATA IS ALREADY ON THE SERVER; THE APP NEVER ASKS FOR IT. #133 INVERTED —
+# written-never-read, across a network boundary. Closing it is WIRING, NOT ARCHITECTURE.
+#
+# THE SENTENCE THAT REFRAMES STRATEGY'S DOCUMENT RULING: A DOCUMENT UPLOADED TODAY WOULD BE
+# MORE DURABLE THAN THE SKU IT DESCRIBES. The Supabase Storage path ALREADY EXISTS AND IS IN
+# PRODUCTION — bil.uploadUrl returns a signed URL and the browser PUTs straight to Storage
+# (2934–2950), written that way because ~569KB of base64 cannot pass through a Netlify
+# function, with a real failure path that marks the row `failed` rather than leaving it on
+# `processing`. SO DOCUMENT UPLOAD DOES NOT SIT BEHIND BUILDING PLUMBING. It sits behind
+# RETENTION AND CUSTODY — a policy gate, which is precisely Strategy's stated concern — and
+# behind the fact that NOTHING BUT brand HAS A RESTORE PATH.
+#
+# CC CORRECTED ITSELF TWICE BEFORE REPORTING: it first read bil.uploadUrl as uncalled (it is
+# called by a RAW fetch, not a wrapper) and the portal.* actions as unimplemented (a
+# three-segment name its pattern missed; index.html does not call them, portal.html does).
+#
+# ── REPORT 3 — APOTEK HJÄRTAT AND MATAS: 172 MENTIONS, split structurally (a string in a
+# top-level const initialiser is DATA; in a function body it is COPY). 134 in reference data
+# across 29 structures — out of scope by the boundary rule. 38 IN RENDERED COPY across 20
+# functions: showSkuExport 9, scoreReadiness 3 (the hardcoded ediMatas blocker for the "Matas
+# Taastrup hub"), exportForRetailer 2, renderRetailChecklist 2, printRetailChecklist 2,
+# showCSRDListingPrompt 2, renderBrandPack 2, generateBizCase 2, eleven singletons.
+#   EARNED: the export copy (RETAILER_TEMPLATES really holds both), downloadSkuTemplate's
+#   column hint, showCSRDListingPrompt (both ARE CSRD-obligated).
+#   THIN: the retail-checklist copy rests on LISTING_REQUIREMENTS, which has 2 entries. One
+#   mention sits inside smartEmpty — copy in UNREACHABLE code.
+#   AND A CORRECTION TO THE LANE'S SPEC: RETAILER_REGISTRY holds 214 entries, not 158. So it
+#   is 2 OF 214 — 0.9% — carrying the product's entire "we know retail" surface across 38
+#   mentions in rendered copy. The finding SHARPENS rather than softens.
+#
+# #145 — RETAILER_REGISTRY HAS 8 DUPLICATE IDS. 214 entries, 206 distinct: kicks_dk,
+# normal_dk, magasin_dk, illum_dk, ici_paris_xl_be, di_be, kruidvat_be, helsam_dk — each at
+# ~9533–10701 AND again at ~12070–12284. Two differ in NAME as well (Di (Parfuma) vs Di
+# (Drogisterij Di); ICI Paris XL vs ICI PARIS XL), so this reads as a MERGED BLOCK, not a
+# paste slip. .find silently takes the first; .filter returns two — the behaviour depends on
+# which the caller used.
+#
+# #146 — savePageState's EMPTY CATCH, above.
+#
+# RAISED AS A QUESTION FOR STRATEGY, NOT NUMBERED AS A DEFECT: brand.save mirrors the WHOLE
+# brand object — including the EU RP's name, email and address — ON EVERY AUTOSAVE. Whether
+# business contact data belongs on an automatic path rather than an explicit one is a policy
+# call, not a code fault.
+#
+# STILL OWED: #141 smoke step 3 — a real CSV and a real Apotek Hjärtat file through a browser.
+# The structural evidence (import machinery byte-identical, no import identifier in either
+# diff) is necessary and not sufficient.
 
 # index.html moved 5461416e → 914f549c on 9 Sep 2026 — #141, THE ADD PRODUCTS SCREEN.
 # Both emojis removed; the VeyaFlow template promoted to RECOMMENDED; the retailer-template
