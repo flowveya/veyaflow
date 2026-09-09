@@ -76,6 +76,8 @@ const SINGLE_DEFINITION = [
   '_appendStamp',
   'CHECKLIST_STAMP_KEY',
   'CONFIRMATION_STAMP_KEY',
+  // Time axis M1 — the record accessor; the ONLY authorised path to expiryDate.
+  'certificationRecords',
 ];
 
 // Call-site counts the handoff states outright.
@@ -95,6 +97,10 @@ const FIXED_CALLSITES = {
   // new confirmation surface was stamped without a ruling; adding one is a spec decision,
   // not an implementation detail, so a floating count would not be a contract.
   _appendStamp: 3,
+  // Time axis M1 (9 Sep 2026). TWO consumers: buildComplianceEvents and hasCertData.
+  // A third call means a new consumer of certificate metadata arrived — legitimate, but
+  // it is a decision, so the number moves on purpose.
+  certificationRecords: 2,
 };
 
 // ── NEAR-COPY GROUPS (#131) ─────────────────────────────────────────────────
@@ -512,6 +518,59 @@ section('CANONICAL CERTIFICATION READER — BYTE-IDENTICAL ACROSS SURFACES');
 // and rotted for three months. No other gate sees a near-copy group — single-definition
 // invariants see one name, call-site contracts see one function, and the reader copy
 // gate sees only its own banner.
+// ── RULING 5 · expiryDate HAS EXACTLY ONE AUTHORISED PATH ───────────────────
+// A flat "zero .expiryDate outside the accessor" is unsatisfiable: the consumers must
+// read the field OFF THE RECORDS the accessor returns — that is the whole point of
+// having one. What ruling 5 forbids is reading it off the RAW field.
+//
+// So the gate asserts: every .expiryDate outside the accessor's own body sits inside a
+// function that calls certificationRecords(). Reintroducing
+// `(brand?.certifications||[]).some(c=>c.expiryDate)` in a fresh function fails, because
+// that function contains no accessor call. Located by banner and closing brace, never by
+// line number.
+//
+// This is what retires the epitaph: the two consumers stop being special sites that
+// needed a comment to explain why they read raw. They stop reading raw.
+section('RULING 5 — expiryDate READ ONLY VIA certificationRecords (time axis M1)');
+{
+  const BANNER = '// \u2500\u2500 CERTIFICATION RECORD ACCESSOR';
+  const i = html.indexOf(BANNER);
+  const j = i < 0 ? -1 : html.indexOf('\nfunction certificationRecords(raw){', i);
+  const k = j < 0 ? -1 : html.indexOf('\n}\n', j);
+  if (i < 0 || j < 0 || k < 0) {
+    line('NOT FOUND', 'certification record accessor — banner or body absent; ruling 5 cannot be checked');
+  } else {
+    const bodyStart = i, bodyEnd = k + 3;
+    const lines = html.split('\n');
+    // map char offsets to line numbers for the accessor body
+    let off = 0; const lineStart = lines.map(l => { const s0 = off; off += l.length + 1; return s0; });
+    const inBody = idx => idx >= bodyStart && idx < bodyEnd;
+    const offenders = [];
+    lines.forEach((l, n) => {
+      if (l.indexOf('expiryDate') < 0) return;
+      if (l.trim().startsWith('//')) return;               // comments are not reads
+      if (inBody(lineStart[n])) return;                     // inside the accessor: authorised
+      // walk back to the enclosing function and check it calls the accessor
+      let fnStart = -1;
+      for (let m = n; m >= 0; m--) {
+        if (/^\s*(?:async\s+)?function\s+[A-Za-z_$][\w$]*/.test(lines[m])) { fnStart = m; break; }
+      }
+      if (fnStart < 0) { offenders.push([n + 1, l.trim().slice(0, 90), 'no enclosing function']); return; }
+      let fnEnd = lines.length;
+      for (let m = fnStart + 1; m < lines.length; m++) { if (/^\}/.test(lines[m])) { fnEnd = m; break; } }
+      const block = lines.slice(fnStart, fnEnd).join('\n');
+      if (block.indexOf('certificationRecords(') < 0) {
+        offenders.push([n + 1, l.trim().slice(0, 90), 'enclosing function never calls certificationRecords()']);
+      }
+    });
+    if (offenders.length === 0) {
+      line('PASS', 'every expiryDate read outside the accessor is inside a function that calls certificationRecords()');
+    } else {
+      offenders.forEach(o => line('FAIL', 'html-line ' + o[0] + ' reads expiryDate off a raw value — ' + o[2] + ': ' + o[1]));
+    }
+  }
+}
+
 section('NEAR-COPY GROUPS — COUNT IS A CONTRACT (#131)');
 NEAR_COPY_GROUPS.forEach(g => {
   const n = g.count(html);

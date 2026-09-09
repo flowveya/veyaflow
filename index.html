@@ -4965,6 +4965,49 @@ function normalizeCertifications(raw){
   return out;
 }
 
+// ── CERTIFICATION RECORD ACCESSOR — MIGRATE 1, time axis step 8 ─────────────
+// normalizeCertifications answers WHAT ARE THEY CALLED. This answers WHAT DO WE KNOW
+// ABOUT THEM. Two readers, two questions — the names must make that obvious at a call
+// site, because reaching for the wrong one is how a validity date gets rendered as a
+// name or a name gets treated as a certificate.
+//
+// ONE COPY, index.html ONLY. brand/index.html and dpp/index.html do not read expiryDate
+// and must not gain it — this is deliberately NOT a copy-gate concern.
+//
+// AFTER THIS SHIPMENT .expiryDate MAY BE READ IN EXACTLY ONE PLACE: inside this
+// function. verify.js asserts zero occurrences outside this body. That is Strategy's
+// ruling 5 expressed as structure rather than policy — the next consumer cannot
+// reintroduce a direct read without the battery refusing, so the sites that used to
+// need a comment explaining why they read raw simply stop reading raw.
+//
+// Same three input shapes as the name reader: string[], bare string, object form.
+// A STRING entry becomes {name} with NO expiryDate and NO verifiedBy — that is what is
+// known about it. It does NOT invent verifiedBy:'not_recorded'; how an absence RENDERS
+// is M4's ruling, and this returns what exists.
+// Order preserved. An entry with no usable name is dropped, same rule as the name
+// reader. Pure: no DOM, no storage, no date computed, no judgement about validity.
+function certificationRecords(raw){
+  if(raw === null || raw === undefined) return [];
+  var list = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',') : []);
+  var out = [];
+  for(var i = 0; i < list.length; i++){
+    var entry = list[i];
+    var name;
+    if(typeof entry === 'string') name = entry;
+    else if(entry && typeof entry === 'object') name = entry.name || entry.label || '';
+    else name = '';
+    name = String(name).trim();
+    if(!name) continue;
+    var rec = { name: name };
+    if(entry && typeof entry === 'object'){
+      if(entry.expiryDate) rec.expiryDate = entry.expiryDate;
+      if(entry.verifiedBy) rec.verifiedBy = entry.verifiedBy;
+    }
+    out.push(rec);
+  }
+  return out;
+}
+
 function normalizeNumericProof(s){
   if(s === null || s === undefined) return '';
   // Trim FIRST so the ^ and $ anchors below align with the actual symbol
@@ -33370,11 +33413,15 @@ function buildComplianceEvents(){
   });
 
   // 2. Brand certifications with expiry dates
-  (brand?.certifications||[]).forEach(cert=>{
+  // M1 — routed through the record accessor. `cert.name` is guaranteed non-empty, so the
+  // 'Certification' fallback and the ||label chains are gone: an entry with no usable name
+  // is dropped rather than labelled with a placeholder. See the report — an event titled
+  // "Certification expires" names nothing a brand can act on.
+  certificationRecords(brand?.certifications).forEach(cert=>{
     if(cert.expiryDate){
       addEvent(cert.expiryDate,
-        (cert.name||cert.label||'Certification')+' expires',
-        'Renew', 'brand', 'cert', cert.name||cert.label);
+        cert.name+' expires',
+        'Renew', 'brand', 'cert', cert.name);
     }
   });
 
@@ -33522,7 +33569,10 @@ function renderComplianceCalendar(){
   const events = buildComplianceEvents();
 
   // Empty state
-  const hasCertData = (brand?.certifications||[]).some(c=>c.expiryDate) || brand?.euResponsible?.renewalDate;
+  // M1 — routed through the accessor so NO direct .expiryDate read remains outside it.
+  // This gates only the "Add your certification dates" empty-state prompt; it asserts
+  // nothing, and M1 deliberately does not harden a surface that is already correct.
+  const hasCertData = certificationRecords(brand?.certifications).some(c=>c.expiryDate) || brand?.euResponsible?.renewalDate;
   if(!events.length){
     return `
       <div style="margin-bottom:1.25rem">

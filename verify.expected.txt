@@ -9,12 +9,76 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        6d4d09b7
+index.html        c8a754f2
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 6d4d09b7 → c8a754f2 on 9 Sep 2026 — TIME AXIS STEP 8, MIGRATE 1: the
+# record accessor. MIGRATE IS FOUR SHIPMENTS, NOT ONE — M1 the accessor and ruling 5's gate
+# (behaviour-neutral), M2 the writer + its three editor includes tests + the description
+# prompt as ONE UNIT, M3 legacy conversion and the five publish/persist sites, M4 Strategy's
+# rulings 1–3. M1 FIRST because the authorised path must exist before anything produces data
+# that needs it — expand-before-write, one level up.
+#   after   c8a754f2695427c8dc249d53caa3c079e9d176618fdf1c1cd272c8d0adcd0aea
+# NAMED BY THE LANE, INDEPENDENT shasum. Five other surfaces UNCHANGED; 1 of 6 modified.
+#
+# certificationRecords() returns [{name, expiryDate?, verifiedBy?}] — ONE COPY, index.html
+# ONLY. brand/index.html and dpp/index.html do not read expiryDate and MUST NOT GAIN IT, so
+# this is deliberately not a copy-gate concern. A string entry becomes {name} with NO
+# expiryDate and NO verifiedBy: it does not invent verifiedBy:'not_recorded', because HOW AN
+# ABSENCE RENDERS IS M4'S RULING and this returns what exists.
+#
+# THE LANE'S GATE WAS UNSATISFIABLE AND CC RESHAPED IT CORRECTLY. The spec demanded "zero
+# occurrences of .expiryDate outside the accessor" — which would forbid the CONSUMERS from
+# reading it off the records the accessor RETURNS, i.e. forbid the accessor's entire purpose.
+# Ruling 5 forbids reading it off THE RAW FIELD. The gate now asserts: every .expiryDate
+# outside the accessor's body sits inside a function that CALLS certificationRecords().
+# Located by banner and closing brace, never by line number.
+# SEEN FAILING on an injected plausible consumer — a new certExpirySummary() reading
+# (brand?.certifications||[]).some(c=>c.expiryDate) → FAIL naming the line and the reason;
+# reverted; PASS. certificationRecords added to SINGLE_DEFINITION and to FIXED_CALLSITES at 2,
+# so a third consumer is a deliberate decision rather than drift.
+#
+# THE EVIDENCE: 12 cases three-way. NINE IDENTICAL — including `label instead of name`, since
+# the accessor resolves label exactly as the old chain did. THREE DIFFERENCES, all reported:
+# a NAMELESS entry with an expiryDate previously raised a calendar event titled "Certification
+# expires" with sourceId null and flipped hasCertData true (hiding the prompt); a nameless
+# entry among named ones produced a second unnamed event; and a BARE STRING THREW
+# (`forEach is not a function`). All three now return empty or are dropped.
+#
+# #132 RAISED, AND IT IS LARGER THAN THIS SHIPMENT. brand.certifications HAS SEVEN CONSUMERS
+# AND NO WRITER. Read at 7 sites, written at 0 — verified independently: no assignment exists
+# anywhere; 1305 and 18253 are the SKU template, 21326 is skuForm, the rest are third-party
+# registries and requestListedForm. The seed brand has no certifications key; onboardForm has
+# none; `expiryDate:` APPEARS IN ZERO OBJECT LITERALS ACROSS THE TREE.
+#   So the Compliance Calendar's certificate-expiry feature has never had data, hasCertData is
+#   therefore false, and the empty state ALWAYS shows "Add your certification dates in Brand
+#   Profile" — POINTING THE BRAND AT A PLACE WHERE NO SUCH FIELD EXISTS. That is #122's class
+#   on a brand-facing surface: the app instructing a user to do something it does not support.
+#   It is also GAP 3 INVERTED — Strategy called hasCertData "gap 3 in miniature, already
+#   shipping" because it says what remains with a button to the fix. It says what remains and
+#   the button goes nowhere.
+#   CAVEAT KEPT: ns_brand is persisted, so a workspace carrying data from an older build could
+#   hold entries this code cannot produce. Reported as a difference, not folded into the pass.
+#
+# M4 IS DEFINING A SCHEMA, NOT INHERITING ONE. Three fields exist in the tree — name (18
+# uses), label (5), expiryDate (3). No issuer, no verifiedBy, no documentRef anywhere.
+# Strategy's ruling 1 ("the migration is what makes the rendering legitimate") presumed a
+# rendering with data behind it. IT MUST SEE #132 BEFORE M4 IS SPECCED.
+#
+# REPORT 1 — normalizeCertifications is NOT re-expressed as accessor(raw).map(r=>r.name), and
+# CC's reason beats the lane's instinct: the name reader is THREE byte-identical copies under
+# the copy gate; the record accessor is ONE, deliberately. Coupling them forces either copying
+# the record accessor to surfaces the spec forbids from having a validity concept, or letting
+# the copies diverge and defeating the gate. Duplicated drop-logic in adjacent identical text
+# is the lesser cost; divergence would be a #131 count contract, not a refactor.
+#
+# NOTICED: the gate's function-scope walk uses ^\} to find a function's end — correct for this
+# file's top-level style, mis-scoping a nested declaration, and CONSERVATIVE IN THE SAFE
+# DIRECTION (a too-large block makes the gate more permissive, never falsely failing).
 
 # NO DIGEST MOVED — #131, 9 Sep 2026, HARNESS ONLY. All six tracked surfaces unchanged;
 # 0 of 6 modified; verify.js the only modified file. Recorded here because the reasoning
