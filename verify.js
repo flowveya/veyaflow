@@ -97,6 +97,48 @@ const FIXED_CALLSITES = {
   _appendStamp: 3,
 };
 
+// ── NEAR-COPY GROUPS (#131) ─────────────────────────────────────────────────
+// A group of expressions that must stay in agreement, pinned by an EXACT COUNT.
+// Same discipline as FIXED_CALLSITES: a hardcoded number that must be changed on
+// purpose. A count that moves — up OR down — fails until someone updates it here.
+//
+// THIS IS NOT A SIMILARITY DETECTOR. It does not scan for lines that look alike:
+// index.html has 162 line-groups repeated 3+ times and 352 repeated logic lines,
+// almost all registry data rows or re-render idioms. A detector over those would
+// fire on coincidence, get muted, and become the check nobody reads.
+//
+// NOR IS IT A BAN ON DUPLICATION. Six export locales may be the right design. The
+// gate says only: if the count changes, someone decided something and must say so.
+//
+// Each group is anchored by EXPRESSION SHAPE, never by line number — line numbers
+// moved in every shipment this week and will move again in migrate.
+const NEAR_COPY_GROUPS = [
+  {
+    name: 'export locale certification rows',
+    expected: 6,
+    note: '3b — six locale variants differing only by label; one sed replaced all six',
+    count: src => (src.match(/normalizeCertifications\(sku\.certifications\)\.join\('; '\)/g) || []).length,
+  },
+  {
+    name: 'ESG merged sku+brand certification spread',
+    expected: 3,
+    note: '3c — calcBrandESGScore, checkMandatoryESG, renderESGModal all build the same merged set',
+    count: src => (src.match(/\.\.\.normalizeCertifications\(sku\?\.certifications\), \.\.\.normalizeCertifications\(brand\?\.certifications\)/g) || []).length,
+  },
+  {
+    name: 'csrdAutoFill allCerts spread members',
+    expected: 3,
+    note: 'MUST MOVE AS ONE UNIT in migrate — all three feed one persisted string (ns_csrd_answers)',
+    count: src => {
+      const i = src.indexOf('const allCerts = [...new Set([');
+      if (i < 0) return -1;                       // anchor gone — reported as NOT FOUND
+      const j = src.indexOf('])]', i);
+      if (j < 0) return -1;
+      return src.slice(i, j).split('\n').filter(l => l.trim().startsWith('...')).length;
+    },
+  },
+];
+
 // Names that must NOT exist. `normalizeBrandRP` was invented by the coding lane
 // and never existed in the tree; the real normaliser is migrateBrandSchemaV3.
 // If this ever becomes non-zero, a spec has been written against a fiction.
@@ -464,6 +506,24 @@ section('CANONICAL CERTIFICATION READER — BYTE-IDENTICAL ACROSS SURFACES');
     }
   }
 }
+
+// #131 — near-copies are identical by luck until they are not. #128 is what that
+// looks like afterwards: six root copies, five identical and untracked, one tracked
+// and rotted for three months. No other gate sees a near-copy group — single-definition
+// invariants see one name, call-site contracts see one function, and the reader copy
+// gate sees only its own banner.
+section('NEAR-COPY GROUPS — COUNT IS A CONTRACT (#131)');
+NEAR_COPY_GROUPS.forEach(g => {
+  const n = g.count(html);
+  if (n < 0) {
+    line('NOT FOUND', g.name + ' — anchor absent; the group cannot be counted');
+  } else if (n === g.expected) {
+    line('PASS', g.name + ' — ' + n + ' as contracted  (' + g.note + ')');
+  } else {
+    line('FAIL', g.name + ' — ' + n + ', contract says ' + g.expected +
+      '. A member was added, removed or edited out of shape; update NEAR_COPY_GROUPS deliberately if that was intended.');
+  }
+});
 
 section('NAMES THAT MUST NOT EXIST');
 MUST_NOT_EXIST.forEach(name => {

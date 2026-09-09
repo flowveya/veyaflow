@@ -16,6 +16,74 @@ brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
 
+# NO DIGEST MOVED — #131, 9 Sep 2026, HARNESS ONLY. All six tracked surfaces unchanged;
+# 0 of 6 modified; verify.js the only modified file. Recorded here because the reasoning
+# belongs with the shipments even when no baseline moves.
+#
+# THE FINDING, TWICE IN TWO SHIPMENTS: six export locale rows (3b) and the ESG merged-cert
+# spread (3c) were IDENTICAL BY LUCK. In both cases one sed with an exact count replaced
+# them all — possible only because nobody had hand-edited one. That is not a property of
+# the code; it is a fact about what has not happened yet. #128 is what it looks like
+# afterwards: six root copies, five untracked and identical, one tracked and rotted.
+#
+# NEAR_COPY_GROUPS: named groups, each an expression anchor plus an EXACT expected count.
+# A count that differs either way FAILS until someone updates the contract deliberately —
+# same discipline as FIXED_CALLSITES. A floating count is not a contract.
+#   export locale certification rows        6
+#   ESG merged sku+brand certification spread  3
+#   csrdAutoFill allCerts spread members     3
+#
+# THE LANE'S COUNT WAS WRONG ON GROUP 2 AND THE REASON IS INSTRUCTIVE. The spec said 2,
+# anchored on the BYTE-IDENTICAL PAIR (calcBrandESGScore, checkMandatoryESG). renderESGModal
+# carries the SAME MERGED SPREAD without the trailing .toLowerCase() map — not byte-identical,
+# equally dangerous to leave behind. CC anchored on THE SPREAD, giving 3, because the spread
+# is what must stay in agreement: edit one merge and the three functions compute DIFFERENT
+# CERTIFICATE SETS. The lane defined the group by a SURFACE PROPERTY (byte-identity of two
+# lines) instead of by THE INVARIANT. Scope-by-shape, one level in. The measurement won, as
+# the spec instructed, and no code was adjusted to match the spec.
+#
+# GROUP 3 NEEDED CARE: a naive `...` count returns 4 — `[...new Set([` contributes one. The
+# contract counts only lines whose TRIMMED TEXT STARTS with `...`, giving the three real
+# members. It also reports NOT FOUND rather than a count if its anchor disappears, so a
+# rewritten allCerts cannot pass silently.
+#
+# ALL THREE SEEN FAILING, then reverted from a pristine copy: an export row reverted to the
+# pre-3b form → 5 of 6; an ESG spread narrowed to sku only → 2 of 3; an allCerts member
+# deleted → 2 of 3. The failure message NAMES THE REMEDY (update NEAR_COPY_GROUPS
+# deliberately if intended), so the gate asks for a decision rather than blocking.
+#
+# GROUP 3 IS WRITTEN FOR A SHIPMENT THAT HAS NOT HAPPENED. Its anchor is the CONTAINING
+# LITERAL and it counts MEMBERS, not shapes — so migrate can rewrite all three bodies and the
+# gate keeps passing, because the property protected is "THREE SOURCES FEED ONE PERSISTED
+# STRING", not "these three expressions look like this". It fails exactly when it should: if
+# migrate converts two and leaves one. Groups 1 and 2 pin an expression shape, so migrate
+# changing that shape means updating the pattern deliberately. That is intended.
+#
+# NO OTHER GROUP DESERVES A CONTRACT, AND THE COUNT IS THE EVIDENCE: 162 line-groups repeated
+# 3+ times and 352 repeated logic lines, examined. The 162 are REGISTRY DATA
+# (verifiedDate/verifiedBy ×220, brandModel ×201); the 352 are IDIOMS (renderFind(...) ×22).
+# Neither is the hazard. THE HAZARD IS A COMPUTATION DUPLICATED ACROSS CALL SITES THAT MUST
+# STAY IN AGREEMENT, and in this file that is exactly these three. Not structural — three
+# hardcoded numbers is the right answer. CC: "Had the number been twenty, I would be
+# reporting the opposite."
+#
+# IT LIVES IN verify.js, and the AST-vs-text objection does not hold: verify.js ALREADY does
+# raw textual counts (PERSIST_KEYS counts quoted occurrences; the copy gate compares extracted
+# source text). It already reads the file once and owns line()/section(). The distinction that
+# matters is not AST-vs-text but "does this belong to the file-contract battery" — it does.
+#
+# HONEST LIMITS, BOTH WRITTEN DOWN RATHER THAN ONE GATE CLAIMING BOTH: it reads index.html
+# only, so a group spanning surfaces would be invisible (the reader is guarded separately);
+# and IT PINS CARDINALITY, NOT CONTENT — rename a label in one export locale and the count
+# stays 6. The copy gate is the shape that pins content where content matters.
+#
+# THE EPITAPH ON 33362/33514 WAS RETIRED BEFORE IT WAS WRITTEN. Strategy's ruling 5: after
+# migrate the second accessor is the ONLY path to expiryDate, so a direct read becomes
+# IMPOSSIBLE rather than forbidden and the comment is never needed. Two sites that would have
+# required a note explaining why they are special simply stop being special. Fourth time this
+# week the answer was to move a condition from policy into structure — and the first time it
+# retired a fix already planned.
+
 # index.html moved eb829955 → 6d4d09b7 on 9 Sep 2026 — TIME AXIS STEP 7, EXPAND PHASE 3c.
 # THE EXPAND PHASE IS COMPLETE. Five surfaces tolerate all three certification shapes;
 # portal.html never needed it.
