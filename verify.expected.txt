@@ -9,12 +9,82 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        80555dcc
+index.html        93139858
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 80555dcc → 93139858 on 9 Sep 2026 — #148 PART 1, SKU ID COLLISION.
+# ONE LINE OF CODE, seven of comment.
+#   after   93139858c820002eedc5fa1ec95359d21632237a38c1d13710817bb835e1c81a
+# NAMED BY THE LANE after reading 18234–18243 at the bytes, INDEPENDENT shasum.
+#
+# THE DEFECT, LIVE TODAY ON THE APP'S OWN RECOMMENDED IMPORT PATH: newSkuForm() set
+# id:Date.now().toString() — MILLISECOND resolution — and the importer calls it inside a
+# SYNCHRONOUS .map() over every row. Measured on both sets of bytes:
+#   BEFORE  20 rows → 3 distinct ids · 100 rows → 2 · 500 rows → 3
+#   AFTER   20 → 20 · 100 → 100 · 500 → 500
+# id is not in SKU_FIELDS so nothing overwrote it downstream, and there are 24
+# .find()-by-id resolution points, every one returning the FIRST match.
+#
+# FIXED WITH retailUuid() (37882), THE TREE'S OWN GENERATOR, already used for retail rows.
+# Block ordering confirmed before editing: both are top-level FunctionDeclarations in BLOCK
+# 1, neither nested nor variable-assigned, so hoisting covers the backward reference.
+# HONEST CHARACTERISATION, VOLUNTEERED: retailUuid is NOT a UUID — within one millisecond
+# uniqueness rests on 6 base-36 chars (2.18e9). Birthday probability at the app's own stated
+# ceiling of ~500 SKUs per batch is 5.7e-5. Adequate here; inventing a generator would have
+# been worse than reusing the tree's.
+#
+# NOTHING EXISTING MOVES, STRUCTURALLY: 27 assignments to a .id property across both blocks,
+# EVERY ONE a DOM element id. Nothing in the tree reassigns sku.id. Seed ids are hardcoded
+# literals. AND THERE IS NO DELETE PATH FOR SKUs ANYWHERE — only add and edit.
+#
+# #150 RAISED, AND IT IS THE SHARPEST LIVE CONSEQUENCE — DESTRUCTION, NOT MIS-RESOLUTION.
+# saveSkuEdit does skus.findIndex(...) then skus[idx]={...skuForm}. SO EDITING MEMBER 57 OF A
+# COLLIDED IMPORT OVERWRITES MEMBER 1. Silent data loss, on existing catalogues, TODAY, with
+# no backup and no delete path to undo it. The lane had been treating the back-fill as
+# cleanup for confusing data; it is stopping an ongoing loss. THAT MOVES THE BACK-FILL UP.
+#
+# AND THE QR RISK IS NARROWER THAN THE SPEC FEARED — the lane pointed the danger at the wrong
+# asset. Because ONLY MEMBER #1 IS EVER ADDRESSABLE, a second publish cannot mint a competing
+# passport: it re-publishes #1's data to #1's dppId. THE PASSPORT IS SAFE; THE CATALOGUE IS
+# NOT.
+#
+# #151 RAISED — addToSourcingCRM (36631) reached from a .map() at 28444: same generator, same
+# missing random component, and id:Date.now() there is a NUMBER, not even type-compatible
+# with SKU ids. Weaker because each call follows an awaited round-trip.
+#
+# THE LANE'S legacyId INSTINCT WAS HALF WRONG AND CC REFUTED THE LOAD-BEARING HALF.
+# PRESERVE: yes — it deletes nothing, makes the migration re-runnable, and is a BETTER guard
+# than _schemaVersion because it is per-record AND records what happened.
+# RESOLVE THROUGH EITHER: NO. `s.id===X || s.legacyId===X` through find-first does not
+# disambiguate a collided group — it returns an arbitrary member SILENTLY. THE DEFECT
+# RE-CREATED INSIDE ITS OWN FIX, and a direct violation of "the system does not choose".
+# Correct shape: resolve through legacyId ONLY when exactly one SKU carries it; more than one
+# is the `attention` case, surfaced and unresolved.
+#
+# MIGRATION PRECEDENT CORRECTED: it is migrateSkuSchemaV2–V8 (nine migrations exist), not the
+# brand one. AND PER-RECORD _schemaVersion IDEMPOTENCY IS ACTIVELY DANGEROUS HERE: an
+# interrupted run that reassigns ids before rewriting dppData keys leaves DANGLING REFERENCES
+# PERMANENTLY, with no way to detect it. No prior migration crossed a reference boundary;
+# this one crosses seven local stores and two server columns.
+#
+# THE SCOUT MISSED loop_events.sku_id (supabase-proxy.js:514) — DURABLE AND READ BACK via
+# loop.list. It is the ONLY sku-id reference that both survives a browser wipe and returns
+# into the app, so it is the one place an orphan is guaranteed to surface rather than stay
+# latent. dpp_records.sku_id is durable but write-only from the client's perspective.
+#
+# TWO CACHE FAMILIES EMBED THE ID IN THE localStorage KEY ITSELF — ns_inci_<skuId>_<market>
+# and ns_pkg_<skuId>_<market>. A back-fill must RENAME KEYS, not rewrite fields — and
+# _evictCaches() may already have deleted some, so absence is normal and not evidence of a
+# missed record.
+#
+# STRATEGY'S "SYSTEM DOES NOT CHOOSE" RULING STANDS WITH ITS COST REVISED DOWN: genuine
+# ambiguity needs two content-identical SKUs, since only member #1 is addressable and
+# dpp_records stores name and ean. "A passport attached to nothing" is a RARE TERMINAL CASE,
+# not the expected one.
 
 # index.html moved 914f549c → 80555dcc on 9 Sep 2026 — #141 PART B, one line, plus the
 # three owed reports. NAMED BEFORE THE COMMIT, which is the process fix for what went wrong

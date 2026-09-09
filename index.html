@@ -18233,7 +18233,14 @@ let skuUploadRows = [];   // mapped rows ready to import
 
 function newSkuForm(){
   return {
-    id: Date.now().toString(),
+    // #148: was Date.now().toString() — millisecond resolution, and the importer
+    // calls this inside a synchronous .map() over every row, so a 100-row import
+    // produced 100 SKUs sharing ONE id and all 24 .find()-by-id sites resolved
+    // every one of them to the first. retailUuid() (37882) is the tree's existing
+    // generator, already used for retail rows, and carries a random component, so
+    // it is collision-safe within a millisecond. Existing ids are NOT touched:
+    // a published DPP's id embeds the SKU id in a URL behind a printed QR code.
+    id: retailUuid(),
     // Product type — drives all compliance fields
     productType:'cosmetic',
     // Tab 1 — Basics
