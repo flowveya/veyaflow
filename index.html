@@ -18231,6 +18231,119 @@ let skuUploadData = null; // parsed CSV rows
 let skuColumnMap = {};    // {veyafield: csvcolumn}
 let skuUploadRows = [];   // mapped rows ready to import
 
+// ── DOSSIER RECORD ACCESSOR — #135 ─────────────────────────────────────────
+// The five unfillable CPNP fields were never five of a kind. Two are document-backed
+// records: the Safety Assessment (value = sku.safetyRef) and the PIF (value = sku.pifRef).
+//
+// documentRef holds a REFERENCE, NEVER A FILE. Holding the file would tempt the product
+// to assert what it read; holding a reference makes the human state what is true.
+//
+// verifiedBy is 'brand', never 'verified'. The platform has confirmed nothing here and
+// must not render this as though it had — the distinction #116 exists for.
+const DOSSIER_KEYS = { safetyAssessment:'safetyRef', pif:'pifRef' };
+
+function dossierRecord(sku, key){
+  var vf = DOSSIER_KEYS[key];
+  if(!vf) return null;
+  var meta = (sku && sku.dossier && sku.dossier[key]) ? sku.dossier[key] : {};
+  return {
+    value:        (sku && sku[vf]) ? String(sku[vf]).trim() : '',
+    verifiedBy:   meta.verifiedBy   || '',
+    verifiedDate: meta.verifiedDate || '',
+    documentRef:  meta.documentRef  || '',
+  };
+}
+
+// PREFILLING MOVES AUTHORITY (Strategy, 10 Sep). An empty field asks the user to know
+// something; a prefilled one asks them not to object, and that is a much weaker act.
+// So a value counts toward completion ONLY when a human confirmed it. Nothing extracts
+// yet — the rule is written in NOW so extraction inherits it rather than retrofitting
+// it, which is #134's filled:true one level up.
+function dossierConfirmed(sku, key){
+  var r = dossierRecord(sku, key);
+  return !!(r && r.value && r.verifiedBy === 'brand' && r.verifiedDate);
+}
+
+// Three states, reusing checkState's vocabulary rather than inventing one:
+//   'ok'           — present AND confirmed by a human
+//   'attention'    — present but unconfirmed: NOT filled, does not move the meter
+//   'not_recorded' — nothing entered. Never blank, never 'None', never 0.
+function dossierState(sku, key){
+  var r = dossierRecord(sku, key);
+  if(!r || !r.value) return 'not_recorded';
+  return dossierConfirmed(sku, key) ? 'ok' : 'attention';
+}
+
+// Editing a value INVALIDATES its confirmation — otherwise a human confirms one
+// reference and the stamp silently carries to a different one.
+function _dossierInvalidate(key){
+  if(!skuForm.dossier) skuForm.dossier = {};
+  if(skuForm.dossier[key]){
+    delete skuForm.dossier[key].verifiedBy;
+    delete skuForm.dossier[key].verifiedDate;
+  }
+}
+function _dossierSetRef(key, val){
+  if(!skuForm.dossier) skuForm.dossier = {};
+  if(!skuForm.dossier[key]) skuForm.dossier[key] = {};
+  skuForm.dossier[key].documentRef = val;
+  _dossierInvalidate(key);
+}
+// The confirmation is an ACT. verifiedDate is written here and nowhere else — never
+// when the field is merely edited.
+function confirmDossier(key){
+  var vf = DOSSIER_KEYS[key];
+  if(!vf || !skuForm[vf] || !String(skuForm[vf]).trim()){
+    if(typeof showSuccess === 'function') showSuccess('Enter the reference before confirming it.');
+    return;
+  }
+  if(!skuForm.dossier) skuForm.dossier = {};
+  if(!skuForm.dossier[key]) skuForm.dossier[key] = {};
+  // ONE timestamp for both writes. Two calls to new Date() can straddle a millisecond,
+  // and a record whose verifiedDate disagrees with its own stamp is a worse artefact
+  // than either alone.
+  var at = new Date().toISOString();
+  skuForm.dossier[key].verifiedBy   = 'brand';
+  skuForm.dossier[key].verifiedDate = at;
+  // The fourth _appendStamp call site, ruled in by Strategy on 10 Sep as an INSTANCE of
+  // the discrete-yes criterion — a human pressing "I confirm this is correct" against one
+  // named record — not an extension of it. FIXED_CALLSITES moved 3 -> 4 in the same
+  // shipment, deliberately and with the reason written down.
+  //
+  // Group by SKU, mirroring the checklist call's use of stateKey as its group: the stamp
+  // must say WHICH product was confirmed, and skuForm.id is that. The stamp records only
+  // WHEN — the value stays in its own field, per the parallel-map precedent this record
+  // was built on.
+  _appendStamp(CONFIRMATION_STAMP_KEY, 'sku:' + (skuForm.id || 'unsaved'), key, { at: at });
+  renderSkuEdit(document.getElementById('page-skus'));
+}
+
+// The confirmation control. Renders the three states honestly: an unconfirmed value
+// says so, and an absent one reads 'not recorded' rather than blank.
+function _dossierCell(sku, key){
+  var r = dossierRecord(sku, key);
+  if(!r || !r.value) return '';                       // renderer shows its Missing treatment
+  return dossierConfirmed(sku, key) ? r.value : (r.value + ' \u00b7 not confirmed');
+}
+
+function _dossierConfirmRow(key, label){
+  var st = dossierState(skuForm, key);
+  var r  = dossierRecord(skuForm, key);
+  if(st === 'not_recorded'){
+    return '<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin:-.35rem 0 .5rem">'
+         + label + ': not recorded</div>';
+  }
+  if(st === 'ok'){
+    return '<div style="font-family:var(--mono);font-size:.55rem;color:#065F46;margin:-.35rem 0 .5rem">'
+         + '\u2713 ' + label + ' confirmed by you on ' + String(r.verifiedDate).slice(0,10)
+         + ' \u00b7 recorded as brand-confirmed, not VeyaFlow-verified</div>';
+  }
+  return '<div style="margin:-.35rem 0 .5rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">'
+       + '<span style="font-family:var(--mono);font-size:.55rem;color:#92400E">' + label + ' entered but not confirmed</span>'
+       + '<button class="btn-outline" style="font-size:.58rem;padding:.2rem .5rem" onclick="confirmDossier(\'' + key + '\')">'
+       + 'I confirm this is correct</button></div>';
+}
+
 function newSkuForm(){
   return {
     // #148: was Date.now().toString() — millisecond resolution, and the importer
@@ -18252,6 +18365,15 @@ function newSkuForm(){
     // Tab 2 — Cosmetic-specific compliance (rendered when productType==='cosmetic')
     inci:'', hasFrag:false, allergens:'', ph:'',
     cpnp:'', euResponsible:'', safetyRef:'',
+    // #135 — the CPNP helper's remaining unwritable fields. safetyRef ABOVE is already
+    // the Safety Assessment's value: FRAMEWORK_VOCAB.cosmetic.safetyDoc.field names it,
+    // and getSafetyDocRegime is the gated lookup. These are the ones the tree never held.
+    safetyAssessor:'', pifRef:'', productCategory:'',
+    // Metadata for the two document-backed records. The VALUE stays in its own canonical
+    // field; this holds only {verifiedBy, verifiedDate, documentRef}. That split follows
+    // brand.euResponsible, where the confirmation was stamped in a PARALLEL map rather
+    // than by reshaping an object a prior batch had fixed exactly.
+    dossier:{},
     // Tab 2 — Shared compliance (cross-product-type, May 2026 Phase 3 reclassification).
     // materialComposition used by beauty_accessory + textile + garment Tab 2 branches.
     // eudrStatus used by all product types via EUDR Dec 2026 enforcement.
@@ -19414,8 +19536,8 @@ function renderCPNPModal(skuId, view){
   const cpnpFields = [
     {section:'A. Product identification',fields:[
       {portal:'Product name',             value: sku.name||'',                     filled:!!sku.name,          required:true},
-      {portal:'Product function / category',value:sku.productCategory||sku.euCosmeticCategory||'',filled:!!(sku.productCategory||sku.euCosmeticCategory),required:true,hint:'Select from EU cosmetic categories list'},
-      {portal:'Country of manufacture',   value: sku.countryOfManufacture||sku.mfrCountry||'',filled:!!(sku.countryOfManufacture||sku.mfrCountry),required:true},
+      {portal:'Product function / category',value:sku.productCategory||'',filled:!!sku.productCategory,required:true,hint:'Select from EU cosmetic categories list'},
+      {portal:'Country of manufacture',   value: sku.countryOfMfr||'',              filled:!!sku.countryOfMfr,              required:true},
       {portal:'Product available online', value: brand?.dtcWebsite?'Yes — '+brand.dtcWebsite:'Specify',filled:!!brand?.dtcWebsite,required:false},
     ]},
     {section:'B. Responsible Person',fields:[
@@ -19437,9 +19559,9 @@ function renderCPNPModal(skuId, view){
       {portal:'Net content',              value: sku.netContent?(sku.netContent+' '+( sku.netUnit||'ml')):'',filled:!!sku.netContent,required:true},
     ]},
     {section:'E. Safety & compliance',fields:[
-      {portal:'Safety Assessment ref.',   value: sku.safetyAssessment||sku.safetyAssessor||'',filled:!!(sku.safetyAssessment||sku.safetyAssessor),required:true},
+      {portal:'Safety Assessment ref.',   value: _dossierCell(sku,'safetyAssessment'),filled:dossierConfirmed(sku,'safetyAssessment'),required:true},
       {portal:'Safety Assessor name',     value: sku.safetyAssessor||'',            filled:!!sku.safetyAssessor,            required:true},
-      {portal:'PIF location / reference', value: sku.pifRef||'',                    filled:!!sku.pifRef,                    required:true,  hint:'Where the complete PIF is stored — e.g. Dropbox link or document reference'},
+      {portal:'PIF location / reference', value: _dossierCell(sku,'pif'),           filled:dossierConfirmed(sku,'pif'),     required:true,  hint:'Where the complete PIF is stored — e.g. Dropbox link or document reference'},
     ]},
   ];
 
@@ -20485,7 +20607,22 @@ function renderSkuTab2(){
           <input type="text" value="${skuForm.euResponsible||''}" placeholder="Company name + country" oninput="skuForm.euResponsible=this.value"></div>
       </div>
       <div class="field"><label class="lbl">Safety Assessment reference</label>
-        <input type="text" value="${skuForm.safetyRef||''}" placeholder="e.g. SA-CG-2024-001" oninput="skuForm.safetyRef=this.value"></div>
+        <input type="text" value="${skuForm.safetyRef||''}" placeholder="e.g. SA-CG-2024-001" oninput="skuForm.safetyRef=this.value;_dossierInvalidate('safetyAssessment')"></div>
+      <div class="field"><label class="lbl">Safety Assessor name</label>
+        <input type="text" value="${skuForm.safetyAssessor||''}" placeholder="e.g. Dr Anna Lindqvist, PhD" oninput="skuForm.safetyAssessor=this.value"></div>
+      <div class="field"><label class="lbl">Safety Assessment document reference <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Where the signed CPSR is held — a reference, not the file</span></label>
+        <input type="text" value="${(skuForm.dossier&&skuForm.dossier.safetyAssessment&&skuForm.dossier.safetyAssessment.documentRef)||''}" placeholder="e.g. Dropbox / Compliance / CPSR-2026-001.pdf" oninput="_dossierSetRef('safetyAssessment', this.value)"></div>
+      ${_dossierConfirmRow('safetyAssessment','Safety Assessment')}
+      <div class="field" style="margin-top:.75rem"><label class="lbl">PIF location / reference</label>
+        <input type="text" value="${skuForm.pifRef||''}" placeholder="e.g. Compliance drive / PIF / CG-Serum-30ml" oninput="skuForm.pifRef=this.value;_dossierInvalidate('pif')"></div>
+      <div class="field"><label class="lbl">PIF document reference <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Where the complete PIF is held — a reference, not the file</span></label>
+        <input type="text" value="${(skuForm.dossier&&skuForm.dossier.pif&&skuForm.dossier.pif.documentRef)||''}" placeholder="e.g. SharePoint / PIF / CG-Serum" oninput="_dossierSetRef('pif', this.value)"></div>
+      ${_dossierConfirmRow('pif','PIF')}
+      <div class="field" style="margin-top:.75rem"><label class="lbl">Product function / category <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">EU cosmetic category, as the CPNP portal asks for it</span></label>
+        <select onchange="skuForm.productCategory=this.value">
+          <option value="">Not recorded</option>
+          ${(EU_COSMETIC_CATEGORIES[(brand&&brand.category)||'Skincare & Beauty']||[]).map(c=>`<option${skuForm.productCategory===c?' selected':''}>${c}</option>`).join('')}
+        </select></div>
       <div class="field" style="margin-top:.75rem">
         <label class="lbl">On-pack claims <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">Type claim + Enter — instant traffic light per product type</span></label>
         <input type="text" id="claim-input" placeholder='e.g. "Clinically tested" then press Enter'

@@ -9,12 +9,118 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        93139858
+index.html        da3aefd5
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved 93139858 → da3aefd5 on 10 Sep 2026 — #135 + documentRef: THE DOSSIER
+# WRITE PATHS. ONE RECORD, NOT TWO SHIPMENTS. verify.js also moved (FIXED_CALLSITES 3→4).
+#   after   da3aefd5c7c2144c7c53a7746950a036503a891194fe836ea2bafbefff28c8ac
+#           41,744 lines · 57 gates · 1 of 6 modified
+# NAMED BY THE LANE after reading 18262–18319 at the bytes, INDEPENDENT shasum. ONE DIGEST
+# FOR THE WHOLE SHIPMENT — the naming was deliberately HELD while the stamp and the sweep
+# were outstanding, because a baseline that moves twice for one shipment is the confusion
+# the naming rule exists to prevent.
+#
+# THE CEILING ROSE 50% → 86% BY MAKING FIELDS FILLABLE, NOT BY RELAXING THE COUNT. The easy
+# way to fix a 50% ceiling is to delete required fields; that road was not taken. The two
+# remaining are #134's pair — nanomaterials and CMR — still deliberately unwritable.
+# CAVEAT ON THE NUMBER: the category select is scoped by brand.category through
+# EU_COSMETIC_CATEGORIES, so 86% ASSUMES A SKINCARE & BEAUTY BRAND. Verified for Cloud &
+# Glow before the run rather than during it. #139's territory: a BRAND-LEVEL ATTRIBUTE
+# CONSTRAINING A PER-SKU REGULATORY FACT — the scalar the substance discriminator already
+# ruled against, surviving in a new place.
+#
+# STEP 0 — SCOUT FOR PRECEDENT BEFORE CONSUMERS. Strategy's new standing rule after the
+# seventh instance, and it earned itself immediately: sku.safetyRef IS ALREADY the Safety
+# Assessment reference — FRAMEWORK_VOCAB.cosmetic.safetyDoc names it, SINGLE_DEFINITION
+# gates it, it is seeded, exported, in RETAILER_SAFE_FIELDS and in the retailer templates.
+# So "Safety Assessment ref" was A SECOND NAME MISMATCH, NOT A NEW RECORD. Restructuring it
+# into {value,…} would have been a second scheme for one value across a dozen consumers.
+# THE PRECEDENT WON, as the rule requires.
+#   Precedent 1 — the {value, verifiedBy, verifiedDate} triple exists THREE times
+#   (TRUST_TIER_META, CONFIDENCE_LEVELS, VERIFICATION_TIERS) and transfers as VOCABULARY,
+#   not structure: all three keep "who established this" separate from the value, and none
+#   lets a lower tier borrow the higher tier's word. None is user-editable.
+#   Precedent 2 — THE TREE HAS NO PRECEDENT FOR A REFERENCE TO A DOCUMENT VEYAFLOW DOES NOT
+#   OWN. dppId, templateVersionUsed/outputFileHash and bil_extractions all point at the
+#   platform's OWN artefacts. documentRef is genuinely new — which is exactly the temptation
+#   Strategy named: holding the file tempts the product to assert what it read.
+#   Precedent 3 — saveManualRp's parallel-map pattern, followed literally, and it is what
+#   kept Part B from becoming a schema migration.
+#
+# PART A — THE COUNT IS ZERO. countryOfManufacture, mfrCountry, safetyAssessment and
+# euCosmeticCategory are written NOWHERE: a rename, not a merge. AND THE CPNP HELPER WAS THE
+# ONLY SURFACE READING THE WRONG NAMES — every other consumer already read countryOfMfr
+# (13696, 19929, 22202, 22214, 30156, 34859, 36036) and safetyRef (6804, 17255, 17515,
+# 22198, 22219). The dead aliases are GONE, not joined by a third.
+#
+# PART B — value in its own canonical field, metadata in sku.dossier[key] as
+# { verifiedBy, verifiedDate, documentRef }. documentRef HOLDS A REFERENCE, NOT A FILE.
+# verifiedBy:'brand', never 'verified', never buyer-facing as though the platform confirmed
+# it — the #116 distinction caught before shipping rather than after.
+#
+# THE PREFILLING RULE IS LOAD-BEARING NOW, NOT LATER. Strategy: prefilling MOVES AUTHORITY —
+# an empty field asks the user to know something, a prefilled field asks the user NOT TO
+# OBJECT, and the second is a much weaker act. So: CONFIRMATION MUST BE AN ACT, NOT AN
+# ABSENCE OF OBJECTION. dossierConfirmed requires value AND verifiedBy==='brand' AND
+# verifiedDate; an unconfirmed value RENDERS, SAYS "· not confirmed", AND DOES NOT MOVE THE
+# METER (measured: 10/14 = 71% with values entered but unconfirmed). Written in before
+# anything extracts, so B inherits it instead of needing it retrofitted — otherwise the
+# meter measures extraction instead of truth, which is #134's filled:true one level up.
+# _dossierInvalidate: EDITING A VALUE CLEARS ITS CONFIRMATION. Not in the spec; it follows
+# from "verifiedDate is written when the human confirms, not when the field is edited".
+#
+# THE FOURTH _appendStamp CALL SITE — RULED IN AS AN INSTANCE, NOT AN EXTENSION. Strategy
+# ruled stamps go on a DISCRETE YES and excluded bulk writes; confirmDossier is not a
+# borderline case, it is THE CONFIRMATION ACT ITSELF. FIXED_CALLSITES 3→4 with the reason
+# recorded beside the number. THE GATE WORKED: it failed the battery until the decision was
+# said out loud, which is a gate functioning rather than a gate in the way.
+# ONE TIMESTAMP FOR BOTH WRITES — two new Date() calls can straddle a millisecond, and a
+# record disagreeing with its own stamp is a worse artefact than either alone. Grouped as
+# 'sku:'+id, mirroring the checklist call's stateKey: the stamp must say WHICH product.
+#
+# ── THE PROXY SWEEP. Strategy's new standing rule, adopted RETROACTIVELY to the shipment in
+# flight: WHEN A FIELD BECOMES REAL, ITS PROXIES BECOME DEFECTS. The proxy is the inference
+# that stood in for the missing field; adding the field makes the inference obsolete but
+# does not remove it. Scoped BY FIELD NAME, NOT BY SCREEN — #157's lesson, that
+# read-never-written does not respect function boundaries.
+#
+# #156 IS NOW 8 SITES ACROSS 7 LOCATIONS, for 4 facts. Three things beyond the count:
+#   1. They are ~4 DECISIONS, TWO DUPLICATED — PIF_REQUIREMENTS (2), COMPLIANCE_RADAR_ITEMS
+#      (1, serving two facts), and the acknowledged copy-pair at 6527/20420.
+#   2. FIVE OF EIGHT INFER FROM A FIELD WITH NO WRITER, so they return THE SAME ANSWER FOR
+#      EVERY PRODUCT — not a proxy for missing data, a proxy for a field that can never be
+#      filled.
+#   3. #135 MADE ONE CONTRADICTORY RATHER THAN MERELY WRONG. 19576 sits THREE LINES from a
+#      row that now requires human confirmation and reports the same fact satisfied without
+#      one — two verdicts about one fact, on one screen, disagreeing.
+#   AND THE ONE FOR STRATEGY: 22595, PIF_REQUIREMENTS.prod_desc, severity BLOCKER, whose
+#   description explicitly names country of manufacture — checked by !!(b?.name). A
+#   REGULATORY SECTION MARKED SATISFIED BY THE BRAND HAVING A NAME.
+#
+# #158 RAISED — estimateCarbon RESOLVES A COUNTRY BY TRUNCATING ITS NAME.
+# (sku.countryOfMfr||'').toUpperCase().slice(0,2) used as an ISO code. Measured against the
+# app's own 32-country list: 2 RESOLVE TO THE WRONG COUNTRY (Denmark→DE = Germany's 0.88,
+# Indonesia→IN = India's 1.30), 27 silently fall back to 1.0 (Sweden, China, Germany, Spain,
+# Poland, Turkey, Vietnam), 3 correct BY COINCIDENCE. THE EDITOR'S OWN PLACEHOLDER IS
+# "e.g. Sweden" — the app asks for the form that fails. confidence:'LOW' softens an
+# estimate; A DANISH PRODUCT PRICED AT GERMANY'S FACTOR IS A WRONG NUMBER, NOT AN IMPRECISE
+# ONE. wMult's substring test for 'sw' (matching Swedish, Switzerland and Southwest alike)
+# is the same defect in the same function and folds in.
+#
+# #157 CONFIRMED AND LOAD-BEARING: cpnpNumber is read at 6521, 6527, 6529 and 20420 and has
+# no writer — the editor writes cpnp. It is half of BOTH PIF gates.
+#
+# THE FIX'S SHAPE, FROM CC: once the proxies are corrected all four displaced names reach
+# ZERO readers — which makes MUST_NOT_EXIST entries the way to keep them there, the same
+# idiom that holds normalizeBrandRP absent.
+#
+# NOTICED, TRIVIAL, NOT FIXED: skuForm.id || 'unsaved' at 18317 is a guard that cannot fire,
+# since newSkuForm always sets an id. The shape declined five times this week.
 
 # index.html moved 80555dcc → 93139858 on 9 Sep 2026 — #148 PART 1, SKU ID COLLISION.
 # ONE LINE OF CODE, seven of comment.

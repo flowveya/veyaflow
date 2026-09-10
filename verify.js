@@ -96,7 +96,13 @@ const FIXED_CALLSITES = {
   // toggleRetailChecklistItem, saveManualRp, saveManualOperator. A fourth call means a
   // new confirmation surface was stamped without a ruling; adding one is a spec decision,
   // not an implementation detail, so a floating count would not be a contract.
-  _appendStamp: 3,
+  //
+  // FOUR since 10 Sep 2026 (#135). confirmDossier is the fourth, ruled in by Strategy as
+  // an INSTANCE of the discrete-yes criterion rather than an extension of it: a human
+  // presses "I confirm this is correct" against one named dossier record. That is the
+  // same act as saveManualRp's, on a different object. The gate did its job — the count
+  // failed the battery until it was ruled, which is why it is a contract and not a total.
+  _appendStamp: 4,
   // Time axis M1 (9 Sep 2026). TWO consumers: buildComplianceEvents and hasCertData.
   // A third call means a new consumer of certificate metadata arrived — legitimate, but
   // it is a decision, so the number moves on purpose.
