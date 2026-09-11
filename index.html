@@ -18888,18 +18888,25 @@ const READINESS_FIELDS = {
 };
 
 // Retailer readiness per product type
+// #167 — Apotek Hjärtat named 'moq' in all three of its lists, and migrateSkuSchemaV8 deletes
+// sku.moq on every state load, so this retailer could never be ready, in any framework, ever.
+// RULED (Strategy, 11 Sep — Option B, (b)): DELETED, not renamed. manufacturerMoq is not in
+// RETAILER_SAFE_FIELDS and no export carries an MOQ column: a value that can never leave the
+// building cannot be a retailer's requirement, and the manufacturer's MOQ is the wrong quantity
+// either way. Completes June's Option B sweep, which removed the other retailer-side MOQ checks and
+// missed these three. NOT a relaxation — seven genuine fields remain. Do not re-add under any name.
 const RETAILER_REQS = {
   cosmetic: {
     'Lyko':         ['name','ean','inci','rspSEK','descSV','descEN'],
     'Kicks':        ['name','ean','inci','rspSEK','cpnp'],
-    'Apotek Hjärtat':['name','ean','inci','cpnp','euResponsible','safetyRef','rspSEK','moq'],
+    'Apotek Hjärtat':['name','ean','inci','cpnp','euResponsible','safetyRef','rspSEK'],
     'Matas':        ['name','ean','inci','cpnp','rspDKK','descEN'],
     'Boots UK':     ['name','ean','inci','cpnp','euResponsible','safetyRef','rspGBP'],
   },
   device: {
     'Lyko':          ['name','ean','ceMarking','docOnFile','rspSEK','descEN'],
     'Kicks':         ['name','ean','ceMarking','rspSEK'],
-    'Apotek Hjärtat':['name','ean','ceMarking','docOnFile','voltageInput','rspSEK','moq'],
+    'Apotek Hjärtat':['name','ean','ceMarking','docOnFile','voltageInput','rspSEK'],
     'Matas':         ['name','ean','ceMarking','docOnFile','rspDKK'],
     'Boots UK':      ['name','ean','ceMarking','docOnFile','ukCaMarking','rspGBP'],
   },
@@ -18910,7 +18917,7 @@ const RETAILER_REQS = {
   },
   supplement: {
     'Holland & Barrett':['name','ean','ingredientList','allergens','novelFoodStatus','rspGBP'],
-    'Apotek Hjärtat':   ['name','ean','ingredientList','allergens','cpnp','rspSEK','moq'],
+    'Apotek Hjärtat':   ['name','ean','ingredientList','allergens','cpnp','rspSEK'],
     'Matas':            ['name','ean','ingredientList','allergens','rspDKK'],
   },
   food: {

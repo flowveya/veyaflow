@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        4b268e17
+index.html        be174bbf
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,100 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              fe285fe9
 netlify/functions/get-dpp.js                     3c050904
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 4b268e17 → be174bbf on 11 Sep 2026 — #167, APOTEK HJÄRTAT WAS STRUCTURALLY
+# UNREACHABLE. THREE STRINGS DELETED, NOT RENAMED.
+#   after   be174bbf669784f188ea0230038f22f3dd983d6c882b82a04ab58c4fc712cb6c
+# NAMED BY THE LANE after reading 18902, 18909 and 18920 at the bytes. Ten other surfaces
+# unchanged; 1 of 11 modified.
+#
+# THE DEFECT: RETAILER_REQS named 'moq' in ALL THREE Apotek Hjärtat lists (cosmetic, device,
+# supplement) and migrateSkuSchemaV8 DELETES sku.moq ON EVERY STATE LOAD. The requirement was
+# UNSATISFIABLE — the retailer could never be ready, for any product, in any workspace, since
+# batch #3. Sweden's largest pharmacy chain, unreachable in a Swedish beauty-compliance product,
+# telling the brand "Missing required fields — complete SKU →": an instruction that could not be
+# followed.
+#
+# FOUND BY CHARLOTTE PRE-FILLING EVERY FIELD AND WATCHING IT STAY RED. 100% readiness, ✓ Lyko
+# ✓ Kicks ✓ Matas ✓ Boots UK, ✗ Apotek Hjärtat. PROOF BY ELIMINATION, and it was not the test the
+# lane wrote — the spec said "enter 85 and export". FILLING EVERYTHING REMOVED EVERY EXPLANATION
+# EXCEPT THE IMPOSSIBLE ONE.
+#
+# AND THE COMMENT WAS THERE AGAIN, sixty lines above at 18832, describing this exact defect in the
+# SIBLING constant: "migration V8 renames the field and DELETES sku.moq on every page load, so the
+# scorer was asking for a key that cannot exist." Batch #3 fixed READINESS_FIELDS and left
+# RETAILER_REQS. THIRD INSTANCE IN ONE DAY of an artefact certifying a check that never happened —
+# and here the artefact is a comment that describes the bug ACCURATELY, fixes ONE of its two
+# sites, and thereby immunises the other from being looked at.
+#
+# CC REFUSED TO SHIP THE SPEC AS WRITTEN, AND WAS RIGHT. The spec said RENAME moq →
+# manufacturerMoq. CC found a Strategy lock the spec contradicted: migrateSkuSchemaV8 (18205) —
+# "a legitimate internal cash-commitment signal but NOT pitchable to retailers… the retailer-side
+# .moq field and the readiness-score MOQ comparison are DELETED IN THE SAME OPTION B SWEEP —
+# these are sites where the field was being used incorrectly" — and 6889: "RETAILER-SIDE MOQ IS A
+# CATEGORY ERROR IN COSMETICS." RETAILER_REQS IS A SITE THAT JUNE SWEEP MISSED.
+#
+# RULED (Strategy, 11 Sep): (b) DELETE, NOT RENAME. manufacturerMoq is not in
+# RETAILER_SAFE_FIELDS and no export carries an MOQ column — A REQUIREMENT WHOSE VALUE CAN
+# STRUCTURALLY NEVER LEAVE THE BUILDING CANNOT BE A RETAILER'S REQUIREMENT. And the decision is
+# the same whichever way Apotek Hjärtat's real process works, because the manufacturer's MOQ is
+# the wrong quantity under both readings.
+# RENAMING WOULD HAVE TRADED A VISIBLE IMPOSSIBILITY FOR AN INVISIBLE CATEGORY ERROR THAT LOOKS
+# CORRECT — #134's shape one level up, and worse, because the corrected field name makes it read
+# as right. It is the same class Strategy has now ruled on four times: A VALUE FROM ONE DOMAIN
+# STANDING IN FOR A VALUE FROM ANOTHER (#108, #139, "a bare 100% is a brand-level scalar in
+# disguise", this).
+# NOT A RELAXATION: it completes June's sweep. Seven genuine fields remain for cosmetics, six for
+# device and supplement.
+#
+# THE LANE'S SPEC FORBADE RELAXING THE REQUIREMENT. That was right as a default and WRONG HERE,
+# on evidence the lane did not have when writing it. The rule exists so a gate cannot be quietly
+# softened to make it pass; it must not stop a sweep being finished once it is known to be
+# half-done.
+#
+# THE RULING HAD BEEN MADE TWO TURNS EARLIER AND HAD NOT REACHED CC.
+# > A RULING THAT EXISTS IN A CONVERSATION BUT HAS NOT REACHED THE LANE THAT NEEDS IT IS
+# > OPERATIONALLY NOT MADE.
+# Recorded as mechanism, not as slips: it is why rulings go in the log and why a relay is a step
+# rather than a courtesy.
+#
+# THE RANGE-WIDENING SWEEP, ADDED TO THE SPEC AFTER #175 AND IT EARNED ITSELF. `ready` can contain
+# 'Apotek Hjärtat' for the first time in the application's history.
+#   5 callers of skuReadiness, 0 inside HTML strings. RETAILER_REQS is read ONLY inside it.
+#   portal.html is NOT a consumer — its same-named skuReadiness is a different payload.
+#   2 callers read only `pct`. 3 read ready/notReady. NO GUARD BREAKS.
+#   BUT showSkuExport's TWO APOTEK HJÄRTAT EXPORT PATHS RUN FOR THE FIRST TIME EVER, carrying two
+#   latent defects: the Artikelnummer column is ALWAYS BLANK (#166 — articleNo is private and the
+#   sanitiser strips it), and DEVICE AND SUPPLEMENT SKUs GET THE COSMETIC-SHAPED TEMPLATE, with
+#   blank INCI/CPNP columns and no CE marking.
+#   renderSkus' notReady.slice(0,3) has always hidden retailers past the third with no "+N more";
+#   a hidden one can now come into view.
+# THE COUNT: 3 CONSUMERS, 0 GUARDS BROKEN, 1 EXPORT PATH NEWLY REACHABLE CARRYING 2 LATENT DEFECTS.
+#
+# THE IMPORT QUESTION IS ANSWERED AND THERE IS NO DATA LOSS: a spreadsheet row with MOQ 200 holds
+# moq:"200" immediately, manufacturerMoq:"200" after reload, unchanged after a second. The spec's
+# feared _schemaVersion>=8 case is ALSO rescued — and WHY it is rescued became #179.
+#
+# THE SMOKE STEP INVERTED, AND CC CAUGHT IT. Step 2 said "clear the MOQ → back to not ready",
+# written to prove the requirement had been REPAIRED rather than REMOVED. Under ruling (b) it is
+# removed deliberately, so clearing the MOQ now CORRECTLY leaves the retailer ready. CC
+# substituted CPNP — the same property tested through the right lever. A SPEC WRITTEN FOR FIX (a)
+# AND APPLIED TO FIX (b) CARRIES TESTS THAT QUIETLY REVERSE, and that one would have read as a
+# failure.
+#
+# MEASURED, 8 CASES × HEAD vs tree: MOQ filled, blank or absent gives the SAME result for Apotek
+# Hjärtat; a MISSING GENUINE FIELD (CPNP) still blocks — satisfiable, not satisfied. 19 of 22
+# retailer lists byte-identical; Lyko, Kicks, Matas, Boots UK, Holland & Barrett, Boozt, `pct` and
+# `missing` identical in all eight. READY SURVIVES TWO FULL MIGRATION-CHAIN RUNS.
+#
+# STILL OPEN FROM JUNE'S SWEEP, REPORTED NOT FIXED: RETAILER_SAFE_FIELDS still allowlists 'moq'
+# (a key that cannot exist), and the line sheet and spec sheet PDFs each read it twice — the line
+# sheet always prints "MOQ —". TWO OF THOSE ARE RETAILER-FACING DOCUMENTS, which under Option B
+# should not carry an MOQ slot at all.
+#
+# THE PRECISION THAT MUST TRAVEL WITH THIS SHIPMENT: MAKING APOTEK HJÄRTAT STRUCTURALLY REACHABLE
+# IS NOT THE FACE TAPE REACHING APOTEK HJÄRTAT. The platform becomes capable; the product is not
+# ready. Nobody should read "#167 landed" as "we can send."
 
 # NO TRACKED DIGEST MOVED — #176, 11 Sep 2026. FIVE LEADING SLASHES IN .gitignore.
 # All eleven surfaces identical at both ends; `.gitignore` the only file changed; GREEN, 0 of 11,
