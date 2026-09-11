@@ -30,10 +30,19 @@ VeyaFlow_Daily_Log.txt
 # public web root, so anything committed at root is served at a guessable URL —
 # these .js files would be served as readable source, not executed.
 _untracked_backup/
-anthropic-proxy.js
-get-brand-pack.js
-get-dpp.js
-share-brand-pack.js
-share-dpp.js
+# #176, 11 Sep 2026 — THE LEADING SLASH IS LOAD-BEARING. Without it these five matched AT ANY
+# DEPTH, including netlify/functions/, where five LIVE production endpoints share these names.
+# They survived only because git does not apply ignore rules to tracked files: delete one and
+# `git add .` silently skipped it, and the next deploy lost the endpoint with no error —
+# demonstrated in a pristine copy. #111's note above ("changes nothing about what deploys")
+# was true of the root copies and false of netlify/functions/.
+# The root copies these lines exist for are byte-identical to production and are NOT blocked in
+# netlify.toml, so they must stay ignored: the slash keeps them ignored and frees the functions.
+# The daily-log lines further up are unanchored ON PURPOSE (see their comment). These are not.
+/anthropic-proxy.js
+/get-brand-pack.js
+/get-dpp.js
+/share-brand-pack.js
+/share-dpp.js
 VeyaFlow_Nav_5Group_Reskin_v1.html
 brandhome_pass2_sketch.html

@@ -23,6 +23,75 @@ netlify/functions/get-brand-pack.js              fe285fe9
 netlify/functions/get-dpp.js                     3c050904
 netlify/functions/share-brand-pack.js            3791bbec
 
+# NO TRACKED DIGEST MOVED — #176, 11 Sep 2026. FIVE LEADING SLASHES IN .gitignore.
+# All eleven surfaces identical at both ends; `.gitignore` the only file changed; GREEN, 0 of 11,
+# exit 0 before and after.
+#
+# THE DEFECT: .gitignore's #111 block (4 Sep) listed anthropic-proxy.js, get-brand-pack.js,
+# get-dpp.js, share-brand-pack.js and share-dpp.js WITH NO LEADING SLASH, so each matched AT ANY
+# DEPTH — including netlify/functions/, where five LIVE ENDPOINTS carry those names.
+# share-dpp.js is one of the SIX ORIGINALLY TRACKED SURFACES, so this was true of a baselined
+# file for as long as the baseline existed. They survived only because GIT DOES NOT APPLY IGNORE
+# RULES TO TRACKED FILES.
+# The file states the principle itself at line 20, deliberately, for the daily-log block:
+# "No leading slash on these patterns, so they match at any depth." KNOWN THERE, REUSED HERE
+# WITHOUT NOTICING. #111's note — "they are already absent from the remote, so this changes
+# nothing about what deploys" — was TRUE OF THE ROOT COPIES AND FALSE OF netlify/functions/.
+#
+# SEEN BOTH WAYS, IN TWO PRISTINE COPIES — delete the endpoint, re-create it from the known
+# bytes, `git add .`:
+#   BEFORE  exit 0, NO OUTPUT, NO WARNING; tracked in index: 0; only `git status --ignored`
+#           reveals it (`!! netlify/functions/get-dpp.js`). THE NEXT DEPLOY LOSES THE ENDPOINT.
+#   AFTER   staged — `new file: netlify/functions/get-dpp.js`; tracked in index: 1; and the root
+#           copies STILL IGNORED, staged by nothing.
+#
+# THE LANE'S REPORT-3 COMMAND WAS A CHECK THAT COULD NOT FAIL, AND CC CAUGHT IT. `git
+# check-ignore` SKIPS TRACKED FILES BY DEFAULT, so the specced command returns nothing/exit 1
+# IDENTICALLY BEFORE AND AFTER — the proof of the fix could not have distinguished the two
+# states. `--no-index` tests whether the RULE matches, and it separates them cleanly:
+#   before  .gitignore:35:get-dpp.js   exit 0
+#   after   (nothing)                  exit 1
+#   root    .gitignore:44:/get-dpp.js  exit 0 — STILL IGNORED, which is the other half
+# TENTH INSTANCE OF THE CLASS THIS WEEK, IN THE SPEC WHOSE ENTIRE PURPOSE WAS DEMONSTRATING A
+# PROTECTIVE CHANGE. Writing "seen failing" into a spec does not make the command able to fail.
+#
+# THE ROOT COPIES ARE REAL AND THE SLASH GUARDS SOMETHING — measured, not inferred. All five
+# exist, untracked, and are BYTE-IDENTICAL TO PRODUCTION (confirmed with cmp): anthropic-proxy.js
+# 2112B, get-brand-pack.js 2494B, get-dpp.js 3512B, share-brand-pack.js 4242B, share-dpp.js
+# 7553B. So deletion was not the honest fix and there was no stop condition.
+#
+# #178 RAISED, AND IT IS WHY THIS FIX IS MORE LOAD-BEARING THAN SPECCED: NONE OF THE FIVE ROOT
+# COPIES IS BLOCKED IN netlify.toml. Only /supabase-proxy.js has a root rule, because it is
+# TRACKED. So for these five THE IGNORE RULE IS THE ONLY CONTROL standing between exact
+# production source and publication at a guessable URL under publish = "." (#99). The slash both
+# frees netlify/functions/ AND PRESERVES THAT CONTROL. A byte-identical duplicate that must be
+# prevented from publishing is worse than no duplicate: the lane's view is that the five root
+# copies should be DELETED, which retires the rule rather than scoping it. Charlotte's files,
+# Charlotte's call.
+#
+# CENSUS — TRACKED FILES MATCHING AN IGNORE RULE: 5 BEFORE, 0 AFTER. Three patterns keep the
+# defect shape and were left alone, none with a deploy consequence: `_untracked_backup/` (32),
+# `VeyaFlow_Nav_5Group_Reskin_v1.html` (47), `brandhome_pass2_sketch.html` (48). The daily-log
+# lines (22–23) are UNANCHORED ON PURPOSE and documented as such — correct by intent, not
+# touched. Recorded so the distinction is not rediscovered.
+#
+# PATTERNS MOVED 33–37 → 42–46; CC added a nine-line comment above them saying the slash is
+# load-bearing. #111's original note is LEFT IN PLACE AS THE RECORD and corrected beneath rather
+# than rewritten.
+#
+# #177 MEASURED, NOT SPECCED: .gitignore 53c1c23c → 941af6b8; netlify.toml 9898419c, unchanged.
+# NEITHER IS TOOL-WRITTEN — four hand commits each, no git hooks, no husky, no pre-commit config,
+# no package.json scripts, no .netlify/ link. Both stable at rest, so both would fit the same
+# digest discipline; adding them makes the count 13. TWO FILES DECIDE WHAT DEPLOYS AND NEITHER IS
+# WATCHED — #174's argument one level up, and #176's own finding came from reading a file the
+# battery does not watch. Held deliberately: a third harness shipment in one morning should be a
+# decision, not momentum.
+#
+# ALSO NOTICED: `_untracked_backup/netlify.toml` is a stale 4 Jun copy — A SECOND DEPLOY CONFIG
+# IN THE TREE, ignored and harmless today. And Finder DOES write into these folders — there is a
+# `.DS_Store` in `netlify/`, which retrospectively justifies #174's choice to read the directory
+# through git rather than with a raw listing.
+
 # NO TRACKED DIGEST MOVED — #174, 11 Sep 2026, HARNESS ONLY. All six existing surfaces
 # identical before the edit, after it, and after the scratch tests. `verify.sh` the only file
 # changed. The battery grew 6 → 11. Recorded here because the reasoning belongs with the
