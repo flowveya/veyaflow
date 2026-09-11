@@ -33710,7 +33710,7 @@ function renderComplianceCalendarPage(el){
       var u=urg(r.days), conf=(r.confidence==='confirmed'), rg=(r.market||'EU').toLowerCase();
       var hasLink = !!(r.link && r.link.length); // no live page → no onclick, no arrow (honest affordance)
       body+='<div class="row'+(hasLink?'':' nolink')+'"'+(hasLink?' onclick="showPage(\''+r.link+'\')"':' style="cursor:default"')+'>'+
-        '<div class="when '+u.k+'"><div class="d">'+(Number.isFinite(r.days)&&r.days>=0?r.days+'<span style="font-size:13px">d</span>':'—')+'</div><div class="u">'+fmtDay(r.deadline)+'</div></div>'+
+        '<div class="when '+u.k+'"><div class="d">'+(Number.isFinite(r.days)?Math.abs(r.days)+'<span style="font-size:13px">d</span>':'—')+'</div><div class="u">'+fmtDay(r.deadline)+'</div></div>'+
         '<div class="what"><div class="titlerow"><span class="ti">'+escapeHtml(r.title)+'</span><span class="tag-rg '+rg+'">'+escapeHtml(r.market||'EU')+'</span></div>'+
           '<div class="meta"><span class="certainty '+(conf?'confirmed':'proposed')+'"><svg viewBox="0 0 24 24">'+(conf?CHECK:QCLOCK)+'</svg>'+(conf?'Confirmed':'Proposed')+'</span>'+
           '<span class="dot"></span><span>'+escapeHtml(r.actionLabel||'')+'</span></div></div>'+
@@ -33720,8 +33720,14 @@ function renderComplianceCalendarPage(el){
     });
   }
 
+  // #175 — the badge's noun must name exactly what it counts. 'upcoming' over a set that
+  // includes passed deadlines is #160's strip-heading defect again. One number, and the noun
+  // switches with state: 'overdue' (urg()'s own label, 33662) whenever any row has passed,
+  // otherwise 'upcoming'. An undated row (days===null) is never counted as overdue.
+  var overdueCount = rows.filter(function(r){ return Number.isFinite(r.days) && r.days < 0; }).length;
+  var countLabel = overdueCount > 0 ? (overdueCount+' overdue') : (rows.length+' upcoming');
   el.innerHTML='<div class="cc" style="margin:0 auto;padding:24px 20px 48px">'+
-    '<div class="head"><h1>Compliance calendar</h1><span class="count">'+rows.length+' upcoming</span></div>'+
+    '<div class="head"><h1>Compliance calendar</h1><span class="count">'+countLabel+'</span></div>'+
     '<p class="sub">Deadlines that apply to '+escapeHtml((brand&&brand.name)||'your brand')+' across your target markets, soonest first.</p>'+
     legend+body+
   '</div>';

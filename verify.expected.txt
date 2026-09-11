@@ -9,12 +9,179 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        efeab029
+index.html        4b268e17
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
+
+# index.html moved efeab029 → 4b268e17 on 11 Sep 2026 — #175, #160'S OWN REGRESSION ON THE
+# SURFACE #160 EXISTED TO REPAIR. TWO LINES. THE LANE'S ERROR, NOT CC'S.
+#   after   4b268e1774a4a5f90f218bb2df28b71cf6c96159ff7c487d804849345787d3b4
+#           41,780 lines · 57 gates · 1 of 6 modified
+# NAMED BY THE LANE after reading 33713 and 33723–33730 at the bytes.
+#
+# FOUND IN SMOKE, BY CHARLOTTE, MINUTES AFTER #160 WENT LIVE. The calendar's day cell read
+# `—` for all 8 overdue rows — and THE EM DASH IS THIS FILE'S MARKER FOR "NO VALUE RECORDED"
+# (#118, written into fmtNum at 4872). So an overdue deadline rendered as though NO DATE
+# EXISTED, inches from the date it has and the red Overdue pill contradicting it.
+#
+# 33713 read `Number.isFinite(r.days) && r.days >= 0 ? r.days+'d' : '—'`. That test was written
+# when daysUntil COULD NOT RETURN A NEGATIVE. #160 made it able to. Before: days=0 → `0d`.
+# After: days=-345 → fails `>=0` → `—`. WE INVERTED OUR OWN RULE: absence must not render as a
+# measurement, AND A MEASUREMENT MUST NOT RENDER AS ABSENCE.
+#
+# THE CAUSE IS THE SPEC, AND IT IS THE LANE'S RECURRING ERROR — SEVENTH INSTANCE, AND THE FIRST
+# TO PRODUCE A LIVE REGRESSION RATHER THAN A WRONG CLAIM IN A REPORT. Part B named 4909 as the
+# only copy site; for the calendar the spec said "33651 → urg() — no edit; report the label
+# flip". CC did exactly that, correctly: it measured daysUntil's OUTPUT and urg()'s LABEL, and
+# both were right. THE RENDER SITE SITS BETWEEN THEM AND HAS ITS OWN `>= 0` TEST THAT NEITHER
+# CHECK TOUCHED. VERIFY THE PARTS, ASSERT THE JOIN.
+# EXTENSION ADOPTED: when a function's RANGE widens, every consumer's GUARD is in scope — not
+# only its callers and its labels. A guard written against the old range is a silent consumer.
+#
+# THE FIX, 33713: `Number.isFinite(r.days) ? Math.abs(r.days)+'d' : '—'`. null still renders the
+# em dash; magnitude shows in both directions; DIRECTION IS CARRIED BY THE PILL AND u.k's
+# COLOUR. Measured on all 14 rows: 8 overdue moved `—` → their true magnitude, 6 futures
+# BYTE-IDENTICAL, and all four constructed undated forms still render `—`.
+#
+# CC VERIFIED THE FIX'S PREMISE INSTEAD OF ACCEPTING IT, AND THAT IS THE REPORT'S BEST MOMENT.
+# The fix rests on "the pill carries the word". CC confirmed 33717 renders u.label AS VISIBLE
+# TEXT (not colour alone), and that no CSS hides .cc .pill at any width — the narrow-screen rule
+# at 418 only re-grids .cc .right. HAD THE PILL BEEN COLOUR-ONLY OR HIDDEN ON MOBILE, `345d`
+# WITH NO WORD WOULD HAVE BEEN #160'S DEFECT A THIRD TIME. The word-not-colour criterion was
+# checked at the surface it was being relied on, not assumed from the spec.
+#
+# 33724 — THE BADGE SAID "8 UPCOMING" OVER 5 OVERDUE ROWS. #160's strip-heading defect, on the
+# count. RULED (b): ONE NUMBER WHOSE NOUN SWITCHES WITH STATE — `N overdue` whenever any row has
+# passed, otherwise `N upcoming`. Same reasoning as the heading: the label must match what it
+# counts, and a late reader must meet the breach first. Option (a) `N deadlines` never lies but
+# does what `-41d` did — survives a glance without conveying that anything is wrong.
+#   var overdueCount = rows.filter(r => Number.isFinite(r.days) && r.days < 0).length;
+# THE isFinite GUARD IS LOAD-BEARING: an undated row is never counted as overdue — #120's rule
+# surviving into the badge, which is where it would have been easiest to drop.
+#
+# CC CORRECTED THE LANE'S COUNT WITHOUT ASSUMING THE LANE WAS WRONG. The lane read 8/5 off
+# Charlotte's screen; CC ran the seed NORDLYS through the real regDeadlinesForBrand and got
+# 10/7/3, then said the difference is presumably Cloud & Glow's own categories and markets,
+# WHICH IT CANNOT SEE. Both are right for different brands — Cloud & Glow is Sweden-only and
+# misses the two UK rows. "NOT FOUND, WITH THESE SEARCHES" APPLIED TO A DISAGREEMENT.
+#
+# THE EDIT IS PROVABLY LOCALISED: 41,774 → 41,780 lines, and EVERY anchor below 33723 moved by
+# EXACTLY 6 (certificationRecords call site 33738→33744, _appendStamp 39636→39642,
+# _dppIsPublished 35807→35813, checkState 40407→40413) while NOTHING above it moved.
+#
+# LEFT FOR DESIGN, DELIBERATELY, AND THE LINE IS DRAWN AT TRUTH: 33725's "soonest first" is TRUE
+# (the sort is ascending by date) and 33704's "No upcoming deadlines" is TRUE WHERE IT APPEARS
+# (reached only at zero rows, where there are no upcoming AND no overdue). ONLY THE BADGE
+# ASSERTED SOMETHING FALSE. Drawing the line there kept #175 a hotfix instead of a copy pass.
+# Also DESIGN's: #deadline-bar is var(--amber-bg) for EVERY row, so a breach renders inside a
+# container styled as a warning.
+#
+# PROCESS NOTE, RECORDED RATHER THAN TIDIED: #160's narrative block below was written WHILE
+# Charlotte's `git add` was running, so f98d0c1 carried the DIGEST but not the REASONING. The
+# load-bearing half landed — verify.sh had the right baseline and nobody worked from a stale
+# one — but the record trailed by one commit and arrives here. THE RULE IS SHARPENED: the record
+# must be COMPLETE before `git add`, not merely started. Same family as 9a88b4f, caught in
+# minutes instead of days because the digest was named first.
+
+# index.html moved da3aefd5 → efeab029 on 11 Sep 2026 — #160, THE PLATFORM COULD NOT SAY A
+# DEADLINE HAD PASSED. ONE LINE OF CODE, ONE WORD OF COPY, SHIPPED ALONE.
+#   after   efeab029972740566c29238d9307da018879d2918ff6d6c7346df6457275dc73
+#           41,774 lines · 57 gates · 1 of 6 modified
+# NAMED BY THE LANE after reading 4890–4898 and 4918 at the bytes. TWO INDEPENDENT
+# COMPUTATIONS AGREED (verify.sh's own shasum vs CC's reported value) — the rule that a sha CC
+# reported itself is not sufficient, satisfied rather than waived.
+#
+# STRATEGY PLACED IT ABOVE #134 AND #150, ON EXPOSURE. Both of those had exposure of zero: no
+# cosmetic product on the market, no imported catalogue. THIS ONE CHARLOTTE WAS LOOKING AT, ON
+# HER OWN PRODUCTS, WHEN IT WAS FOUND. And it does not merely misstate a status — IT INVERTS AN
+# OBLIGATION. "Approaching" means you have time; "Overdue" means you are already in breach.
+# Telling someone they have time when they are six weeks late is the most harmful thing a
+# compliance product can do.
+#
+# THE DEFECT: daysUntil ended `Math.max(0,n)`. Measured against REG_DEADLINES on 10 Sep,
+# 8 OF 14 ROWS WERE IN THE PAST — from 27 days (uk_cmr_si_2026_23_cmrban) to 345 (epr_dk) —
+# and every one reported 0d.
+#   BEFORE  all 8 → `0d`, all 8 → urg() "Approaching", all 8 sorted equal at 0
+#   AFTER   all 8 → their true negative, ALL 8 FLIP TO "Overdue", epr_dk(-345) sorts first
+# THE LABEL FLIP IS THE EVIDENCE AND urg() WAS NOT TOUCHED — the dead branch went live purely
+# as a consequence of the clamp coming off, which is what the spec demanded instead of a
+# hand-wired label. 0 OF 6 FUTURE ROWS MOVED; all four undated forms still return null and
+# still sort last (#118 and #120 both survive, and matter MORE now: a clamp that turned absence
+# into 0 would today turn it into a LATENESS CLAIM).
+#
+# TWO ARTEFACTS VOUCHED FOR THE MISSING CHECK, AND THAT IS THE TRANSFERABLE PART.
+#   (1) urg() at 33662 opens `if(days < 0) return 'Overdue'` — UNREACHABLE, while the legend at
+#       33674 ADVERTISES "Overdue / blocked". A user who looks for it, fails to find it, and
+#       concludes nothing is late.
+#   (2) #118'S OWN COMMENT sat four lines above the surviving clamp calling `Math.max(0, …)`
+#       "a floor-at-zero guard [that] guards nothing". #118 removed the line's NaN role and left
+#       its clamping role. THE COMMENT'S ACCURACY IS WHAT MADE THE LINE LOOK AUDITED.
+# > AN ARTEFACT THAT CERTIFIES A CHECK WHICH NEVER HAPPENED IS WORSE THAN NO ARTEFACT AT ALL.
+# Absence prompts a check; a false assurance forecloses one. Two instances in one finding, one
+# screen apart — and #167 made it three the same day.
+#
+# STANDING RULE, STRATEGY: fixing the defect a line is NAMED for is not the same as auditing
+# what else that line does. WHEN A LINE CHANGES — COUNT ITS BEHAVIOURS, NOT ITS BUGS.
+#
+# CC CORRECTED THE LANE TWICE AND BOTH STAND.
+#   THE CALL-SITE COUNT: the spec said three, the AST says FOUR — 4 expressions, 3 locations,
+#   because the strip's comparator calls daysUntil TWICE ON ONE LINE (once per operand).
+#   Reported as a discrepancy rather than reconciled to the lane's number. No unaccounted
+#   consumer exists; the calendar's sort reads the precomputed a.days and never calls it.
+#   THE CENSUS GENERALISES BETTER THAN THE SPEC ASKED: 6 `Math.max(0, …)` sites, 2 unsafe.
+#   THE FOUR SAFE ONES FLOOR A MAGNITUDE; THE TWO UNSAFE ONES FLOOR A DIRECTION IN TIME.
+#   That makes the next instance recognisable without re-deriving it. ADOPTED.
+#
+# THE COPY CRITERION WAS INVERSION, NOT LEGIBILITY. `0d` is the defect and `-41d` is not a fix:
+# a minus sign in a mono font reads as "about zero" at a glance. A PASSED DEADLINE MUST DIFFER
+# FROM A FUTURE ONE IN WORD. Shipped as `Overdue · 345d` — word first, magnitude second, using
+# urg()'s own label (33662) and the legend's (33674), so no new register was invented.
+# fmtNum's contract is UNCHANGED: it renders the future case and the em dash and learns nothing
+# about sign. The distinction lives at one call site.
+# AND CC ESTABLISHED SOMETHING THE SPEC ASSUMED WRONGLY: #deadline-bar is amber FOR EVERY ROW,
+# so colour was never going to carry this. Word-not-colour was right for a better reason than
+# the one given.
+#
+# THE HEADING WAS A SEPARATE RULING AND CC WAS RIGHT TO STOP FOR IT. `⚠ Upcoming deadlines`
+# sits on the same line as an emoji belonging to #141's sweep. RULED: the word and the glyph are
+# separable edits that share a line — change the word, leave the glyph byte-for-byte. Shipped as
+# `⚠ Regulatory deadlines`. CC'S CONTROL IS THE RIGHT ONE: 67 `⚠` before AND after, proving the
+# character was neither moved nor duplicated, which a one-line diff alone cannot establish.
+# HALF-REPAIRED WAS THE ONE STATE THIS SHIPMENT COULD NOT SHIP IN: an item reading
+# `Overdue · 345d` beneath a heading calling it upcoming is this finding's own defect,
+# reintroduced by its own fix.
+#
+# #161 CONFIRMED AND THIS FIX CREATES IT. regDeadlinesForBrand (1960) filters by category and
+# market ONLY; REG_DEADLINES carries no completion, dismissal or acknowledgement state and
+# nothing writes one. So the app now says "345 days overdue" PERMANENTLY, with no way to record
+# having done it. CC's proposed shape is right and better than the lane's instinct: a
+# BRAND-CONFIRMED ACKNOWLEDGEMENT (verifiedBy:'brand', dated) — the #135 record doing the job it
+# was built for — never a "done" the platform vouches for. Strategy's to rule.
+#
+# #173 RAISED, AND IT IS COMMERCIAL RATHER THAN COMPLIANCE. renderTrialExpiredScreen (4777) has
+# 1 DEFINITION AND 0 CALL SITES across both channels, and `expired:false` is written once at
+# 4641 and never set true. THE TRIAL NEVER ENDS. So `⏰ Free trial: 0 days remaining` is not a
+# stopgap before an expiry screen — IT IS THE ONLY THING AN EXPIRED TRIAL EVER SHOWS. That
+# reframes the sibling clamp at 4650 from "is a floor right here" to "is a floor right when it
+# is the sole surface", and the answer is no: the floor is what keeps the dead path invisible.
+# Second smartEmpty (#133). A SaaS with no way to end a trial is a revenue question.
+#
+# LEFT DELIBERATELY: the calendar's empty state at 33685 still says "No upcoming deadlines" —
+# only reachable when there are zero rows, so not false today; it moves with DESIGN's pass on
+# the amber container. The `⚠` at 4918 belongs to #141.
+#
+# #174 RAISED, HARNESS: FIVE OF SEVEN NETLIFY FUNCTIONS ARE OUTSIDE THE BATTERY —
+# anthropic-proxy.js, anthropic-proxy-background.js, get-brand-pack.js, get-dpp.js,
+# share-brand-pack.js. Every one is a public HTTP endpoint with no named baseline and no place
+# in the one-edit count; a change to any passes GREEN at "0 of 6 modified".
+# anthropic-proxy-background.js is the sharpest: a BACKGROUND function (202 immediately, up to
+# 15 minutes) holding ANTHROPIC_API_KEY and SUPABASE_SERVICE_KEY, which bypasses RLS. NO
+# HARDCODED SECRETS ANYWHERE IN THE DIRECTORY — every reference is process.env. The battery grew
+# 4→5 (#126) and 5→6 (#130) for exactly this reason; this is 6→11, and it ships as a
+# HARNESS-ONLY shipment (the #131 precedent: no tracked digest moves).
 
 # index.html moved 93139858 → da3aefd5 on 10 Sep 2026 — #135 + documentRef: THE DOSSIER
 # WRITE PATHS. ONE RECORD, NOT TWO SHIPMENTS. verify.js also moved (FIXED_CALLSITES 3→4).
