@@ -4876,6 +4876,17 @@ function fmtNum(n, suffix){
 // guards nothing: an absent or unparseable date passed straight through as NaN and 4868
 // rendered it as `NaNd`. Fixed AT THE FUNCTION so all callers inherit it; returns null
 // (an honest absence) rather than NaN, so a caller cannot accidentally arithmetic on it.
+//
+// #160 — and #118 left the CLAMP. Removing a line's NaN role is not auditing what else
+// that line does: Math.max(0,-41) is 0, so every passed deadline reported 0d, urg()'s
+// `days < 0` branch (33662) was unreachable while the legend (33674) advertised
+// 'Overdue / blocked', and both sorts collapsed 344 days of lateness onto one value.
+// An artefact certifying a check that never happened is worse than no artefact: the
+// comment above made this line look audited. When a line changes, count its behaviours,
+// not its bugs.
+//
+// A negative now means THE DATE HAS PASSED. null still means NO DATE RECORDED — #118 and
+// #120's distinction is unchanged and still load-bearing: absence is not lateness.
 function daysUntil(d){
   // An ABSENT date must not become a measurement. Number.isFinite alone cannot catch this:
   // new Date(null) is a VALID date (the epoch), so null produced a finite number that
@@ -4883,7 +4894,7 @@ function daysUntil(d){
   // recorded. Same distinction the em-dash rule is written to hold.
   if(d === null || d === undefined || d === '') return null;
   var n = Math.round((new Date(d)-new Date())/(1000*60*60*24));
-  return Number.isFinite(n) ? Math.max(0,n) : null;
+  return Number.isFinite(n) ? n : null;
 }
 // v4: populates the global #deadline-bar (the per-page #reg-strip was retired).
 // Reuses the SAME category filter + daysUntil (no parallel date truth, Rule #22/#23);
@@ -4904,12 +4915,20 @@ function renderRegStrip(){
     .slice(0,2);
   if(!relevant.length){strip.style.display='none';strip.innerHTML='';return;}
   strip.style.display='flex';
-  strip.innerHTML=`<span class="dl-title">⚠ Upcoming deadlines</span>`+
+  strip.innerHTML=`<span class="dl-title">⚠ Regulatory deadlines</span>`+
     relevant.map(r=>{
       const d=daysUntil(r.deadline);   // #118 — may be null; fmtNum renders — not "nulld"
+      // #160 — a passed deadline must differ from a future one in WORD, not in sign or
+      // colour. '-41d' reads as "about zero" at a glance in a mono font, and this whole
+      // bar is amber for every row, so neither the sign nor the colour survives a hurried
+      // reader who is already in breach. 'Overdue' is urg()'s own label (33662) and the
+      // calendar legend's (33674) — the register exists and is not reinvented here.
+      // fmtNum's contract is UNCHANGED: it still renders the future case and the em dash,
+      // and learns nothing about sign. The distinction lives at this call site only.
+      const dText = (d !== null && d < 0) ? ('Overdue \u00b7 ' + (-d) + 'd') : fmtNum(d,'d');
 
       const hasLink = !!(r.link && r.link.length); // no live page → no arrow (honest affordance — mirrors the calendar L32109)
-      return `<span class="dl-item"><span class="dl-days">${fmtNum(d,'d')}</span><span class="dl-name">${r.title}</span>${hasLink?`<button class="dl-arrow" onclick="showPage('${r.link}')">→</button>`:''}</span>`;
+      return `<span class="dl-item"><span class="dl-days">${dText}</span><span class="dl-name">${r.title}</span>${hasLink?`<button class="dl-arrow" onclick="showPage('${r.link}')">→</button>`:''}</span>`;
     }).join('');
 }
 
