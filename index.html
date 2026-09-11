@@ -4887,13 +4887,29 @@ function fmtNum(n, suffix){
 //
 // A negative now means THE DATE HAS PASSED. null still means NO DATE RECORDED — #118 and
 // #120's distinction is unchanged and still load-bearing: absence is not lateness.
+//
+// #180 — the TIME OF DAY is removed, not adjusted. `new Date(d)` on a date-only string is UTC
+// midnight and `new Date()` is an absolute instant; the leftover fraction of a day was rounded,
+// so every count moved by one at 12:00 UTC (14:00 CEST, 13:00 CET: the flip followed DST)
+// while neither the deadline nor the date had moved. Both sides are now UTC midnight, so the
+// difference is a whole number of days and no time of day survives anywhere in the expression.
+// THE FRAME IS UTC, STATED RATHER THAN ASSUMED: EU regulatory dates are not published in any
+// member state's time, and UTC has no DST. Adequate for arithmetic on a published date; NEVER
+// for asserting a legal position. Part 2 moves the frame to the brand's own country where one
+// is recorded — no such field exists yet, and brand.currentMarket is a MARKET, not a domicile,
+// so it must not stand in for one. Math.round stays: the division is exact, and it is the only
+// guard between a malformed row and a fractional day count.
 function daysUntil(d){
   // An ABSENT date must not become a measurement. Number.isFinite alone cannot catch this:
   // new Date(null) is a VALID date (the epoch), so null produced a finite number that
   // Math.max floored to 0 and rendered as "0d" — a stated zero days for a deadline nobody
   // recorded. Same distinction the em-dash rule is written to hold.
   if(d === null || d === undefined || d === '') return null;
-  var n = Math.round((new Date(d)-new Date())/(1000*60*60*24));
+  var target = new Date(d);
+  if(!Number.isFinite(target.getTime())) return null;
+  var now = new Date();
+  var todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  var n = Math.round((target.getTime() - todayUTC) / 86400000);
   return Number.isFinite(n) ? n : null;
 }
 // v4: populates the global #deadline-bar (the per-page #reg-strip was retired).

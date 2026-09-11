@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        be174bbf
+index.html        dd358cac
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,75 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              fe285fe9
 netlify/functions/get-dpp.js                     3c050904
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved be174bbf → dd358cac on 11 Sep 2026 — #180 PART 1, THE DAY COUNT CHANGED
+# DURING THE DAY. ONE FUNCTION. A REMOVAL, NOT AN ADDITION.
+#   after   dd358cac5be5c8f25e6ef15930a8c7c45b5a4546e445301d7ea2cdb38b0e69dc
+# NAMED BY THE LANE after reading daysUntil at the bytes. Ten other surfaces unchanged.
+#
+# OBSERVED ON THE LIVE SITE, SAME CALENDAR DAY: Danish EPR read `Overdue · 345d` at 10:01 CEST and
+# `Overdue · 346d` at 20:16. Neither the deadline nor the date moved. 345 IS CORRECT ALL DAY.
+# daysUntil subtracted an ABSOLUTE INSTANT from a UTC MIDNIGHT and rounded, so every value flipped
+# at 12:00 UTC — 14:00 CEST in summer, 13:00 in winter.
+#
+# THE FIX REMOVES A VARIABLE AND ADDS NO BRANCH. Both sides become UTC midnight; the time of day
+# leaves the expression entirely. UTC HAS NO DST, so the DST consequence DISAPPEARS rather than
+# moving — and that mattered: A BUG WHOSE BEHAVIOUR CHANGES ON A CALENDAR BOUNDARY GETS
+# RE-DISCOVERED RATHER THAN FIXED, because its reproduction steps stop working twice a year.
+# STRATEGY REVISED ITS OWN CAUTION TO SHIP IT AT 20:30: "small isolated changes late at night" is
+# a rule about fixes that ADD logic. A FIX THAT REMOVES A DEPENDENCY HAS A SMALLER FAILURE SURFACE
+# AT EIGHT IN THE EVENING THAN ONE THAT INTRODUCES A BRANCH HAS AT NINE IN THE MORNING.
+#
+# THE EVIDENCE, AND THE DEFECT WAS SEEN DIRECTLY FOR THE FIRST TIME: both versions run at 00:01,
+# 11:59, 12:01 and 23:59 UTC across all 14 rows.
+#   OLD — 14 OF 14 ROWS CHANGED, every one flipping between 11:59 and 12:01.
+#   NEW — 0 of 14 changed, and every value matches calendar arithmetic computed with INTEGER
+#         ARITHMETIC AND NO Date OBJECT, which is the right control for a date bug.
+# AT 18:49 UTC EVERY ROW ON THE LIVE SITE WAS OFF BY ONE — structural, not coincidence: every
+# deadline is a UTC midnight, so all rows carry the same leftover fraction. Before 12:00 UTC the
+# site is right on every row; after it, wrong by exactly one on every row.
+#
+# ── TWO ERRORS IN THE LANE'S SPEC, BOTH CAUGHT BY CC, AND THE SECOND IS THE SERIOUS ONE ──
+#
+# (1) SMOKE STEP 2 WAS BACKWARDS. It said tomorrow must read 344d — "one lower, because one day
+# passed". AN OVERDUE DEADLINE GETS MORE OVERDUE: 345 today, 346 tomorrow. Wrong direction AND
+# wrong by two. AS WRITTEN, A CORRECT FIX WOULD HAVE FAILED THAT STEP — a CHECK THAT CANNOT PASS,
+# the mirror of the class this lane has declined eleven times.
+#
+# (2) CONSEQUENCE 3 WAS FALSE, AND STRATEGY BUILT ON IT. The lane claimed two parties reading the
+# same record at the same instant could DISAGREE WITH EACH OTHER, and invoked §9's shared record.
+# THEY CANNOT. new Date("2025-10-01") is UTC midnight and new Date() is an absolute instant —
+# NEITHER TERM READS THE READER'S TIMEZONE, in the old code or the new. Measured across UTC,
+# Stockholm, Los Angeles and Tokyo: all four returned −346/15 at 13:00 UTC and −345/16 at 11:00.
+# THEY WERE WRONG ABOUT THE CALENDAR TOGETHER.
+#   THE LANE'S ERROR: confusing "the flip happens at 14:00 LOCAL" with "the value depends on the
+#   LOCALE". The flip's wall-clock time differs by reader; THE VALUE AT A GIVEN INSTANT DOES NOT.
+#   WHAT IS ACTUALLY WRONG, AND IT IS WHAT PART 2 ADDRESSES: every reader agrees with every other
+#   reader, and all of them may disagree with THEIR OWN LOCAL DATE. Between 00:00 and 02:00 CEST a
+#   Stockholm reader is already on the next day and sees yesterday's count. A RECORD-VERSUS-READER
+#   GAP, NOT A READER-VERSUS-READER ONE.
+#   CONSEQUENCE FOR THE RECORD: §9's shared-record property was NOT violated here — the number is
+#   the same for everyone. #181's sweep rule ("every value rendered to more than one party must be
+#   a property of the record, never of the reader") STANDS ON ITS OWN MERITS — locale date
+#   formats, currency and thousands separators ARE reader-dependent — but THE INSTANCE THAT
+#   MOTIVATED IT WAS MISDIAGNOSED BY THIS LANE. Relayed to Strategy as a correction.
+#
+# REPORT 7 CAME BACK CLEAN, AND THE NOTE IS WORTH MORE THAN THE REPORT. All 14 rows are date-ONLY
+# ISO strings; a date-TIME row parses as LOCAL, would defeat this fix, and would produce NO
+# SYMPTOM. STRATEGY: this is #168's lesson applied FORWARD — a net that would have been defeated
+# silently, put up before it bit. EVERY OTHER INSTANCE THIS WEEK WAS FOUND AFTER IT HAD ALREADY
+# FAILED (#160's legend, #118's comment, #134's note that #168 walked through, the battery that
+# could not refuse, the lane's own check-ignore command). THIS IS THE FIRST PREVENTIVE CATCH.
+#
+# #118 AND #120 SURVIVE: all four undated forms still return null; the new explicit invalid-date
+# guard changes nothing ('not a date' was null before and returns null earlier now); undated still
+# sorts 15th of 15. Call sites untouched — 4 calls, 3 sites. urg()'s labels identical under both
+# versions; no row sits near the 0 or 90 thresholds today.
+#
+# THE RESIDUAL IS PART 2'S DISCLOSURE DEBT, UNCHANGED: at 23:30 UTC on 11 Sep all readers see
+# −345 while Stockholm and Tokyo are already on 12 Sep locally. Ruled (c) UTC with three
+# conditions — the reference is visible, the default asks for correction, and UTC IS ADEQUATE FOR
+# ARITHMETIC DERIVED FROM A PUBLISHED DATE BUT NEVER FOR ANYTHING ASSERTING A LEGAL POSITION.
 
 # index.html moved 4b268e17 → be174bbf on 11 Sep 2026 — #167, APOTEK HJÄRTAT WAS STRUCTURALLY
 # UNREACHABLE. THREE STRINGS DELETED, NOT RENAMED.
