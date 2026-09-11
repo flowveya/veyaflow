@@ -31,6 +31,11 @@ else
 fi
 
 RC=0
+# #174 — DIFFERS is counted apart from every other failure, so the verdict can say whether
+# the ONLY thing standing between this tree and GREEN is an unnamed baseline. The exit code
+# does not distinguish them: both are 1. Only the wording does.
+DIFF_RC=0
+DIFFS=""
 
 echo "============================================================================"
 echo " VeyaFlow verification battery"
@@ -75,7 +80,21 @@ echo "== DIGESTS ===============================================================
 # Certifications section was dead — the nesting the viewer reads is created HERE. A tracked
 # surface list that omits the layer shaping a published, shareable record cannot see the
 # difference between "the client sent it" and "the buyer receives it". Same finding as #126.
-FILES="index.html dpp/index.html portal.html brand/index.html netlify/functions/supabase-proxy.js netlify/functions/share-dpp.js"
+# #174, 11 Sep 2026 — the other five functions join, 6 → 11. Every file in
+# netlify/functions/ is a public HTTP endpoint, and five of them could change under a GREEN
+# run with no digest. The function members of FILES are DERIVED from FUNCTIONS_CONTRACT
+# below rather than listed twice, so the directory contract and the digest list cannot
+# drift: adding a name to the contract adds it here, and the battery then refuses until
+# the coding lane names its baseline.
+FUNCTIONS_DIR="netlify/functions"
+FUNCTIONS_CONTRACT="netlify/functions/anthropic-proxy-background.js
+netlify/functions/anthropic-proxy.js
+netlify/functions/get-brand-pack.js
+netlify/functions/get-dpp.js
+netlify/functions/share-brand-pack.js
+netlify/functions/share-dpp.js
+netlify/functions/supabase-proxy.js"
+FILES="index.html dpp/index.html portal.html brand/index.html $(echo ${FUNCTIONS_CONTRACT})"
 EXPECTED_FILE="verify.expected.txt"
 
 for f in $FILES; do
@@ -98,10 +117,22 @@ for f in $FILES; do
     elif [ "$SHORT" = "$EXP" ]; then
       echo "PASS      | $f  ${SHORT}…  matches named baseline"
     else
-      echo "INFO      | $f  ${SHORT}…  DIFFERS from named baseline (${EXP}…)"
-      echo "          |   Proceedable ONLY if this file is the one the batch names AND"
-      echo "          |   the coding lane named the new value. A sha CC reported itself"
-      echo "          |   is not sufficient. Otherwise: stop, report, wait."
+      # #174, ruled (a) 11 Sep 2026 — DIFFERS IS A FAIL, on every surface. It was INFO, and
+      # never set the exit code: seen in a pristine copy, a one-byte change to
+      # anthropic-proxy-background.js (the file holding ANTHROPIC_API_KEY and
+      # SUPABASE_SERVICE_KEY) read `1 of 11 modified`, exit 0, OVERALL GREEN. A battery with a
+      # false clean bill fails OPEN and carries authority. Failing closed costs nothing at
+      # commit time: the expected value is updated IN THE SAME COMMIT as the change (this
+      # file's header), so a named change is PASS by then. DIFFERS can only appear BEFORE
+      # naming, which is exactly when "do not commit" is true.
+      echo "FAIL      | $f  ${SHORT}…  DIFFERS from named baseline (${EXP}…) — AWAITING NAME"
+      echo "          |   Expected mid-batch on the ONE surface the batch names: it stays FAIL"
+      echo "          |   until the coding lane names the new value in $EXPECTED_FILE, and"
+      echo "          |   a named change reads PASS by commit time. On any other file it is a"
+      echo "          |   change nobody named: stop, report, wait. A sha CC reported itself"
+      echo "          |   is not a name."
+      DIFF_RC=1
+      DIFFS="${DIFFS} $f"
     fi
   else
     echo "INFO      | $f  ${SHORT}…  (no $EXPECTED_FILE — nothing to compare against)"
@@ -111,6 +142,63 @@ done
 
 if [ ! -f "$EXPECTED_FILE" ]; then
   echo "NOT FOUND | $EXPECTED_FILE absent — digest comparison is INERT this run."
+  RC=1
+fi
+
+# ---- the functions directory is the contract (#174) ------------------------
+# The digest list above is a list of KNOWN members, and a list of known members is what
+# failed: a throwaway background function sat untracked in this directory for three months,
+# one `git add .` from being a live endpoint, because nothing watched what LANDED here.
+# This gate asserts the directory's contents, not just its members. Anything not named in
+# FUNCTIONS_CONTRACT fails the battery, by name, until it is added deliberately.
+#
+# INPUT IS GIT'S VIEW, not a raw listing: tracked files plus untracked files that are NOT
+# gitignored — i.e. exactly what `git add .` could stage, which is exactly what could reach a
+# git-driven deploy. Two consequences, both deliberate:
+#   - a Finder .DS_Store (gitignored) does not fail the battery. A raw `ls` gate would fail the
+#     first time someone opened this folder, and a gate that fails on normal use gets muted.
+#   - ALL entries count, not just *.js: Netlify deploys subdirectory functions, .mjs and .ts
+#     too, and on 10 Jun 2026 a web upload put an index.html in this directory (still present
+#     on origin/legacy-web-uploads). A *.js glob would have been blind to both.
+# Files present on disk only — a tracked member deleted from the working tree reads MISSING.
+echo ""
+echo "== FUNCTIONS DIRECTORY CONTRACT ============================================"
+if [ -d .git ]; then
+  FN_EXPECTED=$(printf '%s\n' "${FUNCTIONS_CONTRACT}" | sed '/^$/d' | LC_ALL=C sort)
+  FN_ACTUAL=$(git -c core.quotePath=false ls-files -co --exclude-standard -- "${FUNCTIONS_DIR}/" \
+              | while IFS= read -r p; do [ -e "$p" ] && printf '%s\n' "$p"; done \
+              | sed '/^$/d' | LC_ALL=C sort)
+  FN_EXTRA=$(comm -13 <(printf '%s\n' "${FN_EXPECTED}") <(printf '%s\n' "${FN_ACTUAL}") | sed '/^$/d')
+  FN_MISSING=$(comm -23 <(printf '%s\n' "${FN_EXPECTED}") <(printf '%s\n' "${FN_ACTUAL}") | sed '/^$/d')
+  FN_N=$(printf '%s\n' "${FN_EXPECTED}" | sed '/^$/d' | wc -l | tr -d ' ')
+  if [ -z "${FN_EXTRA}" ] && [ -z "${FN_MISSING}" ]; then
+    echo "PASS      | ${FUNCTIONS_DIR}/ holds exactly the ${FN_N} contracted files, nothing else"
+  else
+    if [ -n "${FN_EXTRA}" ]; then
+      printf '%s\n' "${FN_EXTRA}" | while IFS= read -r x; do
+        echo "FAIL      | UNCONTRACTED file in ${FUNCTIONS_DIR}/: ${x}"
+      done
+      echo "          |   Every file here is a public HTTP endpoint on deploy. Add it to"
+      echo "          |   FUNCTIONS_CONTRACT deliberately, with a named digest — or remove it."
+    fi
+    if [ -n "${FN_MISSING}" ]; then
+      # Two shapes, and they need different words (#176). A file that is GONE, and a file that
+      # is sitting right there on disk but invisible to git — untracked and gitignored, so the
+      # next deploy drops it. Calling the second one "missing" while `ls` shows it would read
+      # as a broken gate. It is the more dangerous of the two: the digest gate PASSES it,
+      # because its bytes are exactly the named ones.
+      printf '%s\n' "${FN_MISSING}" | while IFS= read -r x; do
+        if [ -e "$x" ]; then
+          echo "FAIL      | contracted file on disk but untracked and gitignored — will not deploy: ${x}"
+        else
+          echo "FAIL      | contracted file absent from disk: ${x}"
+        fi
+      done
+    fi
+    RC=1
+  fi
+else
+  echo "NOT FOUND | no git — cannot establish what this directory could deploy"
   RC=1
 fi
 
@@ -156,11 +244,20 @@ fi
 # ---- overall ---------------------------------------------------------------
 echo ""
 echo "============================================================================"
-if [ $RC -eq 0 ]; then
+if [ $RC -eq 0 ] && [ $DIFF_RC -eq 0 ]; then
   echo " OVERALL: GREEN — structure and provenance clean."
   echo " Not a shipping verdict. Layout and smoke are unrun; see NOT CHECKED above."
+elif [ $RC -eq 0 ]; then
+  # Every OTHER gate passed; the only failure is an unnamed baseline. Worded as the expected
+  # mid-batch state, because that is what it usually is — but it still exits 1.
+  echo " OVERALL: NOT GREEN — AWAITING NAME for:${DIFFS}"
+  echo " Every other gate passed. Do not commit until the coding lane names the new value."
+  echo " If the batch did not name this file, it is a change nobody made on purpose: stop."
 else
+  # A real failure is present. The awaiting-name wording is withheld so it cannot soften it.
   echo " OVERALL: NOT GREEN — do not commit. Paste this report to the coding lane."
+  [ $DIFF_RC -ne 0 ] && echo " (Also awaiting name:${DIFFS} — but that is not the only failure.)"
 fi
 echo "============================================================================"
-exit $RC
+[ $RC -ne 0 ] || [ $DIFF_RC -ne 0 ] && exit 1
+exit 0

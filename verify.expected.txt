@@ -16,6 +16,186 @@ brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  78c4f6a2
 netlify/functions/share-dpp.js       500806f0
 
+# ── Added #174, 11 Sep 2026. Five live endpoints that were never watched. ──
+netlify/functions/anthropic-proxy.js             7cf20b3f
+netlify/functions/anthropic-proxy-background.js  1f6f47ab
+netlify/functions/get-brand-pack.js              fe285fe9
+netlify/functions/get-dpp.js                     3c050904
+netlify/functions/share-brand-pack.js            3791bbec
+
+# NO TRACKED DIGEST MOVED — #174, 11 Sep 2026, HARNESS ONLY. All six existing surfaces
+# identical before the edit, after it, and after the scratch tests. `verify.sh` the only file
+# changed. The battery grew 6 → 11. Recorded here because the reasoning belongs with the
+# shipments even when no baseline moves (#131's precedent).
+#
+# THE GAP: netlify/functions/ held SEVEN files and the battery named TWO. Five live public HTTP
+# endpoints had no digest, no baseline and no place in the one-edit count — a change to any
+# passed GREEN at "0 of 6 modified". anthropic-proxy-background.js is the sharpest: a BACKGROUND
+# function (202 immediately, up to 15 minutes) holding ANTHROPIC_API_KEY and
+# SUPABASE_SERVICE_KEY, which bypasses RLS. NO HARDCODED SECRETS ANYWHERE IN THE DIRECTORY —
+# every reference is process.env. A PROVENANCE GAP, NOT A DISCLOSURE GAP.
+#
+# WHY NOW: a throwaway background function was found untracked in this directory the same
+# morning — uploaded via github.com's WEB INTERFACE on 5 Jun, live on two branches for 31
+# minutes, deleted, and still sitting in the working tree three months later, one `git add .`
+# from being an unauthenticated write endpoint into production. Zero rows written; never on the
+# deploy branch; closed as a near-miss. AND THE CONTROL THAT EXISTS WOULD NOT HAVE STOPPED IT —
+# netlify.toml blocks /netlify/functions/* from being SERVED, and its own comment says why that
+# is irrelevant: functions are INVOKED at /.netlify/functions/* (leading dot). THE EXISTING
+# CONTROL COVERS DISCLOSURE; THE HAZARD IS DEPLOYMENT.
+#
+# STRATEGY'S ORDERING RULE, ADOPTED: HARNESS WORK IS ORDERED BEFORE WHAT IT CHECKS, NOT AFTER.
+# Its value is the NUMBER OF SHIPMENTS THAT FOLLOW IT; deferring it loses coverage on everything
+# shipped in the gap, and that gap is exactly where a newly-discovered defect class recurs. The
+# lane had argued "it is cheap" — the real argument is that it is MULTIPLICATIVE. Same form as
+# capture-before-render and make-it-possible-before-legible.
+#
+# STRATEGY'S CONDITION: EVERY NEW CHECK IS DEMONSTRATED AGAINST A KNOWN FAILING CASE. Three
+# times this week an artefact vouched for a check that never happened — #160's legend, #118's
+# comment, #134's note about the renderer that #168 then walked through. THE FOURTH INSTANCE
+# WOULD HAVE BEEN THE BATTERY ITSELF, and it is the instrument every other check is judged by.
+# A STRICT BATTERY WITH A BUG FAILS CLOSED AND IS NOTICED IN MINUTES; A BATTERY WITH A FALSE
+# CLEAN BILL FAILS OPEN AND IS WORSE THAN NO BATTERY, BECAUSE GREEN CARRIES AUTHORITY.
+#
+# CC REFUSED THE SPEC'S GLOB AND WAS RIGHT TWICE, ON EVIDENCE RATHER THAN PREFERENCE.
+#   (1) A `*.js` GLOB WOULD NOT WATCH THE DIRECTORY. On 10 Jun a web upload put
+#       netlify/functions/index.html there — still on origin/legacy-web-uploads. Netlify also
+#       deploys .mjs, .ts and SUBDIRECTORY functions. The spec's own gate would have missed the
+#       exact historical shape it was written to catch.
+#   (2) A RAW DIRECTORY LISTING IS NOT STABLE AT REST. The first .DS_Store Finder writes would
+#       fail it, and A GATE THAT FAILS ON ORDINARY USE GETS MUTED.
+#   So the gate reads GIT'S VIEW — tracked files plus untracked files that are not ignored —
+#   WHICH IS EXACTLY WHAT `git add .` COULD STAGE, which is exactly what the spike was.
+#   FUNCTIONS_CONTRACT is the single source and FILES is built from it, so the digest list and
+#   the directory contract CANNOT DRIFT APART. An eighth name enters both at once, and the
+#   battery then refuses until the lane names its baseline.
+#
+# ═══ THE CONDITION CAUGHT THE BATTERY ITSELF, AND THE DEFECT WAS OLDER THAN THIS SHIPMENT ═══
+#
+# PART A COULD NOT FAIL. CC altered anthropic-proxy-background.js by ONE BYTE (134, 'N'→'n',
+# same length) and the battery read:
+#   INFO      | …anthropic-proxy-background.js  d9870d74…  DIFFERS from named baseline (1f6f47ab…)
+#   PASS      | 1 of the 11 tracked surfaces modified
+#   OVERALL: GREEN — structure and provenance clean.        exit=0
+# ON THE FILE THAT HOLDS ANTHROPIC_API_KEY AND SUPABASE_SERVICE_KEY.
+#
+# CAUSE: verify.sh's DIFFERS branch prints INFO and NEVER SETS RC. It was built for mid-batch
+# runs, where the file a batch edits legitimately differs until the lane names its new value,
+# and it relies on a human reading "stop, report, wait". THIS IS OLDER THAN #174 AND COVERS ALL
+# ELEVEN SURFACES, index.html INCLUDED.
+#
+# SO THE BATTERY'S REAL GUARANTEE HAS ALWAYS BEEN "NO MORE THAN ONE TRACKED FILE CHANGED" —
+# never "no unauthorised change". ANY SINGLE UNAUTHORISED EDIT TO ANY TRACKED SURFACE, WITH
+# NOTHING ELSE TOUCHED, PASSED GREEN WITH EXIT 0. Every GREEN in this log predating this entry
+# was a verdict from a gate that could not refuse.
+#
+# WHAT ACTUALLY HELD, AND IT IS WORTH STATING PLAINLY: the control was AUTHOR ≠ VERIFIER
+# operating through a human — Charlotte pasting digests, the lane comparing them against named
+# baselines by eye, before every commit. That is why nothing slipped. THE GATE DID NOT HOLD; THE
+# PRACTICE DID. A battery that claims more than it delivers is the fourth artefact, and it was
+# already in place before #174 arrived to become it.
+#
+# RULED (a): DIFFERS BECOMES FAIL FOR EVERY SURFACE, and it is forced rather than preferred.
+# This file's own header says the expected value is updated IN THE SAME COMMIT AS THE CHANGE, so
+# a named change is PASS by commit time. DIFFERS can therefore only appear BEFORE NAMING —
+# exactly when "do not commit" is true. The new mid-batch message, "NOT GREEN: index.html
+# DIFFERS (awaiting name)", is MORE ACCURATE THAN THE OLD ONE. IT FAILS CLOSED.
+#   (b) FAIL for the functions directory only was declined: a carve-out needing a per-batch
+#       allowance is a control that depends on someone remembering — the class retired three
+#       times today (the spike, #99, #176).
+#   (c) reword OVERALL and keep INFO was declined: anything reading the exit code still gets 0.
+#       That is the defect with better wording.
+# FOLDED INTO #174 RATHER THAN QUEUED: #174's entire product is the sentence "the functions
+# directory is watched", and that sentence is FALSE while a one-byte change reads GREEN.
+# CC STOPPED AND REFUSED TO COMMIT. Correct — shipping it as it stood would have made #174
+# ITSELF the false artefact the condition exists to prevent.
+#
+# WORDING SPLIT APPROVED, and the second string is better than the finding that prompted it:
+#   "absent from disk"
+#   "on disk but untracked and gitignored — will not deploy"
+# In #176's shape the file IS sitting in the directory, so "MISSING" alone would read as a
+# broken gate. The second string names the CONSEQUENCE, which is what a reader needs at 7am.
+#
+# #176'S SHAPE, REPRODUCED AND MEASURED (git rm --cached, then restored):
+#   on disk: yes | tracked: 0 | ignored: yes
+#   PASS      | netlify/functions/get-dpp.js  3c050904…  matches named baseline
+#   FAIL      | contracted file MISSING from netlify/functions/: …/get-dpp.js
+# THE DIGEST GATE SAYS PASS. The bytes on disk are exactly the named ones and it cannot know git
+# will no longer ship them. ONLY THE DIRECTORY GATE CATCHES IT. Without Part B this production
+# endpoint would vanish on the next deploy UNDER A GREEN VERDICT.
+#
+# APPLIED AND RE-DEMONSTRATED IN THIS SAME SHIPMENT. #174 IS THEREFORE THE POINT AT WHICH THE
+# DIGEST GATE BEGAN TO REFUSE — before this entry it could not, on any surface. Seen refusing in
+# a pristine copy, both directions, each reverted to PASS:
+#   A1  anthropic-proxy-background.js, byte 134 'N'→'n' (length unchanged)
+#       FAIL … DIFFERS … — AWAITING NAME · exit 1 · OVERALL: NOT GREEN — AWAITING NAME
+#   A2  index.html, byte 5910 'S'→'s' — CHOSEN INSIDE A CSS COMMENT, OUTSIDE EVERY <script>, so
+#       the AST battery stayed at 57 passed / 0 failed AND THE REFUSAL PROVABLY CAME FROM THE
+#       DIGEST GATE ALONE. A demonstration that controls for its own confound.
+#   A3  a changed function AND a scratch file together → the GENERIC verdict, with awaiting-name
+#       demoted to a parenthetical. THE MILD WORDING CANNOT COVER A REAL FAULT: it is gated on
+#       RC -eq 0, so it appears only when an unnamed digest is the SOLE cause.
+#   M1  mv a function out      → "contracted file absent from disk"
+#   M2  git rm --cached (#176) → "on disk but untracked and gitignored — will not deploy"
+#
+# THE VERDICT IS NOW THREE-WAY: GREEN · AWAITING NAME ONLY · generic NOT GREEN. Exit is 1 for
+# either kind of failure. DIFF_RC is tracked apart from RC, which is what lets the verdict say
+# whether an unnamed baseline is the ONLY thing between this tree and GREEN.
+#
+# CONSEQUENCE FOR EVERY FUTURE SPEC, AND IT MUST NOT BE READ AS A REGRESSION: the VERIFY line
+# this lane has written in every batch — "GREEN expected; index.html DIFFERS; 1 of N modified" —
+# DESCRIBES A STATE THAT CAN NO LONGER OCCUR. Mid-batch is now:
+#   NOT GREEN — AWAITING NAME for: index.html · exit 1 · every other gate passed
+# The spec template is corrected as of #167. A future batch reading "GREEN expected" against
+# this harness would see a refusal and could try to "fix" the gate — which is the failure this
+# shipment exists to prevent, arriving through the documentation instead of the code.
+#
+# SEEN FAILING, FOUR CASES, each added, run, removed, re-run:
+#   A  zz-scratch-174.js                 FAIL, file named    → PASS after removal
+#   B  index.html (the 10 Jun shape)     FAIL, file named    → PASS
+#   C  scratch174/fn.js (subdirectory)   FAIL, file named    → PASS
+#   D  .DS_Store                         PASS — must not fail, and does not
+#
+# THE ONE-EDIT LABEL IS DERIVED, CONFIRMED AT 11: NFILES=$(echo $FILES | wc -w). No live string
+# in verify.sh or verify.js says 6; it survives only in comments.
+#
+# #176 RAISED BY CC, AND IT IS WORSE THAN THE SHIPMENT THAT FOUND IT.
+# .gitignore lines 33–37 list anthropic-proxy.js, get-brand-pack.js, get-dpp.js,
+# share-brand-pack.js and share-dpp.js WITH NO LEADING SLASH, so they match AT ANY DEPTH —
+# INCLUDING netlify/functions/. FIVE OF SEVEN PRODUCTION ENDPOINTS ARE GITIGNORED, and
+# share-dpp.js is one of the six ORIGINALLY TRACKED SURFACES. They survive only because git
+# ignores ignore-rules for already-tracked files. DELETE ANY ONE AND `git add .` SILENTLY SKIPS
+# IT; THE NEXT DEPLOY HAS NO SUCH ENDPOINT AND NOTHING REPORTS AN ERROR.
+# The file states the principle itself at line 20 — "No leading slash on these patterns, so they
+# match at any depth" — knowingly, for the daily log. #111 reused the shape for ROOT-LEVEL
+# working files and its comment says "this changes nothing about what deploys": TRUE OF THE ROOT
+# COPIES, FALSE OF THESE. Fix is a leading slash per pattern, which is what #111 meant.
+# EXPOSURE TODAY IS ZERO — nothing has deleted them. THE FAILURE MODE IS SILENT AND TOTAL, and
+# the recovery path is the one that fails.
+#
+# THE GOVERNANCE POINT CC RAISED AGAINST ITS OWN WORK, FOR STRATEGY: verify.sh lines 12–14 say
+# "CC does not write, edit, or run the harness that verifies CC." THIS SHIPMENT HAD CC WRITE THE
+# GATE THAT NOW GATES CC. The lane's position: the operative control is AUTHOR ≠ VERIFIER, which
+# held — the lane specced it, read the diff at the bytes, Charlotte ran it, and the seen-failing
+# demonstration is what converts "CC wrote it" into "it provably refuses". BUT THE COMMENT IS NOW
+# FALSE, AND A FALSE COMMENT IN THE HARNESS IS PRECISELY THE FOURTH-ARTEFACT RISK ABOVE. The
+# practice is defensible; the sentence is not. Strategy's to settle, not the lane's.
+#
+# OPEN, AND BOTH DECIDE WHAT THIS GATE PROTECTS: `main` has NO netlify/functions/ AT ALL, and
+# the repo does not record which branch Netlify deploys. origin/legacy-web-uploads still carries
+# netlify/functions/index.html. The gate also protects GIT-DRIVEN DEPLOYS ONLY — a
+# `netlify deploy` from the working tree would ship gitignored files; no .netlify/ link exists
+# today, so it is not happening, but it is the gate's edge.
+#
+# THE MISSING BRANCH IS UNTESTED AND IT IS THE ONE #176 WOULD FIRE — a contracted file absent
+# from disk. CC declined to delete a tracked function, correctly. DEMONSTRATED BEFORE COMMIT BY
+# `mv` OUT AND BACK: reversible, no deletion, and it exercises the exact path a silent
+# .gitignore skip would take.
+#
+# verify.sh EXITS 1 EVEN ON PASSING RUNS while any baseline is unnamed, so the exit code was not
+# a usable signal during this shipment; the gate's own line was. Resolves once these five are
+# named.
+
 # index.html moved efeab029 → 4b268e17 on 11 Sep 2026 — #175, #160'S OWN REGRESSION ON THE
 # SURFACE #160 EXISTED TO REPAIR. TWO LINES. THE LANE'S ERROR, NOT CC'S.
 #   after   4b268e1774a4a5f90f218bb2df28b71cf6c96159ff7c487d804849345787d3b4

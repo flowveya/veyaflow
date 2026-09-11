@@ -203,8 +203,24 @@ One key added. One string replaced. One consumer census.
 ./verify.sh
 ```
 
-GREEN expected; `index.html` DIFFERS from the named baseline; five others UNCHANGED;
-`1 of 6 modified`.
+**THE EXPECTED MID-BATCH RESULT CHANGED AT #174. DO NOT READ IT AS A REGRESSION AND DO NOT
+"FIX" THE GATE.**
+
+```
+FAIL      | index.html  <new>…  DIFFERS from named baseline (…) — AWAITING NAME
+PASS      | 1 of the 11 tracked surfaces modified
+ OVERALL: NOT GREEN — AWAITING NAME for: index.html
+exit=1
+```
+
+**That is the correct and expected output while this batch is in flight** — `DIFFERS` is a `FAIL`
+on every surface and sets the exit code (#174, ruled (a)).
+
+**Required:** every other gate passes · the ten other surfaces UNCHANGED · the functions
+directory contract PASSES · `1 of the 11 tracked surfaces modified`.
+
+**GREEN returns when the lane names the new baseline, in the same commit as the change. A GREEN
+run while `index.html` differs means the #174 gate has been undone — report it and stop.**
 
 ---
 

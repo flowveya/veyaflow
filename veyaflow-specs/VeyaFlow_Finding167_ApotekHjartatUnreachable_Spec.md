@@ -17,7 +17,7 @@ instruction that cannot be followed.
 ## NAMED BASELINES — SIX SURFACES
 
 ```
-index.html                           da3aefd5c7c2144c7c53a7746950a036503a891194fe836ea2bafbefff28c8ac
+index.html                           4b268e1774a4a5f90f218bb2df28b71cf6c96159ff7c487d804849345787d3b4
 dpp/index.html                       e480976126cb980ab8d248d651c9f60e3be27a33274d59494d8778e602a29714
 portal.html                          beaa72b85e853dab6cae4d29413fc15e131999e3ee8a2b71bd20e0beb13cd237
 brand/index.html                     fc6c0586e209f6c67e48d8b770da3e9a2aafa1006647db13beab136d3937da73
@@ -25,10 +25,36 @@ netlify/functions/supabase-proxy.js  78c4f6a2ddc551ce63b1b24e307e1b770454b17633c
 netlify/functions/share-dpp.js       500806f0016201f6cdc839856351ca62b59d68552d82ae56d816ff9a7412f242
 ```
 
-**Confirm all six before editing. Only `index.html` moves.**
+**RE-BASELINED 11 Sep after #160 and #175 landed** (`da3aefd5` → `efeab029` → `4b268e17`,
+HEAD `347dee5`). **Confirm all six before editing. Only `index.html` moves.**
 
-**#160 SHIPS FIRST AND ALONE.** If #160 has already landed, the `index.html` baseline above is
-stale — **request the new one from the lane. Do not proceed on a sha you derived yourself.**
+---
+
+## THE RANGE-WIDENING SWEEP — ADDED AFTER #175, AND IT IS NOT OPTIONAL
+
+**#175 was caused by exactly what this shipment does.** #160 widened `daysUntil`'s range to
+include negatives; a render guard three lines away still read `r.days >= 0`; it had never been a
+call site, so no call-site census found it, and an overdue deadline rendered as *"no value
+recorded"* on the live site within minutes.
+
+> **STANDING RULE: when a function's or a field's RANGE widens, every consumer's GUARD is in
+> scope — not only its callers and its labels. A guard written against the old range is a
+> SILENT CONSUMER, and it will not appear in a call-site census because it is not a call site.**
+
+**This shipment widens a range.** `RETAILER_REQS['Apotek Hjärtat']` goes from *never satisfiable*
+to *satisfiable*, which means **`ready` can now contain `'Apotek Hjärtat'` for the first time in
+the application's history.**
+
+**Report every site that consumes `skuReadiness().ready`, `.notReady`, or `r.ready.includes(…)`,
+and for each, state what it does when Apotek Hjärtat is present.** The lane has seen
+`showSkuExport` (22033) and the product-list row. **Anything that has only ever seen this
+retailer absent is a guard written against the old range.**
+
+**Specifically check for:** a hardcoded Apotek Hjärtat blocker, an `ediMatas`-style literal (one
+is already known in `scoreReadiness`), a `.length` test that assumed a maximum, an index
+assumption, or copy that reads correctly only while this retailer is never ready.
+
+**The count is the finding. Report before implementing.**
 
 ---
 
@@ -192,8 +218,26 @@ Three strings. One census.
 ./verify.sh
 ```
 
-GREEN expected; `index.html` DIFFERS from the named baseline; five others UNCHANGED;
-`1 of 6 modified`.
+**THE EXPECTED MID-BATCH RESULT CHANGED AT #174. DO NOT READ IT AS A REGRESSION AND DO NOT
+"FIX" THE GATE.**
+
+```
+FAIL      | index.html  <new>…  DIFFERS from named baseline (4b268e17…) — AWAITING NAME
+PASS      | 1 of the 11 tracked surfaces modified
+ OVERALL: NOT GREEN — AWAITING NAME for: index.html
+exit=1
+```
+
+**That is the correct and expected output while this batch is in flight.** #174 ruled (a):
+`DIFFERS` is a `FAIL` on every surface and sets the exit code, because the old `INFO` form meant
+a one-byte change to any tracked file read GREEN with exit 0.
+
+**Required:** every other gate passes · the ten other surfaces UNCHANGED · the functions
+directory contract PASSES · `1 of the 11 tracked surfaces modified`.
+
+**GREEN returns once the lane names the new baseline**, which happens in the same commit as the
+change. **A run that is GREEN while `index.html` differs would mean the #174 gate has been
+undone — report that immediately and stop.**
 
 ---
 
