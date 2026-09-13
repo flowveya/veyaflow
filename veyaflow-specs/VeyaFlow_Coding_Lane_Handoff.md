@@ -111,12 +111,21 @@ The other two lanes: **STRATEGY** rules priorities and commercial questions. **D
 
 ## 6. OPEN QUESTIONS THAT ARE NOT CODE
 
-Four for the RP, all raised by products Charlotte actually has:
+Five for the RP, all raised by products Charlotte actually has:
 
 1. **MDR Annex XVI** — does the LED mask fall in scope?
 2. **REACH Annex XVII** — adhesive skin contact on the face tape.
 3. **The substance discriminator wording** — "does this product deliver a substance intended to act on the skin?", must return `unknown` when unclear.
 4. **Which instrument grounds the operator obligation** for a device versus a non-harmonised accessory — plus the authoritative Swedish and Danish terms, which can be quoted from the official texts.
+5. **Who is the Responsible Person for an EU-established brand importing from outside the EU?** (#182, 12 Sep) — Cloud & Glow is Swedish and manufactures in China. Under EC 1223/2009 Art. 4, does the brand hold the obligation itself as importer, and what does designating a third party change about who bears it?
+
+**Question 5 is a PRODUCT question, not a cost one — Strategy, 12 Sep.** It was first raised as a possible saving on an RP service fee; that framing fell when the value in the field turned out to be the UI's own placeholder example (`index.html:16562`) rather than a real engagement. **The product consequence stands whatever the commercial answer:**
+
+`_operatorStatus` (6733) tests only `!!((sku && sku[f]) || (rec && rec.name))` — **whether an operator record EXISTS, never whether one is REQUIRED.** And nothing anywhere records where the brand is **established**; `currentMarket`, `targetMarkets` and `ambitionMarkets` are all market axes. **So an EU-established brand and a non-EU one are evaluated identically, and both get the same blocker.**
+
+**The defect that needs no regulatory answer at all:** `FRAMEWORK_VOCAB` names the concept **"EU-established economic operator"** with field `euOperator`, and the check tests only presence. **The field name promises something the check does not do** — fifth instance of #160's legend, #118's comment and `hasCertData`.
+
+**The gate, ruled 12 Sep — and it is the mirror of question 4's:** the establishment field may be **captured** before the RP answers, because **a field is collection**. It may not be **reasoned from**, because **an inference from the field is an assertion.** No obligation appears, disappears, or changes severity on account of what it says, until question 5 is answered. **#180 Part 2's smoke step 3 enforces this** — with establishment set, the RP requirement must be byte-identical to before.
 
 **Until the RP answers question 4, no article numbers go on any buyer-facing surface.** Strategy ruled this on 1 Sep: write the role, not the paragraph. When the answer comes, citations enter as registry data carrying their own source. Do not add a `cite:null` placeholder or park article numbers in a comment "for later".
 
