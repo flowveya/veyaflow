@@ -136,5 +136,12 @@ inverse, and it is equally forbidden.*
 **Step 2.** A SKU whose claims are all green. **The export is unchanged from today** apart from the
 new column.
 
-**Step 3.** The same product exported for two retailers with different column freedom. **The claim
-travels in one and is withheld-with-reason in the other, and both are correct.**
+**Step 3.** A SKU with no product type: the claims and assessment cells are empty in all three CSVs,
+and the screen names the withheld claims and why.
+
+**Step 3b.** The same SKU with the type set: the claims travel with their assessment beside them.
+
+*Rewritten by lane ruling, 14 Sep. The original Step 3 — one product exported for two retailers
+with different column freedom — tested a condition this product cannot reach: none of the five
+retailer templates is locked. Same property — no assessment, no travel — through the reachable
+case.*

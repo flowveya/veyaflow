@@ -22075,27 +22075,29 @@ function showSkuExport(id){
   const r = skuReadiness(sku);
   const el = document.getElementById('page-skus');
   const type = resolveProductFramework(sku).framework;
+  // #183 — the same call the file uses, so the screen and the download cannot disagree.
+  const claimsOut = assessClaimsForExport(sku);
 
   const EXPORT_OPTIONS = [
     {
       name:'Apotek Hjärtat', format:'CSV', fileExt:'csv',
       desc:'Comma-separated — opens directly in Excel. Article data template format.',
-      ready:r.ready.includes('Apotek Hjärtat'),
+      ready:r.ready.includes('Apotek Hjärtat'), carriesClaims:true,
     },
     {
       name:'Apotek Hjärtat', format:'TXT data sheet', fileExt:'txt',
       desc:'Formatted product data sheet. Paste into email or internal doc.',
-      ready:r.ready.includes('Apotek Hjärtat'),
+      ready:r.ready.includes('Apotek Hjärtat'), carriesClaims:true,
     },
     {
       name:'Matas', format:'CSV', fileExt:'csv',
       desc:'Comma-separated — opens in Excel. DKK pricing required.',
-      ready:r.ready.includes('Matas'),
+      ready:r.ready.includes('Matas'), carriesClaims:true,
     },
     {
       name:'Matas', format:'TXT data sheet', fileExt:'txt',
       desc:'Formatted compliance dossier.',
-      ready:r.ready.includes('Matas'),
+      ready:r.ready.includes('Matas'), carriesClaims:true,
     },
     {
       name:'Lyko', format:'CSV', fileExt:'csv',
@@ -22110,7 +22112,7 @@ function showSkuExport(id){
     {
       name:'Boots UK', format:'CSV', fileExt:'csv',
       desc:'UK supplier data. GBP pricing + safety ref required.',
-      ready:r.ready.includes('Boots UK'),
+      ready:r.ready.includes('Boots UK'), carriesClaims:true,
     },
     {
       name:'Universal', format:'JSON data pack', fileExt:'json',
@@ -22152,6 +22154,7 @@ function showSkuExport(id){
                 <div style="flex:1;min-width:160px;border:1px solid ${opt.ready?'var(--border)':'#F5F5F5'};padding:.65rem .85rem;background:${opt.ready?'#fff':'#FAFAFA'}">
                   <div style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${opt.ready?'var(--navy)':'var(--muted)'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">${opt.format}</div>
                   <div style="font-family:var(--sans);font-size:.7rem;color:var(--muted);line-height:1.5;margin-bottom:.5rem">${opt.desc}</div>
+                  ${opt.carriesClaims ? withheldClaimsNotice(claimsOut, opt.name+' '+opt.format, id) : ''}
                   ${opt.ready
                     ? `<button class="btn-primary" style="font-size:.65rem;padding:.3rem .75rem;width:100%"
                         onclick="exportForRetailer('${id}','${opt.name}','${opt.format}','${opt.fileExt}')">
@@ -22167,6 +22170,57 @@ function showSkuExport(id){
       }).join('')}
     </div>
   `;
+}
+
+// ── #183, 14 Sep 2026 — A CLAIM TRAVELS WITH ITS ASSESSMENT, OR IT DOES NOT TRAVEL ──
+// Ruled by Strategy. The app assesses every claim; the retailer CSVs stripped the assessment
+// and shipped the claim ("Påståenden,Smooths Wrinkles" on the first Apotek Hjärtat file).
+//   STATUS TRAVELS IN-BAND, AS ITS OWN COLUMN — OR THE CLAIM DOES NOT TRAVEL AT ALL.
+// There is no third form: not a footnote in a description, not an asterisk, not a status
+// appended inside the claim string, and never the claim dropped quietly. A withheld claim is
+// NAMED on the export screen with its reason (withheldClaimsNotice) — omitting without saying
+// so is the same class as asserting without backing, with the sign reversed.
+// The assessment is getClaimLight's, reached through bdClaimInfo — the call the spec sheet
+// makes — so the two documents cannot disagree about one claim. No second verdict is computed.
+// The framework comes from resolveProductFramework on the brand's OWN record, never brand
+// category (#139), and it must be the UNSANITISED sku: RETAILER_SAFE_FIELDS does not carry
+// productType, so the sanitised copy always resolves 'unknown'. productType is read, not exported.
+// 'unknown' yields no assessment — getClaimLight's "Set the product type" amber is a request,
+// not a verdict — so every claim is withheld.
+// Column reality at #183: none of the five retailer CSV column sets is published by the retailer;
+// all are ours, so each template that carries claims takes the column. If a retailer-published
+// template is ever wired in, a claim it has no column for is WITHHELD with that reason — it is
+// not moved into another field.
+// The TXT data sheets carry the same rule (#183 ruling 2): a formatted sheet takes a line at no
+// structural cost, so each claim that travels gets its assessment on the same line, or no line.
+const CLAIM_WITHHELD_REASONS = {
+  no_framework: 'The product type is not set, so VeyaFlow has no assessment for these claims — and a claim goes into a retailer file only with its assessment beside it.',
+};
+function assessClaimsForExport(skuRaw){
+  var claims = (skuRaw && Array.isArray(skuRaw.claims)) ? skuRaw.claims : [];
+  if(resolveProductFramework(skuRaw).framework === 'unknown'){
+    return { travels:[], withheld: claims.map(function(c){ return { claim:c, reason:'no_framework' }; }) };
+  }
+  return {
+    travels: claims.map(function(c){ var i = bdClaimInfo(c, skuRaw.productType); return { claim:c, light:i.light, note:i.note }; }),
+    withheld: [],
+  };
+}
+// One form for "claim + its assessment", shared by the CSV column and the TXT line.
+function formatClaimAssessment(t){
+  return t.claim+': '+t.light+(t.note?' — '+t.note:'');
+}
+function withheldClaimsNotice(out, fileLabel, skuId){
+  if(!out || !out.withheld.length) return '';
+  var byReason = {};
+  out.withheld.forEach(function(w){ (byReason[w.reason] = byReason[w.reason] || []).push(w.claim); });
+  return Object.keys(byReason).map(function(reason){
+    return `<div style="font-family:var(--sans);font-size:.66rem;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;padding:.4rem .55rem;line-height:1.5;margin-bottom:.5rem">
+      <strong>Not included in the ${escapeHtml(fileLabel)}:</strong> ${byReason[reason].map(function(c){ return '“'+escapeHtml(c)+'”'; }).join(', ')}.
+      ${escapeHtml(CLAIM_WITHHELD_REASONS[reason] || reason)}
+      ${reason==='no_framework' ? `<span style="cursor:pointer;text-decoration:underline" onclick="editSku('${skuId}')">Set the product type →</span>` : ''}
+    </div>`;
+  }).join('');
 }
 
 function exportForRetailer(skuId, retailer, format, fileExt){
@@ -22188,6 +22242,13 @@ function exportForRetailer(skuId, retailer, format, fileExt){
 
   // ── CSV export ───────────────────────────────
   if(fileExt==='csv'){
+    // #183 — see assessClaimsForExport. The claims cell carries only claims that travel; the
+    // column beside it carries each one's registry status and note, keyed by the claim so the
+    // pairing does not depend on position (registry notes contain ';'). skuRaw, not sku: the
+    // sanitised copy has no productType.
+    const claimsOut = assessClaimsForExport(skuRaw);
+    const claimsCell = claimsOut.travels.map(function(t){ return t.claim; }).join('; ');
+    const assessCell = claimsOut.travels.map(formatClaimAssessment).join(' | ');
     // Field sets per retailer
     const RETAILER_CSV_FIELDS = {
       'Apotek Hjärtat': [
@@ -22205,7 +22266,8 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['Tillverkningsland',    sku.countryOfMfr||''],
         ['Ledtid (dagar)',       sku.leadDays||''],
         ['Certifieringar',       normalizeCertifications(sku.certifications).join('; ')],
-        ['Påståenden',           (sku.claims||[]).join('; ')],
+        ['Påståenden',           claimsCell],
+        ['Påståenden – bedömning', assessCell],
         ['Beskrivning SV',       sku.descSV||''],
         ['Beskrivning EN',       sku.descEN||''],
       ],
@@ -22221,7 +22283,8 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['Oprindelsesland',      sku.countryOfMfr||''],
         ['Leveringstid (dage)',  sku.leadDays||''],
         ['Certifikater',         normalizeCertifications(sku.certifications).join('; ')],
-        ['Påstande',             (sku.claims||[]).join('; ')],
+        ['Påstande',             claimsCell],
+        ['Påstande – vurdering', assessCell],
         ['Beskrivelse EN',       sku.descEN||''],
         ['Beskrivelse DA',       sku.descDA||''],
       ],
@@ -22261,7 +22324,8 @@ function exportForRetailer(skuId, retailer, format, fileExt){
         ['Country of manufacture',sku.countryOfMfr||''],
         ['Lead time (days)',     sku.leadDays||''],
         ['Certifications',       normalizeCertifications(sku.certifications).join('; ')],
-        ['Claims',               (sku.claims||[]).join('; ')],
+        ['Claims',               claimsCell],
+        ['Claims – assessment',  assessCell],
         ['Description EN',       sku.descEN||''],
       ],
     };
@@ -22276,6 +22340,8 @@ function exportForRetailer(skuId, retailer, format, fileExt){
       ['pH',sku.ph||''],['CPNP number',sku.cpnp||''],
       ...( (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?[_r]:[];})() ),
       ['Safety Assessment ref',sku.safetyRef||''],['Certifications',normalizeCertifications(sku.certifications).join('; ')],
+      // #183 NOT APPLIED — Universal still carries claims WITHOUT their assessment. It is #164's,
+      // and inherits #183's form when #164 ships. So does the Universal JSON (product: sku).
       ['Claims',(sku.claims||[]).join('; ')],['RSP SEK',sku.rspSEK||''],['RSP DKK',sku.rspDKK||''],
       ['RSP GBP',sku.rspGBP||''],['RSP EUR',sku.rspEUR||''],
       ['RSP NOK',sku.rspNOK||''],['RSP ISK',sku.rspISK||''],
@@ -22320,7 +22386,10 @@ function exportForRetailer(skuId, retailer, format, fileExt){
     (function(){var _r=_operatorRow(sku,'EU Responsible Person'); return _r?`${_r[0]}: ${_r[1]}`:'';})(),
     `Safety Assessment:  ${sku.safetyRef||''}`,
     normalizeCertifications(sku.certifications).length ? `Certifications:     ${normalizeCertifications(sku.certifications).join(', ')}` : '',
-    (sku.claims||[]).length ? `Claims:             ${sku.claims.join(', ')}` : '',
+    // #183 ruling 2 — see assessClaimsForExport. One line per claim that travels, its assessment
+    // beside it; a withheld claim prints nothing here and is named on the export screen.
+    (function(){ var t = assessClaimsForExport(skuRaw).travels;
+      return t.length ? 'Claims (with VeyaFlow assessment):\n'+t.map(function(x){ return '  '+formatClaimAssessment(x); }).join('\n') : ''; })(),
     ``,
     `COMMERCIAL`,
     sku.rspSEK ? `RSP Sweden:         ${sku.rspSEK} SEK` : '',

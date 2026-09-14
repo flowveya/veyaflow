@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        dd358cac
+index.html        74f88657
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,102 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved dd358cac → 74f88657 on 14 Sep 2026 — #183, BUYER-FACING EXPORTS SHIPPED CLAIMS
+# WITHOUT THE ASSESSMENT THE APP PERFORMED.
+#   after   74f88657245ed4efb79153913bc47658b3acebfdace79e19f0d07b6e63a3ba9c
+#           41,872 lines · 57 gates · 1 of 11 modified · drift gate PASSES at 21
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and her own
+# verify.sh run — CC's report is not a name). Ten other surfaces unchanged.
+#
+# THE DEFECT, ON A REAL FILE: the first Apotek Hjärtat CSV ever produced carried
+# `Påståenden,Smooths Wrinkles` — a claim with NO ASSESSMENT, on a document bound for a pharmacy's
+# compliance desk. AND THE APP HELD THE ASSESSMENT: CLAIM_REGISTRY rates 'reduces wrinkles' AMBER
+# for cosmetics and RED FOR ACCESSORIES. A forehead tape sits exactly on that boundary. Same shape
+# as the eleven days of "No specific reason was given" — it holds the answer and sends without it.
+#
+# STRATEGY'S RULING, WRITTEN ABOVE THE DIFF BECAUSE IT WOULD FEEL WRONG TO IMPLEMENT:
+# > STATUS TRAVELS IN-BAND, AS A COLUMN — OR THE CLAIM DOES NOT TRAVEL AT ALL.
+# When the template is locked the claim is WITHHELD, and the app SAYS SO at export time.
+# > SILENTLY DROPPING THE BRAND'S OWN CONTENT IS ITS OWN KIND OF DISHONESTY.
+# > OMITTING WITHOUT SAYING SO IS THE SAME CLASS AS ASSERTING WITHOUT BACKING — SIGN REVERSED.
+# Both failure modes are in the smoke, so a compromise FAILS A TEST rather than passing quietly.
+#
+# THE COLUMN REALITY — AND IT BECAME #190. None of the five column sets is published by the
+# retailer; ALL FIVE ARE OURS, and three (Lyko, Kicks, Boots UK) have NO SOURCE AT ALL. The only
+# template backed by a real retailer file is Åhléns, which is not one of the five. AND APOTEK
+# HJÄRTAT TAKES NO CSV: the app's own masterdata note records Excel notifications RETIRED IN 2026
+# in favour of PDX and Validoo. The export this shipment made honest targets a channel the
+# product's own registry says is shut.
+#
+# 7 SURFACES SHIPPED A CLAIM UNASSESSED BEFORE; 2 REMAIN AFTER, both flagged in-file. The three
+# claim-carrying CSVs and BOTH TXT DATA SHEETS are fixed — the TXT sheets were FOLDED IN BY LANE
+# RULING because the export screen would otherwise say "not included in the Apotek Hjärtat CSV"
+# while the TXT on the SAME CARD shipped the claim unassessed. #175's shape: one surface
+# contradicting itself.
+#
+# THE ASSESSMENT COMES FROM bdClaimInfo → getClaimLight (19020), the same call the spec sheet
+# makes. NO SECOND VERDICT IS COMPUTED. And the framework is resolved on the UNSANITISED SKU,
+# because sanitiseSkuForRetailer STRIPS productType — measured: on the sanitised copy every SKU
+# resolved `unknown`. That is the new call site the drift gate caught.
+#
+# SMOKE STEP 3 WAS UNBUILDABLE AND WAS REWRITTEN, NOT FAKED OR DROPPED. It tested one product
+# exported for two retailers with DIFFERENT column freedom — a condition this product cannot
+# reach, since no template is locked. Replaced with the reachable case: no product type → claims
+# and assessment cells empty in all three CSVs and the screen names the withheld claims; type set
+# → the claims travel with their assessment. SAME PROPERTY, REACHABLE PATH.
+#
+# NOTICED, NOT FIXED: bdClaimInfo returns AMBER WITH AN EMPTY NOTE if getClaimLight throws —
+# A VERDICT THAT WAS NEVER COMPUTED, rendered as a verdict, inside the function this shipment
+# relies on. And 'Smooths Wrinkles' is not a registry key (only 'reduces wrinkles' is), so the
+# brand's actual claim reads amber "Unknown claim" — honest, and it means the registry does not
+# cover the claim she used.
+#
+# CROSS-LOCALE CONSISTENCY: NOTHING COULD HAVE CAUGHT the Swedish/English discrepancy.
+# scanClaimsCopy runs only on AI-generated text at generation time, its patterns are ENGLISH-ONLY,
+# "reduces the appearance of" deliberately does not flag, and NO CODE COMPARES LOCALES.
+# A capability gap stated as a MEASURED ABSENCE, which is the only form that counts.
+
+# NO TRACKED DIGEST MOVED — #191, 14 Sep 2026, commit 33977a6. THE DRIFT BASELINE DESCRIBED NO
+# REAL TREE, AND HAD NOT SINCE 4 SEPTEMBER.
+#
+# FOUND WHILE CLEARING #183's DRIFT GATE. A fresh capture of HEAD alone differed from the
+# committed verify.baseline.json in 78 ENTRIES — before #183 touched anything.
+#
+# WHY NOTHING CAUGHT IT: the gate reads 13 NAMES; the file holds hundreds. None of the 78 was
+# among the 13. SO verify.sh PASSED BECAUSE OF WHAT IT DOES NOT READ. The file was doing two jobs
+# and only one was real — A WATCHED CONTRACT OF 13 NAMES, AND AN UNWATCHED SNAPSHOT QUIETLY
+# ROTTING. That is luck, not design, and it is the fortnight's class in the instrument for the
+# third time, after the digest gate that could not refuse and the check-ignore command that could
+# not fail.
+#
+# THE CAUSE, TRACED COMMIT BY COMMIT: the last TRUE capture was 145d386. A fresh capture of that
+# tree matches the committed file exactly. THEN bb52efa HAND-EDITED ONE ENTRY (persistCritical
+# 53 → 54) — AND THAT IS HOW THE FILE CAME TO DESCRIBE NO REAL TREE.
+#
+# CC REFUSED TO HAND-EDIT THE BASELINE FOR resolveProductFramework, on the principle that the file
+# would then describe no real tree — AND THE INVESTIGATION FOUND SOMEONE HAD ALREADY DONE EXACTLY
+# THAT, AND THAT IT WAS THE CAUSE. It did not know the precedent existed when it refused.
+# THE REASONING WAS RIGHT ON ITS OWN AND THE HISTORY IS THE PROOF.
+#
+# _dppIsPublished 4 → 3 ATTRIBUTED AND NOT AN ACCIDENT: 3da8e58 ("remove regulatory prose from the
+# Brand Pack prompt", 4 Sep) deleted `if(!_dppIsPublished(heroSku.id)) return "";` — the passport
+# gate inside SECTION 5. 824f8cf moved FIXED_CALLSITES 4 → 3 SEVEN SECONDS LATER and did not
+# re-capture the baseline. THE CONTRACT MOVED; THE SNAPSHOT DID NOT. Exactly the gap this closes.
+#
+# TWO CAPTURES, IN ORDER, RULED BY THE LANE: the PRISTINE HEAD baseline committed ALONE as #191,
+# then the re-capture from the edited tree. That separates 78 entries of accumulated drift from
+# the 19 #183 causes — A #183 RECORD SILENTLY ABSORBING 78 UNRELATED ENTRIES WOULD BE THE RECORD
+# LYING ABOUT ITS OWN SCOPE. Same discipline as one digest per shipment.
+#
+# THE 78, GROUPED BY CAUSE: Brand Pack SECTION 5 removal · #110's event builders · the refusal
+# panel, #112, #118, #120, #114a · time axis step 1's stamps · normalizeCertifications' expand
+# phases 3a/3b/3c (new → 1 → 28 → 34) · migrate 1's certificationRecords · #135's dossier work
+# (_appendStamp 3 → 4, the dossier helpers) · #148/#160/#175/#180 · block boundaries, 41254 →
+# 41803 lines. EVERY ENTRY ATTRIBUTED TO A COMMIT BEFORE ANYTHING WAS WRITTEN.
+#
+# OPEN, FOR A LATER RULING: whether the baseline should capture ONLY what is watched, so the file
+# cannot contain fiction at all.
 
 # THREE SURFACES MOVED AT ONCE — #186 PART 1, 14 Sep 2026. THE TOURNIQUET.
 #   netlify/functions/get-dpp.js         3c050904 → 94fe37c8fb8c87eda46c81538fb8ecbc838c139e458db15864ea0dd086bed4dc

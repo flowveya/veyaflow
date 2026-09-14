@@ -89,6 +89,39 @@ matter now:
 
 **State what a real user loses**, in their words: *"you would lose your 51 products."*
 
+## DESIGN IS IN THIS SPEC, NOT AFTER IT — STRATEGY, 14 SEP, CORRECTING ITS OWN RULING
+
+**#147 ADDS SCREENS THAT DO NOT EXIST TODAY** — registration, sign-in, account. Strategy had ruled
+that design need not wait on #147 because identity does not change what is on screen. **That was
+wrong: identity is the one shipment on the board that creates surfaces rather than correcting
+them.**
+
+> **An account means someone registers. That is the FIRST MINUTE — the surface canon calls the
+> most important.**
+
+**And the sizing below carries the defect it was written to avoid.** The client estimate reads
+*"minimal sign-in and 'check your email' screen"* — **a screen produced as a byproduct of a
+function landing**, which is precisely the pattern Strategy named on 14 Sep: *the surface was
+produced, it was not drawn.* **The anti-scope-creep discipline that kept the number honest is the
+same discipline that would make the first minute a side effect.**
+
+**THE TWO OBJECTS ARE DIFFERENT:** *the minimum that survives a cleared browser* and *the first
+minute a customer experiences* are not the same thing, **and the sizing optimised for the first.**
+
+**What this changes and what it does not:**
+
+- **Scope does NOT grow.** The "what it is NOT" list below stands in full — no password, no roles,
+  no invites, no account-settings screens.
+- **AUTHORSHIP changes.** The two or three screens that DO ship are **drawn by DESIGN**, not
+  produced by CC. A minimal surface may still be a designed one.
+- **The design SYSTEM is on this shipment's critical path** — palette, typography rule, weight
+  steps, scale rule, absence pattern, layout width. It is **unblocked today** and depends on no
+  shipment. **DESIGN's system work must land before #147's client half starts.**
+- **Report the day cost of that dependency separately** from the engineering days, so the two
+  numbers are not blended into one that hides which is which.
+
+---
+
 ## QUESTION 4 — THE SIZING. THIS IS THE DELIVERABLE
 
 **Not a design. The smallest thing that survives a cleared browser.**
