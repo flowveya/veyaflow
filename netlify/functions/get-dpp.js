@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════
 // Path:    /.netlify/functions/get-dpp?id=vf-xxxxx
 // Method:  GET
-// Returns: { payload, publishedAt, updatedAt, version, brandId, skuId }
+// Returns: { dppId, skuId, payload, publishedAt, updatedAt, version }
 //          or 404 { error: 'not_found' }
 //
 // Reads via SUPABASE_ANON_KEY through the dpp_public_read RLS policy.
@@ -58,7 +58,7 @@ exports.handler = async (event) => {
 
   const { data, error } = await supabase
     .from('dpp_records')
-    .select('dpp_id, brand_id, sku_id, payload, published_at, updated_at, version')
+    .select('dpp_id, sku_id, payload, published_at, updated_at, version')
     .eq('dpp_id', dppId)
     .maybeSingle();
 
@@ -74,9 +74,17 @@ exports.handler = async (event) => {
   }
 
   // ── Success ────────────────────────────────────────────────────────────
+  // #186 PART 1, 14 Sep 2026 — A TOURNIQUET, NOT A FIX. brand_id is no longer selected or
+  // returned. It is the brand-name slug + '_' + session_id, and session_id is an UNEXPIRING
+  // BEARER CREDENTIAL that supabase-proxy.js accepts from the request body WITHOUT
+  // VERIFICATION. This endpoint is public and cacheable, so it was publishing that credential
+  // to anyone holding a passport link. Removing it stops the publishing. It recalls nothing:
+  // responses already served or cached still contain it, every value already handed out stays
+  // valid, and the credential itself is unchanged. The fix is #147 (separate the identifier
+  // from the credential). Do not re-add brand_id here to identify a brand — that needs an
+  // opaque identifier that is not also a credential, and none exists yet.
   return jsonResponse(200, {
     dppId: data.dpp_id,
-    brandId: data.brand_id,
     skuId: data.sku_id,
     payload: data.payload,
     publishedAt: data.published_at,

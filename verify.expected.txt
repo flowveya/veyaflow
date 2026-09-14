@@ -13,15 +13,118 @@ index.html        dd358cac
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  78c4f6a2
+netlify/functions/supabase-proxy.js  7b498d16
 netlify/functions/share-dpp.js       500806f0
 
 # ── Added #174, 11 Sep 2026. Five live endpoints that were never watched. ──
 netlify/functions/anthropic-proxy.js             7cf20b3f
 netlify/functions/anthropic-proxy-background.js  1f6f47ab
-netlify/functions/get-brand-pack.js              fe285fe9
-netlify/functions/get-dpp.js                     3c050904
+netlify/functions/get-brand-pack.js              ffa0a5b3
+netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# THREE SURFACES MOVED AT ONCE — #186 PART 1, 14 Sep 2026. THE TOURNIQUET.
+#   netlify/functions/get-dpp.js         3c050904 → 94fe37c8fb8c87eda46c81538fb8ecbc838c139e458db15864ea0dd086bed4dc
+#   netlify/functions/get-brand-pack.js  fe285fe9 → ffa0a5b359a1dd1561ff1d3c221a71d1b39946e61a3226fcea88bcbfe45ac734
+#   netlify/functions/supabase-proxy.js  78c4f6a2 → 7b498d16a594e7ab4b437ffdf4864c67edcdcd46cc1040941648a21fa69d3cac
+# NAMED BY THE LANE after reading get-dpp.js 59–93 and supabase-proxy.js 162–175 at the bytes.
+# `index.html` and the other seven surfaces UNCHANGED.
+#
+# THE ONE-EDIT RULE WAS BROKEN DELIBERATELY AND THE BATTERY REFUSED, CORRECTLY.
+# `FAIL | 3 tracked surfaces modified at once — §2 allows one edit`. THE GATE STAYS AS IT IS:
+# a multi-surface shipment SHOULD stop the battery and make the lane say so out loud, and an
+# override flag would be a control that depends on someone remembering — the class retired three
+# times last week. CC REPORTED WHAT THE GATE PRINTED RATHER THAN ADJUSTING IT TO MATCH THE LANE'S
+# PREDICTION; the prediction was wrong and the output was right. The deliberateness lives in this
+# record, not in an escape hatch.
+#
+# THE DEFECT: `session_id` is an UNEXPIRING BEARER CREDENTIAL, taken from the request body and
+# TRUSTED WITHOUT VERIFICATION (159, 170), and three endpoints published it. `brand_id` is the
+# brand-name slug + '_' + session_id, so `get-dpp.js:79` returned it on a PUBLIC, UNAUTHENTICATED,
+# CACHEABLE endpoint. Thirteen actions accept it, `brand.save` and `portal.submission.create`
+# among them. THE REPO IS PUBLIC, so the action names and payload shape are documented to anyone.
+# ESTABLISHED FROM THE CODE. NOT EXERCISED AGAINST PRODUCTION, by CC or the lane — verifying an
+# access-control defect by using it is not verification, it is the thing itself.
+#
+# STRATEGY'S FRAMING, AND IT IS WHY THIS OUTRANKED THE TRUTH WORK:
+# > Everything else is about whether the product tells the truth. #186 is about WHO CAN WRITE IN
+# > THE RECORD. The provenance model presumes a brand-stated value was actually stated by the
+# > brand. IF ANYONE CAN WRITE AS THE BRAND, `verifiedBy: 'brand'` MEANS NOTHING.
+# > A FALSE CLAIM CAN BE CORRECTED. A FOREIGN WRITE IN A COMPLIANCE RECORD CANNOT BE
+# > DISTINGUISHED FROM THE BRAND'S OWN.
+#
+# THE ROOT ERROR IS DUAL USE IN ITS DANGEROUS FORM: session_id is both the IDENTIFIER and the
+# PROOF. AN IDENTIFIER MUST BE SHAREABLE; A PROOF MUST NOT BE. The 12 Sep criterion — a field
+# carries two purposes legitimately only when it is the CORRECT AXIS for both — FAILS HERE IN BOTH
+# DIRECTIONS AT ONCE. Sixth instance of that family, first as a security defect.
+#
+# CC FOUND A FOURTH MOUTH THE SPEC MISSED. The lane specced three endpoints; `mapSubmissionRow`
+# feeds portal.submission.list, .get, status.update AND rejection.create — so EVERY RETAILER WHO
+# RECEIVED A SUBMISSION, A STATUS UPDATE OR A REJECTION was handed the credential, not only those
+# who opened one. One deletion in the mapper closes all four. Found by doing the consumer census
+# rather than trusting the spec's list.
+#
+# AND CC REMOVED `brand_id` FROM THE `.select()`, NOT FROM THE RESPONSE. The value never leaves
+# the database, so it cannot escape through an error path, a log line, or a future refactor of the
+# return shape. REMOVING THE DEPENDENCY RATHER THAN FILTERING ITS OUTPUT — the same distinction
+# Strategy drew about #180's fix, applied without being asked.
+#
+# THE CONSUMER CENSUS CAME FIRST AND MADE IT A DELETION RATHER THAN A REDESIGN: dpp/index.html,
+# brand/index.html and portal.html carry ZERO references to brandId / brand_id / brandSessionId.
+# index.html's 19 are local audit records and the POST bodies it SENDS. Nothing reads these
+# responses. HAD portal.html NEEDED IT, THE SPEC SAID STOP AND REPORT.
+#
+# THIS IS A TOURNIQUET, NOT A FIX, AND THE FILE SAYS SO. The note sits directly above
+# `const { action, session_id, … } = payload;` — you cannot read that destructuring without
+# reading what it means. STANDING RULE, STRATEGY 14 SEP: A PARTIAL FIX CARRIES ITS OWN LIMITATION
+# IN THE FILE, NOT ONLY IN THE LOG. THE LOG IS NOT WHERE THE NEXT READER IS. THE CODE IS.
+# Three further comments saying "Auth is via session_id" / "session_id auth" were reworded in the
+# same shipment: they asserted an authentication that does not exist.
+#
+# AND THE NOTE WENT STALE WHILE THE INK WAS WET. The lane's trim removed the sentence a later
+# "They" referred to, leaving a dangling pronoun that read as pointing at "every value already
+# handed out". CC reported it instead of assuming "nothing else moves" covered it. Fixed as
+# "The session_id check is not authentication." — kept rather than deleted, because "trusted
+# without verification" is DESCRIPTIVE and leaves room for a reader to think WEAK AUTHENTICATION,
+# while "is not authentication" FORECLOSES THE CATEGORY.
+#
+# TWO WITHDRAWN INTERMEDIATE DIGESTS, VOLUNTEERED AND NEVER NAMED: `8f56ee58` (a first trim that
+# deleted an unnamed sentence too) and `4df98a15`. CC reported both and said not to name them.
+# THAT IS THE FAILURE THE NAMING RULE EXISTS TO PREVENT — a baseline named from a state that no
+# longer exists, which is how 9a88b4f happened. It also REBUILT the previous file by restoring the
+# sentence, to prove the trim was the only change, rather than asserting it from intent.
+#
+# ── PART 1 IS NOT COMPLETE WHEN THE DEPLOY IS GREEN ──────────────────────────────────────────
+# MEASURED AGAINST PRODUCTION with a plain public fetch: `cache-control: public,max-age=60`,
+# Netlify Durable BYPASSED, Edge stored. So no copy outlives a deploy, and sixty seconds is enough.
+# BEFORE-STATE RECORDED FROM OUTSIDE THE BUILDING: the curl below printed STILL SERVED on
+# 13 Sep. PART 1 CLOSES WHEN IT PRINTS ABSENT, ≥60s AFTER DEPLOY, FOR BOTH PASSPORTS:
+#   curl -s ".../get-dpp?id=vf-1775931914850-moh0uqut" | grep -q '"brandId"' \
+#     && echo "STILL SERVED" || echo "ABSENT"
+#   …and vf-1786819586659-mtbhin0o
+#
+# THE EXPOSURE QUESTION OPENED AND CLOSED THE SAME EVENING. Strategy's criterion, ruled BEFORE the
+# facts: rotate only if the credential reached a third party — and ROTATION HAPPENS AFTER THE LEAK
+# IS CLOSED, NEVER BEFORE, because rotating into an open leak publishes the new value immediately.
+# Measured: portal_submissions 16, retailer_accounts 4 — buyer@matas.dk, buyer@apotekhjartat.se,
+# buyer@lyko.se CREATED THIRTY SECONDS APART on 2026-04-24 with one naming shape, plus
+# buyer-test@veyaflow.internal. The lane stated this as INFERENCE and asked. Charlotte confirmed
+# she created them. NO THIRD PARTY HAS EVER AUTHENTICATED; brandSessionId never left her machine.
+# NO DISCLOSURE, NO ROTATION — #147 replaces the model instead.
+#
+# #187 GATED AND DROPPED: listing_requests 0, supplier_field_overrides 0. `listing.list` (254)
+# returns EVERY row with contact names and emails and checks NOTHING — but there are no rows, so
+# it is a serious defect WITH NO SUBJECT. `crm.delete` (231) deletes any row by id, unauthenticated
+# — and #144's dead read-back means the 21 sourcing_crm rows are a copy NOTHING READS. A DEFECT
+# LIMITING THE DAMAGE OF ANOTHER DEFECT, which is not a defence. Reading IS scoped (crm.load
+# filters on session_id); only delete and upsert-by-id are not. Ships as hygiene, after this.
+#
+# STILL OPEN AFTER THIS SHIPMENT, STATED SO NOBODY READS IT AS CLOSED: session_id is still written
+# (index.html 26469, 34857 build the composite; share functions store it; submission_status_log
+# .changed_by holds raw ids); the proxy still puts it in PostgREST query strings, which Supabase's
+# API logs retain ~1 day on the Free plan; and NOTHING ALREADY HANDED OUT IS RECALLED.
+# THE FIX IS #147 — 4–6 days, likely 5, measured — AND #186 AND #147 ARE ONE PIECE OF WORK:
+# SEPARATE IDENTITY FROM CREDENTIAL. Speccing them apart is doing the hard part twice.
 
 # index.html moved be174bbf → dd358cac on 11 Sep 2026 — #180 PART 1, THE DAY COUNT CHANGED
 # DURING THE DAY. ONE FUNCTION. A REMOVAL, NOT AN ADDITION.

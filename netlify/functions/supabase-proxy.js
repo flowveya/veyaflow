@@ -115,7 +115,10 @@ function mapSubmissionRow(row) {
     status: row.status,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
-    brandSessionId: row.brand_session_id,
+    // #186 PART 1 — brandSessionId REMOVED. This mapper feeds portal.submission.list, .get,
+    // status.update and rejection.create, so every retailer who received a submission was
+    // handed the brand's session_id: the credential this proxy trusts. See the #186 note at
+    // the top of the handler — removing it here is containment, not authentication.
     category: bp.category || '',
     homeMarket: bp.homeMarket || '',
     targetMarket: bp.targetMarket || '',
@@ -156,6 +159,19 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
+  // ── #186 PART 1, 14 Sep 2026 — A TOURNIQUET, NOT A FIX. READ BEFORE TRUSTING ANYTHING BELOW ──
+  // session_id is an UNEXPIRING BEARER CREDENTIAL, taken from the request body and TRUSTED
+  // WITHOUT VERIFICATION. Whoever holds a brand's session_id can act as that brand on all
+  // thirteen actions that read it, brand.save and portal.submission.create among them. Nothing
+  // here checks who sent it, and nothing expires, rotates or revokes it.
+  //
+  // What Part 1 changed: this proxy no longer returns a brand's session_id to retailers
+  // (brandSessionId removed from mapSubmissionRow), and get-dpp / get-brand-pack no longer
+  // publish brand_id, which embeds it. That narrows how the credential spreads. It does NOT
+  // make session_id safe, and it recalls nothing: every value already handed out stays valid.
+  //
+  // The session_id check is not authentication. The fix is #147: separate the identifier from
+  // the credential.
   const { action, session_id, data, accessToken } = payload;
 
   try {
@@ -403,8 +419,9 @@ exports.handler = async (event) => {
 
     // ─── Brand → Portal bridge ───────────────────
     // These actions are called by the BRAND side, not the retailer portal.
-    // Auth is via session_id (the brand's localStorage identifier) — matches
-    // existing brand.save / crm.upsert pattern. No access_token required.
+    // Access is an UNVERIFIED bearer check on session_id (the brand's localStorage identifier),
+    // not authentication — see the #186 note at the top of the handler. Matches the existing
+    // brand.save / crm.upsert pattern. No access_token required.
 
     // Brand submits its Brand Pack to a retailer's portal inbox
     if (action === 'portal.submission.create') {
@@ -490,7 +507,8 @@ exports.handler = async (event) => {
     // ── Feedback Loop Engine (Phase 1) ──────────
     // ═══════════════════════════════════════════════
     //
-    // All three actions use session_id auth (matches brand-side pattern).
+    // All three actions accept session_id as an UNVERIFIED bearer check, not authentication —
+    // see the #186 note at the top of the handler (same brand-side pattern).
     // No access_token required — these are brand-side only.
 
     // Idempotent upsert by dedupe_key. If an event with this key already
@@ -562,8 +580,9 @@ exports.handler = async (event) => {
     // ── BIL Use Case A monitoring (Trigger 8) ────
     // ═══════════════════════════════════════════════
     //
-    // All three actions use session_id auth (matches brand-side pattern —
-    // loop.*, brand.save, crm.upsert). No access_token required.
+    // All three actions accept session_id as an UNVERIFIED bearer check, not authentication —
+    // see the #186 note at the top of the handler (same pattern as loop.*, brand.save,
+    // crm.upsert). No access_token required.
     //
     // F1.1 lock: server-side mirror gives Charlotte cross-machine visibility
     // of BIL usage. Identity (session_id) remains resettable; these are

@@ -34,7 +34,7 @@ exports.handler = async (event) => {
   }
 
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/shared_brand_packs?id=eq.${shareId}&active=eq.true&select=id,brand_id,brand_pack_data,created_at,expires_at`,
+    `${SUPABASE_URL}/rest/v1/shared_brand_packs?id=eq.${shareId}&active=eq.true&select=id,brand_pack_data,created_at,expires_at`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -74,12 +74,18 @@ exports.handler = async (event) => {
     };
   }
 
+  // #186 PART 1, 14 Sep 2026 — A TOURNIQUET, NOT A FIX. brand_id is no longer selected or
+  // returned. It is the brand-name slug + '_' + session_id, and session_id is an UNEXPIRING
+  // BEARER CREDENTIAL that supabase-proxy.js accepts from the request body WITHOUT
+  // VERIFICATION. This endpoint is public and every brand-pack link sent to a retailer reached
+  // it, so it was handing that credential to each recipient. Removing it stops the handing
+  // out. It recalls nothing — every value already returned stays valid — and the credential
+  // itself is unchanged until #147 separates the identifier from the credential.
   return {
     statusCode: 200,
     headers,
     body: JSON.stringify({
       shareId:       row.id,
-      brandId:       row.brand_id,
       brandPackData: row.brand_pack_data,
       createdAt:     row.created_at,
       expiresAt:     row.expires_at,
