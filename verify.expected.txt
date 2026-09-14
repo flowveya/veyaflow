@@ -98,10 +98,16 @@ netlify/functions/share-brand-pack.js            3791bbec
 # MEASURED AGAINST PRODUCTION with a plain public fetch: `cache-control: public,max-age=60`,
 # Netlify Durable BYPASSED, Edge stored. So no copy outlives a deploy, and sixty seconds is enough.
 # BEFORE-STATE RECORDED FROM OUTSIDE THE BUILDING: the curl below printed STILL SERVED on
-# 13 Sep. PART 1 CLOSES WHEN IT PRINTS ABSENT, ≥60s AFTER DEPLOY, FOR BOTH PASSPORTS:
-#   curl -s ".../get-dpp?id=vf-1775931914850-moh0uqut" | grep -q '"brandId"' \
-#     && echo "STILL SERVED" || echo "ABSENT"
-#   …and vf-1786819586659-mtbhin0o
+# 13 Sep, against production, as a plain public request with no credentials.
+#   curl -s ".../get-dpp?id=<id>" | grep -q '"brandId"' && echo "STILL SERVED" || echo "ABSENT"
+#
+# ── CLOSED 14 Sep 2026, commit a796a38, ≥60s after deploy ─────────────────────────────────────
+#   vf-1775931914850-moh0uqut: ABSENT
+#   vf-1786819586659-mtbhin0o: ABSENT
+# SAME COMMAND, SAME VANTAGE POINT, EITHER SIDE OF THE DEPLOY. The completion criterion was the
+# CACHE, not the deploy: `cache-control: public,max-age=60` with Netlify Durable BYPASSED, so no
+# copy outlives a deploy and sixty seconds is sufficient. A GREEN DEPLOY WOULD HAVE PROVED
+# NOTHING — the edge would still have been serving the credential for up to a minute.
 #
 # THE EXPOSURE QUESTION OPENED AND CLOSED THE SAME EVENING. Strategy's criterion, ruled BEFORE the
 # facts: rotate only if the credential reached a third party — and ROTATION HAPPENS AFTER THE LEAK
