@@ -4083,7 +4083,8 @@ const NAV=[
   {id:"sourcing",  sec:"source", group:"source", icon:"◌", label:"Supplier Pipeline",   stages:["idea","product","trading","expanding","scaling"],  cats:null},
   {id:"circular", sec:"source", group:"source", icon:"<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v4M12 18v4M2 12h4M18 12h4\"/></svg>", label:"Circular GPS",        stages:["trading","expanding","scaling"],                  cats:null},
   {id:"dpp",      sec:"source", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"5\" y=\"3\" width=\"14\" height=\"18\" rx=\"2\"/><path d=\"M9 8h6M9 12h6\"/></svg>", label:"DPP Generator",       stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
-  {id:"csrd",      sec:"source", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 9h8M8 13h5\"/></svg>", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
+  // #197 — HIDDEN: a launch decision, not a deletion. Reverse: localStorage.setItem('ns_show_csrd','true').
+  {id:"csrd",      hidden:{unlessFlag:"ns_show_csrd"}, sec:"source", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 9h8M8 13h5\"/></svg>", label:"CSRD Pack",           stages:["product","trading","expanding","scaling"],        cats:null, badge:"New"},
   {id:"reg_monitor",sec:"brand",  group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", label:"Regulatory Monitor", stages:["idea","product","trading","expanding","scaling"],  cats:null, badge:"Live"},
   {id:"compliance-cal",sec:"brand", group:"comply", icon:"<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18M8 2v4M16 2v4\"/></svg>", label:"Compliance Calendar", stages:["idea","product","trading","expanding","scaling"], cats:null},
   // ── RETAILER RELATIONS section (sec) ────────────
@@ -4095,6 +4096,13 @@ const NAV=[
   {id:"retail-checklist",  sec:"retail", group:"sell", icon:"☑", label:"Listing Checklist",  stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-performance",sec:"retail", group:"sell", icon:"<svg viewBox=\"0 0 24 24\"><path d=\"M3 3v18h18\"/><path d=\"m7 14 3-3 3 2 5-6\"/></svg>", label:"Performance",        stages:["trading","expanding","scaling"], cats:null},
   {id:"retail-comms",      sec:"retail", group:"sell", icon:"✉", label:"Buyer Comms",        stages:["trading","expanding","scaling"], cats:null},
+  // ── INTERNAL ────────────────────────────────────
+  // #197 — Template Admin is DECLARED here so isSurfaceHidden can read it. It used to be pushed
+  // into the visible list by getVisibleNav when its flag was set, carrying parked:true on an object
+  // no gate consulted. HIDDEN — never customer-facing. Same properties as the pushed object; stages
+  // lists all five because the pushed one always passed the stage filter.
+  // Reverse (Charlotte only): localStorage.setItem('ns_atm_show_admin','true').
+  {id:"atm-admin",         hidden:{unlessFlag:"ns_atm_show_admin"}, sec:"retail", group:"mybrand", flag:"pending", parked:true, icon:"⚙", label:"Template Admin", stages:["idea","product","trading","expanding","scaling"], cats:null},
 ];
 
 // 5-group desktop IA (approved June 9). Ordered; labels + italic subtitle per group.
@@ -4117,11 +4125,34 @@ function orderNavByIds(items, ids){
   });
 }
 
+// ── #197, 15 Sep 2026 — HIDDEN IS A STATE THE PRODUCT ENFORCES. Ruled by Strategy. ──
+// Finished, hidden, or honestly empty: no fourth state. A hidden surface is DECLARED ON ITS NAV
+// ENTRY as hidden:{unlessFlag:'<localStorage key>'}, and this predicate is the only reader of that
+// declaration. No gate carries its own list of ids. PARKED_IDS stays for the parked / dev-X-ray
+// concern and must not become the vehicle for this one: it enumerated cases, and atm-admin, which
+// declared parked:true, was never in it.
+// Hidden means UNREACHABLE, not unlisted:
+//   - getVisibleNav drops it, so neither the rail nor the mobile menu lists it;
+//   - showPage REFUSES it and renders home, silently: no error and no "hidden" notice, because a
+//     notice tells a customer a feature exists that they cannot have. That covers every route,
+//     including a typed or bookmarked #hash and any id taken from data;
+//   - an offer whose only action is a hidden page is not rendered. That is decided at each offer
+//     site, so a NEW hidden surface needs its inbound offers censused (#197 did this for csrd and
+//     atm-admin). The router guarantees a hidden page cannot WORK; it cannot stop one being OFFERED.
+// Reversible, never a deletion: set the entry's unlessFlag to 'true' in localStorage. Storage that
+// is unavailable fails CLOSED and the surface stays hidden.
+function isSurfaceHidden(id){
+  var n = NAV.find(function(x){ return x.id === id; });
+  if(!n || !n.hidden) return false;
+  try { return localStorage.getItem(n.hidden.unlessFlag) !== 'true'; } catch(e){ return true; }
+}
+
 // Returns nav items visible for current brand stage
 function getVisibleNav(){
   const stage = brand?.stage || 'trading';
   const cat = brand?.category || null;
   let visible = NAV.filter(function(n){
+    if(isSurfaceHidden(n.id)) return false;   // #197 — declared on the entry
     if(!n.stages.includes(stage)) return false;
     if(n.cats && cat && !n.cats.includes(cat)) return false;
     return true;
@@ -4130,25 +4161,9 @@ function getVisibleNav(){
     var label = getCatLabel(n.id)||n.label;
     return Object.assign({}, n, {label:label});
   });
-  // ATM admin nav entry — surfaced ONLY when localStorage flag is set
-  // (Charlotte sets `localStorage.setItem('ns_atm_show_admin','true')` once
-  // via DevTools). Hidden from all brands by default. Stage 1 simplification
-  // with explicit migration trigger: real auth needed when team grows.
-  try {
-    if(localStorage.getItem('ns_atm_show_admin') === 'true'){
-      visible.push({
-        id:    'atm-admin',
-        sec:   'retail',          // mobile drawer still reads sec
-        group: 'mybrand',         // desktop 5-group rail; parked + "pending" (unplaced, inert)
-        flag:  'pending',
-        parked: true,
-        icon:  '⚙',
-        label: 'Template Admin',  // relabelled from "ATM Admin" (localStorage-gated; no functional change)
-        stages: [stage], // always pass stage filter
-        cats:   null,
-      });
-    }
-  } catch(e){ /* localStorage unavailable — admin entry simply doesn't surface */ }
+  // #197 — the Template Admin entry that was pushed here when ns_atm_show_admin was set is now
+  // declared in NAV with hidden:{unlessFlag:'ns_atm_show_admin'}; the filter above reads it.
+  // Stage 1 simplification, unchanged: real auth is needed when the team grows.
   // Launch IA: parked features hidden from nav by default. Flip back via
   // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
   var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers','pitch'];   // 'pitch' removed from platform (5 Aug refocus to compliant→shelf-ready); code preserved at tag pitch-feature-preserved-2026-08-05
@@ -4538,6 +4553,8 @@ function showPage(id){
   // Verified Directory merged into "Find Manufacturers" (id 'find').
   // Redirect any legacy callers / deep links to the new module.
   if(id === 'agent' || id === 'verified') id = 'find';
+  // #197 — a hidden surface is unreachable, not merely unlisted: render home, silently.
+  if(isSurfaceHidden(id)) id = 'home';
   closeMobMenu();   // close the mobile grouped menu on navigate (was closeMobDrawer)
   currentPage=id;
   // Auto-switch section tab to match the page being shown
@@ -7965,6 +7982,12 @@ function renderComplianceRadar(){
     const actionLabel = (typeof item.actionLabel === 'function')
       ? item.actionLabel(brand, sku0)
       : item.actionLabel;
+    // #197 — an action whose page is hidden is not offered. The ROW stays: whether a requirement
+    // with no route should be shown at all is #199, Strategy's. Both renderers below read these
+    // two fields, so neither the label ("Generate in CSRD Pack") nor the Fix-now link survives.
+    if(item.actionPage && isSurfaceHidden(item.actionPage)){
+      return {...item, status, actionLabel:'', actionPage:''};
+    }
     return {...item, status, actionLabel};
   });
 
@@ -35132,6 +35155,9 @@ function csrdSaveAnswer(id, val){
 }
 
 function showCSRDListingPrompt(retailerName){
+  // #197 — every part of this toast exists to route to the CSRD Pack. While that surface is hidden,
+  // the whole toast is not rendered: its copy ("Generate your pack now") would have no route left.
+  if(isSurfaceHidden('csrd')) return;
   const CSRD_RETAILERS = ['Apotek Hjärtat','ICA','Douglas','dm','Boots','Sephora','Matas','Kicks','Lyko','Asos','Zalando'];
   const isCsrdObligation = CSRD_RETAILERS.some(r=>retailerName.toLowerCase().includes(r.toLowerCase()));
   if(!isCsrdObligation) return;

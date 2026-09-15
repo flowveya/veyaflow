@@ -54,6 +54,46 @@ policies**. `supabase-proxy.js:35` says it *"uses service_role, bypasses RLS."* 
 current count of RLS-enabled tables and how many carry a policy.** That number decides whether
 identity is a feature or a control.
 
+## QUESTION 1b — THE AUDIT TRAIL ALREADY HOLDS THE ANSWER, IN PRODUCTION
+
+**Added 15 Sep. Not a hypothetical — six rows of real data, read out of the database.**
+
+`SELECT changed_by, new_status, changed_at FROM submission_status_log` returns **two identity
+schemes in one column:**
+
+```
+changed_by
+buyer-test@veyaflow.internal     ← an email. A real account. Verified by Supabase Auth.
+sess_1776262521142_s1kn9gn       ← a browser string. Verified by nothing.
+```
+
+**The second value is `ns_session_id`** — the same string inside `brand_id` on all three published
+DPP records (`cloud___glow_sess_1776262521142_s1kn9gn`), and the same value #186 established is an
+**unexpiring bearer credential.** It is minted at `index.html:40253`.
+
+**So `changed_by` cannot answer "who". It answers "which browser".** And the two halves of the log
+are asymmetric by construction: **the second party is authenticated, the paying customer is not** —
+the ninth-and-clearest instance of the standing pattern, visible in production data rather than
+argued from code.
+
+**Three consequences the sizing must account for:**
+
+1. **Clearing the browser severs the audit trail**, not only the workspace. Every future entry
+   carries a different `changed_by` **with nothing linking it to the earlier ones** — the prior
+   entries become permanently unattributable.
+2. **Identity is what makes the trail mean something.** The lane's starting position resolves
+   *user → brand row → that row's `session_id`*, **after which `changed_by` can hold a person.**
+   That is a consequence of #147 nobody had named, and it belongs in Question 4's item 4.
+3. **It is also a back-fill question.** Existing rows hold the session string. **Does the minimum
+   migrate them, alias them, or leave them?** *"Leave them"* is an acceptable answer — **but it must
+   be a stated one**, because an audit trail with two eras and no bridge is a finding of its own.
+
+**Answer, in the report:** which other tables key on `session_id` **as an actor** rather than as an
+owner. **That set, not the owner set, is what a person-shaped identity has to reach**, and it may be
+larger or smaller than Question 4 assumes.
+
+---
+
 ## QUESTION 2 — WHAT ALREADY EXISTS IN THE PORTAL, AND IS IT REUSABLE
 
 **Strategy's first question, and it is the one that could halve the estimate.**
@@ -145,8 +185,8 @@ The lane's starting position, for you to confirm or refute with reasons:
    single unknown prevents it** — that unknown then becomes the next scout, and it is smaller
    than this one.
 4. **What does it unblock, in order?** #143's mirror, #148's back-fill, document upload
-   (retention and custody, not plumbing — Storage is already in production), and the durability
-   of everything else.
+   (retention and custody, not plumbing — Storage is already in production), **the audit trail
+   naming a person (Question 1b)**, and the durability of everything else.
 
 **If the honest answer is that the minimum is larger than a week, say so.** An honest large number
 is worth more than an optimistic small one, and Strategy has ruled twice this week that the
@@ -167,6 +207,8 @@ honest lower number wins.
 
 1. All eleven digests before and after — unchanged, `0 of the 11 tracked surfaces modified`.
 2. `session_id`'s full lifecycle, **including whether it expires and what it authorises.**
+2b. **Every table keying on `session_id` as an ACTOR, not as an owner** (Question 1b), and whether
+   the minimum migrates, aliases or abandons the existing `submission_status_log` rows.
 3. **RLS: tables enabled, policies present.** The number is the finding.
 4. The portal's auth, and **whether it transfers — share token or identity, said plainly.**
 5. The cleared-browser measurement, **with `sku.dossier` answered explicitly** and the seed-versus-

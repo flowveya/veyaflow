@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        74f88657
+index.html        49cefac8
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,88 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 74f88657 → 49cefac8 on 15 Sep 2026 — #197, "HIDDEN" WAS A STATE THE PRODUCT
+# COULD NOT ENFORCE.
+#   after   49cefac83a271e11c4dfce6d59fe92391cc342389739d592150b6994d0e92d6c
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and her own
+# verify.sh run — CC's report is not a name). Ten other surfaces unchanged.
+# Shipped in two parts against one baseline: the gate (74f88657 → 4be10a43, unnamed, not committed)
+# and the radar amendment (4be10a43 → 49cefac8). ONE DIGEST NAMED, ONE COMMIT.
+#
+# THE RULING IT IMPLEMENTS — Strategy, 15 Sep: FINISHED, HIDDEN, OR HONESTLY EMPTY. NO FOURTH
+# STATE. A feature need not be finished before a pilot; it must be INVISIBLE to the pilot. The
+# test that decides which: WHOSE ABSENCE IS IT? CSRD Pack is empty because we did not build for
+# that customer — ours, so hide. Performance is empty because she has not sold through a retailer
+# — hers, so honestly empty.
+#
+# THE DEFECT: the mechanism named "parked" could not reach what it was named for. MEASURED:
+#   - 8 of 9 PARKED_IDS carry group:"plan"/"source", keys absent from NAV_GROUPS — the rail's
+#     group filter already excluded them. 'pitch' is removed unconditionally.
+#   - ns_show_parked therefore governed exactly ONE rail row: suppliers.
+#   - atm-admin DECLARED parked:true and was NOT in PARKED_IDS — the object stated the rule, the
+#     list enumerated cases, and the gate read only the list.
+#   - csrd sits in NAV_GROUPS.comply.ids — structurally unreachable by the parked filter.
+# Fourth instance of the greppable signature: a comment states a principle, the code beneath
+# enumerates cases (after DPP_ORIGIN_LIVE, netlify.toml, .gitignore #111).
+#
+# THE MECHANISM RULING, written into the file: THE DECLARATION ON THE OBJECT IS THE RULE. EVERY
+# GATE READS THE DECLARATION. NO GATE CARRIES ITS OWN LIST OF IDS. Extending PARKED_IDS by two
+# would have been the same defect one iteration later — the next surface to hide would have been
+# forgotten exactly as atm-admin was.
+#
+# WHAT LANDED:
+#   isSurfaceHidden(id)  — reads hidden:{unlessFlag:'<key>'} declared on the NAV entry and nothing
+#                          else. Storage unavailable → returns true. FAILS CLOSED.
+#   getVisibleNav        — drops it from the rail and the mobile menu
+#   showPage             — renders home, SILENTLY. No error, no "this is hidden" notice: a notice
+#                          tells a customer a feature exists that they cannot have
+#   the CSRD toast       — not rendered
+#   renderComplianceRadar— an action whose actionPage is hidden returns actionLabel:'' and
+#                          actionPage:'' at the single evaluation point. BOTH display sites read
+#                          that one array, so neither the label nor the Fix-now link survives.
+#   atm-admin            — now a DECLARED NAV member; it used to be pushed at runtime, which is
+#                          why no gate could see it
+# HIDDEN: csrd (reverse with ns_show_csrd) · atm-admin (ns_atm_show_admin). Reversible, never a
+# deletion. No feature code removed; ns_csrd_answers never touched.
+#
+# #200, FOUND BY CC'S ROUTE CENSUS AND NOT BY THE SPEC: #atm-admin and #atm-admin/audit opened for
+# ANYONE, bypassing the flag entirely. The gate had only ever covered the rail. The census was
+# written to close routes into a surface we CHOSE to hide; it found a surface that was never gated.
+#
+# SMOKE — 6 measured on localhost:8000, ORIGIN NAMED. The first run was against
+# veyaflow.netlify.app and the change was uncommitted, so it was never there: #186 INVERTED — a
+# green production page proved nothing because the change never left the machine. Rule adopted:
+# A SMOKE STEP NAMES ITS ORIGIN.
+#   default rail            Home:1 · Comply:5 · Sell:8 · My Brand:2   (CSRD absent)
+#   showPage('csrd')        currentPage === 'home', silent
+#   #atm-admin/audit        ['home','#home'] — #200 closed, stale hash rewritten
+#   ns_atm_show_admin       My Brand:3, Template Admin listed
+#   ns_show_csrd            Comply:6; page renders 12 questions, sections, completeness meter —
+#                           VISIBILITY REMOVED, FUNCTION INTACT
+#   radar                   CSRD row renders; no label, no Fix-now; DPP's action unaffected
+# Run WITHOUT reloads, by setting the flag and calling buildNav() in one expression — which proves
+# more than the reload version: the predicate reads localStorage at CALL time, not at boot.
+#
+# TWO LANE ERRORS IN THIS SHIPMENT, RECORDED:
+#   - smoke step 1 asserted "My Brand reads 2", which read 2 BEFORE the shipment too. A CHECK THAT
+#     COULD NOT FAIL. Third time (after #176's git check-ignore and #180's step 2). The arithmetic
+#     was also wrong: 1+5+8+2 is 16, not 15.
+#   - the field-census spec named 74f88657 and demanded GREEN with 0 modified while #197 sat
+#     uncommitted. A CHECK THAT COULD NOT PASS. Same week, opposite sign: both artefacts assert an
+#     outcome that cannot occur.
+#
+# OPEN AND DATED: #199 — the Compliance Radar may be INVENTING a CSRD obligation. The row carries
+# categories:['all'] and no size gate; CSRD applies to large undertakings and her customer has 0-4
+# employees. The CSRD page's own banner already says the duty is the RETAILER'S. The primitive is
+# two rows away: Citeo and Norwegian VAT are threshold-gated and ASK THE BRAND TO CONFIRM.
+# A requirement with no route is tolerated for ONE DAY only — #199 is dated 16 Sep. If it slips,
+# this becomes the dead end Strategy ruled against on the 10th: truth without actionability.
+#
+# NOT RULED, AND MUST NOT SHIP AS A MECHANISM: "skip any radar row whose actionPage is hidden."
+# #170 invents an obligation; that would CONCEAL one. Same axis, opposite sign — and concealment is
+# worse, because nothing on screen shows it happened. The CSRD row goes on APPLICABILITY grounds.
 
 # index.html moved dd358cac → 74f88657 on 14 Sep 2026 — #183, BUYER-FACING EXPORTS SHIPPED CLAIMS
 # WITHOUT THE ASSESSMENT THE APP PERFORMED.
