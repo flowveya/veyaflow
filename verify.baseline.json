@@ -2,14 +2,14 @@
   "blocks": [
     {
       "open": 1176,
-      "close": 40316
+      "close": 40342
     },
     {
-      "open": 40317,
-      "close": 41870
+      "open": 40343,
+      "close": 41896
     }
   ],
-  "totalLines": 41872,
+  "totalLines": 41898,
   "defs": {
     "ACTION_PLAN_MILESTONES": 1,
     "ACT_ICONS": 1,
@@ -516,7 +516,6 @@
     "aR": 1,
     "aRT": 1,
     "aRel": 1,
-    "aTier": 1,
     "aboveRev": 2,
     "aboveUnits": 2,
     "absDiff": 1,
@@ -624,7 +623,6 @@
     "bR": 1,
     "bRT": 1,
     "bRel": 1,
-    "bTier": 1,
     "back": 1,
     "backfilledCount": 1,
     "backwardState": 1,
@@ -1632,6 +1630,7 @@
     "isSkincare": 2,
     "isStale": 1,
     "isSupp": 1,
+    "isSurfaceHidden": 1,
     "isSwiss": 2,
     "isTarget": 1,
     "isTargetRetailersPickerOpen": 1,
@@ -1928,7 +1927,7 @@
     "msg": 1,
     "multiCta": 1,
     "mx": 1,
-    "n": 7,
+    "n": 8,
     "nAct": 1,
     "nActD": 1,
     "name": 9,
@@ -3563,6 +3562,7 @@
     "isPopulated": 3,
     "isReportPreContextFix": 2,
     "isRiskDataStale": 1,
+    "isSurfaceHidden": 4,
     "isTargetRetailersPickerOpen": 2,
     "isWEEEDevice": 6,
     "layer2Indicator": 1,
