@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        49cefac8
+index.html        a2bacfe9
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,77 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 49cefac8 → a2bacfe9 on 16 Sep 2026 — THE RP TRIO. #218 / #219 / #217.
+# THREE DELETIONS. NOTHING WAS BUILT.
+#   after   a2bacfe9b4c68ccea63b9b59d363067fa517e474c8c7d97e232cf2f57eb237a8
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run —
+# CC's report alone is not a name). Ten other surfaces unchanged.
+#
+# #218 IS NOT A DISCLOSURE DEFECT. IT WAS AN UNRULED BUSINESS MODEL SITTING IN CODE.
+# A commercial tier WE assign, marked `hidden` in the code's own comment, ordered what a brand saw
+# when choosing a REGULATORY SUPPLIER. Nobody had decided that VeyaFlow takes money from RP
+# partners; it is not in canon. The price metric is the catalogue and the BRAND pays. §5 ruled the
+# agency is a CHANNEL, not a market.
+#
+# STRATEGY'S RULING: VEYAFLOW TAKES NO COMMERCIAL CONSIDERATION THAT AFFECTS ORDERING.
+# > The moat is being the party that says what is true about things the customer CANNOT CHECK.
+# > A brand choosing an RP cannot, by definition, assess RP quality — that is why they need us.
+# > A paid ordering on that surface exploits exactly the asymmetry the product exists to close,
+# > and it is the ONLY kind of discovery that cannot be repaired afterwards.
+# The arithmetic made it easy: referral revenue is negligible against a catalogue subscription
+# priced against a 650-850 kSEK salary. We would have traded the position for small change.
+#
+# #219 — "VETTED" IS A CLAIM THAT REQUIRES A RECORD, AND THE RECORD HAS NO DEFINITION.
+# What vetted MEANS — registration, ERT authorisation, references, insurance — is unruled. A
+# verifiedBy field with nothing defined to verify is the same emptiness removed everywhere else.
+# RULED: the word goes until the check exists. Adding it the day we actually vet is FREE; removing
+# it after a brand has trusted it is not.
+#
+# #217 — A DATE IN PRODUCT COPY IS A PROMISE THE PRODUCT BREAKS BY ITSELF. "Marketplace launches
+# Q3 2026" with fourteen days left and zero partners. Nobody had to do anything for it to become
+# untrue.
+#
+# WHAT LANDED:
+#   - the tier branch deleted from the comparator, and the `tier` line from the partner schema.
+#     DELETED, not flagged and not commented out: a mechanism preserved behind a flag is the same
+#     decision in code that the ruling overturned. Relevance, response time, rating remain.
+#   - "vetted" removed at all three sites (subtitle, empty branch, non-empty branch)
+#   - the launch date removed — FOUR sites, not the three the spec named: CC found a fourth in the
+#     holding-box header ("Marketplace launches Q3 2026") and removed it as the same date in
+#     customer copy
+#   - a comment recording the ruling and its date replaces the tier line
+#
+# THE HONEST USE OF A COMMENT — canon, and it INVERTS two weeks of this lane's discipline. The
+# comment has been the defect six times: asserting a check that does not happen, or a principle the
+# code under-implements. Here the comment is the RIGHT answer, because THERE IS NO CODE.
+# > A comment's honest use is to RECORD A DECISION THAT LACKS CODE — not to describe code that
+# > exists. Code describes itself; decisions do not.
+# The next person to consider a paid ordering finds the ruling rather than the mechanism.
+#
+# MEASURED (scratch harness, real renderRpMarketplace): two partners identical but for `tier` —
+# before, the order followed tier; after, swapping the tiers does not change the order. The
+# RP-on-file box renders byte-identical before and after, expired state included (#50).
+#
+# RESIDUALS FOUND BY CC AND NOT FIXED — THE LANE SCOPED THE SPEC BY THE SURFACE, NOT BY THE RULE:
+#   16425  the partner card's "✓ Verified" badge — the same claim in another word, same surface
+#   1540   status:'verified'|'tier_c_constrained' — the deleted tier survives as a status enum
+#   4342 · 29162  "founder-verified tier opening Q3 2026" in customer copy — the same date promise
+#          AND the same claim, on the manufacturer directory
+#   4377   nav subtitle "VeyaFlow-vetted suppliers"
+#
+# #224, THE LARGER INSTANCE OF THE SAME RULING, FOUND BY CC'S RESIDUAL SCAN ONE HOUR LATER:
+#   LISTING_TIERS (36258) — free / verified sortBoost:10 price:4900 / featured sortBoost:25
+#   price:9900. A priced listing tier that SELLS SORT POSITION, and the badge the 4,900 tier buys
+#   is the word "✓ Verified". It contradicts BOTH rulings at once: ordering for money, and the
+#   trust claim as a purchase. Inert today for two reasons that are not the ruling —
+#   MFR_LISTING_TIERS maps all twelve manufacturers to 'free', and the surface it serves ('find')
+#   is in PARKED_IDS. THE WINDOW IS OPEN. Strategy rules before anything ships on it.
+#
+# SMOKE: the tier-swap is measured. The COPY is not — CC ran the function, not the browser.
+# A digest proves the bytes changed; only a human confirms the words are right. Copy is the one
+# class the harness cannot cover, so the localhost read is required before the commit.
 
 # index.html moved 74f88657 → 49cefac8 on 15 Sep 2026 — #197, "HIDDEN" WAS A STATE THE PRODUCT
 # COULD NOT ENFORCE.
@@ -111,6 +182,31 @@ netlify/functions/share-brand-pack.js            3791bbec
 #           41,872 lines · 57 gates · 1 of 11 modified · drift gate PASSES at 21
 # NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and her own
 # verify.sh run — CC's report is not a name). Ten other surfaces unchanged.
+#
+# ┌─ NOTE, 16 Sep 2026 — THE EVIDENCE BELOW IS CORRECT. ONE NAME IS NOT. ─────────────────────┐
+# │ The array is CLAIMS_RULES, not CLAIM_REGISTRY. Nothing else in the paragraph changes.      │
+# │ Measured at the bytes on the RUNTIME object: 'reduces wrinkles' rates AMBER for cosmetic   │
+# │ (18728) and RED for beauty_accessory, note "Cosmetic efficacy claim — not permitted for    │
+# │ accessories". Both halves of the paragraph are true and the ruling rested on real values.  │
+# │                                                                                            │
+# │ THIS BLOCK REPLACES A CORRECTION THE LANE WROTE EARLIER THE SAME DAY, WHICH WAS WRONG.     │
+# │ That correction claimed the red rating did not exist and that the evidence had been        │
+# │ fabricated. Its own basis was an error: the lane read the CLAIMS_RULES object LITERAL and  │
+# │ missed `CLAIMS_RULES.beauty_accessory = {…}` (35 entries), assigned at top level at 18811   │
+# │ immediately after the literal. Refuted by CC on the runtime object, same day.              │
+# │ The literal has seven keys, not six (garment included); the runtime object has eight.      │
+# │                                                                                            │
+# │ THE BLIND SPOT IS NAMED AND IS THE LANE'S OWN: a static read of a literal cannot see a     │
+# │ member added afterwards — the identical failure the lane had specified for the field       │
+# │ census one day earlier. An accusation of fabrication, entered into this file on that       │
+# │ basis, was itself the error. Recorded rather than deleted.                                 │
+# │                                                                                            │
+# │ #207 IS WITHDRAWN AS STATED: getClaimLight (19051) and scoreReadiness (6907) both find a    │
+# │ real beauty_accessory key; their cosmetic fallbacks are unreachable for accessories, and    │
+# │ the comments at 19044 and 6903 are accurate. The class is real elsewhere — see #210 (raw    │
+# │ productType keys the PROVENANCE while the resolved framework keys the LIGHT) and #211       │
+# │ (runClaimLocalizer picks its regime by BRAND CATEGORY and falls back to cosmetic).          │
+# └────────────────────────────────────────────────────────────────────────────────────────────┘
 #
 # THE DEFECT, ON A REAL FILE: the first Apotek Hjärtat CSV ever produced carried
 # `Påståenden,Smooths Wrinkles` — a claim with NO ASSESSMENT, on a document bound for a pharmacy's

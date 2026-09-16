@@ -1537,7 +1537,6 @@ const PARTNERS=[
 //
 // Schema documented inline so future additions follow consistent shape:
 //   {id, name, country, coverageMarkets:[ISO2,...], capabilities:[...],
-//    tier:'A'|'B'|'C' (INTERNAL — never rendered to brand customer per D10.6),
 //    status:'verified'|'tier_c_constrained' (PUBLIC),
 //    contactEmail (null until verified — gates intro request CTA),
 //    responseTimeMedianDays (manually tracked by Charlotte, null pre-launch),
@@ -16368,19 +16367,20 @@ const BASKET_DATA = {
 function renderRpMarketplace(el){
   if(!brand){el.innerHTML='<div class="page-wrap"><p style="color:var(--muted)">Set up your brand workspace first.</p></div>';return;}
 
-  // Sort algorithm per D10.6 Section 7.2: brand-need-relevance → tier (hidden)
-  // → response time → rating. No-op while RP_PARTNERS empty (H4b). Activates
-  // automatically when partners append.
+  // Sort: brand-need-relevance → response time → rating. No-op while RP_PARTNERS is
+  // empty (H4b); activates automatically when partners append.
+  // #218, RULED BY STRATEGY 16 SEP 2026 — VEYAFLOW TAKES NO COMMERCIAL CONSIDERATION THAT
+  // AFFECTS ORDERING. A brand choosing an RP cannot assess RP quality; that is why it needs
+  // us, and a paid ordering on this surface would exploit exactly that asymmetry. The
+  // "tier (internal, hidden)" step that sat between relevance and response time was DELETED,
+  // not flagged off or commented out. If partnerships ever carry commercial terms, the
+  // ordering stays independent of them and its basis is stated on the surface.
   const brandMarkets = (brand.targetMarkets || []).concat([brand.currentMarket || '']).filter(Boolean);
   const sortedPartners = RP_PARTNERS.slice().sort(function(a,b){
     // Relevance: count of brand markets covered by partner.coverageMarkets
     const aRel = (a.coverageMarkets || []).filter(function(m){ return brandMarkets.indexOf(m) >= 0; }).length;
     const bRel = (b.coverageMarkets || []).filter(function(m){ return brandMarkets.indexOf(m) >= 0; }).length;
     if(aRel !== bRel) return bRel - aRel;
-    // Tier (internal, hidden): A=1 B=2 C=3 → lower number first
-    const aTier = {A:1,B:2,C:3}[a.tier] || 9;
-    const bTier = {A:1,B:2,C:3}[b.tier] || 9;
-    if(aTier !== bTier) return aTier - bTier;
     // Response time: lower median first (null sorts last)
     const aRT = a.responseTimeMedianDays || 999;
     const bRT = b.responseTimeMedianDays || 999;
@@ -16404,7 +16404,7 @@ function renderRpMarketplace(el){
     <div class="page-wrap" style="max-width:980px">
       <div style="margin-bottom:1.5rem">
         <h1 style="font-family:var(--serif);font-size:1.85rem;color:var(--navy);margin:0 0 .35rem">EU Responsible Person</h1>
-        <p style="color:var(--muted);font-family:var(--sans);font-size:.85rem;margin:0">Vetted EU RP partners for CPNP submission, PIF maintenance, and post-market surveillance.</p>
+        <p style="color:var(--muted);font-family:var(--sans);font-size:.85rem;margin:0">EU RP partners for CPNP submission, PIF maintenance, and post-market surveillance.</p>
       </div>
 
       ${hasExistingRp ? `
@@ -16433,8 +16433,8 @@ function renderRpMarketplace(el){
 
       <!-- Holding message (H4b): empty marketplace state -->
       <div style="background:#fff;border:1px solid var(--border);padding:1.5rem 1.6rem;margin-bottom:1.5rem">
-        <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem">Marketplace launches Q3 2026</div>
-        <p style="font-family:var(--sans);font-size:.88rem;color:#333;line-height:1.55;margin:0 0 1rem">${partnerCount === 0 ? 'EU Responsible Person marketplace launches Q3 2026 — vetted partners coming soon. Manual RP entry available if you already have an existing RP relationship.' : `${partnerCount} vetted partner${partnerCount===1?'':'s'} onboarded. More partners onboarding through Q3 2026.`}</p>
+        <div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem">${partnerCount === 0 ? 'No RP partners listed' : 'RP partners'}</div>
+        <p style="font-family:var(--sans);font-size:.88rem;color:#333;line-height:1.55;margin:0 0 1rem">${partnerCount === 0 ? 'No EU Responsible Person partners are listed in VeyaFlow. If you already have an RP relationship, enter its details manually.' : `${partnerCount} RP partner${partnerCount===1?'':'s'} listed.`}</p>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap">
           <button onclick="openManualRpEntry()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;border:none;cursor:pointer">${hasExistingRp ? 'Update existing RP' : 'Enter your existing RP'}</button>
           <button onclick="showRpRequirementsInfo()" style="padding:.55rem 1rem;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;background:#fff;color:var(--navy);border:1px solid var(--navy);cursor:pointer">Learn about EU RP requirements</button>

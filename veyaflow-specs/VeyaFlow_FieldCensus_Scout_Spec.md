@@ -7,8 +7,41 @@
 > **For every array of like objects: which fields do MOST members carry that SOME lack — and which
 > fields does exactly ONE member carry?**
 
-**It requires no understanding of what any field does.** It would have found #199 without anyone
-knowing what CSRD is.
+**It requires no understanding of what any field does.**
+
+---
+
+## WHAT THIS SWEEP COVERS — CORRECTED 15 SEP, AFTER MEASUREMENT REFUTED THE ORIGINAL CLAIM
+
+**This spec previously claimed the census would have found #199 without anyone knowing what CSRD
+is. CC measured it. THE CLAIM WAS FALSE.**
+
+**All 19 members of `COMPLIANCE_RADAR_ITEMS`** *(named `COMPLIANCE_REQS` in the first draft — that
+array does not exist)* **carry the same seven keys.** Citeo's and Norwegian VAT's threshold
+behaviour lives **inside their `check` and `actionLabel` function bodies.** CSRD's key set is
+identical.
+
+> **The missing primitive was not a missing FIELD. It was a missing BEHAVIOUR inside a field that is
+> present.** No scoping choice makes that visible to a key-presence comparison.
+
+**AND #197 IS WEAKER THAN CLAIMED TOO.** `parked` *is* read — the rail and mobile menu use it for
+italic styling. **The read test as worded clears it.** The real question is **what the read
+DECIDES** — styling or gating — **which is a judgement per field, not a formal property.**
+
+**COVERAGE, TO BE STATED IN THE REPORT AND NOT LEFT TO INFERENCE:**
+
+| the census | |
+|---|---|
+| **finds** | structural field absence — a field its siblings carry and this member lacks |
+| **found** | #197, with the read-test caveat above |
+| **does NOT find** | behavioural absence — a present field whose body lacks the behaviour |
+| **does NOT find** | a claim that is FALSE (see the second limit below) |
+| **cannot decide alone** | whether a read is styling or gating |
+
+**Of the eleven instances of the primitive-applied-once pattern, this sweep plausibly reaches three
+or four.** *That number is an estimate and has not been measured — the sort is lane work.*
+
+> **"We have a sweep" must never be read as "the pattern is covered."**
 
 ---
 
@@ -42,9 +75,12 @@ array inventory, and STOP.** A half-triaged census is the failure this section e
 ## NAMED BASELINES — UNCHANGED AT BOTH ENDS
 
 Eleven surfaces; `index.html` at
-`74f88657245ed4efb79153913bc47658b3acebfdace79e19f0d07b6e63a3ba9c`, branch `f2b-async` at
-`2011765`. **This is a scout: `./verify.sh` GREEN, `0 of the 11 tracked surfaces modified`, exit 0,
+`49cefac83a271e11c4dfce6d59fe92391cc342389739d592150b6994d0e92d6c`, branch `f2b-async` at
+`3e75f63`. **This is a scout: `./verify.sh` GREEN, `0 of the 11 tracked surfaces modified`, exit 0,
 at the end. Any digest movement is a failure of the shipment.**
+
+*Corrected 15 Sep: this section named `74f88657`/`2011765` while SCOPE named the post-#197 tree —
+one was edited and the other left. CC used the latter, correctly, and reported the contradiction.*
 
 ---
 
@@ -54,8 +90,13 @@ at the end. Any digest movement is a failure of the shipment.**
 
 | tail | shape | instance |
 |---|---|---|
-| **majority gap** | most members carry it, some do not | **#199** — `COMPLIANCE_REQS`: Citeo and Norwegian VAT are threshold-gated and ask the brand to confirm; CSRD has no equivalent |
-| **singleton** | exactly ONE member carries it | **#197** — `atm-admin` alone declares `parked: true`, and no gate reads the property |
+| **majority gap** | most members carry it, some do not | *no instance yet — #199 was claimed here and does not qualify; see COVERAGE above* |
+| **singleton** | exactly ONE member carries it | **#197** — `atm-admin` alone declares `parked: true`, and no GATE reads the property |
+
+**AND THERE IS A THIRD BAND THE TWO TAILS DO NOT REPORT** — CC's finding: **32 key slots are carried
+by between 2 members and half.** `flag`, `badge` and `hidden` in `NAV`; `urgency` and `fineRisk` in
+the radar. **Two tails and a blind middle.** Report the band's count; **triaging it is not in this
+scope.**
 
 **The singleton tail is the more interesting of the two**: a lone declaration is usually **a rule
 someone stated on the object and no mechanism consults.** Report singletons even when they look
@@ -66,13 +107,35 @@ nothing reads is the #197 shape exactly.
 
 ## SCOPE
 
-**In:** `index.html` and **all seven** `netlify/functions/*.js`. Every array literal of **four or
-more object members sharing at least three keys.**
+**RE-SCOPED 15 SEP, OPTION 1 — after CC's inventory returned 144 candidates and stopped, correctly.**
 
-**BASELINE: the committed #197 tree, not `74f88657`.** This spec originally named the pre-#197 tree
-and required GREEN with 0 modified — **an end condition that could not be met while #197 sat
-uncommitted, and a census that would have described a NAV array about to change.** Run after the
-commit; request the named digest from the lane.
+**In: the NINE candidates in literal arrays OUTSIDE `RETAILER_REGISTRY`, with the runtime pass.**
+`REG_DEADLINES` · `EXPORT_OPTIONS` · `NAV` · `NORWAY_CUSTOMS_CHECKLIST` · the two `cpnpFields[].fields`
+· `RETAILER_ESG.apotek_hjartat_se.mandatoryRequirements` · `LISTING_REQUIREMENTS.matas_dk.requirements`.
+**Every one carries a verdict. That is the shipment.**
+
+**OUT, and each for a stated reason, not for convenience:**
+
+- **`RETAILER_REGISTRY` (47 candidates)** — one 214-member dataset whose singletons are per-retailer
+  FACTS. Its own shipment, if ever.
+- **The maps (88)** — `CLAIMS_RULES`' 31 singletons are claim strings keyed per framework. **Data
+  variation, not record-shape variation.**
+
+> **Both would yield LAWFUL verdicts at volume, which is exactly how a sweep becomes its own
+> artefact.** The completion rule applied in advance rather than discovered at the end.
+
+*Original scope — `index.html` and all seven `netlify/functions/*.js`, every array literal of four or
+more members sharing three keys — produced the inventory. **None of the seven function files holds an
+array meeting the threshold**, so they are out by measurement, not by choice.*
+
+**BASELINE — NAMED, #197 NOW COMMITTED:** `index.html` at
+`49cefac83a271e11c4dfce6d59fe92391cc342389739d592150b6994d0e92d6c`, branch `f2b-async` at
+`3e75f63`. The other ten surfaces at their existing baselines. **Clean tree; `./verify.sh` GREEN,
+57 gates, before you start.**
+
+*This spec originally named `74f88657` — the pre-#197 tree — and required GREEN with 0 modified
+while #197 sat uncommitted: an end condition that could not be met, over a NAV array that was about
+to change. Corrected 15 Sep.*
 
 **Report the array inventory FIRST** — name, line, member count — before any candidate analysis, so
 the size of the job is visible before it is done.
@@ -133,14 +196,17 @@ and narrow.**
 ## REPORT BACK
 
 1. All eleven digests before and after — unchanged, `0 of the 11 tracked surfaces modified`.
-2. **The array inventory**, before the analysis.
-3. **The candidate count**, both tails separately — before the verdicts.
-4. **Every candidate with a verdict** from the fixed vocabulary, or the stop-and-report above.
-5. **For every singleton: does anything READ the field?**
-6. **The runtime-construction pass:** the sites found, the members they build, each compared against
-   its array's literal members — **and the blind-spot sentence that qualifies every LAWFUL verdict.**
-   Name any site whose shape defeated the query.
-7. The sweep's stated limit, in your own words, in the first paragraph.
+2. **Every one of the nine candidates with a verdict** from the fixed vocabulary. **The inventory is
+   already delivered; this run is the triage.**
+3. **For every singleton: what does the read DECIDE — styling or gating?** *Not "does anything read
+   it": `parked` is read for italic styling and the read test cleared it.* **If you cannot tell,
+   UNDECIDED is the correct verdict and the question goes to the lane.**
+4. **The runtime-construction pass** over those arrays: the sites found, the members they build,
+   each compared against its array's literal members — **and the blind-spot sentence that qualifies
+   every LAWFUL verdict.** Name any site whose shape defeated the query.
+5. **The third band's count** (keys on 2 members up to half) — count only, no triage.
+6. **The coverage statement, in your own words, in the first paragraph** — what the sweep finds,
+   what it cannot find, and that #199 is outside it.
 7. Anything noticed and not fixed.
 
 ---
