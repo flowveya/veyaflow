@@ -14,7 +14,63 @@
 
 ---
 
-## PART 0 — THE DEMONSTRATION. RUN THIS FIRST AND REPORT IT BEFORE ANYTHING ELSE.
+## REWRITTEN 16 SEP — PART 0 WAS CIRCULAR, AND CC SAID SO
+
+**CC's own caveat, which found a loophole in the rule this spec was built on:**
+
+> *"I wrote the criteria knowing all three cases, so this shows the criteria CAN express them. It
+> doesn't show they'd have found them cold."*
+
+**That is overfitting, and it makes the demonstration circular.** The rule — *an instrument is
+demonstrated against a known failing case* — existed to stop adoption on plausibility. **But if the
+criteria are written against the test set, the run proves EXPRESSIBILITY, not DETECTION.**
+
+> **THE RULE'S SECOND HALF: an instrument is demonstrated when it finds cases THE AUTHOR DID NOT
+> HOLD. Otherwise it is a specification of known defects, not a detector of unknown ones.**
+
+### THEREFORE THE TEST SET IS THE 266 DIVERGENCES, NOT #197 / #226 / #220
+
+**The stop-reason turns into the method.**
+
+**TRIAGE A SAMPLE OF TWENTY, CHOSEN AT RANDOM. Not all 266, and not a sample you pick.**
+
+- **Two or three real defects → the instrument works**, and the remaining 246 are a work queue.
+- **Zero real defects → it is a noise generator**, and we learned that for the price of **twenty
+  judgements instead of 266.**
+
+> **Same discipline as the calibration: a SAMPLE THAT CAN FAIL, rather than a complete run that
+> cannot.**
+
+**Report the sampling method before the verdicts** — how the twenty were drawn, so the result means
+something.
+
+### FIRST, CUT THE NOISE THAT IS NOISE BY CONSTRUCTION
+
+**CC's second blind spot — a PARTITION read as a GAP — is cheap to fix and is a SET OPERATION, not a
+judgement:**
+
+> **If the union of several lists equals the source, they are a PARTITION, not gaps.**
+
+Each `NAV_GROUPS` group's `ids` covering less than the union of all groups is noise by construction.
+**No domain knowledge required, and it removes a whole class from the 266 before anyone reads them.**
+**Apply it, report how many of the 266 it removes, and draw the twenty from what remains.**
+
+### AND THE STRUCTURAL LIMIT STANDS, UNFIXED BY ANY OF THIS
+
+**#220's miss is not a tuning problem.** A market PICKER uses `includes` exactly as a membership TEST
+does, and **the canonical source is a BEHAVIOUR — each obligation's own `market`, resolved by one
+function — not a SET.**
+
+> **The sweep can say "these disagree" and never "this side is right". Under *divergence is
+> evidence*, that is the half that matters.**
+
+**So it is the same KIND of instrument as the field census: cheap, domain-free, produces candidates,
+does not judge.** The difference is the outcome — **zero of eleven against two of three — and the
+two were in hand.**
+
+---
+
+## PART 0 (SUPERSEDED — KEPT FOR THE RECORD). THE THREE FOUNDING CASES.
 
 **This is the first candidate instrument that arrives with known failing cases already in hand.**
 Yesterday's rule — *a sweep is a check, and a check not demonstrated against the case it claims to

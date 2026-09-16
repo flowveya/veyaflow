@@ -21237,7 +21237,7 @@ function renderSkuEdit(el){
           <div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Pricing</div>
           <div class="grid-2">
             <div class="field"><label class="lbl">RSP Sweden (SEK)</label>
-              <input type="number" value="${skuForm.rspSEK||''}" placeholder="e.g. 599" oninput="skuForm.rspSEK=this.value;updateMarginCalc()"></div>
+              <input type="number" id="rsp-sek" value="${skuForm.rspSEK||''}" placeholder="e.g. 599" oninput="skuForm.rspSEK=this.value;updateMarginCalc()"></div>
             <div class="field"><label class="lbl">RSP Denmark (DKK)</label>
               <input type="number" value="${skuForm.rspDKK||''}" placeholder="e.g. 499" oninput="skuForm.rspDKK=this.value"></div>
           </div>
@@ -21542,16 +21542,19 @@ function toggleSkuCert(cert){
 function updateMarginCalc(){
   const el = document.getElementById('margin-calc');
   if(!el) return;
-  const rsp = parseFloat(document.getElementById('net-price')?.closest('.card')?.querySelector('[placeholder="e.g. 599"]')?.value||skuForm.rspSEK||0);
+  // #229 — the RSP field is addressed by id. It used to be found by its placeholder text
+  // ('e.g. 599'): NO LOGIC MAY ADDRESS AN ELEMENT THROUGH TEXT A HUMAN IS MEANT TO READ.
+  const rsp = parseFloat(document.getElementById('rsp-sek')?.value||skuForm.rspSEK||0);
   const net = parseFloat(document.getElementById('net-price')?.value||skuForm.netPriceSEK||0);
   if(!rsp||!net){el.innerHTML='Enter RSP and net price to see margin calculation';return;}
   const margin = Math.round(((rsp-net)/rsp)*100);
-  const ok = margin>=40&&margin<=60;
-  const warn = margin<40;
-  el.innerHTML=`Retailer margin: <strong>${margin}%</strong> ${ok?'✓ Within typical 40-55% range':warn?'⚠ Below 40% — most pharmacy retailers require 40-55%':'⚠ Above 60% — verify this is intentional'}`;
-  el.style.background = ok?'#ECFDF5':warn?'#FFFBEB':'#FEF2F2';
-  el.style.borderColor = ok?'#A7F3D0':warn?'#FCD34D':'#FCA5A5';
-  el.style.color = ok?'#065F46':warn?'#92400E':'#991B1B';
+  // #228 — this panel stated a threshold no registry holds ("most pharmacy retailers require
+  // 40-55%", pass band 40-60) over per-retailer figures. A threshold is a lookup for a named
+  // retailer, never advice, and this form has no retailer selected — so it states none.
+  el.innerHTML=`Retailer margin at these SEK prices: <strong>${margin}%</strong> · No retailer selected — no margin threshold applies here.`;
+  el.style.background = '#EFF6FF';
+  el.style.borderColor = '#BFDBFE';
+  el.style.color = '#1E40AF';
 }
 
 /* ═══════════════════════════════════════════════════

@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        a2bacfe9
+index.html        108dcad4
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,74 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved a2bacfe9 → 108dcad4 on 16 Sep 2026 — THE MARGIN BATCH, PART 1 OF 2.
+# #229 AND #228 LANDED. #214 AND #230 DID NOT, AND THAT IS RECORDED HERE AS PROMINENTLY.
+#   after   108dcad4db02da32d8d53b4795e5d5e1ab042bf7f259d917f5fa33ed0635511c
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# #229 — LOGIC ADDRESSED THROUGH DISPLAY COPY.
+#   before  getElementById('net-price').closest('.card')
+#             .querySelector('[placeholder="e.g. 599"]').value || skuForm.rspSEK || 0
+#   after   getElementById('rsp-sek').value || skuForm.rspSEK || 0      (input gained id="rsp-sek")
+# CANON: NO LOGIC MAY ADDRESS AN ELEMENT THROUGH TEXT A HUMAN IS MEANT TO READ. CC re-scanned all
+# four HTML surfaces for property reads as well as selector strings — .placeholder, .textContent,
+# .innerText, .title, aria-label, alt. NO OTHER SITE DOES IT. Six .title compares read DATA objects.
+#
+# AND THE LANE'S SMOKE TESTED THE WRONG FAILURE MODE — recorded because the step would have PASSED
+# on the unfixed code. The spec predicted a blank panel ("Enter RSP and net price"). The
+# `|| skuForm.rspSEK` fallback masks that. CC measured the real hazard: with a copy edit giving the
+# DKK field "e.g. 599", the OLD code computed 50% SILENTLY FROM THE DKK VALUE while showing a
+# confident percentage. NOT "the arithmetic stops silently" — "the arithmetic reads the WRONG FIELD
+# silently." A wrong number, not an absent one.
+#
+# #228 — THE THRESHOLD IS A LOOKUP, NOT ADVICE. Deleted: the hardcoded 40/60 band,
+# "✓ Within typical 40-55% range", and "most pharmacy retailers require 40-55%".
+#   renders now  "Retailer margin at these SEK prices: 58% · No retailer selected — no margin
+#                 threshold applies here."
+# AND THE SPEC'S INSTRUCTION WAS UNIMPLEMENTABLE: it said read the threshold from the registry FOR
+# THE SELECTED RETAILER. THE SKU FORM HAS NO RETAILER SELECTOR, so this panel cannot reach the
+# registry at all. CC stated that no threshold applies rather than inventing a path to one. The
+# lane did not check the surface before writing the instruction.
+#
+# #214 DID NOT LAND — AND THE SPEC UNDERSTATED IT BY A FACTOR OF SEVEN.
+# rspCanonical has SEVEN call sites, not the one the spec treated: 6585 computePatternStatus ·
+# 6927 scoreReadiness · 14794 generateReport · 15434 scoreMarketDimension · 24936 renderPrePitchBrief
+# · 28309 renderCRM · 31877 renderExpansionOverview (COMPUTED AND NEVER READ).
+# A FURTHER DEFECT OF THE SAME CLASS, WORSE THAN THE MARGIN ONE: checkRSPFit compares the unit-less
+# number against the RETAILER'S ceiling and floor and PRINTS IT IN THE RETAILER'S CURRENCY. A SKU
+# carrying only rspSEK:599, fitted against a DKK retailer, reads "599 DKK above ceiling" — three
+# sites (6585, 24936, 28309). And 14794's report prompt labels the number "SEK" whatever it is.
+# A wrong number is one defect. A WRONG NUMBER WEARING THE RIGHT UNIT is another.
+#
+# #230 DID NOT LAND — AND ITS BLAST RADIUS IS NOT WHAT EITHER LANE WROTE.
+# NO REGISTRY ROW CARRIES A MARGIN SOURCE. So "no source, no blocker" silences marginTooLow for
+# EVERY retailer — and removes the +10/+5 commercial points across ALL EIGHT scorer callers.
+# Strategy's non-negotiable was "removing a false blocker must not PROMOTE the SKU to passed."
+# THE OPPOSITE HAPPENS: every readiness score DROPS, for a reason having nothing to do with the SKU.
+# The withheld comparison must be NEUTRAL in the score, not ABSENT from it — otherwise honesty
+# costs the brand points. RULING NEEDED BEFORE IT CAN BE BUILT.
+#
+# AND #230 IS THREE COPIES, NOT TWO. RETAILER_REGISTRY 8825: marginMin 0.48 / marginMax 0.52.
+# RETAILER_TARGETS 23865: typical 47, floor 42, ceiling 55, note "Matas 44-50%". AND THE REGISTRY
+# HOLDS 125 PROSE STRINGS restating margin bands, including Matas "48-52% margin mandatory".
+# A structured field, a tiered benchmark, and a SENTENCE — and the sentence is the one a
+# buyer-facing document would quote.
+#
+# MORE MANUFACTURED THRESHOLDS, FOUND BY THE SAME SCAN AND NOT IN SCOPE HERE:
+#   6932/6933/6934  marginMin||0.45   green / amber / red verdicts
+#   24156           data-margin="${r.marginMin||0.45}"  — NO READER FOUND
+#   24205           backwardState.marginPct = (reg?.marginMin||0.45)*100
+#   24161 · 24224   the same 45 in percent form
+#   15437           ||0.48  feeding revenue estimates
+#   16033           : 0.50  printed into the business-case prompt as "Retailer margin: 50%"
+# A fallback invents a threshold wherever a retailer has none. That is #230's defect by a different
+# mechanism, on six more sites.
+#
+# NOTICED, NOT FIXED: the CFO calculator colours margins with hardcoded 40/60/35 bands (#228's
+# shape); the BIL review form states "Typical premium-beauty retail margin is 40-50% of RRP";
+# renderExpansionOverview compares against category benchmarks of 50/35/45.
 
 # index.html moved 49cefac8 → a2bacfe9 on 16 Sep 2026 — THE RP TRIO. #218 / #219 / #217.
 # THREE DELETIONS. NOTHING WAS BUILT.
