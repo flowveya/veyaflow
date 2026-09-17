@@ -16,12 +16,11 @@ the RP tier was a HIDDEN ordering with no price in the code. This one prices it,
 
 ## NAMED BASELINES
 
-Eleven surfaces; `index.html` at
-`a2bacfe9b4c68ccea63b9b59d363067fa517e474c8c7d97e232cf2f57eb237a8`, branch `f2b-async` at
-`380ec3f`. **Confirm all eleven. Only `index.html` moves.**
+**UPDATED 17 SEP — the margin batch has landed since the draft.**
 
-*If the margin batch has landed first, request the current value from the lane — do not read a digest
-out of a CC report.*
+Eleven surfaces; `index.html` at
+`108dcad4db02da32d8d53b4795e5d5e1ab042bf7f259d917f5fa33ed0635511c`, branch `f2b-async` at
+`7fc6b74`, clean tree, 57 gates GREEN. **Confirm all eleven. Only `index.html` moves.**
 
 ---
 
@@ -103,8 +102,39 @@ on the RP partner card. **That one is in the `RP_PARTNERS` trigger** *(register,
 
 ---
 
+---
+
+## PART 2 · #235 — ONE DELETION, FOLDED IN BECAUSE IT IS SUBTRACTION
+
+```js
+16909  Norway: ['Kicks Norway','Apotek 1','Vitusapotek','Vinmonopolet'],
+```
+
+**`Vinmonopolet` is Norway's state alcohol monopoly, offered to a skincare brand as a retailer to
+pitch — on `PACK_RETAILERS`, which names the generated brand pack.**
+
+**Measured:** *"Vinmonopolet" appears **exactly once in the entire tree** — this line.* **No registry
+entry, no revenue row, no insider note.** It is not a retailer the product knows anything about.
+
+**Delete the entry. Nothing else in this part.**
+
+**DO NOT ADD A REPLACEMENT.** The registry holds VITA (10442) and describes it as *"Norway's most
+accessible beauty specialist… start here before approaching Kicks Norway or Apotek 1"* — **so the
+list omits the retailer our own registry names first.** *Adding it CHANGES WHAT THE PRODUCT
+RECOMMENDS, which is Strategy's and is on the board separately.* **Removal is subtraction and needs
+no ruling. Addition is not.**
+
+**Report, do not fix:** `PACK_RETAILERS` is a **parallel retailer vocabulary keyed by display name**,
+with no relationship to `RETAILER_REGISTRY`. **Nothing validates any of its seven markets' entries**
+— and there is a third vocabulary at 15817, a revenue table also keyed by display name. **How many
+of the other 24 names have no registry entry? That count is the finding, and it is #234's family.**
+
+---
+
 ## OUT OF SCOPE
 
+- **Adding VITA or any other retailer to `PACK_RETAILERS`.** Subtraction only.
+- **Reconciling `PACK_RETAILERS` with the registry.** Report the count; the work is its own shipment.
 - **Deciding what "verified" means.** Unruled, Strategy's, and it blocks nothing here.
 - **Un-parking or touching the `find` surface.**
 - **`MFR_LISTING_TIERS`' contents** — all twelve are `'free'`; leave the map.

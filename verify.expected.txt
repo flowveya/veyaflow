@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        108dcad4
+index.html        27b69d30
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,61 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 108dcad4 → 27b69d30 on 17 Sep 2026 — #224 AND #235. TWO DELETIONS.
+#   after   27b69d30b0c1a6a0cf7557a65a7dd47e84e3b8a775b99177e59b8a0d30fa68b9
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# #224 — THE SECOND INSTANCE OF #218's RULING, AND WORSE THAN THE FIRST.
+# VEYAFLOW TAKES NO COMMERCIAL CONSIDERATION THAT AFFECTS ORDERING (Strategy, 16 Sep).
+# The RP tier was a HIDDEN ordering with no price in the code. LISTING_TIERS priced it:
+#   verified  sortBoost:10  price:4900     featured  sortBoost:25  price:9900
+# AND WHAT THE 4,900 TIER BOUGHT WAS THE WORD "✓ Verified" — contradicting #219 in the same object.
+# sortBoost and price DELETED from all three entries. getFilteredMfrs' comparator now sorts by
+# sustainability score alone. Nothing flagged off, nothing commented out. A comment records the
+# ruling and its date — the honest use of a comment is to record a decision that lacks code.
+# It was NOT vestigial: the comparator RAN, sorting by boost BEFORE sustainability. Inert only
+# because all twelve manufacturers map to 'free'.
+#
+# MEASURED (scratch only; the repo file was never seeded) — manufacturer 15 → 'verified', 16 →
+# 'featured':
+#   HEAD    unseeded 11,1,4,9,15,3,16,12,2,7,14,13 → seeded 16,15,11,1,4,9,3,12,2,7,14,13  MOVES
+#   edited  unseeded 11,1,4,9,15,3,16,12,2,7,14,13 → seeded IDENTICAL                      HOLDS
+#
+# #235 — PACK_RETAILERS.Norway offered VINMONOPOLET, Norway's state alcohol monopoly, to a skincare
+# brand as a retailer to pitch — on the structure that NAMES THE GENERATED BRAND PACK.
+# Deleted. Norway now reads ['Kicks Norway','Apotek 1','Vitusapotek'].
+# NO REPLACEMENT ADDED. The registry holds VITA (10442) and calls it "Norway's most accessible
+# beauty specialist… start here before approaching Kicks Norway or Apotek 1" — so the list omits the
+# retailer our own registry names first. ADDING IT CHANGES WHAT THE PRODUCT RECOMMENDS and is
+# Strategy's. Removal is subtraction and needs no ruling; addition is not.
+#
+# THE LANE'S SCOPE ERROR, RECORDED: the spec stated "Vinmonopolet appears exactly once in the entire
+# tree". The lane had grepped index.html ALONE. It also sits at brand/index.html:162 in the brand
+# viewer's slug map — outside this shipment, correctly untouched. A scope claim, not a count claim,
+# and the word "tree" was doing work the measurement had not done.
+#
+# THE RESIDUAL SCAN MATCHED ITS OWN DOCUMENTATION. CC's first edit FAILED Smoke Step 3 because the
+# comment recording the ruling contained the word "sortBoost". Reworded to "sort boost"; digest
+# 7a575b85 → 27b69d30. THE CHECK SHAPED THE RECORD: the next person to grep sortBoost finds nothing,
+# and the comment explaining its removal deliberately avoids the term. Correctly paid, worth naming
+# — A RESIDUAL SCAN THAT MATCHES ITS OWN DOCUMENTATION WILL ALWAYS BE ANSWERED BY WEAKENING THE
+# DOCUMENTATION. The step should have scoped to code lines.
+#
+# THE COUNT, REPORTED NOT FIXED: 7 of the 28 PACK_RETAILERS names have no RETAILER_REGISTRY entry —
+# AND 6 OF THE 7 DIFFER ONLY IN SPELLING: Kicks Sweden/Kicks · Douglas DE/Douglas · Sephora DE/
+# Sephora · Douglas NL/Douglas Netherlands · Ici Paris XL/ICI PARIS XL · Sephora FR/Sephora France.
+# SIX NEAR-MISSES IS WORSE THAN SIX FICTIONS: a fiction fails loudly, a near-miss fails silently and
+# renders as an absence rather than an error. #216's shape at scale, and the argument for keying
+# referential integrity on IDS rather than display names. PACK_RETAILERS is a parallel retailer
+# vocabulary keyed by display name; a third exists at 15817, a revenue table keyed the same way.
+#
+# "✓ Verified" — THREE occurrences, one more than the spec named. The paid listing tier (29397-29402,
+# 29587, 29597; never shown, all tiers 'free'). The RP partner card (16425; RP_PARTNERS empty).
+# AND 7703, THE BRAND VERIFICATION CARD — "Tier 3 Certified requires in-person VeyaFlow audit",
+# shown at tier===2, GRANTED BY HAND through an admin prompt. Three trust claims on three surfaces,
+# one manually awarded. All report-only: what "verified" means is unruled (#219).
 
 # index.html moved a2bacfe9 → 108dcad4 on 16 Sep 2026 — THE MARGIN BATCH, PART 1 OF 2.
 # #229 AND #228 LANDED. #214 AND #230 DID NOT, AND THAT IS RECORDED HERE AS PROMINENTLY.

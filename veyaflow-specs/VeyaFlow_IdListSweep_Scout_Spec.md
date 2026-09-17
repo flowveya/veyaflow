@@ -96,10 +96,15 @@ catch is a claim about a capability* — **applies the same day.**
 
 ## NAMED BASELINES — UNCHANGED AT BOTH ENDS
 
+**UPDATED 17 SEP — two shipments have landed since the first draft.**
+
 Eleven surfaces; `index.html` at
-`a2bacfe9b4c68ccea63b9b59d363067fa517e474c8c7d97e232cf2f57eb237a8`, branch `f2b-async` at **the
-RP-trio commit** — request the value from the lane if the trio has landed; if it has not,
-`3e75f63` with `index.html` dirty at `a2bacfe9`.
+`108dcad4db02da32d8d53b4795e5d5e1ab042bf7f259d917f5fa33ed0635511c`, branch `f2b-async` at
+`7fc6b74`, clean tree, 57 gates GREEN.
+
+*The draft named `a2bacfe9` and the RP-trio commit. Both are now two shipments old. **Confirm the
+value above against `verify.expected.txt` before starting** — a spec's named baseline goes stale the
+moment anything ships, and this one has gone stale twice.*
 
 **`./verify.sh` GREEN, `0 of the 11 tracked surfaces modified`, exit 0.** A scout that moves a digest
 has stopped being a scout.

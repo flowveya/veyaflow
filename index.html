@@ -16906,7 +16906,7 @@ function renderBrandPack(el){
     Sweden:           ['Lyko','Kicks Sweden','Apotek Hjärtat','Åhléns'],
     'United Kingdom': ['Boots UK','Holland & Barrett','Space NK','Selfridges'],
     Germany:          ['dm-drogerie markt','Rossmann','Douglas DE','Sephora DE'],
-    Norway:           ['Kicks Norway','Apotek 1','Vitusapotek','Vinmonopolet'],
+    Norway:           ['Kicks Norway','Apotek 1','Vitusapotek'],
     Netherlands:      ['Etos','Kruidvat','Douglas NL','Ici Paris XL'],
     France:           ['Sephora FR','Monoprix','Galeries Lafayette Beauté','Marionnaud'],
   };
@@ -28453,9 +28453,7 @@ function getFilteredMfrs(){
     const mAc=m.accepting_clients!==false;
     return mQ&&mC&&mM&&mS&&mMoq&&mT&&mQt&&mVt&&mAc;
   }).sort((a,b)=>{
-    const ta=LISTING_TIERS[getMfrTier(a.id)]?.sortBoost||0;
-    const tb=LISTING_TIERS[getMfrTier(b.id)]?.sortBoost||0;
-    if(tb!==ta) return tb-ta;
+    // No listing tier affects this order (#218 / #224 — see LISTING_TIERS).
     return calcSusScore(b)-calcSusScore(a);
   });
 }
@@ -36258,10 +36256,15 @@ async function generateDPPPdf(skuId){
 ═══════════════════════════════════════════════════ */
 
 // ── Listing tiers ─────────────────────────────────
+// #224, 17 Sep 2026 — applies #218's ruling (Strategy, 16 Sep 2026): VEYAFLOW TAKES NO COMMERCIAL
+// CONSIDERATION THAT AFFECTS ORDERING. These tiers carried a price (4,900 / 9,900) and a sort boost
+// (10 / 25) that getFilteredMfrs read to rank paying manufacturers first. Both fields and that
+// comparator branch were DELETED, not flagged or commented out. The badge ('✓ Verified' on a paid
+// tier) is #219's open question and is deliberately left as it was.
 const LISTING_TIERS = {
-  free:     {label:'Free',     badge:null,         color:'#9A9489', sortBoost:0,  price:0},
-  verified: {label:'Verified', badge:'✓ Verified', color:'#1E40AF', sortBoost:10, price:4900},
-  featured: {label:'Featured', badge:'★ Featured', color:'#C4A882', sortBoost:25, price:9900},
+  free:     {label:'Free',     badge:null,         color:'#9A9489'},
+  verified: {label:'Verified', badge:'✓ Verified', color:'#1E40AF'},
+  featured: {label:'Featured', badge:'★ Featured', color:'#C4A882'},
 };
 const MFR_LISTING_TIERS = {1:'free',2:'free',3:'free',4:'free',7:'free',9:'free',11:'free',12:'free',13:'free',14:'free',15:'free',16:'free'};
 function getMfrTier(id){ return MFR_LISTING_TIERS[id]||'free'; }
