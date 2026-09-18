@@ -7702,7 +7702,7 @@ function renderVerificationCard(){
           class="btn-sm" style="background:var(--accent);color:#fff;margin-top:12px;text-decoration:none">Request verification <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       `:tier===2?`<div style="font-family:var(--mono);font-size:10px;color:var(--ink-mute);margin-top:10px">✓ Verified — Tier 3 Certified requires in-person VeyaFlow audit</div>`:''}
       <div style="margin-top:8px;text-align:right">
-        <span onclick="var v=prompt('Admin: set verification tier (0-3):','${tier}');if(v!==null&&v!==''){brand.verificationTier=parseInt(v)||0;saveBrandState();renderDashboard(document.getElementById('page-home'));}" style="cursor:pointer;color:transparent;user-select:none" id="vf-admin-override">·</span>
+        
       </div>
     </div>
   `;
@@ -38395,12 +38395,14 @@ function getIncompleteChecklistSubmissions(){
       if(s.status !== 'under_review') return;
       var reqsObj = LISTING_REQUIREMENTS[s.retailerId];
       if(!reqsObj) return;
-      var reqs = reqsObj.requirements || [];
       var firstSku = (s.skuIds||[])[0];
       if(!firstSku) return;
       var key = s.retailerId+'::'+firstSku;
       var state = cstate[key] || {};
       var sku = (typeof skus !== 'undefined' ? skus : []).find(function(x){ return String(x.id)===String(firstSku); });
+      // #237 — through the product-type gate, like the checklist page. The raw list omitted the
+      // device/accessory rows and kept cosmetic-only ones, so Home understated the remaining work.
+      var reqs = getRequirementsForRetailerAndProduct(s.retailerId, sku);
       var incomplete = 0;
       reqs.forEach(function(r){
         var done = false;
@@ -39804,7 +39806,8 @@ function printRetailChecklist(){
   var state = retailChecklistState[stateKey] || {};
   var retailerLabel = retailChecklistSelRetailer === 'apotek_hjartat_se' ? 'Apotek Hjärtat' : retailChecklistSelRetailer === 'matas_dk' ? 'Matas' : retailChecklistSelRetailer;
   var today = new Date().toLocaleDateString('en-GB');
-  var rowsHtml = reqsObj.requirements.map(function(r){
+  // #237 — the printed checklist lists the same gated rows the checklist page shows.
+  var rowsHtml = getRequirementsForRetailerAndProduct(retailChecklistSelRetailer, sku).map(function(r){
     var autoDone = r.autoCheck ? retailChecklistAutoCheckValue(r.autoCheck, sku) : false;
     var done = autoDone || !!state[r.id];
     return '<tr><td style="padding:.5rem .75rem;border-bottom:1px solid #ddd;text-align:center;width:36px">'+(done?'☑':'☐')+'</td><td style="padding:.5rem .75rem;border-bottom:1px solid #ddd">'+retailEsc(r.label)+'</td></tr>';

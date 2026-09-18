@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        27b69d30
+index.html        f36d7f66
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,76 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 27b69d30 → f36d7f66 on 18 Sep 2026 — #237 AND THE SELF-AWARDING DOT.
+#   after   f36d7f664d0d13e0f5f05521b96499f72e6095820098d6d38f80c25bc2515795
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# #237 — A GATE THAT EXISTS AND TWO OF THREE CONSUMERS IGNORED IT.
+# getRequirementsForRetailerAndProduct filters retailer rows by productTypes AND appends
+# PRODUCT_TYPE_REQUIREMENTS. getIncompleteChecklistSubmissions (the HOME counter) and
+# printRetailChecklist read reqsObj.requirements RAW. Both now call the gate.
+#
+# THE OPEN QUESTION WAS CLOSED BY MEASUREMENT, NOT ASSUMED: the raw reads had no reason. The SKU is
+# already in scope three lines below (38403), and the gate needs exactly that plus the retailer id.
+# The functions were written WITHOUT the gate, not around it — so the entrance-guard fix broke
+# nothing. A CALL-SITE fix, not a schema change.
+#
+# DESIGN'S ITEM 5 IS REWRITTEN BY THIS, NOT SOLVED BY IT. Design asked for a CAPABILITY — "every
+# template field knows whether it applies to cosmetic, device or both". The capability was already
+# present and bypassed. CANON: A CAPABILITY'S STATE CANNOT BE INFERRED FROM THE CORRECTNESS OF ITS
+# OUTPUT — a wrong number means NO GATE or a BYPASSED GATE, and the output cannot say which.
+#
+# MEASURED, incomplete/total, real functions in scratch:
+#   cosmetic   Matas          5/8   → 5/8    UNCHANGED   · Apotek Hjärtat  8/10 → 8/10  UNCHANGED
+#   device     Matas          5/8   → 12/15              · Apotek Hjärtat  8/10 → 14/15
+#   accessory  Matas          5/8   → 7/10               · Apotek Hjärtat  8/10 → 9/10
+# THE HOME COUNTER HAD UNDERSTATED THE REMAINING WORK BY MORE THAN HALF for a device, on a
+# submission already under review. IT FAILED FLATTERING — third instance this week after
+# `filled: true` and the -150% margin. Nobody investigates good news.
+#
+# AND ONE ROW DESERVES ITS OWN NOTE: accessory at Apotek Hjärtat went 8/10 → 9/10, "same count,
+# DIFFERENT ROWS". The total is stable and the content changed. Had we compared totals alone —
+# which is what a smoke step naturally does — we would have recorded it as unchanged. CC caught it
+# by reporting rows rather than counts.
+#
+# READERS OF LISTING_REQUIREMENTS: FIVE, following aliases to any depth. The fifth,
+# renderRetailSubmissionCard (38660), NEVER READS THE ROWS — it only checks that requirements exist,
+# to show a button. renderRetailChecklist is gated whenever a SKU is selected and falls back to raw
+# only when the brand has NO SKUs at all, where there is no type to filter by. So exactly two
+# consumers bypassed the gate, as specced, and both are fixed.
+#
+# THE SELF-AWARDING DOT — DELETED. An invisible, unselectable, one-character control on Brand Home
+# (7705: color:transparent, user-select:none) whose onclick ran prompt('Admin: set verification tier
+# (0-3)') and wrote brand.verificationTier. Its id was referenced nowhere. The wrapper div stays, so
+# the card's spacing is unchanged.
+#
+# RULED: THE TRAP WAS NOT THE TYPO, IT WAS THE DOT. portal.html:1048 renders
+# "★ VeyaFlow Verified · Tier 2" IN GOLD TO A BUYER, reading brand.verifiedTier while the machinery
+# writes brand.verificationTier. The badge never rendered ONLY because the names differ. A trigger
+# saying "don't fix the name yet" is a POLICY that depends on someone reading the register at the
+# right moment; removing the dot makes the mismatch an ordinary bug anyone may fix at any time.
+#
+# BUT DELETING THE WRITER DID NOT DELETE WHAT IT WROTE. Measured: the dot was the ONLY writer, and
+# nothing else assigns brand.verificationTier (the remaining assignment is findForm.verificationTier
+# at 29527, the manufacturer filter — a different object). verifiedTier has NO writer at all.
+# HOWEVER a brand carrying a stored verificationTier: 2 still resolves to Tier 2 and still renders
+# "✓ Verified". NO NEW self-awarded tier can be created; ANY EXISTING ONE SURVIVES, and a rename
+# would still surface it. CANON: REMOVING A MECHANISM DOES NOT REMOVE ITS OUTPUT — same shape as
+# "the cache, not the deploy" and #148's back-fill. Every deletion has a residue question.
+# OPEN DATA QUESTION FOR CHARLOTTE: does any brand row carry verificationTier >= 2?
+#
+# #240, NOTICED AND NOT FIXED — AND THIS SHIPMENT PROPAGATED IT.
+#   37395  var effectiveType = isLegacyProductType(skuType) ? 'cosmetic' : (skuType || 'cosmetic');
+# An UNSET product type becomes 'cosmetic', and skuType is the RAW sku.productType, not
+# resolveProductFramework. TWO STATED CONTRACTS BROKEN IN ONE LINE: "unknown is first-class, never a
+# synonym for cosmetic" and "resolve through the framework resolver, never the raw field". The
+# battery lists the first as NOT CHECKED, so nothing catches it. AND THE HOME COUNTER NOW INHERITS
+# IT — the counts do not move, because it was cosmetic-equivalent there before, but the defect is in
+# one more place than it was this morning. Recorded rather than discovered later.
+#
+# ALSO NOTICED: renderRetailChecklist still falls back to raw rows when the brand has no SKUs.
 
 # index.html moved 108dcad4 → 27b69d30 on 17 Sep 2026 — #224 AND #235. TWO DELETIONS.
 #   after   27b69d30b0c1a6a0cf7557a65a7dd47e84e3b8a775b99177e59b8a0d30fa68b9
