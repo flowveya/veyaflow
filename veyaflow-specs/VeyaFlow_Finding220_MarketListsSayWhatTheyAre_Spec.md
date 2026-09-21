@@ -158,8 +158,10 @@ our own limits.* **A maturity marker, not a defect.**
 3. **What the six-market `isEU` list actually gates — measured, not guessed. DO NOT RENAME IT.**
 4. **Every other reader of `RP_DATA_MARKETS`** after the repoint.
 5. **What a brand targeting one of the 15 previously-missing states sees today** — the banner, and
-   **whether the RP marketplace renders an empty list or says nothing at all.** *Report only; the
-   honestly-empty state is its own item and its copy is Strategy's.*
+   **the question that decides the follow-on build: CAN the RP marketplace REPRESENT "we hold none
+   for this market" AS A STATE, or does it only have an empty array that renders to nothing?**
+   *Report only. Without that state there is nowhere to write the sentence, so this answer is what
+   unlocks the copy — and the copy is Strategy's.*
 6. Anything noticed and not fixed.
 
 ---

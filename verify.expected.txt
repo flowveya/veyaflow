@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        f36d7f66
+index.html        5dac2427
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,96 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved f36d7f66 → 5dac2427 on 21 Sep 2026 — #220's RENAMES AND #243's REPOINT.
+#   after   5dac24271252ead370f7054ef9fa1661e4ed40327320604e363a617cf4919341
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# #243 — THE RP CHECK WAS DELETING A REAL OBLIGATION. #230'S INVERSE.
+# checkComplianceGap read EU_RP_MARKETS (15 entries, a COVERAGE list) for an EU/EEA-WIDE requirement.
+# A brand targeting Poland was told it needs an RP; a brand targeting Czechia was not. #230
+# MANUFACTURES an obligation from an unsourced threshold; this one DELETED a real one.
+# THE FALSE NEGATIVE IS THE WORSE DIRECTION: a false positive costs money — an RP bought
+# unnecessarily. A false negative means PRODUCT ON MARKET WITHOUT A LEGALLY REQUIRED RESPONSIBLE
+# PERSON. The front door failing silently.
+# Proportion, recorded because Strategy has a documented over-escalation: all four of Charlotte's
+# markets were already in the old list, so the check fired correctly for her. LATENT FOR HER,
+# STRUCTURAL FOR THE PRODUCT, and the window opens with a customer.
+# Source for the EU/EEA-wide reach: Strategy research 21 Sep — secondary sources, consistent, NOT
+# the regulation text. No article number goes on any buyer-facing surface; standing rule unchanged.
+#
+# THE FIX WAS NOT UNIFICATION, AND THAT HAD TO BE SAID SO THE EARLIER RULING DID NOT BLOCK IT.
+# The 17 Sep ruling stands: the four market lists are NOT merged — three of them are COVERAGE lists
+# wearing a MEMBERSHIP name, and merging onto the correct one would silently widen three coverage
+# checks into EU-wide assertions. Here ONE CALL SITE used a coverage list where a MEMBERSHIP TEST
+# was required. Pointing it at the membership list corrects WHICH QUESTION IS ASKED.
+#
+# WHAT LANDED:
+#   EU_EEA_MEMBER_STATES  hoisted from `var` inside regMarketApplies (1952) to module-level const.
+#                         Same 30 entries byte-for-byte. Comment: "THIS IS THE MEMBERSHIP LIST.
+#                         IT IS THE ONLY ONE." The hoist makes it globally reachable — which is the
+#                         condition that produced the other three lists — so THE RENAMES ARE IN THE
+#                         SAME EDIT and the name is the guard.
+#   RADAR_MARKETS         was EU_MKTS. "the markets the radar has rows for. NOT EU membership."
+#   RP_DATA_MARKETS       was EU_RP_MARKETS. "the markets we hold RP data for. NOT the RP
+#                         obligation's reach." Duplicate Denmark removed: 16 entries → 15.
+#   euIntent (16652)      now reads EU_EEA_MEMBER_STATES.
+#   cosmeticSkus (16657)  BYTE-IDENTICAL, asserted by the edit script. It resolves through
+#                         resolveProductFramework and its comment states the contract: an unstated
+#                         type is `unknown`, not a cosmetic. CANON: WHEN TWO IMPLEMENTATIONS DIVERGE
+#                         AND ONE HONOURS A WRITTEN CONTRACT, THE CONTRACT DECIDES — so this is the
+#                         reference implementation for #240's later fix.
+#
+# THE THIRD RENAME WAS GATED AND THE GATE WAS RIGHT FOR AN UNANTICIPATED REASON.
+# The lane proposed renaming `isEU` (24551) to `hasLandedCostData`, marked as a guess. Strategy
+# gated it: A RENAME IS AN ASSERTION ABOUT PURPOSE — it outlives comments, it is the first thing the
+# next person reads, and IT IS NEVER QUOTED WITH A CAVEAT. A CONFIDENTLY WRONG NAME IS WORSE THAN AN
+# OBVIOUSLY WRONG ONE: EU_MKTS is suspect the moment anyone looks; hasLandedCostData would have
+# looked SETTLED, and a settled name ends the investigation.
+# MEASURED: `isEU` IS DEAD CODE. Declared in renderLandedTab, never read. Landed cost takes duty
+# from DUTY_RATES and freight from FREIGHT_EST; neither consults it. So ANY gate-shaped name would
+# have been wrong — the measurement dissolved the thing being named. RULING NEEDED: delete or leave.
+#
+# THE RENAME IS ITSELF THE MECHANICAL ENUMERATION OF READERS — and its SCOPE travels with it.
+# A rename breaks every reader not updated, so the run produces the census mechanically. It is
+# EXHAUSTIVE over static references INSIDE THE EDIT'S SCOPE and BLIND to dynamic access
+# (window[name], obj['EU_'+suffix]), to readers in brand/index.html, portal.html and the functions,
+# and to names surviving in serialised data or localStorage keys. A CEILING for static refs in
+# scope; still a LOWER BOUND for "who reads this list". Measured: each name had exactly the readers
+# the spec knew and nothing else.
+#
+# MEASURED (real functions in scratch):
+#   NORDLYS deadline rows   10 → the same 10, same order
+#   NORDLYS radar           identical HTML, same hash
+#   Czechia-only brand      NO GAP → GAP
+#   all 15 previously-missing states  each no-gap → gap; a UK-only brand holds at no-gap as control
+# SMOKE STEP 3 AS WRITTEN COULD NOT FAIL — FOURTH TIME FOR THIS LANE. `markets` includes
+# currentMarket, and NORDLYS's is Sweden, already a membership market, so the banner showed before
+# AND after. CC found the case that can fail — a brand whose ONLY market is Czechia — and ran it.
+#
+# #244, CREATED BY THIS FIX AND AN IMPROVEMENT BY OUR OWN RULE: a Czechia brand now sees the Brand
+# Pack assert that an EU RP is required while the Compliance Radar beside it renders ZERO ROWS,
+# because RADAR_MARKETS has no Czechia. Before, both surfaces were silently wrong together; now one
+# is right and the other is visibly empty. NOISE IS DETECTABLE, A UNANIMOUS FALSEHOOD IS NOT — the
+# disagreement is the user's signal. Fixing the radar's coverage is its own item.
+#
+# RP_DATA_MARKETS NOW HAS NO READER AT ALL — the repoint took its only one. DO NOT DELETE IT: it is
+# exactly the list that answers "do we hold RP partners for this market?", which is the input the
+# honestly-empty state needs. The repoint made it dead and the build item revives it.
+#
+# AND THE RP MARKETPLACE'S EMPTY STATE IS GLOBAL, NOT PER-MARKET — "No RP partners listed". While
+# RP_PARTNERS is empty that is honest for every market, Czechia included. THE PER-MARKET STATE
+# BECOMES NECESSARY ONLY WHEN WE HOLD PARTNERS FOR SOME MARKETS AND NOT OTHERS, so the build item
+# has a TRIGGER, not a date: RP_PARTNERS gaining its first row.
+# Strategy's ruling on that copy, for whoever builds it: the obligation stands unhedged; the gap is
+# named as OURS in one clause, without apology and without promise; the next step is described only
+# as far as it is sourced — the ROLE, not the article, and never a named company; and NO "coming
+# soon". NON-NEGOTIABLE: an empty marketplace must not read as "no RP is needed".
+#
+# NOTICED, NOT FIXED: checkComplianceGap's header comment names THREE surfacing points (Brand Pack
+# banner, compliance radar, checklist). Only the banner calls it. The comment asserts more than the
+# code does — the greppable signature again.
 
 # index.html moved 27b69d30 → f36d7f66 on 18 Sep 2026 — #237 AND THE SELF-AWARDING DOT.
 #   after   f36d7f664d0d13e0f5f05521b96499f72e6095820098d6d38f80c25bc2515795
