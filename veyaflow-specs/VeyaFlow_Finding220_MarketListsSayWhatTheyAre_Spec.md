@@ -45,7 +45,21 @@ unthinkable.**
 |---|---|---|
 | `EU_MKTS` (7959) | **`RADAR_MARKETS`** | the markets `COMPLIANCE_RADAR_ITEMS` has rows for |
 | `EU_RP_MARKETS` (16641) | **`RP_DATA_MARKETS`** | the markets we hold RP data for |
-| `isEU` (24551) | **`hasLandedCostData`** | *(or the truest name for what that six-market list actually gates — **report your reading before renaming if `hasLandedCostData` is wrong**)* |
+| `isEU` (24551) | **NOT RENAMED IN THIS EDIT — GATED ON MEASUREMENT** | see below |
+
+### THE THIRD RENAME IS GATED, AND THE REASON IS THE NAME ITSELF
+
+**`hasLandedCostData` was the lane's guess, marked as one. Strategy gated it:**
+
+> **A rename is an assertion about PURPOSE — the most durable kind we make.** It outlives comments,
+> it is the first thing the next person reads, **and it is never quoted with a caveat.**
+
+> **CANON: A CONFIDENTLY WRONG NAME IS WORSE THAN AN OBVIOUSLY WRONG ONE.** `EU_MKTS` is suspect the
+> moment anyone knows to look. **`hasLandedCostData` would look SETTLED — and a settled name ends the
+> investigation.** *An error that flatters, on the naming axis.*
+
+**So: MEASURE IT AND REPORT. Do not rename it.** *That "one edit" is tidier is not a reason to press
+a guess into a name.*
 
 **Each rename carries a one-line comment stating what the list IS and what it is NOT.** *The honest
 use of a comment: record a decision that lacks code.*
@@ -98,12 +112,38 @@ implementation for #240's later fix and must survive byte-identical.**
 
 ---
 
+### RULED — WHAT A CZECHIA-TARGETING BRAND SEES, AND THE ABSENCE IS SPLIT
+
+**The fix is unambiguously an improvement and that is stated before anyone hesitates:**
+
+> **Telling someone a true thing she cannot act on is better than a false one that lets her continue
+> unlawfully. The obligation is real whether or not we can help with it.**
+
+**But the rendering splits on WHOSE ABSENCE IT IS:**
+
+| | whose | so |
+|---|---|---|
+| **the obligation** | **hers** | **the banner stands** |
+| **no RP partner for Czechia** | **ours** | **honestly empty — never silently empty** |
+
+**"We have no RP partners registered for Czechia."** *Never an empty list, which reads as "no options
+exist."*
+
+> **NON-NEGOTIABLE: AN EMPTY MARKETPLACE MUST NOT READ AS "NO RP IS NEEDED."** **Absence read as its
+> opposite, in the one direction that makes the whole fix pointless.**
+
+**And this is the first time the product says something true it cannot help with.** *The honesty
+discipline has been about not claiming more than we know; the grown-up version is being useful about
+our own limits.* **A maturity marker, not a defect.**
+
+---
+
 ## OUT OF SCOPE
 
 - **Merging any two lists.** The ruling stands.
 - **#240's fix at 37395.** Referenced here, fixed elsewhere.
-- **The 15 EU/EEA states' RP data.** *Widening the TEST is not the same as holding data for those
-  markets; report what a brand targeting Czechia now sees beyond the banner.*
+- **Building the honestly-empty RP-marketplace state** *(ruled below — report what renders today; the
+  copy is Strategy's and the build is its own item).*
 - **#214 / #230 / #233 / #242 / #227.**
 
 ---
@@ -111,12 +151,15 @@ implementation for #240's later fix and must survive byte-identical.**
 ## REPORT BACK
 
 1. All eleven digests before and after — only `index.html` differs.
-2. **Every reader of each renamed list**, before editing — *if a rename touches a site none of us
-   knows about, that site is a finding.*
-3. **Your reading of what the six-market `isEU` list actually gates**, before you rename it.
+2. **Readers discovered BY the rename, as their own item.** *A rename breaks every reader that is not
+   updated — so the run produces the enumeration MECHANICALLY. Canon says an enumeration is a lower
+   bound until something mechanical produces it; **this is the producer.** Any site none of us knew
+   about is a finding in itself.*
+3. **What the six-market `isEU` list actually gates — measured, not guessed. DO NOT RENAME IT.**
 4. **Every other reader of `RP_DATA_MARKETS`** after the repoint.
-5. **What a brand targeting one of the 15 previously-missing states now sees** — the banner, and
-   anything downstream of `hasGap`.
+5. **What a brand targeting one of the 15 previously-missing states sees today** — the banner, and
+   **whether the RP marketplace renders an empty list or says nothing at all.** *Report only; the
+   honestly-empty state is its own item and its copy is Strategy's.*
 6. Anything noticed and not fixed.
 
 ---
@@ -136,8 +179,11 @@ Mid-batch reads `AWAITING NAME for: index.html`, exit 1. Ten other surfaces unch
 of a local one; if anything moves, the hoist changed a value.*
 
 **Step 2 · NORDLYS is unaffected by #243.** All four of her markets were already in
-`RP_DATA_MARKETS`. **The RP banner behaves exactly as today.** *This step cannot fail and is here to
-prove the fix did not disturb the passing case.*
+`RP_DATA_MARKETS`. **The RP banner behaves exactly as today.**
+
+> **THIS STEP CANNOT FAIL. It is a NOTE, not a test** — written out so it is not counted as evidence.
+> *A smoke step that cannot fail is not a test; saying so in the step is what stops it being read as
+> coverage.*
 
 **Step 3 · the step that can fail.** Set `brand.targetMarkets` to include **Czechia** and clear the
 RP name. **The RP gap banner appears.** *Before this shipment it does not.* **Then remove Czechia —
