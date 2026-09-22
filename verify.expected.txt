@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        5dac2427
+index.html        52d0a88f
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -23,6 +23,181 @@ netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
 
+# index.html moved 5dac2427 → 52d0a88f on 22 Sep 2026 — THE PREDICATE BATCH.
+#   after   52d0a88ffa564aaed0fe38134d7b95665965691efd8bbce75e1ace574982cf1f
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# ONE PURPOSE, AND IT FITS IN A SENTENCE: REMOVE THE ROUTES TO A MEMBERSHIP ANSWER THAT SKIP THE
+# LOGIC. Two routes existed and both close here. They are not two cleanups that share a file — they
+# are the same job, and leaving either open would have left the shipment incomplete by its own
+# definition.
+#
+# ROUTE 1 — THE LIST WAS PUBLIC. Yesterday's hoist made EU_EEA_MEMBER_STATES globally reachable, so
+# anyone could write EU_EEA_MEMBER_STATES.includes(m) inline and skip regMarketApplies, losing the
+# 'EU'/'EU/EEA' resolution and the C2N code-to-name mapping that make the answer correct.
+# CANON: A PUBLIC LIST IS A PUBLIC PREDICATE WITH ITS REASONING REMOVED. A correct source with the
+# logic stripped off — the same form as the brand pack's name list against the registry's reasoning,
+# and WE INSTALLED IT IN OUR OWN FIX one day earlier.
+# THE GATING MEASUREMENT: both readers test per-market and neither iterates the list, reads its
+# length, or depends on its order —
+#     1957   mkts.some(m => EU_EEA_MEMBER_STATES.indexOf(m) > -1)     regMarketApplies
+#     16661  markets.some(m => EU_EEA_MEMBER_STATES.indexOf(m) >= 0)  checkComplianceGap
+# so both become .some(isEuEeaMarket), which also collapses the > -1 / >= 0 split: the same test
+# written two ways, a micro-instance of the family this lane keeps finding.
+# THE 30 ENTRIES NOW LIVE INSIDE THE PREDICATE'S CLOSURE, internally named MEMBERS. In a single-file
+# app with no modules PRIVATE MEANS CLOSURE — a structural change, not a wrapper. It makes the list
+# genuinely unreachable rather than merely unfashionable to use, and the bypass needs no second
+# counter-measure. MEASURED AFTER: 0 references outside the closure.
+# And the discoverability argument stands on its own: Set appears 14+ times in the file, every one
+# function-local and derived, never a declared membership constant — while 188 module-level
+# SCREAMING_CASE constants exist. The idiom exists; the convention does not. A 189th constant is not
+# findable; A GREP FOR THE QUESTION FINDS A FUNCTION NAMED FOR THE QUESTION.
+#
+# ROUTE 2 — isEU (24551) DELETED. 0 references. Six markets of twenty-seven, declared in
+# renderLandedTab, never read; landed cost takes duty from DUTY_RATES and freight from FREIGHT_EST.
+# DEAD CODE IS INERT TO THE MACHINE. IT IS STILL READ BY PEOPLE, AND THE NAME MAKES A CLAIM. isEU is
+# the most natural name anyone would give the test "is this market in the EU". Someone needing that
+# test greps it, finds a plausible array of EU countries, and concludes IT ALREADY EXISTS — and a
+# brand selling in Sweden would be told Sweden is not in the EU.
+# THAT REUSE IS NOT HYPOTHETICAL. IT IS WHAT #243 WAS: checkComplianceGap needed a membership answer,
+# found EU_RP_MARKETS looking plausible, used it, and a legal obligation vanished for fifteen states.
+# CANON: LIVE CODE IS CORRECTED BY REALITY — someone eventually sees Sweden fall through. DEAD CODE
+# NEVER GETS THAT CORRECTION. Nothing executes it, so the name's claim is never tested, and every new
+# reader meets it as unbroken as the first.
+# IT HAD TO GO IN THIS SHIPMENT, NOT A LATER ONE: once isEuEeaMarket landed, a search for "the EU
+# check" would return TWO candidates, one correct and one wrong, colliding in autocomplete on isE and
+# in any case-insensitive scan. Leaving it would have made the wrong one HARDER to tell from the
+# right one than it was standing alone and obviously odd.
+# STRUCTURE BEFORE POLICY: you cannot write a rule saying "don't use isEU". You delete it, and the
+# question stops being askable.
+#
+# CORRECTION CARRIED FORWARD — ONE INSTANCE, NOT THREE. Both lanes had accepted "three coverage lists
+# are what the closed door produced". It does not hold: this lane measured on 17 Sep that
+# RADAR_MARKETS and RP_DATA_MARKETS answer legitimate different questions and would have been written
+# regardless. ONLY isEU is the mechanism. The rule "reimplementations >= callers" may be true; the
+# evidence does not carry it at that strength — AND THE LANE REASONED PAST ITS OWN MEASUREMENT TO GET
+# THERE, the seventeenth's finding sitting in the log while the claim was being made.
+#
+# BEHAVIOUR MEASURED BYTE-IDENTICAL: all 30 member states, non-members, edge values (SE, DK, EU,
+# empty, undefined), 34 single-market brands, and renderLandedTab HTML hashes across five markets.
+# regMarketApplies keeps its 'EU'/'EU/EEA' branch and C2N mapping unchanged.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# RULING 22 SEP — THE COUNTERMEASURE IS A FIELD, NOT A RULE. "Read the register harder" is refused
+# for the thirteenth time. EVERY FINDING THAT MAKES AN EXPOSURE CLAIM CARRIES `Reachable via:` WITH A
+# NAMED WRITER, OR `NOT ESTABLISHED`. The finding entry is where the severity decision is taken, and
+# A WARNING MUST LIVE WHERE THE DECISION IS MADE. First time this lane converts a lesson into a FORM
+# instead of a sentence.
+# WHY A SENTENCE WAS NOT ENOUGH: "reachability before incidence" was in the register from 17 Sep —
+# written after Strategy asked for an incidence measurement on a path that could not execute. FIVE
+# DAYS LATER, THE SAME ERROR IN THE OTHER LANE, WITH THE RULE IN PLACE THE WHOLE TIME. Third instance
+# of A CONSTRAINT EXPRESSED TO A LANE IS NOT A CONSTRAINT — and the countermeasure was ALSO already
+# in canon. Diagnosis and countermeasure both written down; neither prevented instance three.
+# THE CANON ACCUMULATES FASTER THAN IT IS APPLIED. Sixty-odd rules. The one needed existed. Nobody
+# read it in the moment it mattered.
+#
+# CANON, VERBATIM: CORRECTNESS IS ARGUED FROM THE CODE; SEVERITY IS ARGUED FROM THE WRITERS.
+#
+# CANON: A CAPABILITY GAP CAN BE WHAT KEEPS A DEFECT LATENT — CLOSING THE GAP ARMS THE DEFECT.
+# #245 would have armed #243. Had the picker gained Poland first, the old coverage-list path would
+# have gone from latent to live WITHOUT ANYONE TOUCHING THE CODE. The order was right by luck, not by
+# design. Third instance of the coupling, and the only one so far that favoured us.
+#
+# AND THE SEVERITY ORDER INVERTS BETWEEN THE TWO. #243 was A WRONG ANSWER NOBODY COULD TRIGGER.
+# #245 is A MISSING ANSWER EVERY BRAND IN THOSE MARKETS HITS IMMEDIATELY — a capability the customer
+# lacks, not a reasoning error. Poland, Spain and Italy are not edge cases.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# #245 — MEASURED DURING THIS SHIPMENT'S SMOKE: #243 CHANGES NO OUTCOME ANY PICKER CAN REACH.
+# Reachable via: MARKETS chips (5172) and CURRENT_MARKETS select (5169) — 10 of 30 members, all ten
+#                already covered by the old list. Every brand targeting Poland, Spain, Italy,
+#                Portugal or Ireland hits the gap on first use.
+# CC reported the predicate is NAME-EXACT: "Czechia" matches, "Czech Republic" does not. Chasing that
+# spelling produced a larger result. THE MEASUREMENT IS ON THE WRITERS, NOT ON A DROPDOWN — it
+# therefore covers every option the pickers can produce, not the ones that happened to be on screen.
+#
+# checkComplianceGap (16664) reads exactly two fields:
+#     const markets = (b.targetMarkets||[]).concat([b.currentMarket||'']).filter(Boolean);
+# and each has a constrained writer:
+#     5172  targetMarkets  ← market chips over MARKETS (1182), 18 entries
+#     5169  currentMarket  ← <select> over CURRENT_MARKETS (1183), 5 entries
+#
+# SET ARITHMETIC AGAINST THE PREDICATE'S 30 MEMBERS:
+#     MARKETS ∩ members          = 8   Denmark Germany Netherlands Norway Finland France Belgium Austria
+#     CURRENT_MARKETS ∩ members  = 5   Sweden Norway Finland Denmark Iceland
+#     UNION REACHABLE            = 10
+#     the 15 states #243 ADDED   = Liechtenstein Estonia Latvia Lithuania Czechia Slovakia Hungary
+#                                  Romania Bulgaria Greece Croatia Slovenia Luxembourg Cyprus Malta
+#     REACHABLE ∩ ADDED          = EMPTY
+# ALL TEN REACHABLE MEMBERS WERE ALREADY IN THE OLD 15-ENTRY RP_DATA_MARKETS. Through onboarding and
+# setup, #243's fix flips ZERO brands from no-gap to gap.
+#
+# ONE UNCONSTRAINED ROUTE EXISTS AND IT IS THE ONLY ONE: BRAND PACK IMPORT.
+#     3399  if(bp.geographicOrigin) brand.currentMarket = bp.geographicOrigin;
+#     3400  if(Array.isArray(bp.primaryMarkets) && bp.primaryMarkets.length) brand.targetMarkets = ...
+# Arbitrary strings from an imported pack, bounded by no picker. A third writer, _setupDraft
+# .primaryMarket (3612), is a picker whose options are NOT YET MEASURED.
+# So the harm #243 describes is reachable ONLY through pack import — a real route, and a completely
+# different claim from the one this file makes.
+#
+# THE FIX IS STILL RIGHT. A coverage list answering a membership question is wrong however few
+# brands reach it, and the day a picker gains Poland or Czechia the old code is wrong silently.
+# WHAT WAS WRONG WAS THE JUSTIFICATION, AND IT IS IN THIS FILE UNDER THIS LANE'S NAME:
+# "PRODUCT ON MARKET WITHOUT A LEGALLY REQUIRED RESPONSIBLE PERSON", written of fifteen states that
+# no picker offers. A LATENT DEFECT DESCRIBED AS AN ACTIVE HARM.
+# CANON, OURS, FROM 19 SEP: REACHABILITY BEFORE INCIDENCE. The lane applied it when Strategy asked
+# for an incidence measurement on an unreachable path (#236) and DID NOT APPLY IT TO ITS OWN FIX.
+# CANON, NEW: A FIX'S SEVERITY IS A CLAIM ABOUT REACHABILITY AND IS MEASURED LIKE ONE. Correctness
+# is argued from the code; severity is argued from the writers. The lane proved the first and
+# asserted the second.
+#
+# AND THE STRUCTURAL FINDING UNDERNEATH, WHICH IS LARGER THAN #243: THE SURFACES DISAGREE ABOUT WHAT
+# A MARKET IS. The compliance engine reasons about 30 member states. The onboarding picker offers 18
+# markets, 8 of them members. RP coverage held 15. Italy, Spain, Portugal, Ireland and Poland sit in
+# the RP list and in the predicate BUT IN NO PICKER — the coverage list's own reach exceeded the
+# interface's. A brand whose market is Portugal cannot say so.
+# SEPARATELY: SUPPLIER_REGIONS (1269) spells it "Czech Republic", maps United Kingdom, Switzerland
+# and Norway to 'EU', and DEFAULTS UNKNOWN COUNTRIES TO 'EU' at 1293. It answers a sourcing-region
+# question, not a membership one — but it is a second spelling of the same country and a fifth
+# meaning of the token 'EU', living 700 lines from the predicate.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+#
+# #246 — FOUND IN THIS SHIPMENT'S OWN STEP 3, AND THE FIRST FINDING BORN WITH ITS FIELD FILLED IN.
+# Reachable via: the Landed Cost destination select (CFO View → Landed Cost Calculator). It is the
+#                UNION of DUTY_RATES (23829, 11 keys) and FREIGHT_EST (23845). Belgium, Austria and
+#                Singapore are SELECTABLE AND HAVE NO DUTY ENTRY. Live on first use.
+# ZERO MEANS TWO THINGS AND ONLY PROSE SEPARATES THEM:
+#     23857  if(!rates) return {rate:0, note:'Rate unknown — verify with customs broker'};
+# rate:0 is ALSO the true rate for Denmark, Germany, Netherlands and France. "We have no data" and
+# "this market is duty-free" COMPUTE TO THE IDENTICAL NUMBER. If the note is not rendered as
+# prominently as the figure, Belgium reads as duty-free when it is merely unmeasured.
+# THE FREIGHT SIDE IS WORSE — IT CARRIES NO NOTE AT ALL:
+#     23852  return modeRates[market] || (mode==='road'?15:mode==='sea'?50:120);
+# Belgium + Sea returns 50 SEK/unit: A SILENT CONSTANT PRESENTED AS AN ESTIMATE. Duty at least says
+# "unknown"; freight invents a number and says nothing.
+# SAME FAMILY AS EVERYTHING ELSE THIS WEEK: a value meaning NOTHING KNOWN and a value meaning
+# NOTHING OWED are the same value, distinguished only by prose. The ESG modal's two-state label over
+# three states; honestly-empty against silently-empty; and now unknown-duty against zero-duty.
+# AND IT FEEDS #245: Finland and Switzerland are in the onboarding chips but NOT in this picker.
+# Finland is one of NORDLYS's own five Nordic markets. A BRAND CAN TARGET FINLAND AND CANNOT COMPUTE
+# LANDED COST FOR IT. Six market lists now, no two agreeing.
+# NOTE ON PROVENANCE: found DURING this batch's smoke, not BY this batch. A FINDING IN AN
+# INSTRUMENT'S OUTPUT IS NOT A FINDING OF THE INSTRUMENT. Registered, not fixed here.
+#
+# NOTICED, NOT FIXED — both reported by CC, both real:
+#   THE ESG MODAL MISLABELS EIGHT ENTRIES. 32971/32977 render `required ? 'Required' : 'Preferred'`
+#   — a TWO-STATE LABEL OVER A THREE-STATE ENCODING, so eight entries carrying preferred:false are
+#   shown as "Preferred" when the data says they are NEITHER required nor preferred. This is #239's
+#   actual consequence and it reclassifies it: while both lanes debated whether `preferred` was a
+#   spare field to delete, THE MISSING THIRD STATE WAS ALREADY PRODUCING A FALSE LABEL ON SCREEN.
+#   Not a subtraction. A live mislabel, and the data can already tell the three apart.
+#
+#   A LIVE LOCAL isEu AT 8037 in the radar's row renderer, meaning "this row is tagged all_eu" —
+#   correct for its purpose. But isEU was deleted precisely so a search for "the EU check" returns
+#   one candidate, and it returns two again. Lower risk: a local cannot be referenced from elsewhere,
+#   it has to be COPIED. Copying is what #243 was.
+
 # index.html moved f36d7f66 → 5dac2427 on 21 Sep 2026 — #220's RENAMES AND #243's REPOINT.
 #   after   5dac24271252ead370f7054ef9fa1661e4ed40327320604e363a617cf4919341
 #           57 gates · 1 of 11 modified · no call-site drift against baseline
@@ -35,6 +210,19 @@ netlify/functions/share-brand-pack.js            3791bbec
 # THE FALSE NEGATIVE IS THE WORSE DIRECTION: a false positive costs money — an RP bought
 # unnecessarily. A false negative means PRODUCT ON MARKET WITHOUT A LEGALLY REQUIRED RESPONSIBLE
 # PERSON. The front door failing silently.
+# >>> CORRECTED 22 SEP BY #245, SEE THE 52d0a88f ENTRY ABOVE. THE SEVERITY CLAIM IN THE TWO LINES
+# >>> ABOVE IS WRONG AS WRITTEN. Measured on the writers: the only fields checkComplianceGap reads
+# >>> are fed by pickers offering 10 of the 30 member states, and ALL TEN WERE ALREADY IN THE OLD
+# >>> LIST. None of the fifteen restored states is reachable except through brand pack import.
+# >>> THE DEFECT WAS REAL AND LATENT; IT WAS NOT PUTTING PRODUCT ON MARKET WITHOUT AN RP. The lane
+# >>> proved the fix correct and asserted its severity without measuring reachability.
+# >>> THE FIX STANDS, AND THAT IS SAID FIRST SO THE CORRECTION DOES NOT OVERSHOOT. A coverage list
+# >>> answering a membership question is wrong HOWEVER FEW BRANDS REACH IT. Correctness and severity
+# >>> are two claims; only one of them was wrong. The temptation after a severity correction is to
+# >>> doubt the fix as well.
+# >>> Reachable via: BRAND PACK IMPORT ONLY — 3399 bp.geographicOrigin → brand.currentMarket, 3400
+# >>>                bp.primaryMarkets → brand.targetMarkets. Arbitrary strings, bounded by no
+# >>>                picker. NOT reachable via onboarding chips or the setup select.
 # Proportion, recorded because Strategy has a documented over-escalation: all four of Charlotte's
 # markets were already in the old list, so the check fired correctly for her. LATENT FOR HER,
 # STRUCTURAL FOR THE PRODUCT, and the window opens with a customer.

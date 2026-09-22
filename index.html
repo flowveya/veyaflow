@@ -1942,10 +1942,16 @@ function getBrandCategories(){
   return [];
 }
 
-// #220, 21 Sep 2026 — THIS IS THE MEMBERSHIP LIST. IT IS THE ONLY ONE. EU 27 + Norway, Iceland,
-// Liechtenstein. Coverage lists are named for what they cover (RADAR_MARKETS, RP_DATA_MARKETS) and
-// are NOT merged onto this: widening a coverage check into an EU-wide claim is the defect #220 names.
-const EU_EEA_MEMBER_STATES = ['Sweden','Denmark','Finland','Germany','Netherlands','France','Belgium','Austria','Italy','Spain','Portugal','Ireland','Norway','Iceland','Liechtenstein','Estonia','Latvia','Lithuania','Poland','Czechia','Slovakia','Hungary','Romania','Bulgaria','Greece','Croatia','Slovenia','Luxembourg','Cyprus','Malta'];
+// #220 (21 Sep) / predicate batch (22 Sep 2026) — THIS IS THE MEMBERSHIP QUESTION AND THE ONLY WAY
+// TO ASK IT. EU 27 + Norway, Iceland, Liechtenstein. The list lives inside this closure on purpose:
+// a public list is a public predicate with its reasoning removed, so it is not reachable from
+// outside. Callers that also resolve 'EU'/'EU/EEA' rows or market codes go through
+// regMarketApplies. Coverage lists are named for what they cover (RADAR_MARKETS, RP_DATA_MARKETS)
+// and are NOT merged onto this: widening a coverage check into an EU-wide claim is #220's defect.
+const isEuEeaMarket = (function(){
+  const MEMBERS = ['Sweden','Denmark','Finland','Germany','Netherlands','France','Belgium','Austria','Italy','Spain','Portugal','Ireland','Norway','Iceland','Liechtenstein','Estonia','Latvia','Lithuania','Poland','Czechia','Slovakia','Hungary','Romania','Bulgaria','Greece','Croatia','Slovenia','Luxembourg','Cyprus','Malta'];
+  return function isEuEeaMarket(marketName){ return MEMBERS.indexOf(marketName) > -1; };
+})();
 
 // Single-source filter for the canonical dated list (REG_DEADLINES). Used by BOTH the
 // deadline banner and the Compliance Calendar so they never disagree. Category gate =
@@ -1954,7 +1960,7 @@ const EU_EEA_MEMBER_STATES = ['Sweden','Denmark','Finland','Germany','Netherland
 function regMarketApplies(r, mkts){
   if(!r.market) return true;
   if(r.market==='EU' || r.market==='EU/EEA'){
-    return mkts.some(function(m){ return EU_EEA_MEMBER_STATES.indexOf(m)>-1; });
+    return mkts.some(isEuEeaMarket);
   }
   var C2N={UK:'United Kingdom',DK:'Denmark',DE:'Germany',NO:'Norway',SE:'Sweden',FI:'Finland',NL:'Netherlands',FR:'France',BE:'Belgium'};
   var nm=C2N[r.market]||r.market;
@@ -7960,7 +7966,7 @@ function renderComplianceRadar(){
   if(hasDevice && !brandCatIds.includes('beauty_device')) brandCatIds.push('beauty_device');
 
   // Filter radar items to relevant ones
-  // #220 — the markets COMPLIANCE_RADAR_ITEMS has rows for. NOT EU membership (that is EU_EEA_MEMBER_STATES).
+  // #220 — the markets COMPLIANCE_RADAR_ITEMS has rows for. NOT EU membership (ask isEuEeaMarket).
   const RADAR_MARKETS = ['Sweden','Denmark','Germany','Netherlands','France','Belgium','Austria','Finland','Italy','Spain','Portugal'];
   const relevant = COMPLIANCE_RADAR_ITEMS.filter(item=>{
     // Category match
@@ -16644,7 +16650,7 @@ function saveManualRp(){
 // cosmetic SKUs in portfolio. Factored out for testability + reuse across
 // surfacing points (Brand Pack banner H5b + compliance radar + checklist).
 // #220 — the markets we hold RP data for. NOT the RP obligation's reach, which is EU/EEA-wide
-// (EU_EEA_MEMBER_STATES). Hand-maintained: listed Denmark twice until 21 Sep 2026.
+// (isEuEeaMarket). Hand-maintained: listed Denmark twice until 21 Sep 2026.
 const RP_DATA_MARKETS = ['Sweden','Norway','Finland','Denmark','Iceland','Germany','Netherlands','France','Belgium','Austria','Italy','Spain','Portugal','Ireland','Poland'];
 
 function checkComplianceGap(b){
@@ -16658,7 +16664,7 @@ function checkComplianceGap(b){
   const markets = (b.targetMarkets||[]).concat([b.currentMarket||'']).filter(Boolean);
   // #243 — EU/EEA MEMBERSHIP, not RP data coverage: one RP covers the whole area, so a brand
   // targeting Czechia needs one exactly as a brand targeting Poland does.
-  const euIntent = markets.some(function(m){ return EU_EEA_MEMBER_STATES.indexOf(m) >= 0; });
+  const euIntent = markets.some(isEuEeaMarket);
   // Cosmetic SKUs present (RP requirement is cosmetics-driven)
   const skuList = Array.isArray(skus) ? skus : [];
   // Only SKUs STATED as cosmetic count — an unstated type is 'unknown', not a cosmetic,
@@ -24557,7 +24563,6 @@ function updateMarginResult(){
 
 function renderLandedTab(){
   const s = landedState;
-  const isEU = ['Denmark','Germany','Netherlands','France','Belgium','Austria'].includes(s.market);
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
       <div class="card">
