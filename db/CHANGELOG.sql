@@ -144,3 +144,86 @@ set drafted_content = 'not_recorded',
 where trigger_type = 'rejection'
   and drafted_content is not null and drafted_content <> ''
   and nullif(trim(context->>'reason'), '') is null;
+
+-- ── 2026-09-23 · #241 — seeded auth accounts moved off real companies' mail domains ──
+-- Executed by Charlotte in the SQL Editor. Entry written AFTER the statements ran and
+-- their effect was read back, per the rule established by the #110 entry above.
+--
+-- WHY THIS WAS NOT "LATENT, THEREFORE LATER". Most triggers fire on a decision or an
+-- edge case. This one fires on THE PRODUCT WORKING AS INTENDED: the moment the retailer
+-- portal sends its first mail, "confirm your VeyaFlow account" reaches a buyer who never
+-- created one, at the three companies we intend to sell to. The window is closed by
+-- planned work, not by an accident.
+-- Measured before the change and the reason it was still latent: confirmation_sent_at,
+-- recovery_sent_at and email_change_sent_at all NULL; email_confirmed_at 13ms after
+-- creation (admin auto-confirm). NO MAIL HAS EVER BEEN DISPATCHED FROM THIS PROJECT.
+--
+-- UPDATE, NEVER DELETE — #148's reasoning: do not destroy identity to fix a leak. An
+-- email change keeps the id; a delete orphans everything referencing it. Every statement
+-- keyed by an explicit id, never by a predicate over the column being changed.
+--
+-- SCOPE, MEASURED RATHER THAN ASSUMED — and it came back THREE TIMES LARGER than the
+-- three rows this item was opened for:
+--   auth.users            4 rows total, grouped over the whole table with no filter,
+--                         so this is a CEILING as well as a floor. 3 non-reserved.
+--   address columns       found via information_schema across the public schema, NOT
+--                         from memory — the lane's guessed list named two tables with
+--                         no address column at all and one column that does not exist.
+--                         7 columns hold addresses; only profiles and retailer_accounts
+--                         carried any of the three domains.
+--   raw_user_meta_data    checked by regex for the three names: no rows. The one place
+--                         a seeded address could hide that no split_part() would see.
+--   => NINE rows, not three: the same address stored in three tables.
+--
+-- THE ROWS (id + BEFORE DOMAIN + AFTER address; see the privacy note below):
+--   39e73a6f-a209-4de8-91de-0e5b3a72013f  apotekhjartat.se -> buyer-apotek@example.com
+--     (auth.users, profiles) + retailer_accounts 712748d8-aec8-42ef-bb29-34a887b5ea26
+--   fca10f07-e107-40a5-a9ae-24d4486963de  lyko.se          -> buyer-lyko@example.com
+--     (auth.users, profiles) + retailer_accounts afb2ff12-6ee6-488c-9d3d-e90477b487af
+--   2a7d21be-e995-408e-864c-ac508e9697e1  matas.dk         -> buyer-matas@example.com
+--     (auth.users, profiles) + retailer_accounts 463c100b-0a55-4f3a-9ad6-230cf56e2f12
+--
+-- example.com, NOT veyaflow.internal, AND THE DIVERGENCE IS CLOSED RATHER THAN FOLLOWED.
+-- Canon says example.com; verify.expected.txt:982-983 said buyer-test@veyaflow.internal.
+-- Two conventions for "this is test data" is the vocabulary problem a third time. Both
+-- are technically safe, but veyaflow.internal is only obviously fake IF YOU KNOW OUR
+-- CONVENTIONS; example.com is obviously fake to anyone. A marker exists so that a
+-- STRANGER reading the line can see it is test data.
+-- The fourth row (e9542fec... / 6a431a21..., already on veyaflow.internal) was NOT
+-- changed. It removes no exposure; normalising it is a separate, deferred judgement.
+--
+-- PRIVACY CALL, FLAGGED RATHER THAN MADE SILENTLY. The instruction was to record the
+-- before-values so the change stays repeatable. THIS REPO IS TREATED AS FULLY PUBLIC,
+-- and a complete before-address is a plausible, guessable mailbox at a real company —
+-- the same exposure class this change removes, moved from the database into a public
+-- file. So: id + before DOMAIN + after address, local parts omitted. That reconstructs
+-- which rows changed and what class of change it was.
+-- PRE-EXISTING AND NOT COMPOUNDED: line 66 of this file already carries one of these
+-- addresses in full, from 25 Aug. It stays. History is corrected forward, never
+-- rewritten — the same rule the #110 entry above established, and no force-push.
+--
+-- VERIFIED BY READING THE ROWS BACK, and the check can fail in both directions: the
+-- domain query re-run across all three tables returns example.com x3 and
+-- veyaflow.internal x1 in each, with NO real-company domain anywhere. It would catch an
+-- update that did nothing AND one that reached further than intended.
+-- BUT THE INSTRUCTION FOR THIS WAS ALREADY ON THE PAGE AND WAS NOT FOLLOWED: line 138
+-- above says "add `returning id` to a corrective UPDATE" so the statement evidences its
+-- own effect. It was not added. The separate check happens to be capable of failing, so
+-- the verification stands — but the file held the instruction and the lane did not read
+-- it. Fourth instance this week of an artefact answering a question nobody asked it.
+-- (The RLS status queried before this change was likewise already recorded at line 59.)
+--
+-- RAISED AND NUMBERED BEFORE THESE STATEMENTS RAN, so that closing #241 could not bury
+-- it: #249 — THE SAME ADDRESS IS STORED IN THREE TABLES AND NOTHING RECONCILES THEM.
+-- on_auth_user_created is AFTER INSERT; set_updated_at is a timestamp. The copies are
+-- written once at creation and never again. profiles.id = auth.users.id, but
+-- retailer_accounts has NO key to auth at all — the only join is the email string
+-- itself, a foreign key made of a mutable value. AND NO SURFACE RENDERS BOTH COPIES, so
+-- the divergence is not merely undetected but UNDETECTABLE THROUGH USE. It does not fail
+-- safely either: company addresses get reassigned or sit on shared mailboxes, so a stale
+-- value may point at someone else rather than at nothing.
+--
+-- SCOPE NOTE: this changes no application surface. No digest moves, verify.sh is not
+-- involved, and #227's sweep still cannot see any of it — that instrument reads code and
+-- these live in data, in either direction, which is why the ordering gate between the
+-- two was discharged rather than satisfied.
