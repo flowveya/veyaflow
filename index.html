@@ -159,6 +159,20 @@
   .nav-tool { background: none; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 8.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-mute); padding: 2px 7px; cursor: pointer; }
   .nav-tool:hover { color: var(--accent-deep); border-color: var(--accent); }
   .nav-item.parked .nav-name { color: var(--ink-mute); font-style: italic; }
+  /* Parked marker (22 Sep 2026): chrome that is visibly NOT part of the page. position:fixed and
+     pointer-events:none so it adds nothing to the layout flow and swallows no clicks — the page
+     underneath keeps its own width, spacing, type and colour, which are what a reviewer judges. */
+  #vf-parked-marker { position: fixed; inset: 0; border: 3px solid #B45309; pointer-events: none; z-index: 9998; }
+  #vf-parked-marker .vf-parked-label { position: fixed; left: 0; bottom: 0; background: #B45309; color: #fff;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; }
+  /* Smoke step 4, 22 Sep: at phone width the label sat on top of #mobile-nav (857–866, shown ≤680px)
+     and covered its labels. Clicks passed through, but a marker may not obscure a control the
+     reviewer is there to judge. It is lifted clear of the bar's own height — 7px + ~28px content +
+     9px + the same env(safe-area-inset-bottom) the bar itself pads with — at the same breakpoint.
+     Desktop is untouched: the bar does not exist above 680px. */
+  @media (max-width: 680px) {
+    #vf-parked-marker .vf-parked-label { bottom: calc(56px + env(safe-area-inset-bottom)); }
+  }
   .flag { margin-left: auto; font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
   .flag.watch { background: var(--amber-soft); color: var(--amber-text); border: 1px solid #E8D3A8; }
   .flag.pend { background: var(--paper-deep); color: var(--ink-mute); border: 1px solid var(--line-strong); }
@@ -4134,6 +4148,31 @@ function orderNavByIds(items, ids){
   });
 }
 
+// ── PARKED, 22 Sep 2026 — A PAGE THAT IS NOT SHIPPED MUST NOT RENDER AS ONE ──
+// The nine parked ids live inside this predicate's closure, so the nav filter and the page marker
+// ask one question of one list. 'pitch' is parked AND removed (7 Aug, removed-beats-parked): the
+// nav drops it even in X-ray mode, which getVisibleNav does separately.
+const isParkedSurface = (function(){
+  const PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers','pitch'];   // 'pitch' removed from platform (5 Aug refocus to compliant→shelf-ready); code preserved at tag pitch-feature-preserved-2026-08-05
+  return function isParkedSurface(id){ return PARKED_IDS.indexOf(id) > -1; };
+})();
+
+// The marker sits on the PAGE's chrome, never on the nav row: a parked page can be opened with no
+// nav entry present (getVisibleNav filters it out; showPage does not gate on parking), so a marker
+// attached to the row would be absent exactly when a reviewer arrives by another route.
+// Copy states what is true, names the gap as ours in one clause, and promises nothing.
+function updateParkedMarker(id){
+  try{
+    var el = document.getElementById('vf-parked-marker');
+    if(!isParkedSurface(id)){ if(el) el.remove(); return; }
+    if(el) return;
+    el = document.createElement('div');
+    el.id = 'vf-parked-marker';
+    el.innerHTML = '<span class="vf-parked-label">Not part of the live product — VeyaFlow has not shipped this page</span>';
+    document.body.appendChild(el);
+  }catch(e){ /* no DOM (harness or sandbox) — the marker simply does not attach */ }
+}
+
 // ── #197, 15 Sep 2026 — HIDDEN IS A STATE THE PRODUCT ENFORCES. Ruled by Strategy. ──
 // Finished, hidden, or honestly empty: no fourth state. A hidden surface is DECLARED ON ITS NAV
 // ENTRY as hidden:{unlessFlag:'<localStorage key>'}, and this predicate is the only reader of that
@@ -4175,11 +4214,12 @@ function getVisibleNav(){
   // Stage 1 simplification, unchanged: real auth is needed when the team grows.
   // Launch IA: parked features hidden from nav by default. Flip back via
   // localStorage.setItem('ns_show_parked','true') (DevTools). Code retained; reversible.
-  var PARKED_IDS = ['report','compare','bizcase','cfo','find','sourcing','circular','suppliers','pitch'];   // 'pitch' removed from platform (5 Aug refocus to compliant→shelf-ready); code preserved at tag pitch-feature-preserved-2026-08-05
+  // The nine ids live in isParkedSurface's closure (see its declaration): the nav filter and the
+  // page marker ask the same question of the same list, and no gate carries a second copy of it.
   var showParked = false;
   try { showParked = localStorage.getItem('ns_show_parked')==='true'; } catch(e){}
   if(!showParked){
-    visible = visible.filter(function(n){ return PARKED_IDS.indexOf(n.id) === -1; });
+    visible = visible.filter(function(n){ return !isParkedSurface(n.id); });
   } else {
     visible = visible.filter(function(n){ return n.id !== 'pitch'; });   // removed-beats-parked: pitch stays hidden even in dev X-ray mode (7 Aug)
   }
@@ -4577,6 +4617,7 @@ function showPage(id){
   document.getElementById('nav-'+id)?.classList.add('active');
   document.getElementById('mobnav-'+id)?.classList.add('active');
   var _rs=document.getElementById('reg-strip'); if(_rs) _rs.style.display=(brand&&id!=='home')?'flex':'none'; // #reg-strip retired → global #deadline-bar; guard so this no-ops
+  updateParkedMarker(id);   // parked marker: on the page, so every route that reaches one carries it
   setDeepLink(id);
   renderPage(id);
 }

@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        52d0a88f
+index.html        e688693d
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,128 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 52d0a88f → e688693d on 22–23 Sep 2026 — THE PARKED MARKER.
+#   after   e688693d21912f726bc055beb5af6d6694950f205d368f28947d559b01758d2e
+#           57 gates · 1 of 11 modified · no call-site drift against baseline
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# AN INTERMEDIATE DIGEST WAS NAMED AND THEN SUPERSEDED, AND IT IS RECORDED RATHER THAN REPLACED.
+# `606c7f94462c0b27ae9a13926ce61dc5134d3863c997f326f75c8d3c8b54b750` was named on two independent
+# computations and GATED BY THE PAGE SMOKE, NOT BY THE BATTERY. 57 gates were GREEN on it. THE
+# FAILURE WAS ONLY VISIBLE ON A SCREEN, AT ONE VIEWPORT — see SMOKE below. *A digest that passes the
+# battery and fails the smoke is the case the battery's own NOT CHECKED block exists to name; this
+# is the first time it has actually happened.*
+#
+# PURPOSE: IN X-RAY MODE, A PARKED PAGE MUST BE DISTINGUISHABLE FROM A LIVE ONE. Measured 22 Sep:
+# of the nine parked ids only `suppliers` carried any mark at all, and that mark means compliance
+# watch. AN UNSHIPPED PAGE RENDERED AS A SHIPPED ONE ASSERTS A CAPABILITY WE DO NOT HAVE — the
+# demo-data class from 19 Sep, and unlike the Gold/Silver/Bronze badges NOBODY NEEDS TO DEMO IT:
+# anyone who opens the mode sees nine finished screens.
+#
+# THE BUILD:
+#   ONE LIST, TWO READERS. The nine ids moved into `isParkedSurface`'s closure; the nav filter asks
+#   the predicate. PARKED_IDS appears once as code, inside that closure. SAME SHAPE AS
+#   isEuEeaMarket one shipment earlier — a second list would have been the exact defect #197 and
+#   #220 removed.
+#   THE MARKER is a fixed overlay frame plus a label chip, attached by updateParkedMarker(id) from
+#   the router. position:fixed + pointer-events:none: it adds nothing to layout flow and intercepts
+#   no clicks.
+#   COPY: "Not part of the live product — VeyaFlow has not shipped this page." The four walls from
+#   the honestly-empty ruling: states what is true, names the gap as OURS in one clause, PROMISES
+#   NOTHING (no "coming soon"), advises nothing.
+#
+# MEASURED: nav filter identical across 5 stages x 3 flag states, HEAD vs edited · marker present
+# on exactly the nine across all 27 NAV ids · idempotent on repeat calls · removed on navigating to
+# a live page.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# BOTH OF THIS SPEC'S PREMISES WERE REFUTED BY ITS OWN MEASUREMENTS, AND THE BUILD SURVIVED BOTH.
+#
+# PREMISE 1, refuted by Part 0: the lane wrote that `flag` and `badge` were two mark axes already
+# sharing the nav position, so a third would collide. MEASURED: `badge` IS READ BY NEITHER RENDER
+# CALLBACK and renders nothing. There was never a second axis. The lane saw `badge:"New"` in the
+# literal and CONCLUDED IT PRODUCED A MARK — reading a declaration and assuming a consumer, the
+# field-census shape and the same reflex as #207.
+# The same run corrected two counts the lane had asserted without looking: `flag` has THREE carriers
+# (skus 4080, suppliers 4091, atm-admin 4114), not one; `badge` THREE (dpp, csrd, reg_monitor) with
+# TWO values. "Sits on one entry" IS A COUNT CLAIM, and a count cannot be cited without looking.
+#
+# PREMISE 2, refuted by Part 1: the lane wrote that parked pages are reachable by URL and built the
+# placement argument on it — and when premise 1 fell, said URL reachability "carries the placement
+# on its own." MEASURED: `#cfo` DOES NOT OPEN CFO VIEW. `validPages` excludes the parked nine and
+# the handler returns false, so the boot route falls through to home. Belägg: index.html:4788-4804.
+# THE LANE HAD EVIDENCE AND MISREAD IT: it told Charlotte "type #/cfo, or run showPage('cfo') in the
+# console — either reaches it", she reached the page, and the lane recorded a fact about the URL
+# route from an outcome produced by THE OTHER ROUTE. Then wrote it into a spec as architecture.
+#
+# WHAT SURVIVED, AND WHY: Strategy's FORM ruling (frame or banner, never restyled text) was never
+# about placement. The marker being REQUIRED rests on the nine carrying nothing plus the capability
+# claim. AND THE BUILD IS RIGHT BY A BETTER ARGUMENT THAN THE LANE'S: it hangs off the ROUTER, so it
+# covers every route that reaches a parked page — including the console call, which a nav-row marker
+# would have missed.
+# CORRECT THING, WRONG REASON — THIRD TIME IN ONE DAY. The difference here is that the wrong reason
+# was also given to Charlotte as a step to take.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+#
+# PART 0's ENUMERATION IS A CEILING, NOT A LOWER BOUND — AND THAT NEEDED TWO CONDITIONS, NOT ONE.
+# Mechanically produced AND dynamic access excluded. CC checked for `n[x]` at both sites and found
+# none (Belägg: absence across 4454-4503, 4512-4545), so the static read is exhaustive. Every other
+# enumeration this week has been a floor. CANON CARRIED ONLY THE FIRST CONDITION UNTIL TODAY: a
+# mechanical producer does not cover the paths the producer cannot see.
+#
+# SMOKE — AND STEP 4 FAILED, WHICH IS WHY THERE ARE TWO DIGESTS.
+# Steps 1-3 passed: the marker is present on the nine by BOTH routes (sidebar and showPage()),
+# absent on live pages, and on `suppliers` — THE ONLY PAGE IN THE PRODUCT CARRYING BOTH THE MARKER
+# AND `WATCH` — the two read as two separate facts. *The separation comes from SCALE AND FORM, not
+# colour: a border round the whole screen is not confusable with a pill on a nav row. NOTED FOR
+# DESIGN: the WATCH amber and the marker's rust are the same family, so the separation currently
+# rests on size alone. The marker's colour should be one nothing else in the product uses.*
+#
+# STEP 4 FAILED AT PHONE WIDTH, ON THE RULING THIS SHIPMENT EXISTS TO SATISFY. At <=680px the label
+# was a FULL-WIDTH BAR across the bottom, sitting on `#mobile-nav` and covering the nav labels.
+# Clicks passed through (pointer-events:none), so it FUNCTIONED — and A PREVIEW MUST NOT RESTYLE
+# WHAT IT SHOWS means the marker may not change any property the reviewer judges. AT PHONE WIDTH A
+# REVIEWER COULD NOT ASSESS THE MOBILE NAVIGATION BECAUSE THE MARKER WAS ON TOP OF IT. Desktop
+# cleared. Not a polish note — the 17 Sep ruling broken on one viewport.
+#
+# THE FIX, AND ITS OFFSET IS DERIVED RATHER THAN PICKED:
+#   @media (max-width: 680px){ #vf-parked-marker .vf-parked-label{ bottom: calc(56px + env(safe-area-inset-bottom)); } }
+# `#mobile-nav` is fixed at bottom:0 with padding 7px/calc(9px + inset) over a 15px icon, 3px gap
+# and 7.5px label — ~44px plus inset. 56px clears it with margin, AND CARRIES THE SAME
+# env(safe-area-inset-bottom) so it tracks the bar on notched devices instead of drifting.
+# Belägg: index.html:857-861, :890-892. Scoped to the same breakpoint that SHOWS the bar, so
+# desktop is untouched. CSS only — no JavaScript moved, so attachment and routing are unchanged.
+# THE TOP EDGE WAS REJECTED ON A MEASUREMENT, NOT A PREFERENCE: that band is occupied at both
+# widths (`#mobile-header` <=680px, the page `.topbar` above), so it would have traded one obscured
+# control for another AND moved the desktop position, which is not what failed.
+#
+# STEP 4 RE-RUN ON e688693d: PASSES. At phone width all four nav labels read (MENU · SEARCH ·
+# RECENT · ME) and the label sits clear above the bar. A live page at the same width shows no
+# marker and an unobstructed nav — the control.
+# WHAT THE LABEL NOW COVERS, MEASURED ON SCREEN: page content — it clips the `STATUS` field label in
+# the Filters card. THAT IS A DIFFERENT SITUATION, NOT A SMALLER VERSION OF THE SAME ONE:
+# `#mobile-nav` IS FIXED, so anything on top of it is PERMANENTLY obscured. PAGE CONTENT SCROLLS, so
+# anything under the label CAN BE MOVED OUT FROM UNDER IT. The marker still covers something; it no
+# longer covers anything UNREACHABLE. That distinction is what makes this shippable.
+#
+# STILL OPEN, AND CC NAMED THE STRUCTURAL FORM OF IT: "the marker is a fixed overlay by
+# construction and EVERY CORNER HAS SOMETHING UNDER IT AT SOME WIDTH." True — so the chip cannot
+# find empty space by moving. On desktop it still sits over the sidebar's foot ("0 saved reports").
+# THE EVENTUAL ANSWER IS NOT A BETTER CORNER: the frame already creates empty space, and THE BORDER
+# BAND IS THE MARKER'S OWN TERRITORY WITH NOTHING ELSE IN IT. A label inside that band overlays
+# nothing, at any width, on any device — the offset clears a KNOWN bar, the band clears EVERYTHING.
+# Own shipment; not this one.
+#
+# SMOKE STEP 1 WAS REWRITTEN BEFORE THE RUN: as originally specced it entered by `#/cfo` and would
+# have failed for a reason unrelated to this shipment — IT TESTED THE DEEP-LINK ALLOWLIST, NOT THE
+# MARKER. A step that fails for the wrong reason is the twin of a step that cannot fail.
+#
+# NOTICED, NOT FIXED: `badge` appears dead in the nav — three entries declare it, neither callback
+# reads it; whether anything outside those two sites reads `n.badge` is OLÄST. Second instance this
+# week of a declared field with an assumed consumer, and both were found by someone looking for
+# something else. TRIGGER SET, NOT A SWEEP: a third accidental instance opens the instrument
+# question. Two is coincidence.
 
 # index.html moved 5dac2427 → 52d0a88f on 22 Sep 2026 — THE PREDICATE BATCH.
 #   after   52d0a88ffa564aaed0fe38134d7b95665965691efd8bbce75e1ace574982cf1f
