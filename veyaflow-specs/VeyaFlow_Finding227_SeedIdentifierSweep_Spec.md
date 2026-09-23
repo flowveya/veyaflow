@@ -6,7 +6,15 @@
 
 | date | sent | evidence |
 |---|---|---|
-| — | **NO DISPATCH RECORDED** | — |
+| 22 Sep 2026 | **Part 0** — dispatched and RUN; result reported | CC's own report, 23 Sep, correcting this table |
+| 23 Sep 2026 | **Part 0 re-run** on `e688693d` / HEAD `92071b6` | reproduces the 22 Sep result on a newer tree |
+
+> **THE INFERENCE IN THIS BLOCK WAS REFUTED BY CC, AND THE MISS WAS LARGER THAN THE ROW SUGGESTED.**
+> The lane inferred "points at unsent" from the absence of a Part 0 result. **There was a Part 0
+> result. It was produced on 22 Sep and neither lane had it.** So the missing artefact did not cost
+> us *do we need to send this?* — **it cost us a COMPLETED MEASUREMENT, and the lane then re-ran it.**
+> *Absence of a result is not absence of a dispatch — and here there was no absence of a result
+> either, only of a record.*
 
 > **BOTH LANES HAVE DESCRIBED THIS SPEC AS "WITH CC" REPEATEDLY, AND NEITHER CAN OBSERVE IT.**
 > "Sent to CC" is a chat action and leaves no trace; the claim travelled between lanes, each quoting
@@ -30,10 +38,21 @@ in hand.** Rename them first and there is nothing to demonstrate against.
 
 ## NAMED BASELINES
 
-Eleven surfaces; `index.html` at
-`f36d7f664d0d13e0f5f05521b96499f72e6095820098d6d38f80c25bc2515795`, branch `f2b-async` at
-`aaaa56c`, clean tree, 57 gates GREEN. **`./verify.sh` GREEN, `0 of the 11 tracked surfaces
-modified`, exit 0. A scout that moves a digest has stopped being a scout.**
+**Eleven surfaces at THE VALUES `verify.expected.txt` NAMES**, clean tree, 57 gates GREEN.
+**`./verify.sh` GREEN, `0 of the 11 tracked surfaces modified`, exit 0. A scout that moves a digest
+has stopped being a scout.**
+
+> **CORRECTED 23 SEP: THIS BLOCK USED TO COPY THE DIGESTS, AND THE COPY WENT STALE BY TWO
+> SHIPMENTS** — it named `f36d7f66` / `aaaa56c`, from before the parked marker (`83ce815`) and the
+> dispatch-log commit. **CC ran against `verify.expected.txt`'s values instead of the spec's, which
+> was correct, and said so.**
+>
+> **SECOND INSTANCE: the census spec named a two-shipment-old baseline and demanded GREEN with 0
+> modified while #197 sat uncommitted — a check that could not pass, and CC refused to start.**
+>
+> **A SPEC NAMES THE SOURCE, NEVER A COPY OF ITS VALUES.** *Cite the source, not the number* — the
+> same rule that moved `Belägg:` from a line number to a name, arriving here as a stale digest
+> instead of a stale line.
 
 ---
 
