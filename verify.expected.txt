@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        0f3fd699
+index.html        eeffc081
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,106 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 0f3fd699 → eeffc081 on 23 Sep 2026 — #239 SLICE 3, HOMOGENEOUS BLOCKS.
+#   after   eeffc081f23dccf49d129d2b964f69adaf86dde0c8a6986b208e3caa029416e0
+#           57 gates · 1 of 11 modified · no call-site drift · 36 insertions, 16 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: MAKE THE HEADING TRUE BY CONSTRUCTION, NOT TRUE TODAY. The modal rendered
+# "MANDATORY REQUIREMENTS (1/3 MET)" over FOUR rows, the first saying "Not mandatory but strongly
+# preferred" in its own note. THE DENOMINATOR WAS CORRECT, WHICH IS EXACTLY WHAT LET IT PASS — a
+# right count under a heading that contradicts its own list.
+#
+# RULED: SPLIT, DO NOT RENAME AS THE FIX. A rename makes the name true TODAY; a split makes the
+# heading true BY CONSTRUCTION — each block is homogeneous and NO HEADING CAN MISDESCRIBE A LIST
+# CONTAINING ONLY ONE KIND. And the denominator decides it: either the list is homogeneous, or the
+# counter must say what it counts — and a heading over a mixed list is precisely what cannot be
+# phrased honestly.
+#
+# THE RESULT IS BETTER THAN THE FIX THE LANE ASKED FOR. `metMandatory` and `totalMandatory` ARE
+# GONE. CC did not correct the ratio — IT REMOVED THE PAIR THAT COULD EXPRESS 4/3. Each block's
+# count is computed inside renderESGReqGroup from the rows it is handed, so A NUMERATOR CANNOT RANGE
+# OVER A SET ITS DENOMINATOR DOES NOT. Structure before policy, and #238's mechanism is DISSOLVED at
+# this site rather than guarded. Belägg: index.html:renderESGReqGroup.
+#
+# MEASURED, real function extracted with verify-harness/shake2.js, fed the real rows, under THREE
+# `met` patterns (all / none / alternating), across all eight retailers: NO NUMERATOR ABOVE ITS
+# DENOMINATOR ANYWHERE. Apotek Hjärtat reads "Mandatory requirements (3/3 met)" over its three
+# required rows and "Preferred (1/1 met)" over ISO 14001. The 1/3-over-four-rows heading is gone.
+# An empty group returns '' — measured, no heading and no empty state.
+#
+# PART 2 — THE ITEM TAG DISARMED IN THE SAME PASS, NOT LEFT AS A TRIGGER.
+#   ${req.required?REQUIRED:PREFERRED}  →  ${req.required?REQUIRED:req.preferred?PREFERRED:''}
+# CANON: A DEFECT WHOSE TRIGGER IS CONTENT ENTRY IS WORSE THAN ONE WHOSE TRIGGER IS A CODE CHANGE —
+# content is entered by someone who does not review code, AND THERE IS NO DIFF THAT CATCHES IT. And
+# a trigger that could have been closed for free is A WISH WITH EXTRA STEPS: what arms it is content
+# work, what disarms it is the same ternary already being opened beside it.
+# THE THIRD BRANCH CANNOT BE DEMONSTRATED ON THE PRODUCT, AND THIS WAS NAMED BEFORE A STEP WAS
+# WRITTEN: of 22 items, 19 are required:true and 3 are required:false — ALL THREE preferred:true,
+# ZERO NEITHER, measured not assumed. CC demonstrated it against a synthetic row AND SAID ON THE SAME
+# LINE THAT THE OBJECT IS ITS OWN CONSTRUCTION, NOT THE PRODUCT'S. Part 2 is a GUARD, not a visible
+# fix, and the spec said so rather than pretending otherwise.
+#
+# THE LANE'S SPEC PREMISE WAS REFUTED BY CC'S TABLE, AND IT IS THE SAME CONFLATION TWICE IN ONE
+# FINDING. Smoke step 3 named `kicks_se` as carrying a required:false item. IT CARRIES NONE — both
+# its items are required:true. It is a preferred:false carrier at the OBJECT level (slice 1), and the
+# lane pulled it across into an ITEM-level step without checking. #239 OPENED WITH EXACTLY THIS
+# ERROR: the register said "`preferred` on ISO 14001" when the defect was on carbonTransparency.
+# ITEM LEVEL AND OBJECT LEVEL, CONFUSED IN THE SAME FINDING, TWICE, SIX HOURS APART.
+# The three carriers are apotek_hjartat_se, douglas_de, sephora_eu. Step 3 corrected before the run.
+#
+# THE THIRD BLOCK HAS NO HEADING, BY CC'S CHOICE, with the reasoning and its date written into
+# renderESGReqGroup: the copy is Design's and may be nothing at all. If the answer is a string it
+# goes in as `heading`; if the answer is "nothing", the code already matches it. AND WHETHER A
+# HEADING OVER A GROUP IS THE SAME QUESTION AS A LABEL ON A ROW IS NOT ESTABLISHED — the group is
+# defined by its data, the label described it. Flagged, not assumed.
+#
+# PART 3 — RENAME PROPOSED, NOT APPLIED: `esgRequirements`. The container names the SUBJECT and
+# leaves the state to the members, each of which already declares its own `required` and, where it
+# has one, `preferred` — THE DECLARATION ON THE OBJECT IS THE RULE. It also survives a third state
+# arriving in the data, which `mandatoryRequirements` cannot. `listingRequirements` was DISCARDED on
+# a collision with the existing LISTING_REQUIREMENTS — a different set with different consumers —
+# ONE PLACE, ONE MEANING, applied without being asked. A rename is an assertion about purpose, so it
+# waits for Strategy.
+#
+# SMOKE — ALL FOUR STEPS PASS, ON THE PAGE.
+#   apotek_hjartat_se  ISO 14001 lifted into PREFERRED (0/1 MET); the mandatory heading now covers
+#                      THREE rows, not four
+#   lyko_se            homogeneous list: ONE block, (1/2 MET) over two rows, NO empty second block
+#   sephora_eu         MANDATORY (0/2) over two, PREFERRED (0/1) over the lifted item
+#   douglas_de         same split
+# The control is lyko_se and it fails in the opposite direction: an empty group renders nothing at
+# all. Step 4's n/n case was measured across all eight retailers under three `met` patterns, so a
+# click adds nothing to it.
+#
+# THE SPLIT CREATED AN ADJACENCY NOBODY PREDICTED, AND THIS SHIPMENT BUILT IT:
+#   PREFERRED (0/1 MET)                  <- new, from mandatoryRequirements
+#   PREFERRED CERTIFICATIONS (0/6 MATCHED)  <- pre-existing, from preferredCertifications
+# TWO ADJACENT SECTIONS WHOSE HEADINGS BEGIN WITH THE SAME WORD, with different denominators and
+# different verbs — MET against MATCHED. Neither heading is wrong about its own list, which is what
+# the split guaranteed. But it is THE VOCABULARY PROBLEM ARRIVING BY CONSTRUCTION, and it was not
+# there before because the preferred item was buried inside MANDATORY REQUIREMENTS.
+# SCOPED BY THE CONTROL FOR FREE: lyko_se has only ONE `PREFERRED…` heading because its group is
+# empty. The doubling occurs on the three carriers only — apotek_hjartat_se, douglas_de, sephora_eu.
+# Design's, and probably one word on the new heading.
+#
+# AND THE SMOKE WIDENED SLICE 3(a) FROM THE SCREEN. All three required:false + preferred:true ITEMS
+# carry a SCOPE-LIMITED OBLIGATION IN THEIR PROSE:
+#   douglas_de   "Mandatory for Douglas owned brands. Strongly encouraged for branded suppliers"
+#   sephora_eu   "Required for 'Planet Positive' tier. Strongly encouraged for all new listings"
+#   apotek_hjartat_se  "Not mandatory but strongly preferred for premium shelf placement"
+# Slice 3(a) was filed against the TRANSPARENCY OBJECTS. IT IS ON THE ITEMS TOO — three for three.
+# The split did not cause it; IT MADE IT MORE LEGIBLE, because a lone item now sits under its own
+# PREFERRED heading while its note says Mandatory. THE SCHEMA HAS ONE BOOLEAN WHERE IT NEEDS A
+# SCOPE, and no choice of label or heading fixes a fact that is not binary.
+#
+# NOTICED, NOT FIXED: the row colour and icon ternaries still branch on req.required alone. INSIDE A
+# HOMOGENEOUS BLOCK THEY CANNOT MISLABEL — which is the split's property doing work beyond the
+# heading. · Slice 3(a) unchanged: "Preferred: Tier 1 factory list REQUIRED for private label" is a
+# conditional obligation flattened into one boolean; the schema has one boolean where it needs a
+# scope, and NO LABEL FIXES A FACT THAT IS NOT BINARY. · verify.baseline.json still predates the
+# parked marker (41898 → 41982 INFO); all 13 drift names PASS.
 
 # index.html moved e688693d → 0f3fd699 on 23 Sep 2026 — #239 SLICE 1, THE THIRD STATE.
 #   after   0f3fd699852c61344247ae9a6ad67a490ecfa0ba90f0004cdc08defa8121f795

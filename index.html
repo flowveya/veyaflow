@@ -32877,6 +32877,31 @@ function checkMandatoryESG(retailerId){
   });
 }
 
+// #239 slice 3 — one block per state. An EMPTY GROUP RENDERS NOTHING: no heading, no
+// empty state. The count ranges over the rows in this block only.
+//
+// PARTIAL, AND THE LIMIT IS HERE RATHER THAN IN A NOTE ELSEWHERE: the third group —
+// `required:false, preferred:false` — has no heading, because the copy is design's and
+// undecided (23 Sep). Its rows render bare, as the object-level notes do. Nothing in the
+// seeded data reaches this group; whoever gets the copy passes it as `heading`.
+function renderESGReqGroup(heading, rows){
+  if(!rows.length) return '';
+  const met = rows.filter(r=>r.met).length;
+  return `
+          <div style="margin-bottom:1rem">
+            ${heading?`<div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.4rem">${heading} (${met}/${rows.length} met)</div>`:''}
+            ${rows.map(req=>`
+              <div style="display:flex;gap:.5rem;padding:.4rem .6rem;border:1px solid ${req.met?'#A7F3D0':req.required?'#FCA5A5':'var(--border)'};background:${req.met?'#F0FDF4':req.required?'#FEF2F2':'#F9FAFB'};margin-bottom:.3rem">
+                <span style="font-size:.8rem;flex-shrink:0">${req.met?'✓':req.required?'⛔':'◌'}</span>
+                <div style="flex:1">
+                  <div style="font-family:var(--sans);font-size:.72rem;color:${req.met?'#065F46':req.required?'#991B1B':'#374151'};font-weight:500">${req.label} ${req.required?'<span style="font-family:var(--mono);font-size:.48rem;color:#991B1B">REQUIRED</span>':req.preferred?'<span style="font-family:var(--mono);font-size:.48rem;color:var(--muted)">PREFERRED</span>':''}</div>
+                  <div style="font-family:var(--sans);font-size:.62rem;color:${req.met?'#065F46':req.required?'#991B1B':'#555'};line-height:1.45">${tipifyRegTerms(req.note)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>`;
+}
+
 function openESGModal(retailerId){
   const existing = document.getElementById('vf-esg-modal');
   if(existing) existing.remove();
@@ -32907,9 +32932,13 @@ function renderESGModal(retailerId){
 
   const score = calcBrandESGScore(retailerId);
   const mandatoryChecks = checkMandatoryESG(retailerId);
-  const metMandatory = mandatoryChecks.filter(r=>r.met).length;
-  const totalMandatory = mandatoryChecks.filter(r=>r.required).length;
-  const failedMandatory = mandatoryChecks.filter(r=>r.required && !r.met);
+  // #239 slice 3 — the list is split by state and each block counts ITS OWN members, so
+  // no heading can misdescribe the rows under it. The old pair counted `met` over every
+  // row and `total` over the required rows only, so the heading could read 4/3.
+  const esgRequiredRows  = mandatoryChecks.filter(r=>r.required);
+  const esgPreferredRows = mandatoryChecks.filter(r=>!r.required && r.preferred);
+  const esgNeitherRows   = mandatoryChecks.filter(r=>!r.required && !r.preferred);
+  const failedMandatory = esgRequiredRows.filter(r=>!r.met);
 
   const sku = skus[0]||null;
   // #3c — both halves normalised; see calcBrandESGScore for the reasoning.
@@ -32956,19 +32985,10 @@ function renderESGModal(retailerId){
           <!-- Retailer approach -->
           <div style="font-family:var(--sans);font-size:.73rem;color:#555;line-height:1.65;margin-bottom:1rem;padding:.6rem .8rem;background:#F9F8F6;border-left:3px solid var(--gold)">${esg.overallApproach}</div>
 
-          <!-- Mandatory requirements -->
-          <div style="margin-bottom:1rem">
-            <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.4rem">Mandatory requirements (${metMandatory}/${totalMandatory} met)</div>
-            ${mandatoryChecks.map(req=>`
-              <div style="display:flex;gap:.5rem;padding:.4rem .6rem;border:1px solid ${req.met?'#A7F3D0':req.required?'#FCA5A5':'var(--border)'};background:${req.met?'#F0FDF4':req.required?'#FEF2F2':'#F9FAFB'};margin-bottom:.3rem">
-                <span style="font-size:.8rem;flex-shrink:0">${req.met?'✓':req.required?'⛔':'◌'}</span>
-                <div style="flex:1">
-                  <div style="font-family:var(--sans);font-size:.72rem;color:${req.met?'#065F46':req.required?'#991B1B':'#374151'};font-weight:500">${req.label} ${req.required?'<span style="font-family:var(--mono);font-size:.48rem;color:#991B1B">REQUIRED</span>':'<span style="font-family:var(--mono);font-size:.48rem;color:var(--muted)">PREFERRED</span>'}</div>
-                  <div style="font-family:var(--sans);font-size:.62rem;color:${req.met?'#065F46':req.required?'#991B1B':'#555'};line-height:1.45">${tipifyRegTerms(req.note)}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+          <!-- Requirements, one block per state (#239 slice 3) -->
+          ${renderESGReqGroup('Mandatory requirements', esgRequiredRows)}
+          ${renderESGReqGroup('Preferred', esgPreferredRows)}
+          ${renderESGReqGroup('', esgNeitherRows)}
 
           <!-- Certifications -->
           <div style="margin-bottom:1rem">
