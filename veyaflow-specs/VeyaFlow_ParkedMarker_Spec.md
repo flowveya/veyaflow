@@ -1,5 +1,25 @@
 # VeyaFlow — the parked marker: a page that is not shipped must not render as one
 
+## DISPATCH LOG — THE ONE PIECE OF STATE THAT HAD NO ARTEFACT
+
+> **"Sent to CC" was the only state in the whole set with nowhere to live.** The register holds open
+> items, the repo holds specs and commits, the log holds rulings — **nothing recorded a handover,
+> because handing over is a chat action and leaves no trace.** So both lanes reported a state neither
+> could observe, repeatedly, each quoting the other's assumption. *A claim with no slot is a claim
+> nobody checks* — the same form as every other finding this week, applied to our own process.
+>
+> **EVERY SPEC CARRIES THIS BLOCK FROM NOW ON. One line per dispatch: date, and what was sent.**
+
+| date | sent | evidence |
+|---|---|---|
+| 22 Sep 2026 | **Part 0 only** — the enumeration, stop and report | CC's Part 0 report quotes this file and its baseline |
+| 23 Sep 2026 | **Part 1** — build, after Part 0's result was recorded here | CC's Part 1 report; shipped `83ce815` |
+
+*Both rows are observable from CC's own reports, not reconstructed from memory.*
+
+---
+
+
 **22 September 2026 · coding lane → CC · ruled by Strategy**
 
 **The shipment has one purpose:**

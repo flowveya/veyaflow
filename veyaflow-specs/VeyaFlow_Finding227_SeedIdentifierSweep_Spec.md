@@ -2,6 +2,22 @@
 
 **19 September 2026 · coding lane → CC · READ ONLY. NO EDITS.**
 
+## DISPATCH LOG
+
+| date | sent | evidence |
+|---|---|---|
+| — | **NO DISPATCH RECORDED** | — |
+
+> **BOTH LANES HAVE DESCRIBED THIS SPEC AS "WITH CC" REPEATEDLY, AND NEITHER CAN OBSERVE IT.**
+> "Sent to CC" is a chat action and leaves no trace; the claim travelled between lanes, each quoting
+> the other's assumption. **The absence now lives in the artefact instead of in memory.**
+>
+> **The reconstruction, named as WEAK inference and not as knowledge:** no Part 0 result has come
+> back, and Part 0 results come back fast — which points at unsent. **But absence of a result is not
+> absence of a dispatch.** CC may hold it and not have run it. *Not concluded.*
+>
+> **If this is dispatched, the row is filled at the moment of sending, not afterwards.**
+
 **Runs BEFORE #241's fix, and that ordering is the point.**
 
 > **When an instrument's founding case is also a pending fix, run the instrument first — otherwise
