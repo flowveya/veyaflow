@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        e688693d
+index.html        0f3fd699
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,97 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved e688693d → 0f3fd699 on 23 Sep 2026 — #239 SLICE 1, THE THIRD STATE.
+#   after   0f3fd699852c61344247ae9a6ad67a490ecfa0ba90f0004cdc08defa8121f795
+#           57 gates · 1 of 11 modified · no call-site drift · 2 lines changed
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: STOP ASSERTING A PREFERENCE THE DATA DOES NOT HOLD. Three states were encoded in two
+# branches — required / preferred / neither — and the ternary read `required` ONLY. EIGHT OBJECTS
+# CARRYING preferred:false RENDERED AS "Preferred". Measured on screen side by side, same two rows:
+#   Lyko            "Preferred: Not currently required. Watch for 2027 requirement."
+#   Apotek Hjärtat  "Preferred: Scope 3 reporting preferred from 2026."
+# One of those is true.
+#
+# THE EDIT: a third branch at both render sites. required:true → "Required:" (unchanged, <strong>
+# wrapper intact) · required:false + preferred:true → "Preferred:" (unchanged) · required:false +
+# preferred:false → THE NOTE ALONE, NO LABEL.
+#
+# NO THIRD LABEL, AND THE REASON IS MEASURED. The eight notes were read and carry FOUR different
+# facts: not required YET with a named date · not required FOR THIS SCOPE, which implies it IS
+# required for another · not tracked at all · flatly not required. ONE WORD OVER THOSE FOUR WOULD
+# ASSERT A SHARED CLASS THAT DOES NOT EXIST — manufacturing exactly the fact the label was meant to
+# stop manufacturing. It also dissolves the repetition: "Not required: Not currently required…"
+# cannot occur when there is no label to repeat.
+#
+# AND THE FIELD IS USED, NOT DELETED. This item stood in the register for days as "`preferred` read
+# by nothing — subtraction, no ruling." WRONG LOCUS AND THE OPPOSITE ACTION: deleting `preferred`
+# would have made NOT PREFERRED permanently indistinguishable from PREFERRED — the collapse locked
+# in rather than removed. CANON: A FIELD IS FOR WHAT CANNOT BE RE-MEASURED; where re-measurement is
+# cheap, labelling is an evasion — but here the field is the ONLY thing that separates the third
+# state from the second.
+#
+# MEASURED, per retailer, by lifting both label expressions out of the edited file and evaluating
+# them against the real objects: 8 rows lost the false "Preferred:", 8 kept it, the Required branch
+# byte-identical. No third render site — and the search was run with a SPACING-TOLERANT pattern
+# because the lane's first grep returned ZERO by assuming spaces around the `?`. A ZERO RESULT IS A
+# CLAIM ABOUT THE PATTERN, NEVER ABOUT THE TREE.
+#
+# SMOKE STEP 4 COULD NOT BE RUN, AND THAT IS THE LANE'S — FIFTH UNRUNNABLE STEP. It asked for a
+# retailer with a required:true transparency row. THERE ARE NONE: all sixteen objects are
+# required:false. The Required branch is UNREACHABLE FROM SEEDED DATA, and CC demonstrated it
+# against a synthetic object WHILE LABELLING IT AS ITS OWN CONSTRUCTION, NOT THE PRODUCT'S. The
+# evidence stands; it is not a page test. The pattern is stable: the lane keeps writing controls
+# without checking the control case exists.
+#
+# SMOKE — PASSED ON THE PAGE, AND THE CONTROL FAILS IN THE OPPOSITE DIRECTION.
+#   Lyko (preferred:false)            both notes render WITH NO LABEL
+#   Apotek Hjärtat (preferred:true)   both notes STILL SAY "Preferred:"
+# The second is the step that matters: had the label vanished there too, the third branch would be
+# catching preferred:true as well and the fix would have removed a TRUE statement along with eight
+# false ones. A smoke that only checks the defect disappeared cannot tell a fix from an over-reach.
+#
+# SLICE 2 IS ANSWERED BY THE SAME SCREEN, SO IT NEEDS NO SEPARATE RULING: the bare note sits under
+# the grey uppercase heading CARBON TRANSPARENCY and reads as a plain statement. NOTHING ABOUT IT
+# SUGGESTS A LABEL FAILED TO RENDER — the heading does the work the label was pretending to do.
+#
+# AND THE SMOKE NEARLY LOGGED A FALSE FAILURE, WHICH IS A HAZARD NOTHING IN THIS BATTERY NAMES.
+# The first run showed Lyko STILL LABELLED. The server had been restarted under an open tab and
+# returned 304 against a file that had changed: THE RIGHT ORIGIN SERVING THE WRONG BYTES. The
+# NOT CHECKED block warns about the WRONG ORIGIN — a run against an empty catalogue — and says
+# nothing about a stale cache at the correct one. Same outcome, different cause, and the lane came
+# within one message of recording a shipped fix as broken. A hard reload resolved it.
+#
+# NOTICED, NOT FIXED — AND THE FIRST IS A FINDING, NOT A NOTE:
+#   THE ITEM-LEVEL TAG IS TRUTHFUL BY COINCIDENCE. `${req.required?'REQUIRED':'PREFERRED'}` on
+#   mandatoryRequirements items does NOT read `preferred` — same defect, same modal, out of scope by
+#   the spec and now MEASURED rather than OLÄST. Of 22 items, 3 carry required:false, and ALL THREE
+#   happen to carry preferred:true. THE SECOND BRANCH TELLS THE TRUTH ONLY BECAUSE NO ITEM ANYWHERE
+#   IS NEITHER. Add one preferred:false item and the tag lies WITH NO CODE CHANGE — the
+#   capability-gap coupling again, and the thing that arms it is ordinary content work.
+#
+#   checkMandatoryESG COUNTS `met` OVER ALL ROWS AND `total` OVER REQUIRED ROWS ONLY, so the modal
+#   can render "Mandatory requirements (4/3 met)". #238's exceeded ratio with its mechanism named:
+#   TWO COUNTS OVER DIFFERENT SETS AND NOTHING CHECKS THEY COUNT THE SAME THING. Apotek Hjärtat
+#   shows 1/3 over FOUR rows today; fill them in and it exceeds.
+#
+#   verify.baseline.json PREDATES THE PARKED MARKER, which is why BASELINE DRIFT prints
+#   41898 → 41962. Harmless — all 13 call-site names PASS — but the capture is two shipments stale
+#   and should be rebased when something else touches the battery.
+#
+# TWO SLICES DELIBERATELY EXCLUDED, because a judgement dropped into a mechanical batch makes the
+# batch only as well verified as the judgement:
+#   SLICE 2 — does an unlabelled row read as "the label failed to load"? A rendering judgement,
+#   Strategy's, and one look at the screen now that this has shipped.
+#   SLICE 3 — "Preferred: Tier 1 factory list REQUIRED for private label" on a row where
+#   preferred:true is HONEST. The obligation is real and SCOPE-LIMITED, and the schema has one
+#   boolean where it needs a scope. NO LABEL FIXES A FACT THAT IS NOT BINARY — #199's family, a
+#   condition living in prose where nothing reads it. And `mandatoryRequirements` CONTAINS A
+#   NON-MANDATORY ITEM: the modal renders "MANDATORY REQUIREMENTS (1/3 MET)" over FOUR rows whose
+#   first says "Not mandatory" in its own note. THE DENOMINATOR IS CORRECT, WHICH IS WHAT LETS IT
+#   PASS. The array's NAME asserts what one of its members denies — EU_RP_MARKETS and isEU's family,
+#   on screen rather than in the source. A rename is an assertion about purpose, so it is Strategy's.
 
 # index.html moved 52d0a88f → e688693d on 22–23 Sep 2026 — THE PARKED MARKER.
 #   after   e688693d21912f726bc055beb5af6d6694950f205d368f28947d559b01758d2e

@@ -33014,13 +33014,13 @@ function renderESGModal(retailerId){
           ${esg.carbonTransparency?.note?`
             <div style="margin-bottom:.6rem">
               <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.2rem">Carbon transparency</div>
-              <div style="font-family:var(--sans);font-size:.7rem;color:#555">${esg.carbonTransparency.required?'<strong>Required</strong>':'Preferred'}: ${esg.carbonTransparency.note}</div>
+              <div style="font-family:var(--sans);font-size:.7rem;color:#555">${esg.carbonTransparency.required?'<strong>Required</strong>: ':(esg.carbonTransparency.preferred?'Preferred: ':'')}${esg.carbonTransparency.note}</div>
             </div>
           `:''}
           ${esg.supplyChainTransparency?.note?`
             <div style="margin-bottom:.6rem">
               <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.2rem">Supply chain transparency</div>
-              <div style="font-family:var(--sans);font-size:.7rem;color:#555">${esg.supplyChainTransparency.required?'<strong>Required</strong>':'Preferred'}: ${esg.supplyChainTransparency.note}</div>
+              <div style="font-family:var(--sans);font-size:.7rem;color:#555">${esg.supplyChainTransparency.required?'<strong>Required</strong>: ':(esg.supplyChainTransparency.preferred?'Preferred: ':'')}${esg.supplyChainTransparency.note}</div>
             </div>
           `:''}
         </div>
