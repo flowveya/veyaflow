@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        55aa0f1a
+index.html        82395393
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,95 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved 55aa0f1a → 82395393 on 24 Sep 2026 — THE PRICING PAGE, PART 1.
+#   after   823953937883f8e0ad138195518a848b8cf246f5164a05d6297eec16e207eb5f
+#           57 gates · 1 of 11 modified · 23 insertions, 63 deletions — NET −40 LINES, and every
+#           insertion is a comment recording a removal
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: STOP THE SURFACE WHERE SOMEONE PAYS FROM CLAIMING WHAT WE CANNOT SOURCE.
+#
+# REMOVED: `Most popular` — we have no customers, and it is `✓ Verified` and `vetted` again, SOCIAL
+# PROOF WITH NO RECORD BEHIND IT, on the surface where someone pays · the cost-of-inaction banner on
+# BOTH surfaces, AND THE ESTIMATE MACHINERY THAT FED IT (MARKET_REVENUE, monthlyMissed, annualMissed,
+# roi) — the spec said remove the block; LEAVING THE COMPUTATION WOULD HAVE LEFT A DEAD
+# REVENUE-FORECAST ENGINE THAT ANYTHING COULD RE-RENDER · "Recover it with one listing" and every
+# instance of "pays for itself when your first listing is confirmed", BOTH ASSERTING A LISTING IS
+# WORTH ≥60 000 SEK TO THE BRAND · five feature rows · the words `alerts`, `(weekly)` and
+# `(unlimited)` from three rows that DO ship · the `Continue with trial →` link.
+#
+# WHY NOT FILL THE TWO BLANKS INSTEAD: what would go there is A REVENUE FORECAST ABOUT THE CUSTOMER'S
+# BUSINESS, and we have no basis for that number. It is the readiness score in its purest commercial
+# form. THE FILLED VERSION IS WORSE THAN THE BROKEN ONE.
+#
+# WHY THE THREE WORDS: `alerts` CLAIMS DISPATCH — the screens ship and render in-app, and NO SEND
+# PATH EXISTS anywhere in the tree; the only outbound construct is mailto:, which opens the user's
+# own client (#241) · `(weekly)` IS A THROTTLE, NOT A SCHEDULE — shouldRunWeeklyCheck fires two
+# seconds after app load or from a button, there is NO CRON AND NO setInterval, so IF NOBODY OPENS
+# THE APP NOTHING IS CHECKED, and weeklyCheck:true is written and never read · `(unlimited)` IS A
+# PROMISE ABOUT A MECHANISM THAT DOES NOT EXIST — no cap exists anywhere and no code reads a plan.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# THE SPEC'S SCOPE CAME FROM A SCREENSHOT, AND CC FOUND THE HOLE. TEN ROWS FAIL, NOT FIVE.
+# Part 0 measured ELEVEN rows because eleven were visible in Charlotte's screenshot of FULL PLATFORM.
+# THE OTHER TWO TIERS HAVE THEIR OWN FEATURE LISTS AND THE LANE NEVER ASKED ABOUT THEM.
+#   Market Access      `Market Entry Report (up to 3 markets)`  → report, PARKED
+#                      `Retailer Pitch generator`               → pitch, PARKED
+#                      `Retailer CRM — up to 15 retailers`      → an UNENFORCED LIMIT
+#   Expansion Partner  `VeyaFlow Verified directory listing`    → `verified` redirects into find, PARKED
+#                      `Contract Terms Analyser`                → THE SAME renderContractTab INSIDE
+#                                                                  THE PARKED cfo
+# SAME ERROR AS PICKING PORTUGAL FOR A SMOKE STEP BECAUSE IT WAS THE SPEC'S HEADLINE: scoping from
+# what was in front of the lane rather than from the data.
+# AND ONE IS WORSE THAN PARKED: `VeyaFlow Verified directory listing` SELLS THE EXACT CLAIM WE
+# REMOVED FROM THE PRODUCT THIS WEEK. There is no verification mechanism — that is why ✓ Verified
+# came out — and it is on the Expansion tier with a price beside it.
+# LEFT STANDING DELIBERATELY: they need a ruling or Part 2, and folding them in silently would have
+# made this batch's scope a second thing the heading got wrong.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+#
+# THREE STATES, NOT TWO — RULED 24 SEP AND THE REASON PART 1 REMOVES RATHER THAN DEFERS:
+# ships today → listed as included · promised for launch WITH A NAMED CONDITION → its own block,
+# visibly separate, the condition written out · neither → OFF THE PAGE.
+# `CFO View` in a list headed INCLUDED FEATURES ASSERTS THAT IT IS INCLUDED. That is not the same
+# claim as that it is coming. THE GATE THAT STOPS THE MIDDLE BLOCK BECOMING A DUMP: a row in the
+# launch block MUST HAVE A SPECCED SHIPMENT BEHIND IT — NOT AN INTENTION, A SPEC. That is the row's
+# Belägg:, with a commitment as the evidence instead of a line of code. Without it, it is "coming
+# soon" with better typography — THE SOFTENING IN A NEW COSTUME. A future claim is honest when it
+# names WHAT MAKES IT TRUE and WHO IS BOUND; "coming soon" names neither.
+# TODAY NONE OF THE TEN HAS A SPEC, SO THE LAUNCH BLOCK STARTS EMPTY.
+#
+# VERIFIED BY ABSENCE ACROSS ALL ELEVEN SURFACES, zero hits each: `pays for itself` · `missed
+# revenue` · `Most popular` · `Cost of waiting` · `Continue with trial` · `Recover it with one
+# listing` · `ROI from first listing` · `MARKET_REVENUE` · `monthlyMissed` · `annualMissed`.
+# THE CONTROL WAS MEASURED, NOT EYEBALLED: market_access and expansion_partner byte-identical, and
+# all three tiers' monthlyPrice, annualPrice, currency, tagline, cta and highlight unchanged.
+# A SUBTRACTION THAT MOVES A PRICE IS NOT A SUBTRACTION.
+#
+# AND CC AVOIDED #183's FAILURE WITHOUT BEING ASKED: its comment in PRICING_TIERS PARAPHRASES the
+# removed rows rather than quoting them, SO THE GREP FOR THE REMOVED STRINGS STAYS AT ZERO. #183 was
+# a ruling comment that contained the literal it banned. This is that failure being avoided by
+# someone who read why it happened.
+#
+# STRUCTURAL GAPS — REPORTED, NOT FILLED, as the spec required: the modal footer keeps
+# justify-content:space-between around a SINGLE child, so the rule now does nothing (left alone —
+# removing it is a template change the spec did not ask for) · the badge render branch
+# `${tier.badge ? … : ''}` SURVIVES WITH NO TIER CARRYING A BADGE (data removed, renderer left) ·
+# no empty containers and no orphan headings anywhere.
+#
+# SMOKE STEP 2 IS UNRUNNABLE AND THE SPEC SAID SO BEFORE THE RUN — renderTrialExpiredScreen HAS NO
+# CALLER ANYWHERE, so its removals are verified BY ABSENCE IN SOURCE, stated explicitly rather than
+# left to silence. SIXTH UNRUNNABLE STEP THIS WEEK, AND THE FIRST CAUGHT WHEN WRITTEN RATHER THAN
+# WHEN RUN. RULED: every smoke step now NAMES ITS ENTRY POINT — the function or URL that reaches the
+# surface. A step whose entry cannot be named is unrunnable, and that shows at writing time.
+#
+# NOTICED, NOT FIXED: the trial-expired heading STILL READS "Your 14-day free trial has ended" — a
+# 14-day trial NOTHING STARTS, on a screen with NO CALLER · the second cadence claim survives on
+# another surface, a label map reading `reg_monitor: 'Weekly regulatory updates'` · a home nudge
+# still offers a parked surface: `Open CFO View →` · `Invest in your expansion.` STAYS AND IS
+# FLAGGED, NOT SILENT: Part 2 re-keys AWAY from the expansion framework, so the page's first line
+# contradicts the axis the same document introduces.
 
 # index.html moved eeffc081 → 55aa0f1a on 24 Sep 2026 — #245 PART 1, COVERAGE HONESTY.
 #   after   55aa0f1a32be7afafd0f3f34e6232e5bd468c225b7a019393db88a6ed470a29e

@@ -4789,21 +4789,27 @@ const PRICING_TIERS = [
     currency:'SEK',
     tagline:'For brands actively pitching and closing retail listings',
     features:[
+      // 24 Sep 2026 — FIVE ROWS REMOVED, measured, not softened. Three named a parked
+      // surface (the market-entry report row, the CFO view row, the mirror-test row —
+      // report / cfo / pitch are all in PARKED_IDS); one named an artefact nothing in the
+      // tree produces (the CPNP package row); one named a pack that does not exist (the
+      // retailer ESG row — the modal renders the data and its footer carries one button,
+      // Close). Wordings are deliberately paraphrased here so a grep for the removed
+      // strings stays at zero.
+      // AND THREE CLAIMS ON ROWS THAT DO SHIP: the dispatch word came off Seasonal
+      // Intelligence (nothing is ever sent — no send path exists), the cadence came off
+      // Regulatory Monitor (shouldRunWeeklyCheck is a throttle, not a schedule) and the
+      // limit word came off the CRM row (no cap exists and no code reads a plan).
+      // A row does not get a softer wording than the record behind it.
       'Everything in Market Access',
-      'Unlimited Market Entry Reports',
-      'Full Retailer CRM (unlimited)',
-      'CFO View — margin stress test + contract analyser',
-      'Seasonal Intelligence alerts',
+      'Full Retailer CRM',
+      'Seasonal Intelligence',
       'Asset Spec Library + Image Resizer',
       'PIF Gap Checker + Label Scanner',
-      'CPNP Notification Package',
-      'Mirror Test + Pitch Scorer',
-      'Retailer ESG Data Pack',
-      'Regulatory Monitor (weekly)',
+      'Regulatory Monitor',
     ],
     cta:'Start Full Platform',
     highlight:true,
-    badge:'Most popular',
   },
   {
     id:'expansion_partner',
@@ -4868,20 +4874,9 @@ function renderPricingModal(activeTierId){
   const daysLeft = getTrialDaysLeft();
   const sku = skus[0]||null;
 
-  // Cost-of-inaction estimate
-  const targetMarket = brand?.targetMarkets?.[0]||brand?.currentMarket||'Sweden';
-  const category = brand?.category||'Skincare & Beauty';
-  const mktCode = MARKET_IDENTITY.codeFor(targetMarket)||'SE';
-  const MARKET_REVENUE = {
-    SE:{'Skincare & Beauty':185000,'Wellness & Supplements':140000,'Food & Beverage':210000,'Fashion & Apparel':165000,default:175000},
-    DK:{'Skincare & Beauty':220000,'Wellness & Supplements':165000,'Food & Beverage':245000,'Fashion & Apparel':195000,default:210000},
-    DE:{'Skincare & Beauty':380000,'Wellness & Supplements':290000,'Food & Beverage':420000,'Fashion & Apparel':340000,default:360000},
-    UK:{'Skincare & Beauty':340000,'Wellness & Supplements':270000,'Food & Beverage':380000,'Fashion & Apparel':310000,default:320000},
-    NO:{'Skincare & Beauty':210000,'Wellness & Supplements':170000,'Food & Beverage':240000,'Fashion & Apparel':190000,default:200000},
-    default:{'Skincare & Beauty':200000, default:180000},
-  };
-  const mktRevData = MARKET_REVENUE[mktCode]||MARKET_REVENUE.default;
-  const monthlyMissed = Math.round(((mktRevData[category]||mktRevData.default||180000)/12)/1000)*1000;
+  // 24 Sep 2026 — the cost-of-inaction estimate and the banner it fed are REMOVED, not
+  // repaired: the number was a revenue forecast about the customer's business, built from a
+  // table nothing sources. The slots are not refilled, here or anywhere.
 
   modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow-y:auto">
@@ -4892,21 +4887,12 @@ function renderPricingModal(activeTierId){
         <!-- Header -->
         <div style="padding:1.25rem 1.5rem 1rem;border-bottom:1px solid var(--border);text-align:center">
           <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.3rem">VeyaFlow Plans</div>
-          <div style="font-family:var(--serif);font-size:1.35rem;font-weight:700;color:var(--navy);margin-bottom:.25rem">Invest in your expansion. Recover it with one listing.</div>
+          <div style="font-family:var(--serif);font-size:1.35rem;font-weight:700;color:var(--navy);margin-bottom:.25rem">Invest in your expansion.</div>
           ${daysLeft!==null?`
             <div style="background:#FFFBEB;border:1px solid #FCD34D;padding:.45rem .85rem;display:inline-block;margin-top:.4rem;font-family:var(--mono);font-size:.6rem;color:#92400E">
               ⏰ Free trial: <strong>${daysLeft} day${daysLeft!==1?'s':''} remaining</strong>
             </div>
           `:''}
-        </div>
-
-        <!-- Cost-of-inaction -->
-        <div style="background:var(--accent);padding:.85rem 1.5rem;text-align:center">
-          <div style="font-family:var(--sans);font-size:.8rem;color:rgba(255,255,255,.8);line-height:1.7">
-            Every month not in <strong style="color:var(--gold)">${targetMarket}</strong> = estimated
-            <strong style="color:var(--gold)">${monthlyMissed.toLocaleString('sv-SE')} SEK</strong> in missed revenue.
-            <br>VeyaFlow pays for itself when your first listing is confirmed.
-          </div>
         </div>
 
         <!-- Tier cards -->
@@ -4942,7 +4928,6 @@ function renderPricingModal(activeTierId){
         <!-- Footer note -->
         <div style="padding:.65rem 1.5rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
           <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">All prices excl. VAT · Cancel anytime · No setup fees</div>
-          <button onclick="document.getElementById('vf-pricing-modal').remove()" style="background:none;border:none;font-family:var(--mono);font-size:.58rem;color:var(--muted);cursor:pointer">Continue with trial →</button>
         </div>
       </div>
     </div>
@@ -4976,41 +4961,16 @@ function renderTrialBadge(){
 
 // Trial expiry screen — shown if trial expired and no plan selected
 function renderTrialExpiredScreen(targetMarket, category){
-  const mktCode = MARKET_IDENTITY.codeFor(targetMarket||'Sweden')||'SE';
-  const MARKET_REVENUE = {
-    SE:{'Skincare & Beauty':185000,'Wellness & Supplements':140000,'Food & Beverage':210000,'Fashion & Apparel':165000,default:175000},
-    DK:{'Skincare & Beauty':220000,'Wellness & Supplements':165000,'Food & Beverage':245000,'Fashion & Apparel':195000,default:210000},
-    DE:{'Skincare & Beauty':380000,'Wellness & Supplements':290000,'Food & Beverage':420000,'Fashion & Apparel':340000,default:360000},
-    UK:{'Skincare & Beauty':340000,'Wellness & Supplements':270000,'Food & Beverage':380000,'Fashion & Apparel':310000,default:320000},
-    NO:{'Skincare & Beauty':210000,'Wellness & Supplements':170000,'Food & Beverage':240000,'Fashion & Apparel':190000,default:200000},
-    default:{'Skincare & Beauty':200000, default:180000},
-  };
-  const mktRevData = MARKET_REVENUE[mktCode]||MARKET_REVENUE.default;
-  const annualMissed   = mktRevData[category||'Skincare & Beauty']||mktRevData.default||200000;
-  const monthlyMissed  = Math.round((annualMissed/12)/1000)*1000;
-  const fullPlatformMo = PRICING_TIERS.find(t=>t.id==='full_platform')?.monthlyPrice||5000;
-  const roi            = Math.round(monthlyMissed / fullPlatformMo);
+  // 24 Sep 2026 — same removal as the pricing modal: the Cost-of-waiting block, its ROI
+  // multiple and the pays-for-itself line are gone, and the estimate behind them with them.
+  // The two parameters stay in the signature: this function has no caller, and changing its
+  // shape is not this shipment's business.
 
   return `
     <div style="position:fixed;inset:0;background:rgba(27,45,79,.95);z-index:9998;display:flex;align-items:center;justify-content:center;padding:1.5rem">
       <div style="background:#fff;max-width:520px;width:100%;padding:2rem">
         <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.3rem">Trial expired</div>
         <div style="font-family:var(--serif);font-size:1.3rem;font-weight:700;color:var(--navy);margin-bottom:1rem">Your 14-day free trial has ended</div>
-
-        <!-- Cost-of-inaction block -->
-        <div style="background:var(--accent);padding:1.1rem 1.25rem;margin-bottom:1.25rem">
-          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);margin-bottom:.35rem">Cost of waiting</div>
-          <div style="font-family:var(--sans);font-size:.82rem;color:#fff;line-height:1.7;margin-bottom:.5rem">
-            Every month not in <strong style="color:var(--gold)">${targetMarket||'your target market'}</strong> =
-            estimated <strong style="color:var(--gold)">${monthlyMissed.toLocaleString('sv-SE')} SEK</strong> in missed revenue.
-          </div>
-          <div style="font-family:var(--mono);font-size:.65rem;color:var(--gold)">
-            Full Platform at ${fullPlatformMo.toLocaleString('sv-SE')} SEK/mo = ${roi}× ROI from first listing alone.
-          </div>
-          <div style="font-family:var(--sans);font-size:.68rem;color:rgba(255,255,255,.65);margin-top:.3rem">
-            VeyaFlow pays for itself when your first listing is confirmed.
-          </div>
-        </div>
 
         <!-- Three tiers compact -->
         <div style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1.25rem">
