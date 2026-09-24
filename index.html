@@ -1967,6 +1967,142 @@ const isEuEeaMarket = (function(){
   return function isEuEeaMarket(marketName){ return MEMBERS.indexOf(marketName) > -1; };
 })();
 
+// #245 Part 1 (24 Sep 2026) — THE TRANSLATION MAP. IDENTITY ONLY: a code and a display name
+// are the same market, and that is the whole content. The moment it carries coverage, ordering
+// or any second fact it becomes a coverage list, and coverage lists drift. This one cannot.
+//
+// SOURCED, NOT REMEMBERED. The pairs below were generated from /usr/share/zoneinfo/iso3166.tab
+// — the tz database's ISO 3166-1 alpha-2 table, public domain, 2025-07-01 release, 249 rows —
+// and, where the CLDR English short name differs from that table's (33 codes), BOTH names are
+// kept against the one code. No code and no name here was written from memory.
+//
+// IT IS A REDUCTION, NOT AN ADDITION: it replaces FIVE partial maps that did this job
+// incompletely — NAME_TO_CODE in renderPricingModal, renderTrialExpiredScreen and
+// renderExpansionOverview, nameToCode in renderReadinessHero (name->code, twelve of thirty
+// member states between them) and C2N in regMarketApplies (code->name, nine).
+//
+// THE PRODUCT'S OWN CODE WINS WHERE IT DIVERGES FROM ISO, and measured today it diverges in
+// exactly one place: United Kingdom is 'UK' here and 'GB' in ISO 3166. That overlay is not a
+// hand list either — it is read from MARKET_REGISTRY's own declarations on first call, so the
+// identity cannot drift from the vocabulary the coverage lists are keyed by.
+//
+// No list is exposed: two predicates, and the data stays inside the closure.
+const MARKET_IDENTITY = (function(){
+  const ISO = {
+    AD:['Andorra'], AE:['United Arab Emirates'], AF:['Afghanistan'],
+    AG:['Antigua & Barbuda'], AI:['Anguilla'], AL:['Albania'],
+    AM:['Armenia'], AO:['Angola'], AQ:['Antarctica'],
+    AR:['Argentina'], AS:['Samoa (American)','American Samoa'], AT:['Austria'],
+    AU:['Australia'], AW:['Aruba'], AX:['Åland Islands'],
+    AZ:['Azerbaijan'], BA:['Bosnia & Herzegovina'], BB:['Barbados'],
+    BD:['Bangladesh'], BE:['Belgium'], BF:['Burkina Faso'],
+    BG:['Bulgaria'], BH:['Bahrain'], BI:['Burundi'],
+    BJ:['Benin'], BL:['St Barthelemy','St. Barthélemy'], BM:['Bermuda'],
+    BN:['Brunei'], BO:['Bolivia'], BQ:['Caribbean NL','Caribbean Netherlands'],
+    BR:['Brazil'], BS:['Bahamas'], BT:['Bhutan'],
+    BV:['Bouvet Island'], BW:['Botswana'], BY:['Belarus'],
+    BZ:['Belize'], CA:['Canada'], CC:['Cocos (Keeling) Islands'],
+    CD:['Congo (Dem. Rep.)','Congo - Kinshasa'], CF:['Central African Rep.','Central African Republic'], CG:['Congo (Rep.)','Congo - Brazzaville'],
+    CH:['Switzerland'], CI:['Côte d’Ivoire'], CK:['Cook Islands'],
+    CL:['Chile'], CM:['Cameroon'], CN:['China'],
+    CO:['Colombia'], CR:['Costa Rica'], CU:['Cuba'],
+    CV:['Cape Verde'], CW:['Curaçao'], CX:['Christmas Island'],
+    CY:['Cyprus'], CZ:['Czech Republic','Czechia'], DE:['Germany'],
+    DJ:['Djibouti'], DK:['Denmark'], DM:['Dominica'],
+    DO:['Dominican Republic'], DZ:['Algeria'], EC:['Ecuador'],
+    EE:['Estonia'], EG:['Egypt'], EH:['Western Sahara'],
+    ER:['Eritrea'], ES:['Spain'], ET:['Ethiopia'],
+    FI:['Finland'], FJ:['Fiji'], FK:['Falkland Islands'],
+    FM:['Micronesia'], FO:['Faroe Islands'], FR:['France'],
+    GA:['Gabon'], GB:['Britain (UK)','United Kingdom'], GD:['Grenada'],
+    GE:['Georgia'], GF:['French Guiana'], GG:['Guernsey'],
+    GH:['Ghana'], GI:['Gibraltar'], GL:['Greenland'],
+    GM:['Gambia'], GN:['Guinea'], GP:['Guadeloupe'],
+    GQ:['Equatorial Guinea'], GR:['Greece'], GS:['South Georgia & the South Sandwich Islands','South Georgia & South Sandwich Islands'],
+    GT:['Guatemala'], GU:['Guam'], GW:['Guinea-Bissau'],
+    GY:['Guyana'], HK:['Hong Kong','Hong Kong SAR China'], HM:['Heard Island & McDonald Islands','Heard & McDonald Islands'],
+    HN:['Honduras'], HR:['Croatia'], HT:['Haiti'],
+    HU:['Hungary'], ID:['Indonesia'], IE:['Ireland'],
+    IL:['Israel'], IM:['Isle of Man'], IN:['India'],
+    IO:['British Indian Ocean Territory'], IQ:['Iraq'], IR:['Iran'],
+    IS:['Iceland'], IT:['Italy'], JE:['Jersey'],
+    JM:['Jamaica'], JO:['Jordan'], JP:['Japan'],
+    KE:['Kenya'], KG:['Kyrgyzstan'], KH:['Cambodia'],
+    KI:['Kiribati'], KM:['Comoros'], KN:['St Kitts & Nevis','St. Kitts & Nevis'],
+    KP:['Korea (North)','North Korea'], KR:['Korea (South)','South Korea'], KW:['Kuwait'],
+    KY:['Cayman Islands'], KZ:['Kazakhstan'], LA:['Laos'],
+    LB:['Lebanon'], LC:['St Lucia','St. Lucia'], LI:['Liechtenstein'],
+    LK:['Sri Lanka'], LR:['Liberia'], LS:['Lesotho'],
+    LT:['Lithuania'], LU:['Luxembourg'], LV:['Latvia'],
+    LY:['Libya'], MA:['Morocco'], MC:['Monaco'],
+    MD:['Moldova'], ME:['Montenegro'], MF:['St Martin (French)','St. Martin'],
+    MG:['Madagascar'], MH:['Marshall Islands'], MK:['North Macedonia'],
+    ML:['Mali'], MM:['Myanmar (Burma)'], MN:['Mongolia'],
+    MO:['Macau','Macao SAR China'], MP:['Northern Mariana Islands'], MQ:['Martinique'],
+    MR:['Mauritania'], MS:['Montserrat'], MT:['Malta'],
+    MU:['Mauritius'], MV:['Maldives'], MW:['Malawi'],
+    MX:['Mexico'], MY:['Malaysia'], MZ:['Mozambique'],
+    NA:['Namibia'], NC:['New Caledonia'], NE:['Niger'],
+    NF:['Norfolk Island'], NG:['Nigeria'], NI:['Nicaragua'],
+    NL:['Netherlands'], NO:['Norway'], NP:['Nepal'],
+    NR:['Nauru'], NU:['Niue'], NZ:['New Zealand'],
+    OM:['Oman'], PA:['Panama'], PE:['Peru'],
+    PF:['French Polynesia'], PG:['Papua New Guinea'], PH:['Philippines'],
+    PK:['Pakistan'], PL:['Poland'], PM:['St Pierre & Miquelon','St. Pierre & Miquelon'],
+    PN:['Pitcairn','Pitcairn Islands'], PR:['Puerto Rico'], PS:['Palestine','Palestinian Territories'],
+    PT:['Portugal'], PW:['Palau'], PY:['Paraguay'],
+    QA:['Qatar'], RE:['Réunion'], RO:['Romania'],
+    RS:['Serbia'], RU:['Russia'], RW:['Rwanda'],
+    SA:['Saudi Arabia'], SB:['Solomon Islands'], SC:['Seychelles'],
+    SD:['Sudan'], SE:['Sweden'], SG:['Singapore'],
+    SH:['St Helena','St. Helena'], SI:['Slovenia'], SJ:['Svalbard & Jan Mayen'],
+    SK:['Slovakia'], SL:['Sierra Leone'], SM:['San Marino'],
+    SN:['Senegal'], SO:['Somalia'], SR:['Suriname'],
+    SS:['South Sudan'], ST:['Sao Tome & Principe','São Tomé & Príncipe'], SV:['El Salvador'],
+    SX:['St Maarten (Dutch)','Sint Maarten'], SY:['Syria'], SZ:['Eswatini (Swaziland)','Eswatini'],
+    TC:['Turks & Caicos Is','Turks & Caicos Islands'], TD:['Chad'], TF:['French S. Terr.','French Southern Territories'],
+    TG:['Togo'], TH:['Thailand'], TJ:['Tajikistan'],
+    TK:['Tokelau'], TL:['East Timor','Timor-Leste'], TM:['Turkmenistan'],
+    TN:['Tunisia'], TO:['Tonga'], TR:['Turkey','Türkiye'],
+    TT:['Trinidad & Tobago'], TV:['Tuvalu'], TW:['Taiwan'],
+    TZ:['Tanzania'], UA:['Ukraine'], UG:['Uganda'],
+    UM:['US minor outlying islands','U.S. Outlying Islands'], US:['United States'], UY:['Uruguay'],
+    UZ:['Uzbekistan'], VA:['Vatican City'], VC:['St Vincent','St. Vincent & Grenadines'],
+    VE:['Venezuela'], VG:['Virgin Islands (UK)','British Virgin Islands'], VI:['Virgin Islands (US)','U.S. Virgin Islands'],
+    VN:['Vietnam'], VU:['Vanuatu'], WF:['Wallis & Futuna'],
+    WS:['Samoa (western)','Samoa'], YE:['Yemen'], YT:['Mayotte'],
+    ZA:['South Africa'], ZM:['Zambia'], ZW:['Zimbabwe'],
+  };
+  function tablesFrom(){
+    const byName = {}, byCode = {};
+    Object.keys(ISO).forEach(function(c){
+      ISO[c].forEach(function(n){ byName[n.toLowerCase()] = c; });
+      byCode[c] = ISO[c][ISO[c].length-1];
+    });
+    // The product's own vocabulary, read from the product's own declaration rather than typed
+    // out here. MARKET_REGISTRY is declared far below this closure, so a call that lands before
+    // it initialises keeps the ISO answer and the overlay is retried on the next call — never
+    // cached half-built, which would leave 'United Kingdom' answering 'GB' for the session.
+    let overlaid = false;
+    try{
+      Object.keys(MARKET_REGISTRY).forEach(function(code){
+        const nm = MARKET_REGISTRY[code] && MARKET_REGISTRY[code].name;
+        if(!nm) return;
+        byName[nm.toLowerCase()] = code;
+        byCode[code] = nm;
+      });
+      overlaid = true;
+    }catch(e){ /* MARKET_REGISTRY not initialised yet */ }
+    return {byName: byName, byCode: byCode, overlaid: overlaid};
+  }
+  let T = null;
+  function tables(){ if(!T || !T.overlaid) T = tablesFrom(); return T; }
+  return {
+    codeFor: function(name){ return tables().byName[String(name||'').trim().toLowerCase()] || null; },
+    nameFor: function(code){ return tables().byCode[String(code||'').trim().toUpperCase()] || null; },
+  };
+})();
+
 // Single-source filter for the canonical dated list (REG_DEADLINES). Used by BOTH the
 // deadline banner and the Compliance Calendar so they never disagree. Category gate =
 // display-name match; market gate = 'EU'/'EU/EEA' applies if the brand sells in any EU/EEA
@@ -1976,8 +2112,7 @@ function regMarketApplies(r, mkts){
   if(r.market==='EU' || r.market==='EU/EEA'){
     return mkts.some(isEuEeaMarket);
   }
-  var C2N={UK:'United Kingdom',DK:'Denmark',DE:'Germany',NO:'Norway',SE:'Sweden',FI:'Finland',NL:'Netherlands',FR:'France',BE:'Belgium'};
-  var nm=C2N[r.market]||r.market;
+  var nm=MARKET_IDENTITY.nameFor(r.market)||r.market;
   return mkts.indexOf(nm)>-1;
 }
 function regDeadlinesForBrand(){
@@ -4736,8 +4871,7 @@ function renderPricingModal(activeTierId){
   // Cost-of-inaction estimate
   const targetMarket = brand?.targetMarkets?.[0]||brand?.currentMarket||'Sweden';
   const category = brand?.category||'Skincare & Beauty';
-  const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'};
-  const mktCode = NAME_TO_CODE[targetMarket]||'SE';
+  const mktCode = MARKET_IDENTITY.codeFor(targetMarket)||'SE';
   const MARKET_REVENUE = {
     SE:{'Skincare & Beauty':185000,'Wellness & Supplements':140000,'Food & Beverage':210000,'Fashion & Apparel':165000,default:175000},
     DK:{'Skincare & Beauty':220000,'Wellness & Supplements':165000,'Food & Beverage':245000,'Fashion & Apparel':195000,default:210000},
@@ -4842,8 +4976,7 @@ function renderTrialBadge(){
 
 // Trial expiry screen — shown if trial expired and no plan selected
 function renderTrialExpiredScreen(targetMarket, category){
-  const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR'};
-  const mktCode = NAME_TO_CODE[targetMarket||'Sweden']||'SE';
+  const mktCode = MARKET_IDENTITY.codeFor(targetMarket||'Sweden')||'SE';
   const MARKET_REVENUE = {
     SE:{'Skincare & Beauty':185000,'Wellness & Supplements':140000,'Food & Beverage':210000,'Fashion & Apparel':165000,default:175000},
     DK:{'Skincare & Beauty':220000,'Wellness & Supplements':165000,'Food & Beverage':245000,'Fashion & Apparel':195000,default:210000},
@@ -7762,8 +7895,7 @@ function renderVerificationCard(){
 function renderReadinessHero(){
   var sku0=skus[0]||{};
   var bestScore=0, bestMktName='', bestBlockers=[];
-  var nameToCode={'Sweden':'SE','Denmark':'DK','Norway':'NO','Germany':'DE','United Kingdom':'UK','Netherlands':'NL','France':'FR','Belgium':'BE'};
-  var tgtCodes=(brand.targetMarkets||[brand.currentMarket||'Sweden']).map(function(m){return nameToCode[m]||'SE';});
+  var tgtCodes=(brand.targetMarkets||[brand.currentMarket||'Sweden']).map(function(m){return MARKET_IDENTITY.codeFor(m)||'SE';});
   tgtCodes.forEach(function(mc){
     var ret=RETAILER_REGISTRY.filter(function(r){return r.market===mc&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket;});
     if(!ret.length) return;
@@ -15561,10 +15693,13 @@ function detectParallelEntry(markets){
 }
 
 function _nameToCode(name){
-  return {Denmark:'DK',Germany:'DE','United Kingdom':'UK',Norway:'NO',Sweden:'SE',Netherlands:'NL',France:'FR',Belgium:'BE',Finland:'FI'}[name]||name.slice(0,2).toUpperCase();
+  // #245 — the nine-entry map that stood here was the sixth partial one; the identity now comes
+  // from MARKET_IDENTITY. The slice(0,2) fallback STAYS: it manufactures a code for a string the
+  // identity map does not hold, and dropping it is a behaviour change this batch does not carry.
+  return MARKET_IDENTITY.codeFor(name) || String(name||'').slice(0,2).toUpperCase();
 }
 function _codeToName(code){
-  return {DK:'Denmark',DE:'Germany',UK:'United Kingdom',NO:'Norway',SE:'Sweden',NL:'Netherlands',FR:'France',BE:'Belgium',FI:'Finland'}[code]||null;
+  return MARKET_IDENTITY.nameFor(code) || null;
 }
 
 // ── Compliance delta ──────────────────────────────
@@ -31897,12 +32032,11 @@ function renderExpansionOverview(){
   if(!crmCards.length) loadCRM();   // Margin Watch reads crmCards before any loader on a fresh #home landing (guard mirrors L20585/L23046/L27018)
 
   const sku  = skus[0]||null;
-  const NAME_TO_CODE = {Sweden:'SE',Denmark:'DK',Norway:'NO',Finland:'FI',Germany:'DE','United Kingdom':'UK',Netherlands:'NL',France:'FR',Belgium:'BE',Austria:'AT',Switzerland:'CH',Portugal:'PT'};
 
   // ── Column 1: Market Readiness ─────────────────────
   const targetMkts = (brand.targetMarkets||[]).slice(0,3);
   const mktScores = targetMkts.map(mkt=>{
-    const code = NAME_TO_CODE[mkt]||'DK';
+    const code = MARKET_IDENTITY.codeFor(mkt)||'DK';
     const retailer = RETAILER_REGISTRY.find(r=>r.market===code&&retailerMatchesBrandTags(r,brand)&&!r.futureMarket&&!r.channelType);
     try{
       const rs = scoreReadiness(brand, sku||{}, code, retailer?.id||'');
@@ -33738,6 +33872,73 @@ function getWEEEMarkets(){
   return [...(brand.targetMarkets||[]), brand.currentMarket||'Sweden']
     .filter(m=>WEEE_MARKET_MAP[m])
     .filter((m,i,a)=>a.indexOf(m)===i);
+}
+
+// #245 Part 1 (24 Sep 2026) — ONE FUNCTION, ONE QUESTION: what do we hold for this market?
+//
+// DERIVED, NEVER A LIST OF ITS OWN. Every fact below is read from the list that already owns
+// it, so a coverage list and this function cannot disagree. A hand-maintained coverage table
+// would be one more market list, which is the defect this item is about.
+//
+// THE OUTPUT IS A STATE, NOT A SENTENCE: each surface answers 'held', 'none' or 'unknown',
+// with the count where a count is what we hold. Copy is Design's and is not written here.
+//
+// 'unknown' IS NOT A HEDGE. It means the answer lives in a list this function cannot see, and
+// every one of them is named on its own facet — today: VAT, and the EU-wide radar rows.
+//
+// MEMBERSHIP IS NOT COVERAGE, so `euEeaMember` sits outside `surfaces`: it says what is true,
+// not what we hold (#220, #243).
+function coverageFor(market){
+  const name = String(market||'').trim();
+  const code = MARKET_IDENTITY.codeFor(name);
+  const surfaces = {};
+  const listed = (v, extra) => Object.assign({state: v ? 'held' : 'none'}, extra||{});
+
+  // Regulatory watch — the radar's coverage comes from the ITEMS, never from its filter list.
+  // Reading RADAR_MARKETS here would repeat #220: a picker read as a membership test.
+  const radarRows   = COMPLIANCE_RADAR_ITEMS.filter(i=>(i.markets||[]).indexOf(name)>-1).length;
+  const radarEuRows = COMPLIANCE_RADAR_ITEMS.filter(i=>(i.markets||[]).indexOf('all_eu')>-1).length;
+  surfaces.regulatoryWatch = radarRows
+    ? {state:'held', rows:radarRows, euWideRows:radarEuRows}
+    : (radarEuRows && isEuEeaMarket(name))
+      ? {state:'unknown', rows:0, euWideRows:radarEuRows,
+         unseen:'RADAR_MARKETS decides whether all_eu rows render, and it is local to renderComplianceRadar'}
+      : {state:'none', rows:0, euWideRows:radarEuRows};
+
+  // Retailer data — RETAILER_REGISTRY is keyed by the product's market code.
+  const retailers = code ? RETAILER_REGISTRY.filter(r=>r.market===code && !r.futureMarket).length : 0;
+  surfaces.retailers = listed(retailers, {count:retailers});
+
+  // Responsible Person — the claim and the partners are two different facts, and #245 keeps
+  // them apart: RP_DATA_MARKETS says we claim RP data here; RP_PARTNERS says who we hold.
+  const partners = RP_PARTNERS.filter(p=>(p.coverageMarkets||[]).indexOf(name)>-1).length;
+  surfaces.rpData     = listed(RP_DATA_MARKETS.indexOf(name)>-1);
+  surfaces.rpPartners = listed(partners, {count:partners});
+
+  // Landed cost — duty and freight are readable; VAT is not.
+  const freightModes = Object.keys(FREIGHT_EST).filter(m=>FREIGHT_EST[m][name]!==undefined);
+  surfaces.dutyRate = listed(!!DUTY_RATES[name]);
+  surfaces.freight  = listed(freightModes.length, {modes:freightModes});
+  surfaces.vat      = {state:'unknown', unseen:'vatRates is local to updateLandedResult'};
+
+  // The rest, each from the list that owns it.
+  surfaces.packagingLanguage = listed(!!PACKAGING_LANG_REQS[name]);
+  surfaces.weee              = listed(!!WEEE_MARKET_MAP[name]);
+  surfaces.epr               = listed(!!(code && PRODUCER_RESPONSIBILITY[code]));
+  surfaces.marketIntel       = listed(!!(code && MARKET_REGISTRY[code]));
+  surfaces.entryCost         = listed(!!(code && MARKET_ENTRY_COSTS[code]));
+  surfaces.readinessReqs     = listed(!!MARKET_REQS[name]);
+
+  const keys = Object.keys(surfaces);
+  return {
+    market: name,
+    code: code,                       // null when the identity map does not hold the name
+    euEeaMember: isEuEeaMarket(name), // membership, not coverage
+    surfaces: surfaces,
+    held:    keys.filter(k=>surfaces[k].state==='held'),
+    notHeld: keys.filter(k=>surfaces[k].state==='none'),
+    unknown: keys.filter(k=>surfaces[k].state==='unknown'),
+  };
 }
 
 // Reconciliation 21 Jun 2026: the former parallel dated list here was MERGED into the

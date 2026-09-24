@@ -113,6 +113,56 @@ and this lane has now had TWO spec premises refuted by its own Part 0.*
 - **It must be able to say NOTHING IS HELD** — the honestly-empty case is the common one, not the
   exception. **`RP_PARTNERS` is empty for every market including the ones we "cover".**
 
+### THE TRANSLATION MAP — RULED IN, AND THE SPEC'S OWN CONSTRAINT DOES NOT APPLY TO IT
+
+**Part 0 measured the obstacle: three lists key by ISO-2, the rest by display name, and the tree's
+four partial name→code maps cover TWELVE of thirty members.**
+
+> **THE "NEVER A NEW LIST" CONSTRAINT EXISTS BECAUSE COVERAGE LISTS DRIFT. A NAME→CODE MAP IS NOT A
+> COVERAGE LIST.** *It asserts an IDENTITY — that `Sweden` and `SE` are the same market — and it
+> cannot drift, because **ISO 3166 is external, stable and authoritative.***
+>
+> **AND IT IS A REDUCTION, NOT AN ADDITION. One complete map REPLACES FOUR PARTIAL ONES** doing the
+> same job incompletely. *Write none and we keep four; write one without removing them and we have
+> five.*
+
+**TWO CONDITIONS, AND THEY ARE WHAT STOP THE MAP BECOMING THE THING IT REPLACES:**
+
+1. **IDENTITY ONLY — code ↔ display name, nothing else.** *The moment it carries coverage, flags,
+   ordering or any second fact, it IS a coverage list and the constraint bites.*
+2. **THE SOURCE IS EXTERNAL: ISO 3166, NOT MEMORY.** *CC supplied twenty codes itself in Part 0 and
+   flagged them —* **that is `NY`, not measured.** **Build the join key out of a lane's construction
+   and we have done precisely what the constraint forbids.**
+
+**The four existing partial maps are removed in the same edit.** *Otherwise the count goes up.*
+
+### `coverageFor` READS `RP_DATA_MARKETS` — AND THAT WAS DECIDED ON 21 SEP
+
+**`Belägg: verify.expected.txt`, the 21 Sep entry:** *"DO NOT DELETE IT: it is exactly the list that
+answers 'do we hold RP partners for this market?', which is the input the honestly-empty state needs.
+The repoint made it dead and **the build item revives it**."*
+
+**THIS SPEC IS THAT BUILD ITEM.** *So the "declared and never read" finding from Part 0 is not
+`isEU`'s case:* **`isEU` was dead because nothing SHOULD read it. This holds coverage information
+something SHOULD read, and giving it a reader is the fix rather than a question.**
+
+### THE RADAR'S COVERAGE COMES FROM THE ITEMS, NOT FROM THE FILTER
+
+**`RADAR_MARKETS` is a FILTER list.** What the radar can actually show is each item's own `markets`
+in `COMPLIANCE_RADAR_ITEMS`. **Belägg:** `index.html:renderComplianceRadar`,
+`index.html:COMPLIANCE_RADAR_ITEMS`.
+
+> **DERIVING RADAR COVERAGE FROM THE FILTER WOULD REPEAT #220 EXACTLY** — a picker read as a
+> membership test. **Third time coverage-against-membership has bitten in this same area.**
+
+### THE FIVE FUNCTION-LOCAL LISTS
+
+`RADAR_MARKETS`, `vatRates`, `PKG_MARKETS`, `INCI_MARKETS`, `PACK_MARKETS` are not visible to a
+top-level `coverageFor`. **A hoist is an edit to the surface that owns each one** — report which are
+needed and why before hoisting anything, and hoist to a closure predicate rather than a public
+constant where the list answers a question (`isEuEeaMarket`'s shape, and **a public list is a public
+predicate with its reasoning removed**).
+
 **AND THE DISCLOSURE RENDERS AT THE POINT OF SELECTION**, reading `coverageFor`. Per-surface empty
 states read the same function, so **one source answers both** — otherwise the disclosure and the
 empty state are two expressions of one fact with nothing checking they agree.
@@ -127,11 +177,24 @@ empty state are two expressions of one fact with nothing checking they agree.
 
 **Named consequences, each of which must be handled BEFORE its market becomes selectable:**
 
-- **#246 — the landed-cost silent defaults.** `getDutyRate` returns `rate:0` for an unknown market,
-  and **0 is also the TRUE rate for Denmark, Germany, Netherlands, France.** `getFreightCost` falls
-  back to `road 15 / sea 50 / air 120` **with no note at all.** *Add Poland and a brand gets a
-  landed cost computed from a constant, presented as an estimate.* **Belägg:**
-  `index.html:getDutyRate`, `index.html:getFreightCost`.
+- **#246 — SHARPER THAN THIS SPEC FIRST STATED, AND INVERTED ON ONE HALF.** *Part 0 measured it:*
+  `getDutyRate` **does** return `'Rate unknown — verify with customs broker'`, and
+  `updateLandedResult` renders it — **and the same screen's table row reads `0 SEK — EU/FTA`**,
+  because the row branches on `dutyRate>0` alone. **A disclosure and a positive claim contradicting
+  each other in one view, about one market.** *A silent default is one wrong thing; this is two, one
+  of them right, and the reader cannot tell which.* **And three of the four callers —
+  `calcSupplierLanded`, `renderCompareQuotesTab`, the TCO line — destructure `rate` and DROP THE
+  NOTE.** `getFreightCost`'s fallback still carries no note at all. **Belägg:**
+  `index.html:getDutyRate`, `index.html:updateLandedResult`, `index.html:getFreightCost`.
+  > **CANON: A CAVEAT THAT CAN BE DESTRUCTURED AWAY IS NOT A CAVEAT.** *The rate and its note must
+  > be ONE value, not two, so that whoever drops the note drops the rate.* **#214's rule one level
+  > up: money without its currency is not a number → A VALUE WITHOUT ITS PROVENANCE IS NOT A VALUE.**
+
+- **SWEDEN GOES FIRST AMONG THE MARKETS, AND IT IS NOT A DEFECT — IT IS THE WEDGE.** *Part 0
+  measured the home market as the worst-covered in the product:* **16 of 22 against Denmark's 21,
+  in no `MARKETS` picker, no duty rate, no freight, no VAT.** **The wedge is Nordic brands and the
+  home market is Sweden. The first real customer conversation hits it immediately** — and it
+  explains why testing has run on Danish data, which we had taken for an arbitrary choice.
 - **The radar's 11-market coverage.** *#244 already exists: a Czechia brand sees the Brand Pack
   assert an RP is required while the Radar renders zero rows. Adding markets multiplies that.*
 - **The RP marketplace's GLOBAL empty state.** *"No RP partners listed" is honest for every market

@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        eeffc081
+index.html        55aa0f1a
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -22,6 +22,101 @@ netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
 netlify/functions/share-brand-pack.js            3791bbec
+
+# index.html moved eeffc081 → 55aa0f1a on 24 Sep 2026 — #245 PART 1, COVERAGE HONESTY.
+#   after   55aa0f1a32be7afafd0f3f34e6232e5bd468c225b7a019393db88a6ed470a29e
+#           57 gates · 1 of 11 modified · no call-site drift · 213 insertions, 12 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# THIS SHIPMENT CHANGES NUMBERS ON SCREEN, AND IT DOES SO BY CORRECTING AN UNFILED DEFECT.
+#
+# The seven partial name→code maps DEFAULTED EVERY MARKET THEY DID NOT COVER TO `SE`. So:
+#   A PORTUGUESE TARGET WAS SCORED WITH SWEDEN'S 33 RETAILERS. It now scores Portugal's 7.
+#   Finland was Sweden's 33 → 17. Austria, Switzerland, Portugal 33 → 7.
+#   Italy, Spain, Poland, Ireland, Iceland, Canada, Australia, Japan, South Korea, Singapore,
+#   New Zealand — ALL SCORED AS SWEDEN, now 0, because they have no retailer rows at all.
+#
+# READINESS SCORES FOR AT LEAST ELEVEN MARKETS WERE SWEDEN'S SCORE WEARING ANOTHER MARKET'S NAME.
+# Nobody measured it, nobody filed it, and it surfaced ONLY because the map got wider. THE FIX RODE
+# IN; THE FINDING GETS ITS OWN NUMBER.
+#
+# AND IT MOVES A COMMERCIAL FIGURE. The pricing screen's missed-revenue number goes
+# 15 000 → 17 000 SEK/month for those markets, 185 000 → 200 000 annually on the trial-expiry
+# screen, because the figure moves off Sweden's table onto the default. BOTH ARE CORRECTIONS — and a
+# money figure changing on a user-facing screen is not something a batch carries silently.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# THE TRANSLATION MAP — RULED IN BECAUSE THE CONSTRAINT DOES NOT APPLY, NOT BECAUSE IT BENT.
+# The "never a new list" rule exists because COVERAGE LISTS DRIFT. A name→code map asserts an
+# IDENTITY — that `Sweden` and `SE` are the same market — and cannot drift, because ISO 3166 is
+# EXTERNAL, STABLE AND AUTHORITATIVE. Two conditions, and they are what stop it becoming the thing
+# it replaces: IDENTITY ONLY (the moment it carries coverage, flags or ordering it IS a coverage
+# list), and THE SOURCE IS EXTERNAL, NOT MEMORY.
+# HONOURED AT THE BYTES: generated from /usr/share/zoneinfo/iso3166.tab (tz database, public domain,
+# 2025-07-01, 249 rows). Where CLDR's English short name differs from that table's — 33 codes,
+# e.g. CZ: 'Czech Republic' / 'Czechia' — BOTH are kept, so both are external. NONE of the twenty
+# codes CC constructed in Part 0 survives; they were flagged as ITS OWN CONSTRUCTION and were not
+# used. Exposed as two predicates over a closure, never as a list: Belägg: index.html:MARKET_IDENTITY.
+#
+# AND IT IS A REDUCTION, LARGER THAN THE SPEC KNEW: SEVEN partial maps removed, not four. Four
+# NAME_TO_CODE/nameToCode, C2N, and the literals inside _nameToCode and _codeToName. NET −6.
+# Equivalence MEASURED, not asserted: 36 name→code keys and 18 code→name keys across all seven,
+# 0 mismatches.
+#
+# THE UK/GB NEAR-MISS, CAUGHT BY MEASUREMENT. The product keys by ITS OWN code set, which is ISO
+# EXCEPT the UK: `UK` in the product, `GB` in ISO. Had the map returned ISO's answer,
+# MARKET_REGISTRY['GB'], MARKET_ENTRY_COSTS['GB'] and MARKET_REVENUE['GB'] would ALL have missed and
+# A MONEY FIGURE WOULD HAVE SILENTLY DROPPED TO A DEFAULT. CC built the overlay by READING
+# MARKET_REGISTRY'S OWN DECLARATIONS on first call rather than typing them — THE DECLARATION ON THE
+# OBJECT IS THE RULE — and retries rather than caching half-built, since MARKET_REGISTRY is declared
+# far below the closure. THE SPEC'S "three lists key by ISO-2" IS REFUTED IN ONE PLACE.
+#
+# coverageFor(market) — TWELVE SURFACES, EACH READ FROM THE LIST THAT ALREADY OWNS IT, NO LIST OF ITS
+# OWN. Every facet answers held / none / unknown. Copy appears nowhere in it: ITS OUTPUT IS A STATE,
+# NOT A SENTENCE. `euEeaMember` sits OUTSIDE `surfaces`, because MEMBERSHIP IS NOT COVERAGE.
+# Measured: Malta holds NOTHING AT ALL and says so · Poland holds rpData and nothing else · Sweden
+# holds no duty, no freight, no entry cost · rpPartners is `none` FOR EVERY MARKET INCLUDING ALL
+# FIFTEEN WE "COVER" — the honestly-empty case, and it is the common one.
+#
+# RP_DATA_MARKETS HAS A READER AGAIN, AND THAT WAS DECIDED ON 21 SEP IN THIS FILE: "DO NOT DELETE
+# IT… the build item revives it." THIS SPEC WAS THAT BUILD ITEM. The lane carried it as an open
+# question for three days — FIFTH INSTANCE THIS WEEK OF THE ARTEFACT HOLDING THE ANSWER. It is kept
+# deliberately apart from RP_PARTNERS: one says we CLAIM RP data, the other says WHO WE HOLD.
+#
+# RADAR COVERAGE COMES FROM THE ITEMS, NEVER THE FILTER — COMPLIANCE_RADAR_ITEMS' own `markets`.
+# Deriving from RADAR_MARKETS would have repeated #220 exactly, THIRD TIME coverage-against-
+# membership has bitten in this area.
+#
+# THE FIVE FUNCTION-LOCAL LISTS: REPORTED, NONE HOISTED, as the spec required.
+#   NEEDED: RADAR_MARKETS — and the evidence is in coverageFor's own output. Nine radar items carry
+#   the sentinel 'all_eu', and whether those render is decided inside renderComplianceRadar. SO
+#   DENMARK READS `unknown` FOR REGULATORY WATCH DESPITE BEING ONE OF THE ELEVEN THE RADAR COVERS.
+#   Without the hoist the disclosure UNDERSTATES radar coverage for every EU market. Recommended as
+#   a CLOSURE PREDICATE, not a public constant — isEuEeaMarket's shape.
+#   NEEDED: vatRates — every market currently reads vat: unknown.
+#   NOT NEEDED: PKG_MARKETS, INCI_MARKETS, PACK_MARKETS — they are PICKERS, and by the radar ruling
+#   a picker is not coverage.
+#
+# PART 1'S RENDER HALF IS DELIBERATELY UNWRITTEN, AND THAT IS THE RIGHT CALL. The mechanism is
+# complete and callable; the disclosure is not placed. THE COPY IS DESIGN'S and THE PLACEMENT IS A
+# DESIGN DECISION — writing either would be inventing buyer-facing words. Same call as the blank
+# third heading in #239 slice 3. Per-surface empty states read the SAME function, so the disclosure
+# and the empty state cannot disagree.
+#
+# NOTICED, NOT FIXED:
+#   _nameToCode's slice(0,2).toUpperCase() FALLBACK MANUFACTURES REAL COUNTRIES FROM GARBAGE —
+#   measured: 'Nowhereland' → NO → Norway. WORSE THAN A SILENT DEFAULT: a default is wrong once;
+#   THIS IS WRONG SPECIFICALLY, and it looks like an answer. Kept because removing it changes what
+#   five callers receive, which is a judgement; the limitation is written into the function.
+#   ELEVEN inline translation literals remain, NINE convertible by the same mechanical edit. TWO
+#   MUST NEVER BE REPOINTED: getClaimLight's `codes` maps Norway→SE and Netherlands→DE, which is a
+#   REGIME CLAIM, NOT AN IDENTITY; and WEEE_MARKET_MAP is a coverage list whose values happen to be
+#   codes. CC SEPARATED THESE FROM THE NINE — that distinction is the entire reason the map was
+#   allowed in.
+#   'UAE' IS UNRESOLVABLE by both external sources (they say "United Arab Emirates"), so any site
+#   relying on codeFor('UAE') falls to its default. The tree's display vocabulary and ISO's disagree
+#   there, and regMarketApplies has NO delta today because REG_DEADLINES carries only EU, DK and UK.
 
 # index.html moved 0f3fd699 → eeffc081 on 23 Sep 2026 — #239 SLICE 3, HOMOGENEOUS BLOCKS.
 #   after   eeffc081f23dccf49d129d2b964f69adaf86dde0c8a6986b208e3caa029416e0
