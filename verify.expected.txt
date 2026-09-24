@@ -104,6 +104,18 @@ netlify/functions/share-brand-pack.js            3791bbec
 # third heading in #239 slice 3. Per-surface empty states read the SAME function, so the disclosure
 # and the empty state cannot disagree.
 #
+# THE PAGE SMOKE IS UNRUN, AND IS RECORDED AS UNRUN — second time, after 21 Sep.
+# CC measured every delta with the real functions in scratch: eleven markets moving off Sweden's
+# score, the retailer counts per market, the 36+18 key equivalence. THAT IS REAL EVIDENCE AND IT IS
+# NOT THE PAGE.
+# AND TWO OF THE FOUR SMOKE STEPS THE LANE WROTE COULD NOT HAVE BEEN READ ANYWAY: steps 1 and 2
+# asked for the missed-revenue figure in the pricing modal, WHICH IS THE TEAL-ON-TEAL NUMBER —
+# invisible whether it reads 15 000 or 17 000. The lane wrote a check against a value that cannot
+# be seen, and only learned so afterwards from an unrelated screenshot.
+# WHAT REMAINS LEGIBLE: Brand Home's readiness card with the brand's market set to Finland —
+# 17 retailers, not Sweden's 33. One step, one screen, and it is the only place this shipment's
+# correction can be read.
+#
 # NOTICED, NOT FIXED:
 #   _nameToCode's slice(0,2).toUpperCase() FALLBACK MANUFACTURES REAL COUNTRIES FROM GARBAGE —
 #   measured: 'Nowhereland' → NO → Norway. WORSE THAN A SILENT DEFAULT: a default is wrong once;
