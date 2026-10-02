@@ -1,128 +1,140 @@
-# VeyaFlow — M1: the RP assertion. Shipment 1 of 11 sites, and only the published one
+# VeyaFlow — M1b · M1c · M1d: the published pack path. Expand → migrate → contract
 
-**2 October 2026 · coding lane → CC · ONE EDIT. `buildPortalBrandPack` ALONE.**
+**2 October 2026 · coding lane → CC · THREE SHIPMENTS, ONE SURFACE EACH. STRICT ORDER.**
 
-**THE RULING THIS SPEC IMPLEMENTS IS NOT RESTATED HERE BEYOND THE RENDERED STRINGS.**
-`Belägg: open-items.md § CODINGS ANDRA RELÄ 2 okt, §2.` *Read it there. The register is the source; this spec names it.*
+**SUPERSEDES THIS FILE'S 2 OCT VERSION AT `f7f37cf`**, which specified one edit to
+`buildPortalBrandPack` and was stopped by CC on two of its own stop conditions. *Same filename on
+purpose — two names for one shipment is failure mode 7, and the older name held the stale version.*
+**M1a (the preview) is a separate surface in its own spec and ships FIRST.**
 
-**THE MEASUREMENT IS ALREADY DONE AND IS NOT REDONE.** CC's M1 reading, 2 Oct: one correct comparator
-(`index.html:_rpDateExpired`, seven call sites, correct), wrapped by `index.html:_operatorStatus`
-returning `absent · expired · present`; eight sites producing a tick from the NAME alone; three more
-reading the date without comparing it. **This shipment changes exactly one of the eleven.**
+---
+
+## THE RULING, VERBATIM — NOT A POINTER
+
+**Source: `open-items.md` at commit `5d4e1ce`, sections `CODINGS ANDRA RELÄ 2 okt §2` and
+`CODINGS TREDJE RELÄ 2 okt §2 and §4`.** *That file is in the log repo and you cannot reach it. The
+standing rule was amended 2 Oct for that reason: a spec carries the operative text, the section name
+and the hash. If the register has moved past `5d4e1ce`, this is a relay that may have expired — say so
+rather than implementing it.*
+
+### The three states and their strings
+
+> `present` → **EU Responsible Person · `<name>` · confirmed to `<renewalDate>`**
+> `expired` → **EU Responsible Person · `<name>` · last confirmed `<date>` · not confirmed since**
+> `absent` → **EU Responsible Person · not recorded**
+>
+> The pack never asserts a regulatory STATUS we have not measured — it asserts the RECORD's state with
+> its date. *We do not know whether the brand renewed with its RP. We know when our record was last
+> confirmed. The date IS the provenance.*
+
+### The level
+
+> **No SKU governs. A brand-level RP row is a category error. A Responsible Person is appointed PER
+> PRODUCT.** `Mätt 2 okt: Lyko's own template has one RP row per product; C&G's submission carries two
+> different RPs across five rows.`
+> - same regime, operator and date across all the pack's SKUs → **one** row, in the regime's own words:
+>   *EU Responsible Person* (cosmetic) / *EU Economic Operator* (device)
+> - two regimes → **two** rows, one per regime, never merged
+> - differing operator or date inside one regime → **no brand-level row for that regime; the per-SKU
+>   cells carry it.** *A brand-level row is a SUMMARY and may exist only when true for all.*
+>
+> **`heroSku` has no role. No third argument is invented — it is derived from the pack's content.**
+
+### Why three shipments and not one
+
+> `onFile` is writer → passthrough → reader, and the reader is `portal.html:renderDetail`. Remove it
+> from `index.html` alone and `brandRp` becomes `''`: the *EU Responsible Person on file* line
+> disappears and the per-SKU cells lose their fallback — **exactly what the previous spec's own smoke
+> listed as must-not-appear.** As M4's certificate migration: expand → migrate → contract, one surface
+> per shipment, no exception from the one-edit rule.
+
+---
 
 ## DISPATCH LOG
 
-| date | sent | evidence |
-|---|---|---|
+| date | shipment | sent | evidence |
+|---|---|---|---|
 
-> **NOT DISPATCHED UNTIL THE ROW ABOVE EXISTS.** *Filled at the moment of sending, with the commit sha
-> that carries the bytes sent — not after the reply.*
-
----
+> **Not dispatched until the row exists. One row PER shipment, filled at the moment of sending.**
 
 ## NAMED BASELINES
 
-**The eleven surfaces at the values `verify.expected.txt` NAMES.** *The source, not a copy — a copied
-baseline went two shipments stale twice.* Confirm all eleven GREEN, `0 of 11 modified`, exit 0 before
-starting. **`index.html` is pinned and verified both ends as of 2 Oct; this edit moves it, and the new
-value is named by the lane after two independent computations, never by CC.**
+**The eleven surfaces at the values `verify.expected.txt` NAMES** — the source, never a copy.
+**Each shipment starts from GREEN with `0 of 11 modified` and ends at `1 of 11`.** *Two modified at any
+point means two surfaces moved and the shipment is wrong.* The lane names each digest after two
+independent computations.
 
 ---
 
-## PART 0 · ONE MEASUREMENT, REPORT-ONLY, RUNS ALONGSIDE
+# M1b · EXPAND — `index.html` emits the new shape BESIDE `onFile`
 
-**S7/K9 — call sites per meaning for `verificationTier` and `verifiedTier`.** *Strategy ruled: no
-rename, no writer. The gap that keeps `★ VeyaFlow Verified` dead is the protection until "Verified"
-has a disposition.* **So this is a COUNT, not a change.**
+**Nothing is removed. Nothing downstream changes behaviour.**
 
-- How many call sites read `brand.verificationTier`, in which enclosing functions, and which of those
-  functions are live versus parked.
-- The same for `brand.verifiedTier`, including the path through `supabase-proxy.js` into `portal.html`.
-- **Confirm by search that nothing WRITES either name**, and state the pattern searched — a zero result
-  is a claim about the pattern, never about the tree.
+`Belägg: index.html:buildPortalBrandPack` iterates the pack's SKUs, groups them by
+`getOperatorRegime(sku)`, calls `_operatorStatus` per SKU, and emits brand-level operator entries
+**only where the level ruling permits a row** — carrying, per entry: the regime, the regime's own
+label, the operator name, the state, and the date.
 
-**Report the numbers. Rename nothing, write nothing, and do not add a writer "while you are there."**
+**`pack.euResponsible = { name, onFile:true }` STAYS, untouched**, so `supabase-proxy.js` and
+`portal.html` keep working byte-for-byte.
 
----
+- **Reachability is settled, do not re-measure it:** `_operatorStatus` and `buildPortalBrandPack` are
+  top-level declarations in separate classic `<script>` blocks sharing one global scope, block 1 first.
+  **Do not inline a second comparator.**
+- **STOP** if a regime cannot be resolved for a SKU — report which SKU and what `getOperatorRegime`
+  returned. *Do not default it: a defaulted regime is a value whose absence meant something.*
 
-## PART 1 · THE EDIT — `buildPortalBrandPack`, AND NOTHING ELSE
+**Smoke:** none. *This shipment changes no rendered string anywhere — that is what makes it safe, and
+a smoke step asserting on an unchanged screen would be theatre.* Verification is `verify.sh` plus the
+emitted structure reported as text.
 
-### WHAT IS WRONG
+# M1c · MIGRATE — `portal.html` reads the new fields and renders state + date
 
-`index.html:buildPortalBrandPack` sets `pack.euResponsible = { name, onFile: true }`. **`onFile` is
-derived from the presence of a NAME and never from the renewal date.** That is what put
-`✓ EU RP · Cosmeservice GmbH` under the heading `VERIFIED DATA ONLY, NO AI` in a published,
-buyer-facing document whose brand's RP page read `EXPIRED 2025-12-31`.
+**The surface question lives here.** `Belägg: portal.html:renderDetail` today holds a boolean-gated name:
+`brandRp` feeds the per-SKU `EU RP` column cells and one *EU Responsible Person on file: `<name>`* line.
+**It must grow to carry one row per permitted regime, each with state and date, and zero rows where the
+ruling says the brand-level row may not exist.**
 
-**The pack published on 5 May was withdrawn 2 Oct** (`db/CHANGELOG.sql`, entry 2026-10-02). **That
-removed one artefact. This removes the source.**
+- **The per-SKU cells keep their fallback** until this shipment lands; after it, the fallback comes from
+  the new entries, not from `onFile`.
+- **Removing a false entry must not create a false absence.** Where the ruling permits no brand-level
+  row, the per-SKU cells carry it — **not a blank, not a placeholder, not "coming soon".**
+- **STOP** if the column layout cannot carry a date without a design change — report the constraint.
+  *That is Design's, not an edit.*
 
-### WHAT IT BECOMES
+**After M1c, and not before, the no-sharing rule below lifts.**
 
-**`onFile` DISAPPEARS AS A CONCEPT.** *It is not recomputed, not renamed, not set from the comparator —
-the field goes.* What the pack carries is the RECORD's state and its date:
+**Smoke:** entry point `localhost:8000` → portal → a submission detail view; **writer of the asserted
+string: `portal.html:renderDetail`.** Expect the `expired` form verbatim for a brand whose record is
+past its renewal date. Report as text.
 
-| `_operatorStatus` | the pack renders |
-|---|---|
-| `present` | **EU Responsible Person · `<name>` · confirmed to `<renewalDate>`** |
-| `expired` | **EU Responsible Person · `<name>` · last confirmed `<renewalDate>` · not confirmed since** |
-| `absent` | **EU Responsible Person · not recorded** |
+# M1d · CONTRACT — `onFile` disappears
 
-**THE PACK NEVER ASSERTS A REGULATORY STATUS WE HAVE NOT MEASURED.** *We do not know whether the brand
-renewed with its RP. We know when our record was last confirmed.* **The date IS the provenance, per the
-scope clause of 1 Oct: every value about the product that leaves the system carries its provenance.**
+Remove `onFile` from `Belägg: index.html:buildPortalBrandPack` and the passthrough in
+`Belägg: netlify/functions/supabase-proxy.js`. **Only now does the concept cease to exist.**
 
-**Use `_operatorStatus`, not `_rpDateExpired` directly** — the three-state wrapper is what exists and
-what the other ten sites will inherit. *Do not introduce a second comparator.*
-
-### WHAT THIS SPEC DOES NOT TOUCH
-
-- **The other ten sites.** `retailChecklistAutoCheckValue`, the `eu_rp` radar item, the PIF checks,
-  `buildSkuReadiness`, `checkComplianceGap`, `retailTemplateResolveSource`,
-  `generateRpHandoffPayload`, `buildComplianceEvents`, `generateSpecSheetPDF`,
-  `renderComplianceCalendar`. **They inherit the form — state plus date, never a bare tick — in their
-  own shipments, with each surface's wording.** Not here.
-- **The readiness parking**, which is the next shipment after this one.
-- **Anything in `#252`, `#251` or the stash.**
-
-> **ONE EDIT PER SHIPMENT, AND THIS ONE CARRIES A JUDGEMENT.** *A judgement dropped into a mechanical
-> batch makes the batch only as well verified as the judgement.* **Bundling any of the other ten here
-> is the thing the rule forbids.**
-
-### STOP CONDITIONS
-
-- **If the three strings cannot be rendered because the pack template has room for a tick and nothing
-  else — STOP and report.** *That is a surface question, not an edit, and the register's ruling is
-  about what is said, not about where it fits.*
-- **If `_operatorStatus` is not reachable from `buildPortalBrandPack` — STOP and report the reachability,
-  do not inline a copy of the comparator.** *A second comparator is the defect this shipment removes.*
-- **If `renewalDate` is absent while `_operatorStatus` returns `expired` — STOP.** *That combination
-  should be impossible, and if it occurs the state machine is wrong, not the renderer.*
+- **Precondition, checkable:** no reader of `onFile` remains in any of the eleven surfaces. **Report the
+  pattern searched** — a zero result is a claim about the pattern, never about the tree.
+- **STOP** if any reader remains. *Contracting with a live reader is the failure M1c exists to prevent.*
+- `verified: bp.verified === true` in the proxy is **out of scope** — it is false today for the same
+  reason the gold badge never renders, and it belongs to the `verifiedTier` gap Strategy ruled is the
+  protection.
 
 ---
 
-## REPORT BACK
+## STANDING, UNTIL M1c HAS SHIPPED
 
-1. The diff, and **the digest CC computes** — reported as CC's own computation, never pasted into
-   `verify.expected.txt`. *The lane names the value after Charlotte's `shasum` agrees.*
-2. `./verify.sh` — expect **57 gates GREEN, 1 of 11 modified**.
-3. `Belägg:` for every function touched — **a NAME, never a line number.**
-4. Part 0's counts.
+> **NO BRAND PACK IS SHARED.** *The generator still writes `onFile` from a name; the one published pack
+> is withdrawn; the next publication carries the same lie until M1c.* **No flag is built — Charlotte is
+> the only user and the rule lives in the register. A flag would be a shipment; the rule is free.**
 
----
+## WHAT NONE OF THE THREE TOUCH
 
-## SMOKE — ONE STEP, LOCAL ONLY, AND ONE HARD PROHIBITION
+The preview path (`renderBrandPack` → `_operatorRow` → `_operatorValueFor`) — **M1a**. The nine other
+name-only sites. The readiness parking. `#252`, `#251`, the stash. `verificationTier` / `verifiedTier`.
 
-**At `localhost:8000`, hard-reload first.** Entry point: **Brand Pack Generator → page 1 preview**, with
-a brand whose RP record carries a past `renewalDate`. *Every step names its entry point, so an
-unreachable step fails at writing time rather than at running time.*
+## REPORT BACK, PER SHIPMENT
 
-**Expect:** `EU Responsible Person · <name> · last confirmed <date> · not confirmed since`.
-**Must NOT appear anywhere on that preview:** a tick, a `✓`, the word `verified` applied to the RP, or
-the row missing entirely.
-
-> **DO NOT SHARE OR PUBLISH A PACK TO TEST THIS.** *Sharing writes a `shared_brand_packs` row and puts
-> real Cloud & Glow data at a public URL — which is how the artefact this shipment exists to fix came
-> to be published on 5 May.* **The preview is local and is the whole smoke.**
-
-**Report the rendered line as TEXT, not a screenshot.** *A screenshot is a viewport, not a page.*
+The diff · **your** digest as your own computation, never pasted into `verify.expected.txt` ·
+`./verify.sh` at 57 gates GREEN, **1 of 11 modified** · `Belägg: <file>:<function name>`, a name and
+never a line number · `OLÄST` for anything not looked at.
