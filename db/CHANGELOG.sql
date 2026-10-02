@@ -227,3 +227,65 @@ where trigger_type = 'rejection'
 -- involved, and #227's sweep still cannot see any of it — that instrument reads code and
 -- these live in data, in either direction, which is why the ordering gate between the
 -- two was discharged rather than satisfied.
+
+-- ── 2026-10-02 · Part 1 of the 2 Oct screen-read — PUBLISHED BRAND PACK ASSERTS AN RP IT DOES NOT HAVE ──
+-- A published, buyer-facing Brand Pack at veyaflow.netlify.app/brand/479e6985-… renders
+-- "✓ EU RP · Cosmeservice GmbH" under the heading "VERIFIED DATA ONLY, NO AI", while the
+-- EU Responsible Person page for the same brand in the same session shows
+-- "EU RP AGREEMENT EXPIRED · Cosmeservice GmbH · EXPIRED 2025-12-31". A third party can
+-- open that link today and read that the brand has a valid Responsible Person. It does not.
+--
+-- BEFORE-VALUES, read in the SQL Editor by Charlotte 2 Oct 2026 before the statement ran:
+--   id          479e6985-0d85-46b2-a517-be2d805c6b3b
+--   brand_id    cloud__glow_sess_1776262521142_s1kn9gn
+--   active      true
+--   created_at  2026-05-05 11:12:58.40101+00
+--   expires_at  2026-11-29 11:24:11.054+00
+-- brand_pack_data deliberately NOT read or recorded: it is real Cloud & Glow content and
+-- this repo is treated as fully public. The id and brand_id are already in the published
+-- URL, so recording them adds no exposure — the same privacy call as the #241 entry above,
+-- made explicitly rather than silently.
+--
+-- SUFFICIENCY MEASURED FIRST, AND IT IS WHY A ROW CHANGE IS ENOUGH. pg_policies on
+-- shared_brand_packs returns exactly one row: "Public can read active packs", cmd SELECT,
+-- qual ((active = true) AND ((expires_at IS NULL) OR (expires_at > now()))), with_check NULL.
+-- So active=false fails the POLICY, not merely the query in get-brand-pack.js — the row
+-- becomes unreadable to anon on every path, not just through the function. Had the policy
+-- been unscoped, the takedown would have been an RLS change and not this.
+-- `Mätt: Supabase SQL Editor, Charlotte 2 okt. Metadata only — the pack was never fetched
+-- to test it, per the standing constraint that an access-control defect is never verified
+-- by exercising it against production.`
+-- This also closes, three months late, what the 2 Jul note asserted without a measurement
+-- ("policies confirmed correct"), and shows shared_brand_packs is NOT among the thirteen
+-- RLS-on-zero-policy tables recorded 2026-08-15. Those thirteen are still unnamed here.
+--
+-- WHY active AND NOT expires_at. Backdating expires_at would also 404 the link, but the
+-- function's message for that path reads "This Brand Pack link has expired" — which asserts
+-- the link was once valid and timed out. It wasn't; it is being withdrawn. Remove, don't
+-- soften, and don't state a false reason. active=false yields "no longer active or does not
+-- exist", which is true.
+--
+-- `returning` ADDED PER LINE 138 OF THIS FILE, which the #241 entry recorded as an
+-- instruction the file already held and the lane did not follow. The statement evidences
+-- its own effect: one row, active false.
+--
+-- SCOPE: no application surface changes. No named digest moves, verify.sh stays GREEN with
+-- 0 of 11 tracked surfaces modified, and #227's sweep cannot see this — it reads code and
+-- this lives in data. That invisibility is exactly why this entry exists: it is the only
+-- trace the change leaves.
+--
+-- THIS IS NOT THE FIX, AND THE ENTRY SAYS SO RATHER THAN IMPLYING IT. index.html:
+-- buildPortalBrandPack sets euResponsible = { name, onFile: true } — onFile derived from
+-- the presence of a NAME, never from the renewal date — so the next pack generated will
+-- carry the same false assertion. Seven further sites produce a tick from the name alone,
+-- against one correct comparator (index.html:_rpDateExpired, seven call sites, correct).
+-- Measured by CC 2 Oct; the repair is queued as its own shipment.
+--
+-- FLAGGED, NOT RESOLVED: created_at is 2026-05-05 while the published pack renders
+-- "Generated 31 Aug 2026". One active share per brand_id means the row is reused on
+-- re-share, so the two fields measure different events and neither is labelled as such.
+-- Not touched by this change.
+update public.shared_brand_packs
+   set active = false
+ where id = '479e6985-0d85-46b2-a517-be2d805c6b3b'
+returning id, active;
