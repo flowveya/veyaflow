@@ -28,6 +28,7 @@ counts against the rule is the coding lane's call, made before taking it.**
 
 | date | sent | evidence |
 |---|---|---|
+| **2 okt 2026** | **Part 1** *(1a bekräftad i källan · RLS-grinden · 1b)* **+ Part 0 M1–M5b**, till CC | **`3e3629e`** — commiten som bär de avsända bytena, 15 595 byte. *Läs den, inte reläet.* |
 
 > **DENNA SPEC ÄR INTE DISPATCHAD FÖRRÄN RADEN OVAN FINNS.** *En tom dispatchlogg är det tillstånd som aldrig haft en artefakt — båda lanerna rapporterade `skickad till CC` i dagar utan att kunna observera det. Raden fylls VID AVSÄNDANDET, inte efter svaret.*
 
