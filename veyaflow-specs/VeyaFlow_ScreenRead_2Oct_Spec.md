@@ -29,6 +29,8 @@ counts against the rule is the coding lane's call, made before taking it.**
 | date | sent | evidence |
 |---|---|---|
 
+> **DENNA SPEC ÄR INTE DISPATCHAD FÖRRÄN RADEN OVAN FINNS.** *En tom dispatchlogg är det tillstånd som aldrig haft en artefakt — båda lanerna rapporterade `skickad till CC` i dagar utan att kunna observera det. Raden fylls VID AVSÄNDANDET, inte efter svaret.*
+
 ---
 
 ## NAMED BASELINES
@@ -61,8 +63,8 @@ need no tree change. If measurement shows it does, STOP and report — do not ta
 **1a · Measure where the pack is served from.** *Hypothesis, not a finding:* the share link is served
 by `get-brand-pack.js` from a `shared_brand_packs` row *(the 2 July security note: "shared_brand_packs
 (active-packs public read) policies confirmed correct")*. **If so, the pack can be made inactive by a
-row change — no `index.html` touch, no deploy.** Report: the function, the table, the row id, the
-field that governs `active`. `Belägg:` file and line, or table and column.
+row change — no `index.html` touch, no deploy.** Report: the function, the table, the row id, the field that governs `active`.
+`Belägg: <file>:<function name>` or `<table>:<column>` — **a NAME, per this spec's own binding rule. Never a line number.**
 
 **1b · If 1a holds: deactivate the row for pack `479e6985-0d85-46b2-a517-be2d805c6b3b`.** Report the
 before/after state of the row and confirm the URL no longer serves the page. **If 1a does NOT hold —
@@ -70,13 +72,40 @@ if taking the pack down needs a tree change — STOP, report, and leave it to Ch
 change against an unpinned `index.html` is the thing the 1 October blocker forbids, and this spec
 does not override it.*
 
+### 1a ÄR REDAN BEKRÄFTAD I KÄLLAN — KODNINGSLANEN 2 okt
+
+**`get-brand-pack.js` frågar `shared_brand_packs?id=eq.<shareId>&active=eq.true`.** ⇒ **`active=false` ger noll rader och funktionen returnerar 404 *"This link is no longer active or does not exist."*** `Mätt med: läsning av get-brand-pack.js, kodningslanen 2 okt.` `Belägg: get-brand-pack.js:handler`
+**Hypotesen HÅLLER: ingen trädändring, ingen deploy.** *CC bekräftar tabell och rad-id; mekanismen behöver den inte leta efter.*
+
+> **ANVÄND `active`, INTE `expires_at`.** *Funktionen 404:ar även på utgånget datum, så ett bakåtdaterat `expires_at` skulle också stänga länken — men dess 404 säger `has expired`, vilket påstår att länken en gång var giltig och löpte ut.* **Ett påstående om historik som inte inträffat. Ta bort, mjuka inte upp — och ljug inte om skälet.**
+
+### SUFFICIENSVILLKORET — RLS, OCH NOTEN FRÅN 2 JULI SVARAR INTE PÅ DEN
+
+**`get-brand-pack.js` bär kravet i en KOMMENTAR:** *"anon key is fine for public read (RLS must allow SELECT on active=true)"*. **En grind skriven som en kommentar är ingen grind.**
+
+> **TILLÅTER RLS `SELECT` PÅ ALLA RADER i `shared_brand_packs` i stället för bara `active=true`, tar `active=false` bort paketet ur FUNKTIONENS väg och ingen annans.** *Supabase-URL och anon-nyckel ligger i den deployade funktionens miljö, och repot behandlas som fullt publikt.* **Funktionens filter är ett FRÅGEFILTER, inte en säkerhetsgräns.**
+
+**NÄRCITATET NAMNGES: noten 2 juli — *"shared_brand_packs (active-packs public read) policies confirmed correct"* — säger att policyn bedömdes korrekt. Den säger INTE att `SELECT` är begränsat till `active=true`, och den är tre månader gammal.** *Ett rimligt citat bredvid en fråga läses som dess svar; här står frågan det inte svarar på utskriven.*
+
+**⇒ MÄTNING FÖRE 1b, OCH DEN AVGÖR OM 1b RÄCKER: läs policyn på `shared_brand_packs` — METADATA ENBART.** *Stående constraint: en åtkomstdefekt verifieras aldrig genom att utöva den mot produktion. Hämta aldrig ett paket för att se om det går.* **Räcker inte RLS är borttagningen en RLS-ändring, inte en radändring — och den är Charlottes.**
+
+### VEM SOM KÖR DEN, OCH DEN ENDA ARTEFAKT ÄNDRINGEN NÅGONSIN FÅR
+
+**DB-ändringar görs av Charlotte i Supabase SQL Editor, aldrig från kod. CC skriver satsen och kör den inte.**
+
+**OCH: en append till `db/CHANGELOG.sql` med FÖRE-VÄRDEN och proveniens, skriven INNAN satsen körs.** *En radändring syns inte för `verify.sh` — GREEN med `0 av 11 modifierade` både före och efter. CHANGELOG-raden är det enda spår ändringen någonsin lämnar, och existens utan spår är defekten.*
+
+> **RULAT, kodningslanen 2 okt: 1b räknas INTE mot en-ändring-per-leverans.** *Regeln budgeterar ändringar digest-harnesset kan SE; den här ligger utanför harnesset helt.* **Men det gör den till den FARLIGARE klassen, inte den säkrare — utlösaren är datainmatning, och ingen diff fångar den.** *Priset för att slippa budgeten är CHANGELOG-raden. Den är inte valfri.*
+
+---
+
 **What this spec does NOT ask:** fixing the RP read. *That is Part 0 · M1 — measured, not fixed.*
 
 ---
 
 ## PART 0 · FIVE MEASUREMENTS, IN ORDER — STOP AND REPORT
 
-**Each answer carries `Belägg:` (file:line, table:column, or the exact string) or `OLÄST`.**
+**Each answer carries `Belägg: <file>:<function name>`, `<table>:<column>`, or the exact string — never a line number — or `OLÄST`.**
 **Report what IS. Propose nothing. Fix nothing.**
 
 ### M1 · The RP read — why three surfaces say "confirmed" against an expired date
