@@ -2,12 +2,16 @@
 
 **coding lane → CC · `index.html` ONLY · REWRITTEN after CC's stop on condition 2.**
 
-> **STALENESS CHECKED BY THE CODING LANE against register HEAD `241751e`, 3 October 2026, at dispatch.**
+> **STALENESS CHECKED BY THE CODING LANE against register HEAD `c24ef5b`, 4 October 2026, at dispatch.**
 > *CC carries no staleness check. The hash is the evidence that the check was made, not a task.*
 
-**SUPERSEDES THIS FILE'S VERSION AT `1bd6e03`**, whose `Expect:` line asserted a string the ruling it
-cited forbids for the measured fixture. *CC caught the spec contradicting its own source. Same filename:
-two names for one shipment is failure mode 7.*
+**THIS IS A′.1** — *ruled by Charlotte 4 Oct: "Vi döljer inget, vi löser problemen." The hide (A) was
+dropped; this surface is repaired instead.*
+
+**SUPERSEDES THIS FILE'S VERSION AT `212cf27`**, which still carried the summary row as a LIVE third
+level. *The register made it unreachable by construction on 3 Oct and this file had not caught up — the
+same staleness the pack spec was corrected for, found by re-checking the hash rather than by anyone
+noticing.*
 
 ---
 
@@ -28,15 +32,22 @@ two names for one shipment is failure mode 7.*
 
 > - **Uniform** → **one row**, in the regime's own words
 > - **Two regimes** → **one row per regime**, never merged
-> - **Non-uniform within one regime** → **a SUMMARY row true for all:**
->   *EU Responsible Person · 5 products · 2 operators · earliest confirmation lapsed 2025-12-31*
+> - **Non-uniform within one regime** → **a SUMMARY row true for all**, naming its set — *for this
+>   surface the set is THE CATALOGUE*, since `brandPackState` has no `skuIds`.
 >
-> **THE SUMMARY ROW MUST NAME ITS SET. For this surface the set is THE CATALOGUE** — `brandPackState`
-> has no `skuIds`, so the row says so in its own words (*in the catalogue*), not by implication.
-> **Without the set the number is a claim about something unknown.**
+> *Why the level before that one was wrong: "no brand-level row" on a tile with no per-SKU cells is a
+> blank where a claim stood — a false absence.*
+
+> ### THE THIRD LEVEL IS UNREACHABLE BY CONSTRUCTION TODAY. IT IS NOT DROPPED. **DO NOT IMPLEMENT IT.**
 >
-> *Why the earlier rule was wrong: "no brand-level row" on a tile with no per-SKU cells is a blank where
-> a claim stood — a false absence.*
+> **`Belägg: index.html:_operatorStatus` — `var rec = (brand && brand[regime.field]) || null;
+> var renew = (rec && rec.renewalDate) || ''`.** Name and date come from **the brand record, one object
+> per regime**; the SKU contributes presence only. **Two operators or two dates within one regime cannot
+> arise.** `Mätt av CC 3 okt: s1 and s2 both report expired / 2025-12-31 while s2.euResponsible reads
+> 'Another RP Oy'.`
+>
+> **Build the two reachable levels. The third stands written because the model changes under K21** —
+> RP per product in the record, layer 1. *Same form as `#197`: hidden is a state.*
 
 ---
 
@@ -109,11 +120,14 @@ the tile's other eight values — **measured after M1b is out**. K18, K19. The r
 | **writer of the asserted string** | **`index.html:renderBrandPack` → the Compliance tile's RP row** |
 
 **Report two things, both as text:** the rendered line, **and the catalogue's actual distribution** —
-how many SKUs, how many regimes, how many distinct operators, the earliest confirmation date.
-*The expected string cannot be written here in advance, because the live catalogue's uniformity is
-`OLÄST` — the SKU records are in Charlotte's browser (`ns_skus`). The check is that the rendered line
-matches the rule GIVEN the distribution, not that it matches a sentence I guessed.* **That is what the
-previous version got wrong: it asserted the non-uniform fixture's row would read as a uniform one.**
+how many SKUs, how many regimes, how many SKUs per regime, the state and date per regime, and the
+`unresolved` rows. *The expected string is not written here in advance: the live catalogue is `OLÄST`
+(the SKU records are in Charlotte's browser, `ns_skus`). The check is that the rendered line follows the
+rule GIVEN the distribution, never that it matches a sentence anyone guessed.*
+
+> **With today's model the row will be the UNIFORM form for every regime present**, because the
+> comparator reads one brand record per regime. **If it is ever anything else, the measurement above is
+> wrong and that is the finding — stop and report it rather than rendering the summary form.**
 
 ## REPORT BACK
 
