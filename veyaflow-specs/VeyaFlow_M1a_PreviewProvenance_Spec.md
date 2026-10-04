@@ -6,7 +6,10 @@
 > *CC carries no staleness check. The hash is the evidence that the check was made, not a task.*
 
 **THIS IS A′.1** — *ruled by Charlotte 4 Oct: "Vi döljer inget, vi löser problemen." The hide (A) was
-dropped; this surface is repaired instead.*
+dropped; this surface is repaired instead.* **Queue: `A′.0` → `A′.1` → `A′.2a` → `A′.2b` → `A′.3` → `A′.4`
+→ B.** *`A′.0` is closed: `select count(*), count(*) filter (where active) from shared_brand_packs` returned
+`total 1, aktiva 0` — the only row that ever existed is the one withdrawn 2 Oct, so there is no live
+exposure in front of this.* `Mätt: Charlotte, SQL-editorn, 4 okt.`
 
 **SUPERSEDES THIS FILE'S VERSION AT `212cf27`**, which still carried the summary row as a LIVE third
 level. *The register made it unreachable by construction on 3 Oct and this file had not caught up — the
@@ -93,12 +96,17 @@ removed rather than left reading as a live risk.**
 **Must not survive the edit:** the `✓`/`✗` prefix on the RP row · the literal `Not set` as its value ·
 any RP value sourced from a SKU free-text field · any RP claim that describes `skus[0]`.
 
-> **STOP CONDITION — geometry, measured by CC and unresolved.** *The value cell is capped at 120 px with
-> `white-space:nowrap` and `text-overflow:ellipsis` at `.7rem` — about 17–18 characters. The ruled strings
-> are 60+.* **Two ways out exist and both are layout changes to the tile: put the full sentence in the
-> unconstrained label cell and leave the value cell empty, or give the Compliance block its own row shape
-> by duplication rather than by sharing with "The numbers".** *Report which you would take and why — and
-> STOP. The surface is Design's, not this spec's.*
+> ### GEOMETRY — RULED 4 Oct. THE STOP IS CLOSED.
+>
+> **The whole line is written into the UNCONSTRAINED LABEL cell; the value cell is left empty.**
+> *One row in one tile; no shared shape changes.* `Belägg: open-items.md § CODINGS SJUNDE RELÄ 4 okt §4,
+> at c24ef5b.`
+>
+> **CC's 3 Oct measurement stands as the reason:** the value cell is capped at 120 px with
+> `white-space:nowrap` and `text-overflow:ellipsis` at `.7rem` — about 17–18 characters — against ruled
+> strings of 60+. *The colour is a per-row parameter and never blocked it; the geometry did.*
+>
+> **`RELÄ:Design` may overturn this. Until it does, it holds — do not stop on it again.**
 
 ## WHAT THIS SPEC DOES NOT TOUCH
 
