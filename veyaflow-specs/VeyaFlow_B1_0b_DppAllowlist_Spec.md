@@ -146,7 +146,11 @@ Rätta båda till det sanna. Förslag, ordalydelsen är CC:s att justera så lä
 
 ## 5 · EXPECT — CC verifierar, rapporterar, STANNAR
 
-- `Expect:` `grep -c "cpnpStatus" netlify/functions/share-dpp.js` → **0**
+- `Expect:` **ingen KOD refererar fältet** — kommentarer exkluderade:
+  `grep -vE '^[[:space:]]*//' netlify/functions/share-dpp.js | grep -c "cpnpStatus"` → **0**
+  *Begränsning, utskriven: formen exkluderar helradskommentarer, inte en efterhängd kommentar på en kodrad. I den här filen är de berörda kommentarerna helradiga.*
+
+  > **RÄTTAD 5 okt efter CC:s rapport. Den ursprungliga raden löd `grep -c "cpnpStatus" … → 0` och **motsade §3(a)**, vars kommentar namnger fältet för att dokumentera varför det togs bort. Invarianten är *koden refererar inte fältet*, inte *strängen förekommer inte*. En kommentar som inte får nämna sitt eget ämne är en sämre kommentar, och att skriva om den för att passa kontrollen vore att anpassa artefakten efter en felskriven grind. Samma form som `#183`:s Smoke Step 3. **CC gjorde rätt som rapporterade i stället för att lösa den.** `verify.js` använder redan den här uteslutningen och skriver ut `[N comment mention(s) correctly excluded]`.**
 - `Expect:` `DPP_PUBLIC_FIELDS.regulatory` har **tre** poster: `cpnp`, `ceMarking`, `novelFoodStatus`
 - `Expect:` `DPP_CONDITIONAL_GATING.cpnp` är `(p) => !!p.cpnp` — inget `&&`, ingen referens till status
 - `Expect:` de övriga grindarna (`ceMarking`, `novelFoodStatus`, `certifications`, `takeback`) är **ordagrant oförändrade**
@@ -156,7 +160,11 @@ Rätta båda till det sanna. Förslag, ordalydelsen är CC:s att justera så lä
 - `Expect:` `git status --short` nämner ingen annan fil
 - `Expect:` filen parsar (`node --check`)
 
-**Avviker något: ändra inte specen, rapportera avvikelsen och stanna.**
+**Avviker något: ändra inte specen, rapportera avvikelsen och stanna.** *Det inträffade i första passet och hanterades rätt.*
+
+### Tillägg efter första passet — §3(b):s kommentar återställs
+
+CC parafraserade statusfältets namn i §3(b):s kommentar för att undvika den felskrivna Expect-raden ovan. **Rimligt under den grinden; grinden är nu borta.** Skriv tillbaka §3(b):s kommentar **ordagrant som §3 anger den**, med fältet namngivet. *Precision i posten slår att undvika en sträng.* Övriga två ändringar rörs inte.
 
 ---
 
