@@ -16458,6 +16458,10 @@ function renderBizCaseResult(el){
    7 sections rebuilt with buyer psychology.
 ═══════════════════════════════════════════════════ */
 let brandPackState = {retailer:'', market:'', generating:false, result:null, timestamp:null, hideTerms:false};
+// A′.4 — sätts ENBART av ett 403-svar från share-brand-pack. Den låser inte upp
+// något och konfigureras inte: den registrerar vad servern svarade. Skälet har en
+// enda källa, hanteraren.
+var shareRefusal = null;
 
 // Retailer-specific tones and cover colours
 const BRAND_PACK_COVERS = {
@@ -26656,6 +26660,21 @@ function brandPackRetailerSlug(retailerName){
 // Rule 8 single-write-path: Generate/Refresh both invoke shareBrandPack().
 function renderMagicLinkCard(){
   if(!brand) return '';
+  if(shareRefusal){
+    return `
+      <div style="background:#F7F5F0;border:1px solid var(--border);padding:.95rem 1.1rem;margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem;flex-wrap:wrap;gap:.5rem">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--navy);letter-spacing:.08em;text-transform:uppercase;font-weight:700">Brand Pack link</div>
+          <span style="display:inline-block;padding:.15rem .55rem;border:1px solid #D1D5DB;background:#F3F4F6;color:#6B7280;font-family:var(--mono);font-size:.55rem;letter-spacing:.04em;text-transform:uppercase">Sharing off</span>
+        </div>
+        <div style="font-family:var(--sans);font-size:.78rem;color:var(--muted);line-height:1.5;margin-bottom:.75rem">${shareRefusal}</div>
+        <button class="btn-primary" onclick="shareBrandPack(false)" id="share-pack-btn"
+                style="font-family:var(--mono);font-size:.65rem;padding:.55rem 1.1rem;letter-spacing:.06em">
+          Generate Brand Pack link →
+        </button>
+      </div>
+    `;
+  }
   const url = brand.magicLinkUrl;
   if(!url){
     // State 1: No link generated yet
@@ -26777,7 +26796,21 @@ async function shareBrandPack(regenerate){
     });
 
     if(!res.ok){
-      // Netlify function not deployed yet — fall back to static URL
+      var refusal = null;
+      try { refusal = await res.json(); } catch(e) { refusal = null; }
+      if(res.status === 403 && refusal && refusal.refused && refusal.reason){
+        // A′.4 — en vägran är inte ett fel. Visa det namngivna skälet i kortet.
+        // Ingen alert, inget påstående om nätverk eller deploy, och magicLinkUrl
+        // skrivs inte (γ-arkitekturen, Bug B).
+        shareRefusal = refusal.reason;
+        if(btn){ btn.disabled = false; btn.textContent = 'Generate Brand Pack link →'; }
+        if(currentPage === 'brandpack'){
+          renderBrandPack(document.getElementById('page-brandpack'));
+        } else if(currentPage === 'pitch'){
+          renderPitch(document.getElementById('page-pitch'));
+        }
+        return;
+      }
       throw new Error('Function not deployed');
     }
 

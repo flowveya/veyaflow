@@ -9,7 +9,55 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        752320fd
+index.html        b1216b77
+
+# index.html moved 752320fd → b1216b77 on 5 Oct 2026 — A′.4, SHIPMENT 2 OF 2.
+#   after   b1216b776e23d3dbd32eca9e4620718e8f184ddcddb644af41467b0b73ac6f4f
+#           57 gates · 1 of 11 modified · 34 insertions, 1 deletion
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: THE SURFACE STOPS LYING ABOUT WHY SHARING FAILED.
+#
+# Shipment 1 made the handler refuse. The client then DISCARDED the response body on !res.ok and
+# alerted "Could not generate Brand Pack link. Check your connection and try again. (If this
+# persists, the share-brand-pack Netlify function may need redeployment.)" — A FALSE CAUSE FOR A
+# DELIBERATE REFUSAL, on the only surface that reports it. That is a new untruth on a surface,
+# which is the thing A′.4 exists to stop, so the refusal needed two files.
+#
+# §4(a) `var shareRefusal = null` — STATE, NOT A FLAG. Set only by a 403 from the handler; it
+# unlocks nothing and is never configured. The reason string has ONE source: the handler.
+# §4(b) the !res.ok branch reads the body, and on 403 + {refused,reason} renders instead of
+# alerting. The catch(err) path is untouched — a real failure still behaves exactly as before.
+# §4(c) a third state in renderMagicLinkCard, placed first, using STATE 1's GEOMETRY VERBATIM and
+# the SAME MUTED GREY as "Not set up" — not green, not red.
+# The single deletion is the stale "// Netlify function not deployed yet …" comment inside the
+# replaced branch.
+#
+# THE SMOKE, AND WHAT IT COULD NOT REACH. #K39: NO NETLIFY FUNCTION CAN BE RUN LOCALLY AT ALL —
+# netlify-cli is absent, and `python3 -m http.server` returns 404 for /.netlify/functions/*, so
+# the first smoke attempt produced the old alert and proved NOTHING: it could not tell a correct
+# §4(b) from an unapplied one. A smoke that cannot separate pass from fail is not an instrument.
+# What was done instead, and what each half rests on:
+#   HANDLER — proven BY CONSTRUCTION, not by smoke. The insertion is an UNCONDITIONAL `return` at
+#     the top of exports.handler. A return with no condition above it cannot fail to execute.
+#   CLIENT — proven in the browser with a console stub returning a genuine 403 carrying the
+#     handler's exact reason string. `shareRefusal` read `null` before and the full string after;
+#     not undefined, not ReferenceError, so the variable is top-level and visible from
+#     renderMagicLinkCard. No alert fired. magicLinkUrl was not written.
+#   CARD — painted by injecting the real markup into a real page container, at real page width
+#     with the app's own stylesheet. READ BY A HUMAN: badge "Sharing off" in muted grey, reading
+#     at the SAME WEIGHT as the rest rather than as a footnote or an alarm; reason flowing in two
+#     lines; no overflow, no overprint; button intact; NO POPUP.
+# NOT OBSERVED, STATED RATHER THAN ROUNDED UP: the card IN SITU among other page content. Both
+# call sites of renderMagicLinkCard sit behind an anthropic-proxy call, so no local instrument can
+# reach it until K39 is fixed. The pitch call site is also PARKED (PARKED_IDS, 5 Aug) — the lane
+# sent the smoke there having counted call sites without checking which are live.
+#
+# K42, FROM THE PAINTED CARD AND NOTHING ELSE: the button is the MOST VISUALLY DOMINANT ELEMENT on
+# a card whose text says sharing is off and that re-enabling it is a code change. The text is
+# honest; the affordance argues with it. The lane specced it enabled and defended that as "nothing
+# claims what will happen" — seeing it painted, the button claims plenty. Design question, not
+# correctness. Does not block this shipment.
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
