@@ -289,3 +289,41 @@ update public.shared_brand_packs
    set active = false
  where id = '479e6985-0d85-46b2-a517-be2d805c6b3b'
 returning id, active;
+
+-- ── 2026-10-05 · CORRECTION to the entry at ecaabc5 — NOT an edit of it ──
+-- History is corrected forward, never rewritten. The entry at ecaabc5 stands as written;
+-- this one records what it got wrong and what was measured instead.
+--
+-- THAT ENTRY STATES that the published page rendered "✓ EU RP · Cosmeservice GmbH" under
+-- the heading "VERIFIED DATA ONLY, NO AI".
+--
+-- MEASURED 5 Oct 2026: brand/index.html has no RP row and no compliance panel. It renders
+-- coverHTML + sectionsHTML + skusHTML + snapshotHTML, and sectionsHTML is the MODEL'S
+-- output (brandPackState.result split on '## '). The payload shareBrandPack builds carries
+-- no euResponsible field at all. That string was on the GENERATOR'S OWN PREVIEW —
+-- Charlotte's screen — not in the published document.
+--
+-- WHAT THE PUBLISHED PACK DID CARRY, read from brand_pack_data on 5 Oct 2026 by a reading
+-- select against shared_brand_packs (Charlotte, SQL Editor): a MODEL-GENERATED table with
+-- the row "EU Responsible Person | Cosmeservice GmbH" — name only, no tick, no date, no
+-- state — and six rows marked "✓ Certified":
+--   COSMOS Organic · B Corp · Vegan Society · Cruelty Free International ·
+--   Nordic Swan · FSC Packaging
+-- Whether those six are true, and whether any evidence for them is on record:
+-- NOT ESTABLISHED. Their source is not measured either; brand.certifications is a
+-- candidate, not a finding.
+--
+-- THE TAKEDOWN STANDS. The pack carried real Cloud & Glow data at a public URL from 5 May,
+-- and the link was live and unmonitored. That was reason enough on its own.
+--
+-- NO DATABASE STATEMENT ACCOMPANIES THIS ENTRY. Nothing is being changed; this is the
+-- record catching up with the measurement.
+--
+-- AND THE CLASS, because it is not a one-off: a model was handed a list of certification
+-- names and rendered them as ticked assertions in a buyer-facing document. The brand-pack
+-- prompt already forbids UPGRADING AN ABSENT ITEM to ✓ (generateBrandPack, and the same
+-- rules are in generatePitch). It does not forbid the tick itself for a PRESENT list entry
+-- — and a name typed into a field is not evidence of certification.
+-- Ruled by Strategy 5 Oct: model prose never carries a tick, and never the words certified
+-- / verified / compliant / notified. Such things are rendered by CODE from the record, with
+-- state + date + source, or not at all.
