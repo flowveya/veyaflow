@@ -50,6 +50,7 @@ Strategys §5 listar sex mätningar. **Tre av dem ligger utanför CC:s räckvidd
 | 5 | Vilka SKU-fält bär regelefterlevnad | **CC** |
 | 6 | **RÄTTAD:** vilka fem SKU:er motsvarar Lykofilens fem rader | CC listar alla 51 · **Charlotte matchar mot filen** |
 | 7 | **K44:** vad härleds produktlistans brickor, procenttal och `✓ CPNP confirmed` ur | **CC** |
+| 8 | **NY:** lagrar appen i dag en källa för något fält, någonstans | **CC** |
 
 ---
 
@@ -118,6 +119,48 @@ Den sista kolumnen är frågan. **Ett procenttal som räknar ifyllda fält är e
 
 ---
 
+### M8 — lagrar appen redan en källa för något fält?
+
+*Strategys tillägg 5 okt. Förslaget är en sidotabell `product_field_source {product_id, field, source, recorded_at}`, **inte EAV för värdena**, och Strategy bad uttryckligen om invändning **med mätning**. Det här är den mätningen.*
+
+> **SKÄRPNING, Strategy §8 — två axlar, inte en.**
+> **KÄLLA** = varifrån värdet kom: *inmatat · importerat ur fil · läst ur Validoo*.
+> **UNDERLAG** = vad som belägger påståendet: *CPSR · certifikat · intyg*.
+> `product_field_source` bär **bara källa**. **Underlag hör till skiva 2.**
+> **Rapportera de två var för sig.** Lanens första formulering slog ihop dem; `dossier.*.documentRef` är underlag, inte källa.
+
+**Fråga inte blint — det finns redan en fångstmekanism i trädet, och den är halvbyggd.** `verify.sh` grindar på den under rubriken *"TIME AXIS — CONFIRMATION STAMPS ARE WRITE-ONLY (capture-only shipment)"*. Börja där:
+
+**(a) Stämpelmekanismen.** `_appendStamp` (4 anropsställen, kontrakterat i `FIXED_CALLSITES`), `CHECKLIST_STAMP_KEY`, `CONFIRMATION_STAMP_KEY`.
+- **Vilken form har en stämpel?** Rapportera nycklarna i objektet, ordagrant.
+- **Är den per fält, per objekt eller per yta?** Det avgör om Strategys sidotabell är något nytt eller ett namnbyte på något som finns.
+- **Bär den en källa, eller bara en tidpunkt?** En tidsstämpel utan källa svarar på *när*, aldrig på *varifrån*.
+- **Bekräfta eller fäll att ingenting läser dem.** `verify.sh` påstår `0 direct getItem() by literal` för båda nycklarna. **Om det stämmer: mekanismen fångar och kastar.**
+
+**(b) `confirmedAt`-mönstret.** Strategys `product_operators` bär `confirmedAt` och `source`. Finns något av de namnen redan i trädet? Var?
+
+**(c) `certificationRecords`.** Den kanoniska läsaren är byte-identisk över tre ytor (2 269 B) och har 2 anropsställen. **Bär en certifieringspost något utöver namn och datum — en källa, en bekräftare, ett dokument?** Det är samma fråga som gav de sex bockarna.
+
+**(d) `dossier.*.documentRef` — UNDERLAG, inte källa.** `safetyAssessment` och `pif` bär en `documentRef`: *"Where the signed CPSR is held — a reference, not the file"*. **Det belägger ett påstående; det säger inte varifrån värdet kom.** Mät det ändå, men **rapportera det under underlag** — det hör till skiva 2 och ska inte dras in i `product_field_source`.
+
+**(e) Finns någon KÄLLA alls?** Letar efter spår av *hur ett värde kom in*: ett `source`-fält, en importmarkör från `confirmSkuImport` / `buildSkuPreview` / `renderSkuMapping` (massimporten skriver 51 rader — **noterar den var de kom ifrån?**), en Validoo-markering, eller en flagga som skiljer inmatat från importerat. **Om ingenting sådant finns är svaret på Strategys fråga nej, och `product_field_source` är en nykonstruktion.**
+
+**Rapportformen — två tabeller, inte en:**
+
+`KÄLLA (varifrån värdet kom)`
+
+| mekanism | vad den lagrar | per fält / per objekt / per yta | läses den tillbaka |
+|---|---|---|---|
+
+`UNDERLAG (vad som belägger påståendet)`
+
+| mekanism | vad den lagrar | vilka fält | läses den tillbaka |
+|---|---|---|---|
+
+**Slutsatsen är Strategys, inte CC:s.** CC rapporterar vad som finns. **Om något under KÄLLA redan bär `{fält, varifrån, när}` är sidotabellen en migrering, inte en nykonstruktion** — och det är en annan leverans. **Underlag avgör ingenting här**, hur fullständigt det än är.
+
+---
+
 ---
 
 ## 4 · CHARLOTTES TVÅ MÄTNINGAR
@@ -142,6 +185,6 @@ Lanen levererar dem separat. De står här så att CC vet varför M1 och M3 sakn
 
 ## 6 · RAPPORTFORM
 
-En rubrik per mätning, i ordningen M2, M4, M5, M6, M7. Varje påstående bär sitt `Belägg:` som ett namn. Allt som inte kunde mätas står som `OLÄST` med skälet. **Sedan STANNAR CC.**
+En rubrik per mätning, i ordningen M2, M4, M5, M6, M7, M8. Varje påstående bär sitt `Belägg:` som ett namn. Allt som inte kunde mätas står som `OLÄST` med skälet. **Sedan STANNAR CC.**
 
 Lanen verifierar mot källan och skickar vidare till Strategy. **B1.1 specas först när B1.0 är läst** — ett schema skrivet före mätningen är ett antagande med kolumner.
