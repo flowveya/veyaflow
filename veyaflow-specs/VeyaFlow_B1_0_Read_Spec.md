@@ -49,6 +49,7 @@ Strategys §5 listar sex mätningar. **Tre av dem ligger utanför CC:s räckvidd
 | 4 | Formen på `brand.id` och `sku.id`, var de härleds, hur många ställen som läser dem | **CC** |
 | 5 | Vilka SKU-fält bär regelefterlevnad | **CC** |
 | 6 | Går det att läsa ur posten vilka fem SKU:er som är verkliga | **CC föreslår instrumentet, Charlotte avgör** |
+| 7 | **K44:** vad härleds produktlistans brickor, procenttal och `✓ CPNP confirmed` ur | **CC** |
 
 ---
 
@@ -91,6 +92,22 @@ Lanens förslag, att **mäta, inte anta**: EAN-numret. Mätt i listan: *Forehead
 
 **CC mäter:** har varje SKU:s EAN en giltig GS1-kontrollsiffra, och vilket prefix? Rapportera en tabell `namn · EAN · kontrollsiffra giltig · prefix`. **Rapportera signalen, dra ingen slutsats om vilka fem som är verkliga** — det avgör Charlotte.
 
+### M7 — K44: vad produktlistan härleder, element för element
+
+*Rulat av Strategy 5 okt, klass 2. Mäts här eftersom det är samma fil och samma läsning — en egen rundtur för det vore en rundtur för intet.*
+
+`renderSkus` renderar per produkt: **`✓ CPNP confirmed`**, ett **procenttal** (sett: 100 / 90 / 75 / 25), en **DPP-procent**, och **bockade eller kryssade återförsäljarbrickor** (`✓ Lyko`, `✗ Matas` …).
+
+**Rapportera, ett element i taget:**
+
+| element | vilken funktion producerar det | ur vilka fält | är det en RÄKNING ur posten eller en BEDÖMNING |
+
+Den sista kolumnen är frågan. **Ett procenttal som räknar ifyllda fält är en räkning. Ett som väger dem är en bedömning.** `✓ CPNP confirmed` är det skarpaste fallet: **bekräftat av vem, och mot vad?** Om tecknet står för "ett nummer är inknappat" säger brickan något annat än vad posten bär — samma klass som de sex certifieringsbockarna, på en annan yta.
+
+**Rapportera också vilka av dessa funktioner läsvyn skulle behöva undvika.** Strategys kontraktsrad för `verify.js` lyder *"läsvyn anropar ingen funktion som räknar status eller beredskap"* — **den raden är inte kontrollerbar förrän funktionerna har namn.** Den här mätningen ger dem.
+
+---
+
 ---
 
 ## 4 · CHARLOTTES TVÅ MÄTNINGAR
@@ -115,6 +132,6 @@ Lanen levererar dem separat. De står här så att CC vet varför M1 och M3 sakn
 
 ## 6 · RAPPORTFORM
 
-En rubrik per mätning, i ordningen M2, M4, M5, M6. Varje påstående bär sitt `Belägg:` som ett namn. Allt som inte kunde mätas står som `OLÄST` med skälet. **Sedan STANNAR CC.**
+En rubrik per mätning, i ordningen M2, M4, M5, M6, M7. Varje påstående bär sitt `Belägg:` som ett namn. Allt som inte kunde mätas står som `OLÄST` med skälet. **Sedan STANNAR CC.**
 
 Lanen verifierar mot källan och skickar vidare till Strategy. **B1.1 specas först när B1.0 är läst** — ett schema skrivet före mätningen är ett antagande med kolumner.
