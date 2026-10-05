@@ -21,7 +21,42 @@ netlify/functions/anthropic-proxy.js             7cf20b3f
 netlify/functions/anthropic-proxy-background.js  1f6f47ab
 netlify/functions/get-brand-pack.js              ffa0a5b3
 netlify/functions/get-dpp.js                     94fe37c8
-netlify/functions/share-brand-pack.js            3791bbec
+netlify/functions/share-brand-pack.js            c6975871
+
+# netlify/functions/share-brand-pack.js moved 3791bbec → c6975871 on 5 Oct 2026 — A′.4, SHIPMENT 1 OF 2.
+#   after   c6975871bb5db5589e2fb9094ab3935c0bc1a1bbc3c37efef310c6aff03bdd28
+#           57 gates · 1 of 11 modified · 19 insertions, 0 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: THE SHARE HANDLER REFUSES, SO NO SECOND PACK CAN BE WRITTEN.
+#
+# The refusal is a `return` placed immediately after the OPTIONS early-return — before the method check,
+# before any parsing, and therefore before BOTH writes. 403 with {refused:true, reason}. NO ENV VAR AND
+# NO FLAG (register 5ee1711, §"A′.4 — villkoret var fel, vägran står"): unlocking it is a code change
+# that carries a ruling. Nothing below it was removed. The PATCH and the INSERT are intact and
+# unreachable, WHICH IS THE POINT — a deleted write cannot be audited, a blocked one can.
+#
+# WHY A REFUSAL AND NOT THE TAKEDOWN. The 2 Oct takedown set one row to active=false. The handler's
+# existence check filters active=eq.true, SO THAT ROW IS SIMPLY NOT FOUND — a press does not revive it,
+# it takes the INSERT path and creates a SECOND live pack at a new id. A ROW SET TO FALSE IS A STATE;
+# A REFUSAL IN CODE IS A BLOCK. The lane had been calling the first one the second for three days, and
+# the surface was one button-press from not being still that whole time.
+#
+# WHY TWO SHIPMENTS. The spec required two surfaces at once; §2 allows one. THE SPEC WAS WRONG, NOT THE
+# GATE. The lane had written "verify.sh will report 2 of 11 modified" hours earlier and done nothing
+# with it — noticing a conflict and not resolving it is the same failure as not noticing. verify.sh WAS
+# NOT TOUCHED, and widening §2 to fit a spec written that morning was refused: that is Strategy's ruling
+# made calmly, not the lane's made to unblock itself. Shipment 2 carries index.html §4(a)(b)(c).
+#
+# WHAT IS FALSE ON THE SURFACE UNTIL SHIPMENT 2 LANDS. Pressing share falls into the existing catch(err)
+# and alerts "Could not generate Brand Pack link. Check your connection and try again. (If this
+# persists, the share-brand-pack Netlify function may need redeployment.)" — A FALSE CAUSE FOR A
+# DELIBERATE REFUSAL, and precisely what §2 of the spec was written against. It is bounded by the
+# standing rule that Charlotte does not press share, and NO ROW CAN BE CREATED EITHER WAY. That last
+# clause is the whole property shipment 1 buys, and it is why the handler went first rather than second.
+#
+# NO SMOKE FOR THIS SHIPMENT. The only way to exercise the handler is to press share — forbidden by the
+# standing rule, and it would show the false message anyway. §7 of the spec runs after shipment 2.
 
 # index.html moved 55aa0f1a → 82395393 on 24 Sep 2026 — THE PRICING PAGE, PART 1.
 #   after   823953937883f8e0ad138195518a848b8cf246f5164a05d6297eec16e207eb5f

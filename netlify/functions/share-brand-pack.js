@@ -22,6 +22,25 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
+  // A′.4 — VÄGRAN. Rulat 5 okt 2026 (registret 5ee1711, §"A′.4 — villkoret var fel,
+  // vägran står"). Ingen miljövariabel, ingen flagga: att låsa upp detta är en
+  // kodändring som bär en ruling. Villkoren står i §9 i specen.
+  //
+  // Placerad EFTER OPTIONS-grenen, inte före den, så att CORS-preflighten fortfarande
+  // lyckas och POST:en når hit. Annars ser webbläsaren ett CORS-fel i stället för
+  // skälet, och kortet kan inte visa något.
+  //
+  // Den ligger före BÅDA skrivningarna — PATCH:en och INSERT:en nedan. Ingen av dem
+  // tas bort; att de blir onåbara är hela poängen.
+  return {
+    statusCode: 403,
+    headers,
+    body: JSON.stringify({
+      refused: true,
+      reason: 'Brand Pack sharing is turned off in the code. The published pack renders model-generated prose, and the pack taken down on 2 October asserted six certifications that are not on record. Sharing stays off until the pack states which parts are model-generated and every compliance statement comes from the record with its state and date. Turning it back on is a code change.',
+    }),
+  };
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
