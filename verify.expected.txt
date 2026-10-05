@@ -9,7 +9,7 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        82395393
+index.html        752320fd
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
@@ -3510,3 +3510,47 @@ netlify/functions/share-brand-pack.js            3791bbec
 # only assert 8 hex characters — 32 bits. That is ample against accidental
 # drift and is NOT a tamper check. If a full digest is ever needed, capture it
 # from a tree whose provenance the lane has established, not from a report.
+
+# index.html moved 82395393 → 752320fd on 5 Oct 2026 — A′.1, THE BRAND PACK PREVIEW'S RP ROW.
+#   after   752320fd5ecef80df864cbbb5312a939d6daf75a9647a01c095ecff948a33aa4
+#           57 gates · 1 of 11 modified · 56 insertions, 5 deletions — one IIFE replaced inside
+#           renderBrandPack, the page-1 Compliance tile's RP row
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# WHAT CHANGED, AND WHY THE BATTERY COULD NOT BE GREEN BEFORE THIS COMMIT.
+# The row rendered a ✓ from heroSku.euResponsible — SKU free text, no date, no comparator —
+# beneath "VERIFIED DATA ONLY, NO AI". It now renders state + date from _operatorStatus, per
+# regime, over the whole catalogue rather than over array position zero.
+#
+# THREE FAILS IN CC'S RUN, ALL THIS SHIPMENT'S OWN ARITHMETIC:
+#   FIXED_CALLSITES._operatorStatus 2 → 4   a CHANGED CONTRACT, ruled by the lane 5 Oct and
+#                                           corrected in verify.js in this commit. "Use the one
+#                                           comparator" and "the comparator has two callers"
+#                                           cannot both hold once a third surface reads it;
+#                                           no implementation of A′.1 reaches 57 GREEN at 2.
+#   _operatorRow      10 → 9                this row stopped calling the shared per-SKU helper
+#   getOperatorRegime  6 → 7                this row resolves regimes itself
+#   The last two are baseline drift and are re-captured at this tree, not argued.
+#
+# TWO DECISIONS TAKEN WHERE THE RULING WAS SILENT, BOTH FLAGGED IN THE CODE, NEITHER BURIED:
+#   (1) the rendered status is taken with no SKU argument — _operatorStatus(brand, null, reg).
+#       The spec said "per SKU"; CC found the per-SKU call's presence term reads sku[field],
+#       the same free text this row stops asserting, so rendering from it would re-admit the
+#       banned source one level down. THE SPEC'S WORDING WAS THE DEFECT, not the deviation.
+#       The per-SKU runs are kept as the falsifier probe and it fires in the constructed
+#       disagreement case.
+#   (2) "· no confirmation date recorded" is a FOURTH rendered string, for a reachable state
+#       the ruling's three do not cover (a name with no renewalDate returns present).
+#       Rendering "confirmed to " with a blank would be the false-provenance class.
+#       RELÄ:STRATEGI — ratify or replace. It stands until then.
+#
+# TWO COSTS THIS SHIPMENT CREATED, NAMED RATHER THAN DISCOVERED LATER:
+#   The geometry ruling puts the whole sentence in the label cell, so a regulatory line now
+#   renders muted at .72rem and the per-row colour parameter reaches nothing. RELÄ:Design.
+#   The CPNP row directly above still renders ✓ / Not set from one arbitrary SKU (K17). Two
+#   adjacent rows under one heading now disagree about what they describe, and the repaired
+#   row lends credibility to the one beside it.
+#
+# THE LIVE CATALOGUE IS OLÄST — the SKU records are in Charlotte's browser (ns_skus). CC
+# exercised the shipped bytes against constructed catalogues via verify-harness/shake2.js and
+# got the UNIFORM form in every reachable case, as predicted. The browser smoke is Charlotte's.

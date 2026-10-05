@@ -17141,11 +17141,62 @@ function renderBrandPack(el){
                 return [[ _v ? '✓ '+_n.label+' notified' : '✗ '+_n.label, _v||'Not set', _v?'#065F46':'#991B1B' ]];
               })() ),
               ...( (function(){
-                // #53 — site beyond the spec's twelve: a per-hero-SKU compliance tile
-                // that badged "EU RP" for any product type.
-                var _r = heroSku ? _operatorRow(heroSku,'EU RP') : null;
-                if(!_r) return [];
-                return [[ (_r[1]?'✓ ':'✗ ')+_r[0], _r[1]||'Not set', _r[1]?'#065F46':'#991B1B' ]];
+                // A′.1, 4 Oct 2026 — THE RP ROW IS ABOUT THE RECORD, AND ITS SET IS THE CATALOGUE.
+                // It used to go through the shared per-SKU operator row helper and its value
+                // resolver, which for the cosmetic field hands back the SKU's own FREE-TEXT operator
+                // string — no date, no comparator — ticked, shown under "verified data only, no
+                // AI", and describing one arbitrary catalogue position rather than the catalogue.
+                // Both halves go: the state and the date now come from the brand record through the
+                // ONE comparator, and the set is every SKU. A hero product is a marketing choice,
+                // not a regulatory key. (Identifiers paraphrased on purpose: a banned string in a
+                // comment defeats the grep that checks it is gone — #183's Smoke Step 3.)
+                //
+                // THE WHOLE SENTENCE GOES IN THE LABEL CELL, value cell empty: the value cell clips
+                // at 120px with nowrap (~18 chars) and the ruled strings run past 60. Ruled 4 Oct;
+                // RELA:Design may overturn the placement, not the wording.
+                //
+                // THE SUMMARY ROW FOR A NON-UNIFORM REGIME IS DELIBERATELY NOT BUILT. With one brand
+                // record per regime, two operators or two dates cannot arise (measured 3 Oct). The
+                // one variance the comparator still admits is per-SKU PRESENCE, because it reads
+                // sku[field] — the same free text this row stops asserting. So the rendered status
+                // is taken with NO sku argument: the record's own state, true for every SKU in the
+                // regime. If the per-SKU states disagree, that falsifies the measurement; it is
+                // logged rather than rendered, because a console line is a finding and a rendered
+                // line would be a claim.
+                //
+                // The three ruled strings live below and nowhere else on this tile.
+                var _byRegime = {};
+                (Array.isArray(skus) ? skus : []).forEach(function(sk){
+                  var reg = getOperatorRegime(sk);
+                  if(!reg || !reg.field) return;   // no operator vocabulary for this framework: nothing to assert
+                  var g = _byRegime[reg.field] || (_byRegime[reg.field] = {reg:reg, n:0, seen:{}});
+                  g.n++;
+                  var perSku = _operatorStatus(brand, sk, reg);
+                  g.seen[perSku.state + '|' + (perSku.renewalDate || '')] = 1;
+                });
+                return Object.keys(_byRegime).map(function(field){
+                  var g   = _byRegime[field];
+                  var rec = (brand && brand[field]) || null;
+                  var st  = _operatorStatus(brand, null, g.reg);
+                  if(Object.keys(g.seen).length > 1){
+                    try{ console.warn('A\u2032.1 — per-SKU operator states disagree within ' + field + ': ' +
+                                      Object.keys(g.seen).join(' / ') + '. Rendering the record state, which is true for all.'); }catch(e){}
+                  }
+                  var nm = (rec && rec.name) ? String(rec.name) : '';
+                  var line;
+                  if(st.state === 'present'){
+                    // A present record with no date is a real state (#50: a missing renewalDate is
+                    // not evidence of lapse) and the ruling's three strings do not cover it. The
+                    // clause below is CC's wording, flagged in the report, not the register's.
+                    line = g.reg.label + ' · ' + nm + (st.renewalDate ? ' · confirmed to ' + st.renewalDate
+                                                                          : ' · no confirmation date recorded');
+                  } else if(st.state === 'expired'){
+                    line = g.reg.label + ' · ' + nm + ' · last confirmed ' + st.renewalDate + ' · not confirmed since';
+                  } else {
+                    line = g.reg.label + ' · not recorded';
+                  }
+                  return [line, '', 'var(--muted)'];
+                });
               })() ),
               [normalizeCertifications(heroSku&&heroSku.certifications).length ? '✓ Certified' : '○ Certifications', normalizeCertifications(heroSku&&heroSku.certifications).join(', ')||'None set', normalizeCertifications(heroSku&&heroSku.certifications).length?'#065F46':'var(--muted)'],
               [(heroSku?.claims||[]).filter(c=>c).length ? '✓ Claims set' : '○ Claims', (heroSku?.claims||[]).length+' on-pack claims', '#065F46'],

@@ -82,7 +82,21 @@ const SINGLE_DEFINITION = [
 
 // Call-site counts the handoff states outright.
 const FIXED_CALLSITES = {
-  _operatorStatus: 2,   // §3: 1 definition, 2 call sites
+  // §3 recorded "1 definition / 2 call sites" — scoreReadiness and the RP page. FOUR since
+  // 5 Oct 2026 (A′.1). THIS IS A CHANGED ARCHITECTURAL CONTRACT, not a drifted count: the
+  // number encoded "only readiness and the RP page use the comparator", and that stopped
+  // being true BY RULING. A′.1 moved the Brand Pack preview's RP row onto the one comparator
+  // instead of a SKU free-text field; the two new sites are both inside renderBrandPack —
+  // one rendering call, one per-SKU falsifier probe. The handoff §3 table and
+  // CODING_STATUS.md record 2 and must be corrected, or the next lane stops on a phantom.
+  //
+  // IT WILL MOVE AGAIN, AND THAT IS THE DEFECT IN THE CONTRACT'S FORM. M1 puts eleven
+  // surfaces on this comparator; a number that must be edited eleven times is a counter with
+  // a ceremony, not a contract. What it protects is NO SECOND COMPARATOR EXISTS — that no
+  // function other than _operatorStatus compares renewalDate. RELÄ:STRATEGI, 5 Oct: restate
+  // it that way and it holds at 2 callers and at 11, and fails exactly when someone inlines
+  // a copy, which is the thing it was built to catch.
+  _operatorStatus: 4,
   // §3 recorded "1 definition / 4 call sites — the publication gate". Reduced to 3 on
   // 4 Sep 2026 by batch #9 shipment 4 item 6: the fourth call gated the passport line
   // inside the Brand Pack prompt's SECTION 5, and that section was removed because it
