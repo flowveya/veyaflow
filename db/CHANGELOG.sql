@@ -327,3 +327,46 @@ returning id, active;
 -- Ruled by Strategy 5 Oct: model prose never carries a tick, and never the words certified
 -- / verified / compliant / notified. Such things are rendered by CODE from the record, with
 -- state + date + source, or not at all.
+
+-- ── 2026-10-05 · SECOND CORRECTION — the word "real" was wrong in both earlier entries ──
+-- History is corrected forward. ecaabc5 stands, and so does today's correction at c47178d.
+-- This entry corrects a word that both of them carry.
+--
+-- BOTH ENTRIES CHARACTERISE THE WITHDRAWN PACK AS "REAL CLOUD & GLOW DATA". c47178d goes
+-- further and promotes it to the takedown's standing justification: "real data at a public URL,
+-- live and unmonitored since 5 May". That justification is false.
+--
+-- MEASURED 5 Oct 2026, reading selects against shared_brand_packs (Charlotte, SQL Editor):
+--   id          479e6985-0d85-46b2-a517-be2d805c6b3b   (one row; totalt 1, aktiva 0)
+--   brand_id    cloud__glow_sess_…                     (brand slug + session id)
+--   brand_name  Cloud & Glow
+--   created_at  2026-05-05 11:12:58+00
+--   active      false
+--
+-- SO THE BRAND WAS RIGHT AND THE DURATION WAS RIGHT. The pack was Cloud & Glow, not NORDLYS,
+-- and it was live from 5 May until the 2 Oct takedown — five months, as written.
+--
+-- WHAT WAS WRONG: "real". Stated by Charlotte 5 Oct: everything in the app is test data and no
+-- customer uses the app yet. The pack's own payload corroborates it at the bytes — the first SKU
+-- carries ean "1234567891023" and inci "Aqua, Glycerin, Niacinamide", a sequential dummy barcode
+-- and a three-ingredient stub.
+--
+-- THE TAKEDOWN STILL STANDS, FOR THE OTHER REASON. Not a data leak. A BUYER-FACING DOCUMENT
+-- UNDER A REAL BRAND NAME, at a public and unmonitored URL, carrying six model-generated
+-- "✓ Certified" rows that nothing in the record supports. The brand name is real even where the
+-- values are fixtures, and that is the whole harm surface: anyone finding the link read
+-- unsupported certification claims attributed to Cloud & Glow.
+--
+-- AND ONE HYPOTHESIS CLOSED, so it is not re-opened later. The CPNP number in the pack is NOT
+-- fabricated. Measured in index.html: generateBrandPack feeds the prompt
+-- (heroSku.cpnp || heroSku.cpnpNumber) or the literal 'not on file', and the hero SKU — Cloud &
+-- Glow Forehead Tape, skus[0] — carries that exact value in the local record. The model copied a
+-- value it was handed, by design. What remains is scope, not invention: A BRAND-LEVEL DOCUMENT
+-- RENDERED ONE SKU'S NOTIFICATION NUMBER, which a buyer reads as the brand being notified.
+--
+-- NO DATABASE STATEMENT ACCOMPANIES THIS ENTRY.
+--
+-- THE LANE'S OWN NOTE: c47178d was written this morning and already corrected ecaabc5 for
+-- overstating. It then overstated in the same direction, on an assumption never measured —
+-- that data under a real brand name was real data. The question that settles it took one
+-- reading select and was not asked until Charlotte asked it.
