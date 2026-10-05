@@ -48,7 +48,7 @@ Strategys §5 listar sex mätningar. **Tre av dem ligger utanför CC:s räckvidd
 | 3 | Vad finns bara i `localStorage` för C&G-arbetsytan, nyckel för nyckel | **Charlotte** (webbläsaren) + CC (vilka nycklar koden skriver) |
 | 4 | Formen på `brand.id` och `sku.id`, var de härleds, hur många ställen som läser dem | **CC** |
 | 5 | Vilka SKU-fält bär regelefterlevnad | **CC** |
-| 6 | Går det att läsa ur posten vilka fem SKU:er som är verkliga | **CC föreslår instrumentet, Charlotte avgör** |
+| 6 | **RÄTTAD:** vilka fem SKU:er motsvarar Lykofilens fem rader | CC listar alla 51 · **Charlotte matchar mot filen** |
 | 7 | **K44:** vad härleds produktlistans brickor, procenttal och `✓ CPNP confirmed` ur | **CC** |
 
 ---
@@ -86,11 +86,21 @@ Kända att leta efter, inte en komplett lista: `cpnp` / `cpnpNumber`, `euRespons
 
 **Markera för varje fält om det är per-SKU eller om något ställe läser det som ett varumärkespåstående.** Det är omfattningsregelns mätning och den som avgör hur många ytor K36 rör.
 
-### M6 — går det att skilja verkliga SKU:er från fixturer *ur posten*?
+### M6 — vilka fem SKU:er motsvarar Lykofilens fem rader
 
-Lanens förslag, att **mäta, inte anta**: EAN-numret. Mätt i listan: *Forehead Tape* `7350105830624`, *Led Face Mask* `7350105830747`, *Face Serum* `1234567891023`. Den tredje är en uppenbar attrapp.
+**RÄTTAD 5 okt (Strategy, tillägg).** Den tidigare frågan — *"vilka fem är verkliga"* — byggde på ett antagande som aldrig mättes.
 
-**CC mäter:** har varje SKU:s EAN en giltig GS1-kontrollsiffra, och vilket prefix? Rapportera en tabell `namn · EAN · kontrollsiffra giltig · prefix`. **Rapportera signalen, dra ingen slutsats om vilka fem som är verkliga** — det avgör Charlotte.
+> **Charlotte, mätt:** alla 51 utom *Cloud & Glow Face Serum* (EAN `1234567891023`) är **riktiga** C&G-produkter; vissa säljs inte längre. **50 verkliga, 1 fixtur.** Strategys *"5 verkliga, 46 fixturer"* var fel.
+
+**EAN-kontrollsiffran är därmed inte diskriminanten** och lanens förslag i den riktningen faller. Fixturen är redan känd vid namn.
+
+**Den nya frågan:** vilka fem SKU:er i arbetsytan motsvarar de fem raderna i **Lykoinlämningen av 2 okt**? **Matchas på EAN.** Kärnslingan körs på de fem.
+
+**CC:s del — bara detta:** rapportera en tabell över **alla 51** SKU:er: `index · namn · EAN · productType`. Ingen bedömning, ingen sortering i verkliga och påhittade.
+
+**Charlottes del:** matcha tabellen mot Lykofilen. **Filen ligger hos Charlotte, inte i repot — CC kan inte nå den och ska inte leta efter den.**
+
+**Noterat för B1.1, inte CC:s uppgift här:** produkten får ett livscykeltillstånd `active · discontinued` med datum, satt av Charlotte, **aldrig härlett**. En `discontinued` produkt screenas inte och får inga positioner; posten står kvar. *Att vissa av de 50 inte längre säljs är skälet till att fältet finns.*
 
 ### M7 — K44: vad produktlistan härleder, element för element
 
