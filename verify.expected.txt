@@ -61,7 +61,58 @@ index.html        b1216b77
 dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  7b498d16
+netlify/functions/supabase-proxy.js  9b63fbbb
+
+# netlify/functions/supabase-proxy.js moved 7b498d16 → 9b63fbbb on 6 Oct 2026 — B1.1a-2.
+#   after   9b63fbbbe8ffb220534385e0c7f6fb1485510dfa1800d477cd6b7e6f2e8b935b
+#           57 gates · 1 of 11 modified · 16 insertions, 0 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: THE SERVER BEGINS TO COMPUTE WHO IS CALLING. IT ACTS ON THE ANSWER IN NO WAY.
+#
+# Three insertions, no deletions. verifyAccessToken() sends GET /auth/v1/user with the caller's
+# accessToken as Authorization and SUPABASE_ANON as apikey. The service key does not occur in the
+# function — sent as Authorization it would describe the service role rather than the caller, and
+# every probe would read verified. A CHECK THAT ALWAYS PASSES IS WORSE THAN NO CHECK, because it
+# looks like one. The verdict is {verified, reason}; u.id is read and NOT returned, so no user id
+# exists downstream to log. One call site, immediately after the handler destructure, and one
+# [authprobe] log line carrying action, a boolean and a reason string — no token, no user id, no
+# session_id, no payload, no email, no domain.
+#
+# WHY NOTHING BRANCHES ON THE VERDICT. Login is B1.1a-3. A server that refuses unverified callers
+# before any caller can obtain a token turns the app off, including Charlotte's own access.
+# expand → migrate → contract, the same shape as B1.1a-1's nullable account_id: B1.1a-2 MEASURES,
+# B1.1a-3 supplies real tokens, B1.1a-5 refuses. By then the log says what that refusal breaks.
+# Today "29 of 38 proxy operations authorise on an unverified body value or nothing" is a count
+# made by reading code. After this runs it becomes a count of what happens.
+#
+# EXPECT 2 AND THE DETECTOR THAT WAS WRONG. CC's first probe counted `auth.reason || ''` as a
+# guard on the verdict. It is a value default inside an argument list, not control flow. CC
+# reported the corrected breakdown rather than the first: if on auth 0 · loops/switch 0 ·
+# ternary test 0 · return of auth 0 · throw 0. THE DETECTOR READ THE TOKEN `auth` RATHER THAN THE
+# INVARIANT "no control flow depends on the verdict" — the same failure as this lane's own
+# cpnpStatus Expect on A′.4, which forbade a string its own spec comment required.
+#
+# EXISTING AUTHORISATION IS UNTOUCHED, AND THAT IS THE LOAD-BEARING CLAIM. Every existing
+# supabase() call expression and all 6 verifyPortalAuth sites are byte-identical to 38c095e.
+# 16 lines added, 0 removed, and the destructure line itself is unchanged. #147 is NOT addressed
+# here: session_id remains an unexpiring bearer and rate limiting is still absent from the whole
+# proxy. This delivery adds an observer, not a control.
+#
+# WITH NO accessToken THE PROBE RETURNS BEFORE THE FETCH, so it adds no round-trip to calls that
+# carry none. The latency cost begins at B1.1a-3, not here.
+#
+# EJ FASTSTÄLLT, TWO COUNTS. How many proxy calls currently carry an accessToken — the 6
+# verifyPortalAuth sites mean it may not be zero, and the [authprobe] log answers it. And whether
+# the file holds 38 or 43 call expressions: CC reports 38 expressions over 43 sites, this lane
+# previously recorded 43 calls and 38 operations. Those are not the same claim and neither was
+# re-measured here. The byte-identical gate holds under either count.
+#
+# THE SMOKE IS CHARLOTTE'S AND IT COMES AFTER THE PUSH. #K39 stands: no Netlify function runs
+# locally — netlify-cli is absent and python3 -m http.server returns 404 for
+# /.netlify/functions/*. So this surface cannot be smoked before deployment, the commit is gated
+# on verify.sh rather than on the smoke, and anything the smoke finds is fixed in B1.1a-2b. No
+# amend, no force-push.
 netlify/functions/share-dpp.js       e092f214
 
 # netlify/functions/share-dpp.js moved 500806f0 → e092f214 on 5–6 Oct 2026 — B1.0b.

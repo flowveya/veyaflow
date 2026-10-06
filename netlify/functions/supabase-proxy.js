@@ -137,6 +137,20 @@ function mapSubmissionRow(row) {
   };
 }
 
+async function verifyAccessToken(accessToken) {
+  if (!accessToken) return { verified: false, reason: 'no_token' };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!r.ok) return { verified: false, reason: 'rejected_' + r.status };
+    const u = await r.json();
+    return (u && u.id) ? { verified: true } : { verified: false, reason: 'no_user_id' };
+  } catch (e) {
+    return { verified: false, reason: 'verify_error' };
+  }
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -173,6 +187,8 @@ exports.handler = async (event) => {
   // The session_id check is not authentication. The fix is #147: separate the identifier from
   // the credential.
   const { action, session_id, data, accessToken } = payload;
+  const auth = await verifyAccessToken(accessToken);
+  console.log('[authprobe]', action, auth.verified, auth.reason || '');
 
   try {
 
