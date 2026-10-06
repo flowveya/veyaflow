@@ -11,10 +11,14 @@
 //   - Re-publish: UPDATE, version increments via trigger
 //   - URL stays stable across re-publishes (critical for physical packaging QRs)
 //
-// Server-side guardrail: Payload is filtered through DPP_PUBLIC_FIELDS allowlist
-// + conditional gating BEFORE write. Even if client sends commercial-sensitive
-// data, only allowlisted fields land in Supabase. Belt-and-suspenders alongside
-// client-side filtering in saveDPP().
+// Server-side guardrail: Payload is filtered through the DPP_PUBLIC_FIELDS allowlist
+// + conditional gating BEFORE write. Even if the client sends commercial-sensitive
+// data, only allowlisted fields land in Supabase.
+// THIS IS THE ONLY FILTER. Corrected 5 Oct 2026 (B1.0b): the comment here claimed a
+// client-side twin in the app's own save path and a replica to keep in sync. Neither
+// exists — DPP_PUBLIC_FIELDS appears in index.html exactly once, in a comment.
+// publishDPP sends every candidate-public field and this allowlist is what stops
+// anything else.
 // ════════════════════════════════════════════════════════════════════════
 
 const { createClient } = require('@supabase/supabase-js');
@@ -22,20 +26,33 @@ const { createClient } = require('@supabase/supabase-js');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
-// ─── Allowlist + gating (mirrors index.html DPP_PUBLIC_FIELDS) ──────────
-// Server-side replica. If you update one, update both.
+// ─── Allowlist + gating — the only filter, no client-side counterpart ───
 const DPP_PUBLIC_FIELDS = {
   identity:       ['name', 'ean', 'productType', 'netContent', 'netUnit'],
   composition:    ['inci', 'materialComposition', 'ingredientList'],
   origin:         ['countryOfMfr'],
-  regulatory:     ['cpnp', 'cpnpStatus', 'ceMarking', 'novelFoodStatus'],
+  // cpnpStatus BORTTAGET 5 okt 2026 (B1.0b, registret 4c0bd07). Det är en
+  // SJÄLVDEKLARATION: index.html:setCPNPStatus skriver vad modalen skickar, och
+  // index.html:renderSkus renderar '✓ CPNP confirmed' ur enbart det fältet — den läser
+  // aldrig sku.cpnp. Brickan kan stå med numret tomt. En självdeklaration hör inte hemma
+  // på ett publikt pass under något villkor, och den grindas därför inte: en grind är ett
+  // villkor som kan bli fel, vilket cpnp-grinden nedan var.
+  regulatory:     ['cpnp', 'ceMarking', 'novelFoodStatus'],
   certifications: ['certifications'],
   environmental:  ['carbonKg', 'carbonEstimated', 'recycledProduct',
                    'recyclability', 'takeback'],
 };
 
 const DPP_CONDITIONAL_GATING = {
-  cpnp:            (p) => !!p.cpnp && (p.cpnpStatus === 'active' || !p.cpnpStatus),
+  // cpnp 5 okt 2026 (B1.0b): publiceras när numret finns, oberoende av status.
+  // DEN GAMLA GRINDEN VAR DÖD: cpnpStatus antar aldrig 'active' — enumet är
+  // not_started | ready | submitted | confirmed (index.html:STATUS_OPTS), noll förekomster
+  // av 'active'. Villkoret föll därmed till (!!cpnp && !cpnpStatus): numret publicerades
+  // BARA när ingen status var satt, och ströks när statusen sade 'confirmed'. Omvänt mot
+  // varje läsbar avsikt. Att i stället testa mot de riktiga statusvärdena vore att återinföra
+  // kopplingen till deklarationen som (a) just tog bort. Det som publiceras är att ett
+  // nummer är angivet.
+  cpnp:            (p) => !!p.cpnp,
   ceMarking:       (p) => p.productType === 'device',
   novelFoodStatus: (p) => ['supplement', 'food'].includes(p.productType),
   certifications:  (p) => Array.isArray(p.certifications) && p.certifications.length > 0,

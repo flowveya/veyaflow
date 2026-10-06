@@ -62,7 +62,75 @@ dpp/index.html    e4809761
 portal.html       beaa72b8
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  7b498d16
-netlify/functions/share-dpp.js       500806f0
+netlify/functions/share-dpp.js       e092f214
+
+# netlify/functions/share-dpp.js moved 500806f0 → e092f214 on 5–6 Oct 2026 — B1.0b.
+#   after   e092f21483c81a26f97bd69748ed7f4922fe38c8b5be2cd5b03cd1d8295ab9a8
+#           57 gates · 1 of 11 modified · 25 insertions, 8 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: A SELF-DECLARATION CAN NO LONGER REACH A PUBLIC PRODUCT PASSPORT.
+#
+# THE MECHANISM, MEASURED 5 Oct. index.html:renderSkus renders '✓ CPNP confirmed' from
+# sku.cpnpStatus ALONE — an inline ternary, not a function — and never reads sku.cpnp.
+# index.html:setCPNPStatus writes whatever the modal passes. SO THE BADGE CAN STAND WITH THE
+# NOTIFICATION NUMBER EMPTY: confirmed by the user, against nothing. index.html:publishDPP then
+# sends cpnpStatus to the server, and this file allowlisted it WITH NO GATE. This file's own
+# header: "URL stays stable across re-publishes (critical for physical packaging QRs)."
+#
+# LATENT, NOT LIVE, AND THE REASON IS LUCK. Three published passports read 5 Oct carry
+# {ceMarking:"Yes"}, NULL, {ceMarking:"Yes"} — none carries cpnpStatus or cpnp. All three are
+# device-type, and the CPNP modal only renders for Skincare & Beauty, so the status was never set
+# on them. ONE COSMETIC SKU WITH STATUS 'confirmed', PUBLISHED AS A DPP, WAS THE WHOLE DISTANCE.
+#
+# REMOVED, NOT GATED — Strategy's ruling, and it corrected the lane's proposal. The lane proposed
+# gating cpnpStatus and testing cpnp against the real enum. BOTH WERE WRONG: a gate is a condition
+# that can be wrong, which this file proves, and testing the number against the status would have
+# re-tied it to the very declaration being removed. A key absent from an allowlist has no condition
+# to evaluate.
+#
+# THE OLD GATE WAS DEAD AND INVERTED IN EFFECT:
+#   cpnp: (p) => !!p.cpnp && (p.cpnpStatus === 'active' || !p.cpnpStatus)
+# 'active' is a value the enum NEVER TAKES — it is not_started | ready | submitted | confirmed
+# (index.html:STATUS_OPTS), zero occurrences of 'active' anywhere. The condition therefore collapsed
+# to (!!cpnp && !cpnpStatus): THE NUMBER PUBLISHED ONLY WHEN NO STATUS WAS SET, AND WAS STRIPPED
+# PRECISELY WHEN THE STATUS SAID 'confirmed'. The opposite of any readable intent, for an unknown
+# length of time. It is now (p) => !!p.cpnp — what is published is that a number is on file.
+#
+# AND A COMMENT THAT CLAIMED A FILTER THAT DOES NOT EXIST. This file said "Server-side replica.
+# If you update one, update both" and "Belt-and-suspenders alongside client-side filtering in
+# saveDPP()". DPP_PUBLIC_FIELDS appears in index.html EXACTLY ONCE, IN A COMMENT. There is no
+# client-side twin; publishDPP sends every candidate-public field and this allowlist is the only
+# thing that stops anything else. Both claims corrected to what is true.
+#
+# PROVEN BY CONSTRUCTION. NO SMOKE, AND NOT FOR WANT OF TRYING.
+# filterPayload builds its output solely from Object.entries(DPP_PUBLIC_FIELDS); nothing passes
+# through unfiltered, and filteredPayload is the only thing reaching the upsert. A FIELD ABSENT
+# FROM THE ALLOWLIST CANNOT BE EMITTED — that is control flow, not judgement. Exercising it
+# server-side would require a publish, and both routes were ruled out: a new SKU mints a new
+# passport URL, and re-publishing an existing one mutates a live row and increments version
+# irreversibly. The floor is measured instead: no published passport carries the field today.
+#
+# EJ FASTSTÄLLT, WRITTEN OUT RATHER THAN OMITTED: that the changed function is DEPLOYED cannot be
+# verified from outside. index.html could be hashed against the live site; a Netlify function is not
+# served as a file and has no external digest. The only outside proof would be behaviour, and
+# behaviour requires a publish. THIS DELIVERY IS PROVEN IN THE REPO, NOT ON THE PLATFORM, AND THAT
+# HOLDS FOR ALL SEVEN FUNCTIONS. #K39 is the standing gap.
+#
+# THE SPEC'S OWN DEFECT, RECORDED BECAUSE IT IS THE DAY'S PATTERN. The first Expect line read
+# `grep -c "cpnpStatus" … → 0` and CONTRADICTED §3(a), whose comment names the field in order to
+# document why it was removed. CC reported the contradiction and REFUSED TO RESOLVE IT, which is
+# correct: rewording the comment would have been fitting the artefact to a badly-written check.
+# The invariant is THE CODE MUST NOT REFERENCE THE FIELD, not THE STRING MUST NOT APPEAR — and
+# verify.js already draws that distinction elsewhere ("[N comment mention(s) correctly excluded]").
+# Same shape as #183's Smoke Step 3. The lane wrote three checks against tokens today where it meant
+# invariants; this is the third and the rule that catches it: A CHECK NAMES THE INVARIANT, NEVER A
+# TOKEN THAT HAPPENS TO APPEAR IN IT. The field now appears three times in the file, all on
+# full-line comments, and zero times in code.
+#
+# WHAT THIS DOES NOT FIX: the badge itself. '✓ CPNP confirmed' reading cpnpStatus alone is
+# index.html — a different surface, row 18 on the live gate, after B1.2b's read view. This delivery
+# stops the leak; the badge's honesty is the copy pass.
 
 # ── Added #174, 11 Sep 2026. Five live endpoints that were never watched. ──
 netlify/functions/anthropic-proxy.js             7cf20b3f
