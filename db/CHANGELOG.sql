@@ -370,3 +370,74 @@ returning id, active;
 -- overstating. It then overstated in the same direction, on an assumption never measured —
 -- that data under a real brand name was real data. The question that settles it took one
 -- reading select and was not asked until Charlotte asked it.
+
+-- ── 2026-10-06 · B1.1a-1 · KONTOT SOM ÄGARE — accounts, account_members, brands.account_id ──
+-- Rulat av Strategy 6 okt (registret `3244a66` §1–2, `786eaf0` §1). Första steget i att flytta
+-- posten från en session till ett verifierat konto. EXPANDERA — inget värde flyttas, ingen
+-- befintlig rad ändras, ingenting börjar kräva den nya kolumnen.
+--
+-- VARFÖR, MÄTT 5–6 okt och inte antaget:
+--   · `supabase-proxy.js` destrukturerar `session_id` ur anropskroppen och validerar det
+--     ingenstans. Filens eget huvud: "an UNEXPIRING BEARER CREDENTIAL … TRUSTED WITHOUT
+--     VERIFICATION". 29 av 38 operationer auktoriserar på det värdet eller på ingenting.
+--   · Varje proxyanrop skickar `Authorization: Bearer SUPABASE_SERVICE_KEY`, så allt kör som
+--     `service_role`.
+--   · `relforcerowsecurity` är FALSE på samtliga 20 tabeller, och service_role kringgår RLS.
+--     DET FINNS ALLTSÅ INGET DATABASSIDIGT SKYDDSNÄT BAKOM PROXYN och kan inte finnas så länge
+--     service_role är bäraren. Proxyns egen filtrering är inte extra säkerhet — den är den enda.
+--   · `brands`-policyn ger ENBART `service_role`; anon och authenticated nekas allt. Posten har
+--     alltså aldrig varit öppen i databasen. Dörren är proxyn.
+--
+-- VAD SATSEN GÖR:
+--   accounts          — kontot som äger posten.
+--   account_members   — {account_id, user_id, role}, user_id mot auth.users.
+--   brands.account_id — NULLABLE, utan värde, utan krav. Fylls i B1.1a-4.
+--
+-- ALLT I EN TRANSAKTION. Mellan `create table` och `enable row level security` står en tabell
+-- utan radsäkerhet. I en transaktion är det fönstret aldrig synligt utifrån. Strategys §1:
+-- "Aldrig en tabell som står öppen ens en commit" — en transaktion är vad som gör den meningen
+-- bokstavligt sann.
+--
+-- POLICY FRÅN FÖRSTA RADEN: service_role, som `brands`. Ingen anon, ingen authenticated.
+-- `role` lämnas som fri text med default 'owner'; vilka roller som finns är inte rulat, och en
+-- CHECK-begränsning skriven på gissning vore en grind som kan bli fel — samma lärdom som
+-- `cpnpStatus === 'active'` i `share-dpp.js` (B1.0b).
+--
+-- INGEN RAD SKAPAS. `accounts` och `account_members` är tomma efter satsen, och varje
+-- `brands.account_id` är null. Det är avsikten med expandera-steget.
+--
+-- Charlotte kör satsen i SQL-editorn. Lanen skriver posten och kör aldrig satsen.
+
+begin;
+
+create table public.accounts (
+  id          uuid primary key default uuid_generate_v4(),
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.accounts enable row level security;
+
+create policy accounts_service_role_all on public.accounts
+  for all to service_role using (true) with check (true);
+
+create table public.account_members (
+  account_id  uuid not null references public.accounts(id) on delete cascade,
+  user_id     uuid not null references auth.users(id)      on delete cascade,
+  role        text not null default 'owner',
+  created_at  timestamptz not null default now(),
+  primary key (account_id, user_id)
+);
+
+alter table public.account_members enable row level security;
+
+create policy account_members_service_role_all on public.account_members
+  for all to service_role using (true) with check (true);
+
+alter table public.brands
+  add column account_id uuid references public.accounts(id);
+
+create index brands_account_id_idx on public.brands (account_id);
+
+commit;
