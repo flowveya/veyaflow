@@ -59,7 +59,54 @@ index.html        b1216b77
 # claims what will happen" — seeing it painted, the button claims plenty. Design question, not
 # correctness. Does not block this shipment.
 dpp/index.html    e4809761
-portal.html       beaa72b8
+portal.html       908647c0
+
+# portal.html moved beaa72b8 → 908647c0 on 8 Oct 2026 — B1.1a-2a.
+#   after   908647c0049d9c19b5abad3edda421622fb37a20c36652bf3e7e7557a399f6c1
+#           57 gates · 1 of 11 modified · 13 insertions, 6 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: THE RETAILER'S SCREEN STOPS QUOTING THE DATABASE.
+#
+# portal.html:661 built a client Error from the proxy's response body, and the proxy builds that
+# string at supabase-proxy.js:57 as `Supabase ${status}: ${JSON.stringify(data)}` — the WHOLE
+# PostgREST error body, details included. PostgREST quotes the conflicting ROW VALUES in details.
+# Six sites then rendered it: 713 (login error), 736 (console.warn), 793 (loadError), 818, 1337
+# and 1395 (toasts). SO A BRAND'S ROW VALUES COULD BE PAINTED INTO A TOAST ON A RETAILER'S
+# SCREEN — a different tenant — through a failed status update. One helper, portalErrorText(status),
+# now supplies every one of those six from a fixed string keyed on status. No word comes from the
+# server. Line 661 is untouched: the Error still carries .status, which every branch reads.
+#
+# THE 404 STRING IS SAFER THAN THE SERVER'S WORDS, NOT MERELY EQUAL. portal.submission.get returns
+# 404 both for a submission that does not exist and for one belonging to ANOTHER retailer. One
+# string covers both. Distinguishing them would have turned an error message into an enumeration
+# oracle, which is what echoing the server was quietly doing.
+#
+# THE LANE'S OWN EXPECT WAS THE DEFECT, FOR THE THIRD TIME IN TWO DAYS. Expect 1 demanded that
+# `e.message` occur ZERO times. It occurs once, on the e.status === 0 branch, whose string is
+# built at line 654 IN THIS FILE and never leaves it. CC reported the contradiction and REFUSED
+# TO RESOLVE IT — correct, and the same refusal it made on B1.0b's cpnpStatus check. The spec that
+# contained this defect closes §4 with the words "a check names the invariant, never a token that
+# happens to appear in it". RESTATED AND PASSING: `e.message` occurs exactly once, on the
+# status === 0 branch; every other error reaching a user calls portalErrorText(e.status).
+#
+# A SECOND LANE ERROR, CORRECTED BY CC: the spec's §0c said all FIVE catch sites intercept 401 and
+# call handleAuthExpired() first. There are SIX catch blocks, and TWO do not call it — the login
+# branch shows 'Invalid email or password.' and restoreSession shows 'Your session expired…'.
+# Both are fixed strings, so the conclusion held, but the mechanism was asserted without being
+# read. Same shape as the console.warn grep that found the right answer with the wrong pattern.
+#
+# WHAT THIS DELIVERY DOES NOT FIX, NAMED SO IT IS NOT MISTAKEN FOR DONE:
+#   The proxy STILL BUILDS the leaking string. B1.1a-2b stops that at rad 57/764/768. Until then
+#   the value travels; it is simply no longer displayed.
+#   portal.status.update and portal.rejection.create BOTH verify ownership with one statement and
+#   then PATCH by id alone, dropping the retailer filter from the WRITE. Two instances, so it is a
+#   pattern. Same file as 2b, and 2b's.
+#   #147 stands: portal.submission.create and portal.status.sync still authorise on session_id.
+#
+# THE SMOKE IS CHARLOTTE'S AND IT NEEDS A PROVOKED FAILURE — an ordinary session shows no toast at
+# all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
+# locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
 netlify/functions/supabase-proxy.js  9b63fbbb
 

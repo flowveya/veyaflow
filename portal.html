@@ -640,6 +640,13 @@ function updateTopbar(title, sub, actionsHtml){
 }
 
 /* ─── PROXY ─── */
+function portalErrorText(status){
+  if(status === 403) return 'No active retailer account for this email. Contact VeyaFlow admin.';
+  if(status === 400) return 'That request was incomplete. Reload the page and try again.';
+  if(status === 404) return 'That submission is no longer available.';
+  return 'Something went wrong at our end. Try again in a moment.';
+}
+
 async function proxyCall(action, payload){
   var body = Object.assign({ action: action }, payload || {});
   if(accessToken) body.accessToken = accessToken;
@@ -710,7 +717,7 @@ async function handleLogin(){
   } catch(e) {
     var msg = 'Sign in failed. Try again.';
     if(e.status === 401) msg = 'Invalid email or password.';
-    else if(e.status === 403) msg = e.message || 'No active retailer account for this email. Contact VeyaFlow admin.';
+    else if(e.status === 403) msg = portalErrorText(403);
     else if(e.status === 0)   msg = e.message;
     showLoginError(msg);
   } finally {
@@ -733,7 +740,7 @@ async function restoreSession(){
     await loadSubmissionsFromServer();
     return true;
   } catch(e) {
-    console.warn('Session restore failed:', e.message);
+    console.warn('Session restore failed, status', e.status);
     accessToken = null;
     refreshToken = null;
     currentUser = null;
@@ -790,7 +797,7 @@ async function loadSubmissionsFromServer(){
     submissionsCache = result.submissions || [];
   } catch(e) {
     if(e.status === 401){ handleAuthExpired(); throw e; }
-    loadError = e.message || 'Failed to load submissions.';
+    loadError = portalErrorText(e.status);
     submissionsCache = [];
   } finally {
     isLoading = false;
@@ -815,7 +822,7 @@ async function refreshDetail(){
     renderDetail();
   } catch(e){
     if(e.status === 401) handleAuthExpired();
-    else toast('Failed to refresh: ' + e.message, 'error');
+    else toast('Failed to refresh. ' + portalErrorText(e.status), 'error');
   }
 }
 
@@ -1334,7 +1341,7 @@ async function handleStatusChange(newStatus){
     renderDetail();
   } catch(e){
     if(e.status === 401) handleAuthExpired();
-    else toast('Failed to update status: ' + e.message, 'error');
+    else toast('Could not update status. ' + portalErrorText(e.status), 'error');
     if(sel){ sel.disabled = false; sel.value = s.status; }
   }
 }
@@ -1392,7 +1399,7 @@ async function confirmRejection(){
     renderDetail();
   } catch(e){
     if(e.status === 401){ handleAuthExpired(); return; }
-    toast('Failed to reject: ' + e.message, 'error');
+    toast('Could not reject. ' + portalErrorText(e.status), 'error');
     if(btn){ btn.disabled = false; btn.textContent = 'Reject submission'; }
   }
 }
