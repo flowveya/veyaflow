@@ -45,7 +45,7 @@ async function supabase(method, path, body) {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON,
+      'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Prefer': preferHeader,
     },

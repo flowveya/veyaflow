@@ -108,7 +108,59 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  0a70fdad
+netlify/functions/supabase-proxy.js  267370bf
+
+# netlify/functions/supabase-proxy.js moved 0a70fdad → 267370bf on 12 Oct 2026 — B1.1a-2d.
+#   after   267370bf19c9a8293e9263b37adee4bffd0779436b509bd0cf108f0b03a29e1b
+#           57 gates · 1 of 11 modified · 1 insertion, 1 deletion
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum och CC:s körning).
+#
+# PURPOSE: BEHÖRIGHETEN FLYTTAR TILL apikey, FÖRE NYCKELBYTET — INTE SAMTIDIGT MED DET.
+#
+# EN RAD: rad 48 i supabase(), 'apikey': SUPABASE_ANON → 'apikey': SUPABASE_KEY. Rad 49:s
+# Authorization: Bearer ${SUPABASE_KEY} är orörd. Filen KRYMPER med en byte, 37 155 → 37 154,
+# eftersom SUPABASE_KEY är ett tecken kortare än SUPABASE_ANON — en aritmetisk kontroll som
+# faller ut av ändringen själv.
+#
+# VARFÖR. De äldre anon/service_role-nycklarna GÅR INTE LÄNGRE ATT ROTERA; Supabase tog bort
+# förmågan ("it is no longer possible to rotate the legacy anon, service and JWT secrets",
+# Supabase troubleshooting, läst 9 okt). Enda vägen bort från en läckt äldre nyckel är de nya
+# publishable/secret-nycklarna, som INTE är JWT. Med äldre nycklar tar PostgREST rollen ur
+# Authorization-JWT:n; med nya nycklar måste den komma ur apikey — och apikey var där proxyn
+# lade sin LÅGPRIVILEGIERADE nyckel.
+#
+# DET HÄR ÄR FELET SOM UNDVIKS: ett rakt byte av värdena i Netlify hade INTE gett något fel.
+# Alla 38 anrop hade tyst körts som anon och returnerat tomma svar. Ett fel som svarar 200 och
+# ingenting är långt värre än ett som svarar 401.
+#
+# MÄTT MOT DET HÄR PROJEKTET 9 okt: sb_publishable_ på apikey mot brands ger [] (anon, RLS
+# håller) · en privilegierad nyckel på apikey utan Authorization ger en rad · en icke-JWT i
+# Authorization bryter INTE PostgREST, den avgör bara ingenting. Dokumentationens varning om
+# "Invalid JWT" gäller Edge Functions, inte PostgREST — kodningen generaliserade först fel och
+# mätningen rättade den.
+#
+# FORMEN FUNGERAR MED BÅDA NYCKELGENERATIONERNA, AVSIKTLIGT. Med äldre nycklar kommer rollen
+# fortfarande ur Authorization-JWT:n; med nya ur apikey. Därför kan den här leveransen
+# driftsättas och kontrolleras INNAN någon nyckel rör sig: expandera → migrera → kontraktera,
+# tillämpat på ett nyckelbyte i stället för på ett schema.
+#
+# EXPECT 1 SKREVS OM INNAN LEVERANSEN GICK UT. Första lydelsen krävde att SUPABASE_ANON
+# förekom "nowhere else in the file", vilket hade fallit på dess egen const-deklaration och en
+# kommentar — båda förbjudna att röra av samma spec. CC flaggade motsägelsen FÖRE tillämpning.
+# Fjärde gången på en vecka som lanen skrivit en token-räkning där en invariant hör hemma, och
+# första gången den fångades innan något hann appliceras.
+#
+# RÖKEN ÄR SPECAD MEN OGJORD, och 2b:s rök görs tillsammans med den här. CC:s svar på den
+# utestående frågan: ALLA 38 operationer når throw i supabase(), men provokationsytan är smal.
+# field.load interpolerar data.mfrId OENKODAT i mfr_id=eq.…, är en enda GET och skriver
+# ingenting — till skillnad från unika-krock-vägen (waitlist.create två gånger), som lämnar en
+# rad efter sig redan på första anropet. OLÄST: om det ger 400 beror på kolumntypen för
+# supplier_field_overrides.mfr_id, vilket är M1:s information_schema-läsning och Charlottes.
+#
+# OCH DET 2d FÖRHINDRAR ÄR OCKSÅ DET SOM GÖR RÖKEN AVGÖRANDE: efter den här ändringen betyder
+# en privilegierad apikey att en fungerande läsning RETURNERAR RADER. Kommer ett läsanrop
+# tillbaka med 200 och [] där rader finns, är nyckeln på apikey inte privilegierad. Det tysta
+# anon-felet blir observerbart i EN förfrågan i stället för upptäckt veckor senare.
 
 # netlify/functions/supabase-proxy.js moved 9b63fbbb → 0a70fdad on 12 Oct 2026 — B1.1a-2b.
 #   after   0a70fdad8ca07fe6d3810f81b97a77b5280498d45b3e8c95105c601fb1876c28
