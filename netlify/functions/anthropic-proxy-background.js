@@ -32,7 +32,7 @@ const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_KEY; // service_role
 const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
 
 // PATCH a bil_extractions row by id. Mirrors supabase-proxy's REST shape exactly:
-// apikey = anon key, Authorization = Bearer service_role key. Best-effort; logs
+// apikey = service_role key (privilege is taken from apikey), Authorization = Bearer service_role key. Best-effort; logs
 // and returns false on failure (the caller decides what to do next).
 async function patchRow(extractionId, patch) {
   if (!SUPABASE_URL || !SUPABASE_KEY || !SUPABASE_ANON) {
@@ -46,7 +46,7 @@ async function patchRow(extractionId, patch) {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON,
+          'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Prefer': 'return=minimal',
         },
@@ -72,7 +72,7 @@ async function deleteStorageObject(storagePath) {
     await fetch(`${SUPABASE_URL}/storage/v1/object/bil-images/${storagePath}`, {
       method: 'DELETE',
       headers: {
-        'apikey': SUPABASE_ANON,
+        'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
       },
     });
@@ -121,7 +121,7 @@ exports.handler = async (event) => {
   try {
     const dlRes = await fetch(`${SUPABASE_URL}/storage/v1/object/bil-images/${storagePath}`, {
       headers: {
-        'apikey': SUPABASE_ANON,
+        'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
       },
     });
