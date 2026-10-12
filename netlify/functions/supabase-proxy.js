@@ -54,7 +54,10 @@ async function supabase(method, path, body) {
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch { data = text; }
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${JSON.stringify(data)}`);
+  if (!res.ok) {
+    const pgCode = (data && typeof data === 'object' && data.code) ? String(data.code) : '';
+    throw new Error('Supabase ' + res.status + (pgCode ? ' ' + pgCode : ''));
+  }
   return data;
 }
 
@@ -381,7 +384,7 @@ exports.handler = async (event) => {
       const existing = await supabase('GET', `portal_submissions?id=eq.${encodeURIComponent(id)}&retailer_id=eq.${encodeURIComponent(ctx.retailerId)}&limit=1`);
       if (!existing.length) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Submission not found' }) };
       const oldStatus = existing[0].status;
-      const updated = await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(id)}`, {
+      const updated = await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(id)}&retailer_id=eq.${encodeURIComponent(ctx.retailerId)}`, {
         status: newStatus,
       });
       await supabase('POST', 'submission_status_log', {
@@ -409,7 +412,7 @@ exports.handler = async (event) => {
         category: reasonCategory,
         detail: reasonDetail || '',
       }});
-      const updated = await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(id)}`, {
+      const updated = await supabase('PATCH', `portal_submissions?id=eq.${encodeURIComponent(id)}&retailer_id=eq.${encodeURIComponent(ctx.retailerId)}`, {
         status: 'rejected',
         brand_pack_data: newPack,
       });

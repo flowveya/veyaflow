@@ -108,7 +108,50 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  9b63fbbb
+netlify/functions/supabase-proxy.js  0a70fdad
+
+# netlify/functions/supabase-proxy.js moved 9b63fbbb → 0a70fdad on 12 Oct 2026 — B1.1a-2b.
+#   after   0a70fdad8ca07fe6d3810f81b97a77b5280498d45b3e8c95105c601fb1876c28
+#           57 gates · 1 of 11 modified · 6 insertions, 3 deletions
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlotte's shasum and CC's run).
+#
+# PURPOSE: THE SERVER STOPS BUILDING THE STRING THAT CARRIES ROW VALUES.
+#
+# Rad 57 byggde felet som `Supabase ${status}: ${JSON.stringify(data)}` — HELA PostgREST-kroppen,
+# vars details-fält citerar de radvärden som orsakade felet. Den strängen nådde loggen (764) och
+# svaret till anroparen (768), och före B1.1a-2a även en toast på en återförsäljares skärm. Nu
+# bär den endast status och SQLSTATE: 'Supabase ' + res.status + (pgCode ? ' ' + pgCode : '').
+# 764 och 768 är AVSIKTLIGT ORÖRDA — invarianten uppnås vid källan i stället för att lappas hos
+# två konsumenter, och en tredje konsument som tillkommer senare ärver skyddet automatiskt.
+#
+# OCH SKRIVNINGARNA AUKTORISERAR SIG SJÄLVA. portal.status.update och portal.rejection.create
+# kontrollerade ägarskap i EN sats och PATCHade sedan på id ensamt. Båda PATCH-vägarna bär nu
+# &retailer_id=eq.${ctx.retailerId}. Två instanser, alltså ett mönster, inte en halkning: kontroll
+# och skrivning i skilda satser betyder att skrivningen inte bär någon egen auktorisation.
+#
+# VERIFIERAT AV KODNINGEN VID BYTES, INTE LÄST UR CC:S RAPPORT. Alla fem Expect mättes mot filen:
+# `JSON.stringify(data)`, `data.details`, `data.message` och `data.hint` saknas i supabase() ·
+# det kastade meddelandet byggs endast av res.status och data.code · catch-blocket på rad 768 är
+# byte-identiskt och supabase() sätter noll `.code`, så dess fel mappar fortfarande till 500 ·
+# båda PATCH mot portal_submissions bär retailer-filtret och ingen saknar det · hela diffen är två
+# hunkar. Den fullständiga diffen mot 9b63fbbb är 6 rader till, 3 bort, ingenting annat.
+#
+# KODNINGENS EGET FEL, OCH DET KOSTADE TRE DAGAR. Leveransen låg committad-färdig 9–12 okt medan
+# kodningen väntade på CC:s rapport med de fem Expect. Rapporten nådde aldrig den här lanen, och
+# kodningen gjorde den till ett villkor. DEN VAR ALDRIG ETT VILLKOR: en rapport är AUTHORS ord om
+# sitt eget arbete, och lanens egen mätning av bytena är det som gäller. Filen fanns tillgänglig
+# hela tiden. Regel: när CC:s rapport uteblir mäter lanen själv och går vidare — den väntar inte.
+#
+# KVAR, NAMNGIVET SÅ DET INTE MISSTAS FÖR KLART:
+#   RÖKEN ÄR OGJORD OCH OSPECAD. CC:s §6 bad om listan över vilka actions som kan nå rad 57:s
+#   throw, så ett verkligt databasfel kunde framkallas utan att skriva skräp i tabellerna. Den
+#   listan kom aldrig. Röken görs tillsammans med B1.1a-2d, som rör samma fil.
+#   Åtkomstdefekten i §3 kan enligt stående regel inte prövas mot produktion och är bevisad
+#   genom konstruktion: filtret står i själva PATCH-vägen.
+#   bil.uploadUrl returnerar fortfarande `detail: signText.slice(0, 300)` — uppströms lagringsfel
+#   rakt till anroparen. Den throw går inte genom supabase(), så rad 57:s fix når den inte.
+#   #147 står: portal.submission.create och portal.status.sync auktoriserar på session_id.
+#   De sju operationerna utan ägarkoppling står kvar, listing.list först av dem.
 
 # netlify/functions/supabase-proxy.js moved 7b498d16 → 9b63fbbb on 6 Oct 2026 — B1.1a-2.
 #   after   9b63fbbbe8ffb220534385e0c7f6fb1485510dfa1800d477cd6b7e6f2e8b935b
