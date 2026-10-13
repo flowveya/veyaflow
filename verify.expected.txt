@@ -9,7 +9,79 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        f1e3021d
+index.html        e19bb174
+# ============================================================================
+# B1.1a-2h  index.html  f1e3021d -> e19bb174
+# 13 Oct 2026. 42218 -> 42227 lines, 2785086 -> 2785481 bytes. 9 insertions,
+# 0 deletions: one blank line and an eight-line branch.
+#
+# WHAT CHANGED
+#   Inserted after 35086 inside handleDeepLink, before the validPages
+#   allowlist, so the route cannot fall through to home:
+#     if(page==='bil-dev'){ showPage('home'); setTimeout(... renderBilDevPanel
+#     ...,100); return true; }
+#   with three comment lines saying it is an overlay rather than a page, that
+#   nothing in the interface points at it, and that role gating lands in 4b.
+#
+# WHY
+#   The dev panel could only be reached by typing renderBilDevPanel() into the
+#   browser console. Smokes that touch extraction are run by hand and the
+#   console is the wrong instrument for a repeated action. Access is not
+#   protection: anyone with a console could already start an extraction, and
+#   the protection is B1.1a-4 on the server plus B1.1a-4b in this file.
+#   Charlotte decided to build the route and lifted the coding lane's own
+#   deferral; Strategy had said no and withdrew it. Conditions are in Strategy's
+#   relay of 13 Oct and are reproduced below because they bind later work.
+#
+# CONDITIONS CARRIED FORWARD
+#   No menu, no link, no button and no visible text names the route. The name
+#   is convenience, not a secret, and not a gate.
+#   The gate row Anthropic calls can be started without a login stays open. It
+#   closes when B1.1a-4 (server: login plus admin role for extraction) and
+#   B1.1a-4b (this file: panel and route for admin only) are both GREEN, before
+#   the pilot starts.
+#   The push waits for Charlotte to confirm a spending cap in the Anthropic
+#   Console. On this project a push to coding-aug2026 is the deploy.
+#
+# SHAPE, AND WHY IT IS THAT SHAPE
+#   showPage('home') comes first because init() skips its own showPage('home')
+#   when handleDeepLink returns true, and the panel is an overlay that needs a
+#   page beneath it. The setTimeout at 100 ms mirrors the crm branch in the same
+#   function, which already does page-render-then-act. The typeof guard exists
+#   because renderBilDevPanel is declared far later in the same block.
+#   bil-dev is deliberately absent from validPages. That array feeds showPage
+#   and mirrors NAV; the panel is not a page value.
+#
+# C7, MEASURED
+#   When handleDeepLink returns true, init() skips exactly one statement,
+#   showPage('home'), and nothing else. Everything before the branch runs
+#   unconditionally, and the two-second background regulatory check after it
+#   runs either way. That is why the branch calling showPage('home') itself is
+#   the right shape rather than a guess that happened to work.
+#
+# LANE ERRORS THIS DELIVERY
+#   1. C6 predicted 42226, plus eight. The spec's own section 2 specifies a
+#      blank line plus an eight-line block, which is nine. The lane miscounted
+#      its own block. CC applied section 2 as written, reported the mismatch,
+#      and refused to drop the blank line to make the number come out. The
+#      check was corrected to 42227; the file was not touched. Adjusting the
+#      artefact to satisfy a check is the failure these checks exist to catch,
+#      and this is the fourth time the pattern has appeared in this sequence.
+#   2. C3 was written as a token count, not an invariant. It said the string
+#      bil-dev occurs only inside handleDeepLink. The substring also lives in
+#      bil-dev-panel, the overlay's own DOM element id at 3639 and 3675, both
+#      predating this delivery. The invariant meant was that nothing in the
+#      interface names the route, and that holds. A check names the invariant,
+#      never a token that happens to appear in it. That rule is in the register
+#      because the lane broke it three times in the week of 6 Oct. This is the
+#      fourth.
+#
+# NOT CHECKED
+#   Smoke, and by design it cannot be a click. Charlotte opens
+#   veyaflow.netlify.app/#bil-dev in a fresh tab and confirms the panel opens
+#   over Brand Home, then opens a nonsense hash and confirms it still lands on
+#   Brand Home, which is the check that the allowlist still works.
+# ============================================================================
 # ============================================================================
 # B1.1a-2e  index.html  ca816552 -> f1e3021d
 # 13 Oct 2026. 42214 -> 42218 lines, 2784814 -> 2785086 bytes.

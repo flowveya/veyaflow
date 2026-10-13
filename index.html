@@ -35085,6 +35085,15 @@ function handleDeepLink(){
   const page = parts[0];
   const param = parts[1];
 
+  if(page==='bil-dev'){
+    // Overlay, not a page, so it is deliberately absent from validPages below.
+    // No nav entry and no link points here: the address is the only way in.
+    // Role gating lands in B1.1a-4b; this is convenience, not protection.
+    showPage('home');
+    setTimeout(()=>{ if(typeof renderBilDevPanel === 'function') renderBilDevPanel(); }, 100);
+    return true;
+  }
+
   // Valid page IDs — must match NAV array at L2110 (canonical source of truth).
   // Hash-aware init route at init() calls handleDeepLink() before showPage('home'),
   // so this list determines what bookmarks/hard-reload-to-hash actually work.
