@@ -46,3 +46,12 @@ _untracked_backup/
 /share-dpp.js
 VeyaFlow_Nav_5Group_Reskin_v1.html
 brandhome_pass2_sketch.html
+
+# 13 Oct 2026. "Claude outputs/" is a working folder the lanes write into. It has
+# been untracked all week, which left it one git add -A away from publication:
+# publish = "." (#99) makes the repo root the public web root, so a tracked copy
+# would be served at a guessable URL.
+# Unanchored on purpose, like the daily-log lines above and unlike the five
+# endpoint names above. There is no production directory of this name at any
+# depth, and moving the folder should not un-ignore it.
+Claude outputs/
