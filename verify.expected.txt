@@ -9,7 +9,78 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        ca816552
+index.html        f1e3021d
+# ============================================================================
+# B1.1a-2e  index.html  ca816552 -> f1e3021d
+# 13 Oct 2026. 42214 -> 42218 lines, 2784814 -> 2785086 bytes.
+# Three places, one file, applied bottom-up. 7 insertions, 3 deletions: CC
+# reused the original line 7113 byte-identically rather than retyping it, so
+# git counts that line as context.
+#
+# WHAT CHANGED
+#   7112-7113   two lines became six. The readiness view now calls
+#               _validateEan13 before awarding anything. pd+=3 and the green
+#               are reachable only through _eanCheck.valid. A non-empty but
+#               invalid value takes a new amber blocker, id eanInvalid. An
+#               absent value still takes the existing eanMissing branch, whose
+#               line is byte-identical to HEAD.
+#   3646        No extraction wired. -> Vision extraction wired (B4).
+#   2983        (B4 wires Vision next.) -> (Press EXTRACT to run Vision.)
+#
+# WHY
+#   _validateEan13 existed, worked, and was called from exactly one place: the
+#   bulk import at 20095, which maps each of its four reasons to its own
+#   message. The readiness view never asked. It paid three points and printed
+#   EAN barcode on file for any non-empty string. Under the rule Strategy set
+#   on 12 Oct, a tick means the value is valid, never that something was typed.
+#   That green was a lie and this delivery removes it.
+#
+#   3646 and 2983 both still claimed Vision was not wired. It demonstrably is:
+#   the EXTRACT button at 3660 calls runBilExtraction, which B1.1a-2f smoked in
+#   production on 12 Oct. Strategy named 3646 for this delivery; the lane added
+#   2983 because it is the same stale claim in the same file, and fixing one
+#   while leaving the other is half a fix.
+#
+# DELIBERATELY NOT CHANGED
+#   5401 and 5565, byte-identical to HEAD and checked as C7. Manual entry still
+#   has no validation and an invalid EAN can still be typed and saved. F1 is
+#   split: this delivery takes only the false green. What the field accepts is
+#   a later delivery.
+#
+# WHAT C3 FOUND, AND WHAT SHIPS ANYWAY
+#   The spec asked CC to measure whether anything treats blocker ids as a closed
+#   set, and to change nothing either way. Four places do:
+#     BLOCKER_RESOLUTION   a map keyed by id, about 20 entries, read for maxDays
+#                          and at two render sites
+#     computePatternStatus a switch on pattern.blocker
+#     the rejection-risk tables, which embed id strings as data
+#     buildSkuReadiness    explicit id lists passed to checkState
+#   eanInvalid is in none of them. Nothing breaks, and one thing is thin: that
+#   blocker renders with no days, no cost and no fix text where every other
+#   blocker carries all three.
+#   Shipped as it stands. An honest blocker with a thin detail row is strictly
+#   better than a false green, and the gap is recorded rather than silent. The
+#   BLOCKER_RESOLUTION entry is its own delivery because it needs a day figure
+#   and a cost figure, and the lane does not invent either.
+#   Separately, four hand-maintained id sets is the shape of a defect waiting to
+#   happen. Nothing is broken today. RELAY:STRATEGY.
+#
+# CHECKS
+#   C1 pass, read not counted: pd+=3 and the green are reachable only through
+#      _eanCheck.valid.
+#   C2 pass, measured: _validateEan13 is a function declaration and sits in the
+#      same script block as the readiness function. Not assumed.
+#   C3 measured and not acted on, by instruction. See above.
+#   C4 pass: No extraction wired and B4 wires Vision next each occur zero times.
+#   C5 pass: both script blocks parse clean.
+#   C6 pass: 42218 lines, the predicted figure, plus four from the first change.
+#   C7 pass: 5401 and 5565 byte-identical to HEAD.
+#
+# NOT CHECKED
+#   Smoke. Charlotte enters an EAN with the right digit count and a wrong check
+#   digit on the hero SKU and confirms the readiness view shows the amber
+#   blocker instead of the green tick, and that a valid EAN still earns it.
+# ============================================================================
 # ============================================================================
 # B1.1a-2c  index.html  b1216b77 -> ca816552
 # 13 Oct 2026. 42227 -> 42214 lines, 2785447 -> 2784814 bytes.

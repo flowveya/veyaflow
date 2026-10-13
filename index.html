@@ -2980,7 +2980,7 @@ async function renderBilPages(){
   bilState.pageImages = images;
   bilState.status = 'pages-ready';
   bilState.error = null;
-  setProg('✓ '+images.length+' page image'+(images.length===1?'':'s')+' ready in bilState.pageImages. (B4 wires Vision next.)', '#065F46');
+  setProg('✓ '+images.length+' page image'+(images.length===1?'':'s')+' ready in bilState.pageImages. (Press EXTRACT to run Vision.)', '#065F46');
   _bilRefreshReadout();
 }
 
@@ -3643,7 +3643,7 @@ function renderBilDevPanel(){
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem">
         <div>
           <div style="font-family:var(--sans);font-size:.95rem;font-weight:700;color:var(--navy)">BIL upload — dev panel</div>
-          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">B1–B3 · validate, hold, and render a brand-deck PDF to page images. No extraction wired.</div>
+          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">B1–B3 · validate, hold, and render a brand-deck PDF to page images. Vision extraction wired (B4).</div>
         </div>
         <button onclick="closeBilDevPanel()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted)">×</button>
       </div>
@@ -7109,7 +7109,11 @@ function scoreReadiness(brand, sku, marketCode, retailerId){
   // 4. PRODUCT DATA (10)
   let pd = 0;
   if(skuValid){
-    if(sku.ean){ pd+=3; greens.push('EAN barcode on file'); }
+    if(sku.ean){
+      const _eanCheck = _validateEan13(sku.ean);
+      if(_eanCheck.valid){ pd+=3; greens.push('EAN barcode on file'); }
+      else{ blockers.push({id:'eanInvalid',level:'amber',label:'EAN barcode invalid',impact:'The value on file is not a valid EAN-13. Retail listing systems reject it.'}); }
+    }
     else{ blockers.push({id:'eanMissing',level:'amber',label:'EAN barcode missing',impact:'Required for all retail listing systems.'}); }
     if(sku.inci||sku.ingredients){ pd+=4; greens.push('INCI / ingredients list on file'); }
     else if(sku.productType==='cosmetic'){ blockers.push({id:'inciMissing',level:'amber',label:'INCI list missing',impact:'Mandatory for EU cosmetics listings and PIF.'}); }
