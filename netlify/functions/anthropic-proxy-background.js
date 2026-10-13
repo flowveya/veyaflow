@@ -23,19 +23,18 @@
 // data, never executed — safe to store raw.
 //
 // Env (same names as anthropic-proxy.js + supabase-proxy.js):
-//   ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
+//   ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
 // ============================================================================
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_KEY; // service_role
-const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
 
 // PATCH a bil_extractions row by id. Mirrors supabase-proxy's REST shape exactly:
 // apikey = service_role key (privilege is taken from apikey), Authorization = Bearer service_role key. Best-effort; logs
 // and returns false on failure (the caller decides what to do next).
 async function patchRow(extractionId, patch) {
-  if (!SUPABASE_URL || !SUPABASE_KEY || !SUPABASE_ANON) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error('[bg] missing SUPABASE_* env — cannot write row');
     return false;
   }

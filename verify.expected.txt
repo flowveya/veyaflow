@@ -462,7 +462,65 @@ netlify/functions/share-dpp.js       e092f214
 
 # ── Added #174, 11 Sep 2026. Five live endpoints that were never watched. ──
 netlify/functions/anthropic-proxy.js             7cf20b3f
-netlify/functions/anthropic-proxy-background.js  1f0b16a4
+netlify/functions/anthropic-proxy-background.js  47a6f874
+# ============================================================================
+# B1.1a-2g  netlify/functions/anthropic-proxy-background.js  1f0b16a4 -> 47a6f874
+# 13 Oct 2026. 204 -> 203 lines, 8399 -> 8309 bytes.
+# Three places, one file, applied bottom-up. 2 insertions, 3 deletions.
+#
+# WHAT CHANGED
+#   38  the startup guard inside patchRow drops its third condition and now
+#       reads if (!SUPABASE_URL || !SUPABASE_KEY) {
+#   32  const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY; removed entirely
+#   26  the env-var comment no longer lists SUPABASE_ANON_KEY; it ends at
+#       SUPABASE_SERVICE_KEY
+#
+# WHY
+#   B1.1a-2f moved privilege to apikey and left SUPABASE_ANON with no reader
+#   among the requests, while the startup guard still required it. That is a
+#   trap: whoever tidies the Netlify environment gets a background writer that
+#   returns false on every call, logs, and tells the caller nothing. The hazard
+#   was recorded in the 2f narrative on 12 Oct and this delivery removes it.
+#
+# ALIGNMENT LEFT CROOKED ON PURPOSE
+#   Lines 30 and 31 keep two spaces before the equals sign, which existed to
+#   line them up with the now-deleted line 32. Realigning them would be a change
+#   with no reason in a file we had just corrected, and would make the diff
+#   larger than the delivery. CC was told to leave it crooked and did.
+#
+# CHECKS
+#   C1 pass: SUPABASE_ANON occurs zero times, in any form, code or comment.
+#   C2 pass: the guard reads exactly if (!SUPABASE_URL || !SUPABASE_KEY) { and
+#      still sits inside patchRow, before its console.error and return false.
+#   C3 pass: lines 29, 30, 31 byte-identical to HEAD.
+#   C4 pass: node --check parses the file.
+#   C5 pass: 203 lines, minus one from the deleted declaration.
+#   C6 pass to the byte: 8309 = 8399 - 18 - 53 - 19. The lane predicted all
+#      three deltas from the exact strings before CC applied anything.
+#   C7 measured and not acted on, by instruction. See below.
+#
+# C7 CORRECTS THE STRATEGY RELAY OF 13 OCT
+#   The relay said SUPABASE_ANON_KEY stays in Netlify until 2g is closed, which
+#   reads as though closing 2g unlocks removing it. It does not. Three other
+#   functions read that variable:
+#     get-brand-pack.js  10 declaration, 27 startup guard, 40 apikey, 41 Bearer
+#     get-dpp.js         16 declaration, 41 startup guard, 55 createClient
+#     supabase-proxy.js  33 declaration, read at its three auth sites, which
+#                        B1.1a-2d deliberately left on the public key
+#   Removing the variable would make get-brand-pack and get-dpp refuse at their
+#   own startup guards and would send an undefined apikey from the proxy auth
+#   endpoints. The variable is load-bearing and stays, permanently.
+#   The lane measured this before writing the spec; CC measured it again and
+#   agreed. Two independent measurements, neither of them the author of the
+#   claim being checked.
+#
+# NOT CHECKED
+#   Smoke. Charlotte runs an extraction from the dev panel with a new filename
+#   and confirms the row reaches done with [bg] done and wrote=true in the
+#   Netlify log, read in real time because background-function logs are not
+#   retained. The guard is the only thing this delivery touched on the write
+#   path, so the smoke exists to show it still lets a write through.
+# ============================================================================
 # ============================================================================
 # B1.1a-2f netlify/functions/anthropic-proxy-background.js 1f6f47ab -> 1f0b16a4
 # 12 Oct 2026. 204 lines, 8361 -> 8399 bytes. Four lines changed: 35, 49, 75, 124.
