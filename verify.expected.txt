@@ -9,7 +9,71 @@
 # Source: CODING LANE HANDOFF §3, HEAD 649f0ef8e48a66c6ef16b3babc9ecc1c5dfdb190
 # ---------------------------------------------------------------------------
 
-index.html        b1216b77
+index.html        ca816552
+# ============================================================================
+# B1.1a-2c  index.html  b1216b77 -> ca816552
+# 13 Oct 2026. 42227 -> 42214 lines, 2785447 -> 2784814 bytes.
+# Three deletions and one in-place substitution, applied bottom-up so that
+# line numbers above each edit stayed valid while the work was in progress.
+#
+# WHAT CHANGED
+#   8327        the ${brand.userName?...} expression with its <div class="signed">
+#               Signed in as block. One line. The Edit workspace button remains
+#               in the same div.
+#   17900-17907 the // Verify no private data comment, all of assertNoPrivateData,
+#               and the trailing blank. Eight lines. Dead code: one definition,
+#               zero call sites, measured in B1.1a-2b and confirmed here.
+#   18019-18022 the blank line, if(name || cleaned){, its console.log carrying
+#               brand.euResponsible name and email, and the closing brace. Four
+#               lines. The whole condition went, not only the log, because an
+#               empty if would have been left behind.
+#   30624       one CPNP reference in a comment, swapped for NORD-CPNP-2026-001,
+#               the form the file already uses at line 2163. Line-count neutral.
+#               It now sits at 30611 after the deletions above it.
+#
+# WHY
+#   Four items about what a publicly served file shows: a signed-in user name in
+#   the interface, a name and an email address in the console, a real CPNP
+#   reference in a comment, and a function whose name promised a check that
+#   nothing called. Closes row 28 in the register.
+#
+# K38 AND THE NORDLYS RULE
+#   The reference at 30624 was real, not fictional. It was taken out for the
+#   NORDLYS rule, which does not ask whether a value is real. The value appears
+#   nowhere in the spec, nowhere in CC's report, and nowhere in this narrative:
+#   the spec located the line by its wording and by pattern, never by quoting it.
+#   The lane did paste it into chat once while narrowing the search, from a
+#   command the lane itself supplied. Recorded, not repeated.
+#
+# CHECKS
+#   C1 Signed in as occurs zero times in the file.
+#   C2 assertNoPrivateData occurs zero times, in code and in comment.
+#   C3 migrateBrandSchemaV3 contains no console call of any kind.
+#   C4 every CPNP-yyyy-n occurrence in the file is preceded by NORD-. Read, not
+#      counted: two occurrences, 2163 and 30611, each one checked.
+#   C5 both script blocks parse clean under acorn.
+#   C6 42214 lines, the predicted figure.
+#   C7 measured and not acted on, by instruction.
+#
+# WHAT C7 FOUND, INCLUDING WHAT THIS DELIVERY CREATED
+#   PRIVATE_SKU_FIELDS now has no readers: its declaration at 17858 is the only
+#   occurrence left. assertNoPrivateData was its sole reader.
+#   cleaned is now write-only: incremented at six sites, read nowhere, because
+#   the if(name || cleaned) condition was its only reader. That orphan was
+#   created by this delivery, not found by it. The lane wrote the spec; CC found
+#   the consequence by measuring rather than assuming the deletion was
+#   self-contained.
+#   name and email are load-bearing and stay: both are read at 17997, where the
+#   migration writes brand.euResponsible.
+#   Neither orphan is removed here. Removal is its own delivery, and cleaned is
+#   the larger of the two because of its six increment sites.
+#
+# NOT CHECKED
+#   Smoke. Charlotte reloads and confirms the workspace header still renders with
+#   the Edit workspace button and no name row, and that the console no longer
+#   prints [migrateBrandSchemaV3] on page load. That reading is what lets the
+#   console on index.html be opened at all.
+# ============================================================================
 
 # index.html moved 752320fd → b1216b77 on 5 Oct 2026 — A′.4, SHIPMENT 2 OF 2.
 #   after   b1216b776e23d3dbd32eca9e4620718e8f184ddcddb644af41467b0b73ac6f4f

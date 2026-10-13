@@ -8324,7 +8324,6 @@ function renderDashboard(el){
             <div class="route">${brand.category} · ${brand.currentMarket}${brand.targetMarkets?.length?' → '+brand.targetMarkets.slice(0,3).join(', ')+(brand.targetMarkets.length>3?' +'+(brand.targetMarkets.length-3):''):''}</div>
           </div>
           <div>
-            ${brand.userName?`<div class="signed">Signed in as <b>${brand.userName}</b></div>`:''}
             <button class="btn-edit" onclick="resetBrand()"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit workspace</button>
           </div>
         </div>
@@ -17897,14 +17896,6 @@ function sanitiseSkuForRetailer(sku){
   return safe;
 }
 
-// Verify no private data in a prompt string (dev safety check)
-function assertNoPrivateData(str){
-  const leaked = PRIVATE_SKU_FIELDS.filter(function(f){
-    return str.includes(f) && str.includes('exWorksCost');
-  });
-  if(leaked.length>0) console.warn('VeyaFlow privacy warning: private field in prompt:', leaked);
-}
-
 // ── EUDR compliance derived getter ────────────────────────────────────
 // Replaces phantom field `eudrCompliant` reads. The canonical SKU field is
 // `eudrStatus` (string enum). Two form sites use DIFFERENT vocabularies for
@@ -18016,10 +18007,6 @@ function migrateBrandSchemaV3(){
 
   brand._schemaVersion = 3;
   persistCritical('ns_brand', brand)
-
-  if(name || cleaned){
-    console.log(`[migrateBrandSchemaV3] Canonical object: brand.euResponsible={name:${JSON.stringify(name)}, email:${JSON.stringify(email)}, ...}, cleaned ${cleaned} legacy field(s).`);
-  }
 }
 
 
@@ -30621,7 +30608,7 @@ async function generateSpecSheetPDF(skuId){
             moq:sku.moq||'', lead:sku.leadDays||'',
             // #93 — almost the whole Regulatory status section sat OUTSIDE the fingerprint
             // the footer advertises, while the device's ce/doc sat inside it. A serum sheet
-            // showing CPNP-2025-0231233 carried the same Document ID as the version with no
+            // showing NORD-CPNP-2026-001 carried the same Document ID as the version with no
             // CPNP at all. The mechanism was never wrong; the field list was.
             cpnp:sku.cpnp||'', safety:sku.safetyRef||'', skuRp:sku.euResponsible||'',
             certs: normalizeCertifications(sku.certifications).sort(),
