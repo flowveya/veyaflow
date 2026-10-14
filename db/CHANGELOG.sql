@@ -441,3 +441,68 @@ alter table public.brands
 create index brands_account_id_idx on public.brands (account_id);
 
 commit;
+
+-- ── 2026-10-14 · B1.1a-3c-1 — login_attempts, spärr per identitet ──
+-- Stänger underlaget för grindrad 34: inloggningsförsök kan inte
+-- hastighetsbegränsas per användare eller per angripare. Supabase räknar per
+-- IP-adress (dokumentationssidan Rate limits, raden för /token) och Netlifys
+-- utgående adresser fluktuerar (Private Connectivity). Den IP som räknas är
+-- därför aldrig slutanvändarens, och spärren måste ligga hos oss.
+--
+-- VARFÖR EN TABELL. Netlify-funktioner är tillståndslösa och körs i instanser
+-- som kommer och går. En räknare i minnet räknar ingenting.
+--
+-- VAD SOM LAGRAS. sha256 av den gemenfällda e-posten, aldrig adressen. En dump
+-- av tabellen är därför ingen adresslista. Den skyddar däremot inte en redan
+-- känd adress, som går att hasha och slå upp. Avvägningen är skriven, inte dold.
+-- Endast misslyckade försök skrivs; ett lyckat behöver ingen rad.
+--
+-- TILLVÄXT. Skrivvägen nås av en oautentiserad anropare, eftersom den loggar
+-- misslyckade inloggningar. B1.1a-3c-2 raderar därför alla rader äldre än
+-- fönstret vid varje kontroll, inte bara den aktuella identitetens, och skriver
+-- ingen ny rad för en identitet som redan ligger på taket. Tabellens storlek
+-- begränsas då av antalet försök under ett fönster. pg_cron finns inte i
+-- projektet, mätt 14 okt, så städningen kan inte schemaläggas i databasen.
+--
+-- TRÖSKEL OCH FÖNSTER. Fem försök per identitet inom femton minuter. Detta är
+-- POLICYVÄRDEN, inte mätta värden. Fem ligger över vad en människa gör innan
+-- hon återställer lösenordet och under vad en gissningsattack behöver för att
+-- vara meningsfull. Femton minuter är tre gånger Supabases eget
+-- femminutersfönster, så spärren överlever det fönster en angripare annars
+-- kunde rida på. Talen bor i koden i B1.1a-3c-2, inte i schemat, så att de kan
+-- ändras utan en databasändring när mätt data finns.
+--
+-- PRIMÄRNYCKEL. bigint identity, inte uuid som i accounts. Tabellen är en
+-- append-only räknare med hög skrivtakt och ingen extern referens; en uuid hade
+-- kostat utrymme och indexbredd utan att ge något.
+--
+-- POLICY. service_role, samma form som accounts och account_members.
+--
+-- INGEN LÄSARE ÄN. Tabellen används först av B1.1a-3c-2. Ingen rök i denna post,
+-- och det är avsiktligt, inte förbisett.
+--
+-- Charlotte kör satsen i SQL-editorn. Lanen skriver posten och kör aldrig satsen.
+
+begin;
+
+create table public.login_attempts (
+  id            bigint      generated always as identity primary key,
+  email_hash    text        not null,
+  attempted_at  timestamptz not null default now()
+);
+
+create index login_attempts_hash_time_idx on public.login_attempts (email_hash, attempted_at desc);
+create index login_attempts_time_idx      on public.login_attempts (attempted_at);
+
+alter table public.login_attempts enable row level security;
+
+create policy login_attempts_service_role_all on public.login_attempts
+  for all to service_role using (true) with check (true);
+
+comment on table public.login_attempts is
+  'Misslyckade inloggningsförsök för brand.auth.login. Skrivs och läses bara av proxyn med servicenyckeln. Grindrad 34.';
+
+comment on column public.login_attempts.email_hash is
+  'sha256 av den gemenfällda e-posten. Adressen lagras aldrig.';
+
+commit;
