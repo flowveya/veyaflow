@@ -309,6 +309,66 @@ exports.handler = async (event) => {
       });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
+    // ═══════════════════════════════════════════════
+    // ── Brand auth (B1.1a-3a) ────────────────────
+    // ═══════════════════════════════════════════════
+    // Header form copied from portal.auth.login below, which is smoke-tested:
+    // apikey = SUPABASE_ANON, Content-Type json, credentials in the body.
+
+    if (action === 'brand.auth.login') {
+      const { email, password } = payload;
+      if (!email || !password) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Email and password required' }) };
+      }
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const authData = await res.json();
+      // One message for every failure, and no upstream status or response body is
+      // forwarded: a login that distinguishes 'no such email' from 'wrong password'
+      // is an enumeration oracle.
+      if (!res.ok || !authData.access_token) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid email or password' }) };
+      }
+      // Stop-block, replaced by the role check in B1.1a-4: a retailer-portal account
+      // must not receive a brand token. No token is returned on this path.
+      const portalAccounts = await supabase('GET', `retailer_accounts?contact_email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`);
+      if (portalAccounts.length) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'This account signs in through the retailer portal.' }) };
+      }
+      // No user.id here: the password-grant response shape is not measured in this
+      // repo — only access_token and refresh_token are read today. The id comes from
+      // brand.auth.verify, where the shape IS measured (verifyPortalAuth reads it).
+      // No account resolution either: the account binding lands in B1.1a-4, and a check
+      // here would lock out the only user before that delivery exists.
+      return { statusCode: 200, headers, body: JSON.stringify({
+        access_token: authData.access_token,
+        refresh_token: authData.refresh_token,
+        expires_in: authData.expires_in,
+        email,
+      })};
+    }
+
+    if (action === 'brand.auth.verify') {
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      if (!userRes.ok) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Not authenticated' }) };
+      }
+      const user = await userRes.json();
+      return { statusCode: 200, headers, body: JSON.stringify({
+        user: { email: user.email, id: user.id },
+      })};
+    }
 
     // ═══════════════════════════════════════════════
     // ── Retailer Portal ──────────────────────────

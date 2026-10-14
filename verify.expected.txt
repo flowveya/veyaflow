@@ -315,7 +315,72 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  267370bf
+netlify/functions/supabase-proxy.js  268a9e87
+
+# netlify/functions/supabase-proxy.js moved 267370bf -> 268a9e87 on 14 Oct 2026, B1.1a-3a.
+#   after   268a9e87a5214f7f5ce1d40c1f0bba058a18c043debc5a4232048edd3932f223
+#           57 gates · 1 of 11 modified · 60 insertions, 0 deletions
+#           775 -> 835 rader, 37154 -> 40293 byte
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlottes shasum och kodningens
+# egen beräkning). CC rapporterade ingen sha, och ombads inte göra det.
+#
+# PURPOSE: VARUMÄRKESSIDAN FÅR EN INLOGGNING. DEN AUTENTISERAR, DEN AUKTORISERAR INTE.
+#
+# TVÅ NYA ACTIONER, insatta som ett block efter field.set och före Retailer Portal.
+#   brand.auth.login   e-post + lösenord -> access_token. Formen är kopierad från
+#                      portal.auth.login, som är rökt: apikey = SUPABASE_ANON, referenserna
+#                      i kroppen. Ett enda felmeddelande för varje misslyckande, ingen
+#                      vidarebefordrad statuskod och ingen svarskropp från Supabase, för att
+#                      inte bygga ett uppräkningsorakel.
+#   brand.auth.verify  access_token -> {user:{email,id}}, för sessionsåterställning.
+#
+# VARFÖR INGEN KONTOUPPLÖSNING. portal.auth.login kräver en aktiv rad i retailer_accounts och
+# svarar 403 utan den. En motsvarande kontroll här hade låst ute den enda användaren, eftersom
+# kontobindningen för C&G görs först i B1.1a-4. accounts och account_members har noll träffar i
+# filen, mätt.
+#
+# STOPPKLOSSEN, spec §3, godkänd av strategin. Efter en lyckad token slår login i
+# retailer_accounts på e-posten; träff ger 403 och ingen token på den vägen. Den finns för att
+# en portalanvändare annars kunde hämta en varumärkestoken ända till B1.1a-5. Den ersätts av
+# rollkontroll via accounts/account_members i B1.1a-4 och namnges där.
+#
+# MÄTT BASLINJE FÖRE LEVERANSEN: brand.auth.login mot veyaflow.netlify.app svarade 400,
+# Unknown action. Ett 200 efter deployen betyder därför något.
+#
+# STRUKTURELL KONTROLL AV ATT INGET ANNAT RÖRDES, utan att HEAD behövde läsas: varje ankare
+# före insättningspunkten står kvar på sitt radnummer (32, 48, 143, 194, 301) och varje ankare
+# efter har flyttat exakt +60 (317->377, 352->412, 723->783, 764->824).
+#
+# VAD DEN HÄR LEVERANSEN INTE GÖR, NAMNT SÅ ATT DET INTE MISSTAS FÖR KLART:
+#   Ingen klient skickar en token än. Det är B1.1a-3b, på index.html.
+#   Ingenting nekas än. verifyAccessToken loggar fortfarande bara [authprobe].
+#   §3 är en stoppkloss, inte en rollmodell.
+#
+# GRINDRAD 34, myntad av kodningen i denna leverans: inloggningsförsök kan inte
+# hastighetsbegränsas per användare eller per angripare. Supabase räknar per IP-adress
+# (dokumentationssidan Rate limits, raden för /token: 150 per 5 minuter, och meningen "By
+# default, Supabase Auth uses the IP address of the client for rate limiting"), och Netlifys
+# utgående adresser fluktuerar (dokumentationssidan Private Connectivity: "the IP addresses
+# that the build process and serverless functions use to connect to your systems will
+# fluctuate"). Den IP som räknas är aldrig slutanvändarens. Gäller portal.auth.login redan i
+# dag. Lagas i B1.1a-3c med en räknare per e-postadress, oberoende av IP.
+#
+# EJ FASTSTÄLLT, MÄTS INNAN B1.1a-3b BYGGS: samma tabell listar /user i raden "Sign-ups and
+# sign-ins", 30 per 5 minuter per IP, alltså en femtedel av /token. verifyAccessToken anropar
+# /auth/v1/user vid varje proxyanrop som bär en token. I dag fyrar det aldrig, eftersom ingen
+# klient skickar en token. Från och med -3b fyrar det på varje anrop. Om raden gäller GET /user
+# eller bara skrivande anrop mot samma väg är inte fastställt, och det måste mätas före -3b.
+#
+# NYTT FEL, NÄSTA LEVERANS PÅ YTAN: brand.auth.verify saknar tidig vakt på utebliven
+# accessToken och skickar då Bearer undefined uppströms. Utfallet blir rätt, 401, men anropet
+# görs i onödan och räknas mot samma gräns. verifyPortalAuth har vakten.
+#
+# RÖKEN ÄR CHARLOTTES OCH LIGGER EFTER PUSH. #K39 står: ingen Netlify-funktion kör lokalt, så
+# röken görs mot den deployade sidan. Hon skapar först sitt auth-konto i Supabase, under
+# Authentication -> Users, med Auto Confirm User på. Adressen är fri: exakt träff 0 och noll
+# aktiva portalrader på domänen, mätt 14 okt. Tre fall: rätt lösenord 200, fel lösenord 401,
+# portalanvändare 403. Det tredje kan inte rökas nu, eftersom det inte finns någon aktiv
+# portalrad att testa med. Det förblir EJ RÖKT och tas när en portalanvändare finns.
 
 # netlify/functions/supabase-proxy.js moved 0a70fdad → 267370bf on 12 Oct 2026 — B1.1a-2d.
 #   after   267370bf19c9a8293e9263b37adee4bffd0779436b509bd0cf108f0b03a29e1b
