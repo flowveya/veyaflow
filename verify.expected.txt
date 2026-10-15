@@ -315,7 +315,77 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  268a9e87
+netlify/functions/supabase-proxy.js  9a85a9cb
+
+# netlify/functions/supabase-proxy.js moved 268a9e87 -> 9a85a9cb on 15 Oct 2026, B1.1a-3c-2.
+#   after   9a85a9cb833519463d3cb11ef722d17c4ea90677b56a15362389a0b5fb6874eb
+#           57 gates · 1 of 11 modified · 71 insertions, 0 deletions
+#           835 -> 906 rader, 40293 -> 44188 byte
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlottes shasum och kodningens
+# egen beräkning). CC rapporterade ingen sha, och ombads inte göra det.
+#
+# PURPOSE: GRINDRAD 34 STÄNGS. INLOGGNINGSFÖRSÖK SPÄRRAS PER IDENTITET, INTE PER IP.
+#
+# VARFÖR DEN INTE KAN LIGGA PÅ IP. Supabase räknar per IP-adress (dokumentationssidan Rate
+# limits) och Netlifys utgående adresser fluktuerar (Private Connectivity). Den IP som räknas
+# är därför aldrig slutanvändarens, och en IP-gräns separerar varken användare eller angripare.
+#
+# LAGRINGEN. Tabellen public.login_attempts, skapad 14 okt i B1.1a-3c-1, med id, email_hash och
+# attempted_at. Lagrar sha256 av den gemenfällda e-posten, aldrig adressen. En dump är därför
+# ingen adresslista, men den skyddar inte en redan känd adress. Endast misslyckade försök skrivs.
+#
+# TILLVÄXTSKYDDET, tre delar, eftersom skrivvägen nås oautentiserat. Vid varje kontroll raderas
+# alla rader äldre än fönstret, inte bara den aktuella identitetens, vilket begränsar tabellens
+# storlek av antalet försök under ett fönster. Ingen ny rad skrivs för en identitet som redan
+# ligger på taket. Och pg_cron finns inte i projektet, mätt 14 okt, så städningen kan inte
+# schemaläggas i databasen utan måste ske vid varje anrop.
+#
+# TRÖSKEL OCH FÖNSTER: fem försök per identitet inom femton minuter. POLICYVÄRDEN, inte mätta.
+# De bor i koden och inte i schemat, så att de kan ändras utan en databasändring när mätt data
+# på verkliga pilotanvändare finns.
+#
+# FAIL-OPEN, ETT AVSIKTLIGT VAL SOM STÅR SKRIVET I KODEN. Kastar räkningen släpps försöket
+# igenom och en rad som börjar [throttle] loggas. Att neka i stället förvandlar en databashicka
+# till ett driftstopp för en verklig användare, medan skyddet är en motåtgärd mot en attack som
+# inte pågår. Det som skulle ändra beslutet är om räkningen börjar fela i normal drift, och det
+# syns på [throttle]-raderna.
+#
+# ORDNINGEN ÄR HELA POÄNGEN, och den är verifierad av lanen genom läsning, inte genom räkning.
+# brand.auth.login börjar på rad 364, loginAttemptState anropas på 371, 429-returen ligger på
+# 373, och anropet till /auth/v1/token på 375. Sker kontrollen efter beviljningen förbrukar en
+# angripare fortfarande Supabases egen kvot, och då är spärren en bokföring utan verkan.
+#
+# INVARIANTEN SOM GÖR SPÄRREN SÄKER: den räknar den INSKICKADE adressen, oavsett om ett konto
+# finns. Räknades bara befintliga konton skulle en 429 avslöja att adressen finns, och spärren
+# vore ett uppräkningsorakel. Den står som hjälpfunktionens inledande kommentar.
+#
+# DE FYRA INKOPPLINGARNA, alla inuti brand.auth.login och ingen annanstans: kontrollen före
+# beviljningen med 429 och inget Supabase-anrop; en rad skrivs på 401-vägen när antalet ligger
+# under taket; INGEN rad skrivs på 403-vägen, eftersom lösenordet var rätt och det är en
+# auktoriseringsvägran, inte ett referensfel; och identitetens rader raderas på 200-vägen, så
+# att den som till slut skriver rätt inte sitter spärrad av sina egna tidigare försök.
+#
+# STRUKTURELL KONTROLL AV ATT INGET ANNAT RÖRDES. 71 insättningar och 0 borttagningar, alltså
+# har ingen befintlig rad ändrats. Ankarna efter blocket har flyttat exakt +71: brand.auth.verify
+# 357 -> 428, portal.auth.login 377 -> 448, Unknown action 824 -> 895. brand.auth.login själv
+# flyttade +46, vilket är modulnivån plus hjälpfunktionen, och differensen 25 är raderna inuti
+# blocket. portal.auth.login är därmed bevisat orörd, inte bara avsett orörd.
+#
+# CC AVBRÖT SITT FÖRSTA FÖRSÖK OCH SKREV INGENTING. 401-raderna är byte-identiska i
+# portal.auth.login, så ett tvetydigt ankare utlöste ett stopp, och filen stod kvar på 835 rader.
+# Andra försöket gjordes med redigeringarna begränsade till brand.auth.login. Noteras eftersom
+# CC 14 okt rapporterade en ändring som aldrig skedde; här vägrade den gissa och sa det.
+#
+# VAD DEN HÄR LEVERANSEN INTE GÖR. portal.auth.login har exakt samma svaghet som grindrad 34
+# beskriver och rörs inte, eftersom leveransen gör en sak. Namngivet till Strategy, ingen ny
+# grindrad, ingen ny identifierare.
+#
+# RÖKEN ÄR CHARLOTTES OCH LIGGER EFTER PUSH. #K39 står: ingen Netlify-funktion kör lokalt.
+# Spärren provas med en ADRESS SOM INTE FINNS, inte med Charlottes egen. Fem försök ger 401 och
+# det sjätte ger 429. Med hennes egen adress hade det låst hennes konto i femton minuter, eftersom
+# en spärrad identitet aldrig når fram till lösenordsbeviljningen. Att en obefintlig adress ändå
+# spärras är samtidigt beviset för invarianten ovan. Dessutom rökas §3:s 403-väg för första
+# gången, med buyer-test@veyaflow.internal, som har en aktiv rad i retailer_accounts.
 
 # netlify/functions/supabase-proxy.js moved 267370bf -> 268a9e87 on 14 Oct 2026, B1.1a-3a.
 #   after   268a9e87a5214f7f5ce1d40c1f0bba058a18c043debc5a4232048edd3932f223

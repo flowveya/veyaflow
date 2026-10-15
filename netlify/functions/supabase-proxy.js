@@ -28,9 +28,16 @@
 //   portal.submission.create, portal.status.sync
 // ═══════════════════════════════════════════════════
 
+const crypto = require('crypto');
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
+
+// Login throttle (B1.1a-3c-2). Both values are POLICY, not measurement, and they live
+// here precisely so they can change without a database change.
+const LOGIN_WINDOW_MS   = 15 * 60 * 1000;   // 15 minutes
+const LOGIN_ATTEMPT_CAP = 5;                // attempts per identity per window
 
 // Simple Supabase REST helper — uses service_role, bypasses RLS.
 // When the path contains 'on_conflict=', PostgREST needs the
@@ -152,6 +159,45 @@ async function verifyAccessToken(accessToken) {
   } catch (e) {
     return { verified: false, reason: 'verify_error' };
   }
+}
+
+// ── Login throttle state ─────────────────────────────────────────────────────
+// THE INVARIANT: the throttle counts the SUBMITTED ADDRESS, whether or not an account
+// exists for it. If only existing accounts were counted, a 429 would reveal that the
+// address is registered, and the throttle itself would become an enumeration oracle.
+//
+// The address never reaches the table: only a sha256 of its trimmed, lower-cased form
+// does, so a stored row identifies an attempt without naming anyone.
+async function loginAttemptState(email) {
+  const hash = crypto.createHash('sha256').update(String(email).trim().toLowerCase()).digest('hex');
+  const windowStart = new Date(Date.now() - LOGIN_WINDOW_MS).toISOString();
+
+  // Cleanup, best effort, and deliberately NOT scoped to this identity: every expired
+  // row goes, whoever it belongs to. That is what bounds the table, because the write
+  // path is reachable without authentication.
+  try {
+    await supabase('DELETE', `login_attempts?attempted_at=lt.${encodeURIComponent(windowStart)}`);
+  } catch (e) {
+    console.error('[throttle] cleanup failed:', e.message);
+  }
+
+  // Count. The limit IS the cap: we never need to know more than whether there are at
+  // least that many inside the window.
+  let count = 0;
+  try {
+    const rows = await supabase('GET', `login_attempts?email_hash=eq.${hash}&attempted_at=gte.${encodeURIComponent(windowStart)}&select=id&limit=${LOGIN_ATTEMPT_CAP}`);
+    count = Array.isArray(rows) ? rows.length : 0;
+  } catch (e) {
+    // DELIBERATE, and the reason belongs in the code: a failing count LETS THE ATTEMPT
+    // THROUGH. Denying instead would turn a database hiccup into an outage for a real
+    // user, while the throttle is a countermeasure against an attack that is not under
+    // way. What would change this decision is the count starting to fail in normal
+    // operation — and that is visible on these [throttle] lines.
+    console.error('[throttle] count failed, allowing attempt:', e.message);
+    count = 0;
+  }
+
+  return { hash, count, blocked: count >= LOGIN_ATTEMPT_CAP };
 }
 
 exports.handler = async (event) => {
@@ -320,6 +366,12 @@ exports.handler = async (event) => {
       if (!email || !password) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Email and password required' }) };
       }
+      // Throttle check BEFORE the token call, and the order is the whole point: checked
+      // afterwards, an attacker still burns Supabase's own auth quota on every try.
+      const attempts = await loginAttemptState(email);
+      if (attempts.blocked) {
+        return { statusCode: 429, headers, body: JSON.stringify({ error: 'Too many attempts. Try again later.' }) };
+      }
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: {
@@ -333,10 +385,22 @@ exports.handler = async (event) => {
       // forwarded: a login that distinguishes 'no such email' from 'wrong password'
       // is an enumeration oracle.
       if (!res.ok || !authData.access_token) {
+        // Record the failed attempt, but not once this identity is already at the cap:
+        // a blocked identity stops growing the table. Best effort.
+        if (attempts.count < LOGIN_ATTEMPT_CAP) {
+          try {
+            await supabase('POST', 'login_attempts', { email_hash: attempts.hash });
+          } catch (e) {
+            console.error('[throttle] insert failed:', e.message);
+          }
+        }
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid email or password' }) };
       }
       // Stop-block, replaced by the role check in B1.1a-4: a retailer-portal account
       // must not receive a brand token. No token is returned on this path.
+      // NO throttle row is written here: the password was correct, so this is an
+      // authorisation refusal, not a credential failure. Counting it would make the
+      // counter mean two different things.
       const portalAccounts = await supabase('GET', `retailer_accounts?contact_email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`);
       if (portalAccounts.length) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'This account signs in through the retailer portal.' }) };
@@ -346,6 +410,13 @@ exports.handler = async (event) => {
       // brand.auth.verify, where the shape IS measured (verifyPortalAuth reads it).
       // No account resolution either: the account binding lands in B1.1a-4, and a check
       // here would lock out the only user before that delivery exists.
+      // A successful login clears this identity's rows: a user who finally types it
+      // right must not stay blocked by their own earlier attempts. Best effort.
+      try {
+        await supabase('DELETE', `login_attempts?email_hash=eq.${attempts.hash}`);
+      } catch (e) {
+        console.error('[throttle] reset failed:', e.message);
+      }
       return { statusCode: 200, headers, body: JSON.stringify({
         access_token: authData.access_token,
         refresh_token: authData.refresh_token,
