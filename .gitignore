@@ -55,3 +55,4 @@ brandhome_pass2_sketch.html
 # endpoint names above. There is no production directory of this name at any
 # depth, and moving the folder should not un-ignore it.
 Claude outputs/
+_*
