@@ -315,7 +315,77 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  9a85a9cb
+netlify/functions/supabase-proxy.js  1c38e22b
+
+# netlify/functions/supabase-proxy.js moved 9a85a9cb -> 1c38e22b on 16 Oct 2026, B1.1a-3d.
+#   after   1c38e22b8a2fa434e37c357db2fcd2cfab03a6c35a8079cfc22c58de9e74718c
+#           57 gates · 1 of 11 modified · 111 insertions, 24 deletions
+#           906 -> 993 rader, 44188 -> 48768 byte
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlottes shasum och kodningens
+# egen beräkning). CC rapporterade ingen sha, och ombads inte göra det.
+#
+# PURPOSE: GRINDRAD 36 STÄNGS. INGEN RUNDTUR TILL AUTH-SERVERN PER ANROP.
+#
+# MÄTNINGEN SOM ÄNDRADE BILDEN AV RADEN. verifyPortalAuth hade fem anropsställen, och fyra av
+# dem är vanliga portalhandlingar: inkorgen, hämta en inskickning, ändra status, skriva ett
+# avslag. Bara ett är sessionsåterställning. Portalen förbrukade alltså hinken på 30 per 5
+# minuter per IP REDAN I DAG, vid varje klick. Raden beskrev vad som skulle hända när B1.1a-3b
+# börjar skicka token; mätningen visade att halva problemet var i drift.
+#
+# MÄTNINGEN SOM GJORDE LEVERANSEN MÖJLIG. Nyttolasten i en verklig access-token bär aal, amr,
+# app_metadata, aud, email, exp, iat, is_anonymous, iss, phone, role, session_id, sub och
+# user_metadata. email, sub, exp och iss finns alla. Huvudet bär alg ES256 och ett kid som är
+# samma nyckel som står som current key i dashboarden och ensam ligger i JWKS. Lokal
+# verifiering kan därför ge både portalen och varumärkessidan exakt det de hämtade över nätet.
+# Mätt genom att skriva ut FÄLTNAMNEN, aldrig värdena.
+#
+# KONSTRUKTIONEN. JWKS hämtas en gång per funktionsinstans och cachas i modulens omfång, så en
+# kallstart kostar en hämtning och varma anrop kostar noll. Okänd kid utlöser en omhämtning,
+# men högst en per 60 sekunder, så att påhittade kid inte kan få oss att hamra JWKS-adressen.
+# Golvet är självpåtaget: om den adressen är hastighetsbegränsad är EJ FASTSTÄLLT, eftersom den
+# inte finns i Supabases uppräknade rader, och golvet gör frågan ointressant. kid hårdkodas
+# aldrig, det läses ur token och slås upp, annars slutar allt fungera vid nästa rotation.
+#
+# ALGORITMEN ÄR PINNAD TILL ES256, och det är hela skyddet mot nedgradering. En verifierare som
+# väljer algoritm utifrån vad token själv påstår är sämre än ingen verifiering alls. Raden som
+# avgör det jämför mot konstanten och inget annat.
+#
+# dsaEncoding: ieee-p1363 ÄR OBLIGATORISKT. En JWS-signatur för ES256 är rå r||s, inte DER.
+# Utan den raden avvisas varje giltig signatur, och felet ser ut som att nyckeln är fel.
+#
+# iss PINNAS mot projektets Auth-adress. aud PINNAS INTE: fältet finns, men dess värde är inte
+# mätt, och en pinning på ett ogissat värde är en grind som kan bli fel. Pinnas när det är mätt.
+#
+# is_anonymous AVVISAS, utöver minimum och godkänt. Anonyma inloggningar är avstängda i
+# projektet, mätt 9 okt, men slår någon på dem igen ska varumärkessidan inte tyst börja godta
+# dem. En avstängd inställning blir därmed en kontroll i koden.
+#
+# VAD DEN HÄR LEVERANSEN KOSTAR, UTSKRIVET. Lokal verifiering ser inte en borttagen användare
+# eller en utloggad session förrän token löper ut, alltså upp till 3600 sekunder. Det fönstret
+# är godtaget för piloten. MEN det gäller bara autentiseringen: uppslaget mot retailer_accounts
+# ligger kvar per anrop, så att avaktivera ett återförsäljarkonto slår igenom OMEDELBART. Det är
+# bara återkallelse på auth-nivå som har timmen.
+#
+# EN ÄRLIG BEGRÄNSNING I BEVISNINGEN. Det här är första leveransen med BORTTAGNINGAR, så
+# argumentet "noll borttagningar bevisar att ingen befintlig rad ändrats" gäller inte. Beviset
+# vilar i stället på att de 24 borttagningarna motsvarar de tre ersatta rundturerna och att
+# varje annat ankare står kvar: supabase() på 60, loginAttemptState på 264, handlerns
+# destrukturering på 331, [authprobe] på 333, brand.auth.login på 457 med spärrens 429 på 466,
+# portal.auth.login på 535, Unknown action på 982. verifyJwtLocally anropas från exakt tre
+# ställen, 181, 249 och 522. Svagare än förra gången, och det ska stå så.
+#
+# CC SKREV OM EN EGEN KOMMENTAR FÖR ATT C4 SKULLE BLI SANN. Dess första mätning gav 1, eftersom
+# kommentaren den själv skrivit citerade endpointens sökväg medan den förklarade gränsraden.
+# Samma #183-fälla som 15 okt, andra gången CC orsakar den. Den lade in en notering i filen om
+# att sökvägen är utelämnad med flit, så att nästa läsare inte hjälpsamt förtydligar kommentaren
+# och därmed bryter kontrollen. Rätt åtgärd, och den hör till koden och inte till specen.
+#
+# RÖKEN ÄR CHARLOTTES OCH LIGGER EFTER PUSH. Leveransen ändrar INGEN statuskod och inget
+# svarsfält, så den har ingen ny observerbar skillnad att röka deployen med. Enligt regeln som
+# rulades 15 okt kontrolleras deployen därför mot commit-hashen på Netlifys Deploys-sida FÖRE
+# röken. Båda ytorna röks: varumärkessidans brand.auth.verify med en levande token, och
+# portalens inkorg med en inloggning, eftersom verifyPortalAuth nu verifierar lokalt. En
+# förvanskad token ska ge 401.
 
 # netlify/functions/supabase-proxy.js moved 268a9e87 -> 9a85a9cb on 15 Oct 2026, B1.1a-3c-2.
 #   after   9a85a9cb833519463d3cb11ef722d17c4ea90677b56a15362389a0b5fb6874eb

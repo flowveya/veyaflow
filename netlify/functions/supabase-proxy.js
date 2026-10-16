@@ -39,6 +39,20 @@ const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
 const LOGIN_WINDOW_MS   = 15 * 60 * 1000;   // 15 minutes
 const LOGIN_ATTEMPT_CAP = 5;                // attempts per identity per window
 
+// ── Local JWT verification (B1.1a-3d) ───────────────────────────────────────
+// Gate row 36: the Auth user endpoint sits in Supabase's "Sign-ups and sign-ins"
+// bucket, 30 calls per 5 minutes per IP, and Netlify's egress addresses fluctuate —
+// so the IP being counted is never the end user's. Measured 15 Oct: four of
+// verifyPortalAuth's five call sites are ordinary portal actions, so the portal spent
+// that bucket on every click in the inbox. Verifying the signature here costs one
+// fetch per cold start and nothing on warm calls. (The endpoint's path is deliberately
+// not written out here: a comment naming it would be counted by the check that proves
+// no code calls it any more.)
+const JWKS_URL = `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`;
+const JWKS_REFETCH_FLOOR_MS = 60 * 1000;
+// kid → crypto.KeyObject, plus when the set was last fetched.
+const jwksCache = { keys: new Map(), fetchedAt: 0 };
+
 // Simple Supabase REST helper — uses service_role, bypasses RLS.
 // When the path contains 'on_conflict=', PostgREST needs the
 // 'resolution=merge-duplicates' Prefer header to actually upsert
@@ -68,6 +82,93 @@ async function supabase(method, path, body) {
   return data;
 }
 
+// ── JWKS lookup ─────────────────────────────────────────────────────────────
+// The kid is read from the token and looked up. It is NEVER hardcoded: a pinned kid
+// stops working at the next key rotation, silently and everywhere at once.
+// The refetch floor exists because this address is absent from Supabase's published
+// rate-limit rows — whether it is limited is EJ FASTSTÄLLT — and the floor makes the
+// question moot: an attacker sending invented kids cannot make us hammer it.
+async function getSigningKey(kid) {
+  if (jwksCache.keys.has(kid)) return jwksCache.keys.get(kid);
+  if (Date.now() - jwksCache.fetchedAt < JWKS_REFETCH_FLOOR_MS) return null;
+  jwksCache.fetchedAt = Date.now();
+  const res = await fetch(JWKS_URL);
+  if (!res.ok) return null;
+  const jwks = await res.json();
+  const next = new Map();
+  for (const jwk of (jwks && jwks.keys) || []) {
+    if (!jwk || !jwk.kid) continue;
+    try {
+      next.set(jwk.kid, crypto.createPublicKey({ key: jwk, format: 'jwk' }));
+    } catch (e) {
+      console.error('[jwks] unusable key', jwk.kid, e.message);
+    }
+  }
+  jwksCache.keys = next;
+  return next.has(kid) ? next.get(kid) : null;
+}
+
+// ── Local JWT verification ──────────────────────────────────────────────────
+// Returns { valid, payload, reason }. Never throws for a bad token; a thrown error
+// means the lookup itself failed and the caller decides.
+async function verifyJwtLocally(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) return { valid: false, reason: 'malformed' };
+  const [h, pl, sig] = parts;
+
+  let header;
+  try {
+    header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
+  } catch (e) {
+    return { valid: false, reason: 'malformed' };
+  }
+
+  // THE ALGORITHM IS PINNED AND IS NEVER CHOSEN FROM WHAT THE TOKEN CLAIMS. This line
+  // is the whole protection against downgrade; without it, local verification is worse
+  // than none at all.
+  if (header.alg !== 'ES256') return { valid: false, reason: 'alg_' + header.alg };
+  if (!header.kid) return { valid: false, reason: 'unknown_kid' };
+
+  const key = await getSigningKey(header.kid);
+  if (!key) return { valid: false, reason: 'unknown_kid' };
+
+  // dsaEncoding: 'ieee-p1363' is MANDATORY. A JWS ES256 signature is raw r||s, not DER.
+  // Without this line every valid signature is rejected, and the failure looks exactly
+  // like a wrong key.
+  let ok = false;
+  try {
+    ok = crypto.verify(
+      'sha256',
+      Buffer.from(h + '.' + pl),
+      { key, dsaEncoding: 'ieee-p1363' },
+      Buffer.from(sig, 'base64url')
+    );
+  } catch (e) {
+    return { valid: false, reason: 'signature' };
+  }
+  if (!ok) return { valid: false, reason: 'signature' };
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(pl, 'base64url').toString('utf8'));
+  } catch (e) {
+    return { valid: false, reason: 'malformed' };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== 'number' || payload.exp <= now) return { valid: false, reason: 'expired' };
+  if (typeof payload.nbf === 'number' && payload.nbf > now) return { valid: false, reason: 'not_yet_valid' };
+  if (payload.iss !== `${SUPABASE_URL}/auth/v1`) return { valid: false, reason: 'issuer' };
+  // Anonymous sign-ins are off in this project (measured 9 Oct). If someone turns them
+  // back on, the brand side must not start accepting them silently: one line turns a
+  // disabled setting into a check in the code.
+  if (payload.is_anonymous === true) return { valid: false, reason: 'anonymous' };
+  // aud is NOT pinned: the field is present but its value is not measured here, and
+  // pinning an unguessed value is a gate that can be wrong. Pin it once measured.
+
+  return { valid: true, payload };
+}
+
 // ── Portal auth verification ─────────────────────
 // Verifies an access_token via Supabase Auth and resolves the retailer_account.
 // Throws with .code = 401 (bad/expired token) or 403 (no active retailer account).
@@ -77,19 +178,14 @@ async function verifyPortalAuth(accessToken) {
     err.code = 401;
     throw err;
   }
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      'apikey': SUPABASE_ANON,
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
-  if (!userRes.ok) {
+  const v = await verifyJwtLocally(accessToken);
+  if (!v.valid) {
     const err = new Error('Invalid or expired token');
     err.code = 401;
     throw err;
   }
-  const user = await userRes.json();
-  if (!user || !user.email) {
+  const user = { email: v.payload.email, id: v.payload.sub };
+  if (!user.email) {
     const err = new Error('Invalid user');
     err.code = 401;
     throw err;
@@ -150,12 +246,9 @@ function mapSubmissionRow(row) {
 async function verifyAccessToken(accessToken) {
   if (!accessToken) return { verified: false, reason: 'no_token' };
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${accessToken}` }
-    });
-    if (!r.ok) return { verified: false, reason: 'rejected_' + r.status };
-    const u = await r.json();
-    return (u && u.id) ? { verified: true } : { verified: false, reason: 'no_user_id' };
+    const v = await verifyJwtLocally(accessToken);
+    if (!v.valid) return { verified: false, reason: v.reason };
+    return (v.payload && v.payload.sub) ? { verified: true } : { verified: false, reason: 'no_user_id' };
   } catch (e) {
     return { verified: false, reason: 'verify_error' };
   }
@@ -426,18 +519,12 @@ exports.handler = async (event) => {
     }
 
     if (action === 'brand.auth.verify') {
-      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      if (!userRes.ok) {
+      const v = await verifyJwtLocally(accessToken);
+      if (!v.valid) {
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Not authenticated' }) };
       }
-      const user = await userRes.json();
       return { statusCode: 200, headers, body: JSON.stringify({
-        user: { email: user.email, id: user.id },
+        user: { email: v.payload.email, id: v.payload.sub },
       })};
     }
 
