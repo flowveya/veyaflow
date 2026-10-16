@@ -315,8 +315,76 @@ portal.html       908647c0
 # all, so "nothing looked wrong" would prove nothing here. #K39 stands: no Netlify function runs
 # locally, so the smoke is on the deployed site after the push.
 brand/index.html  fc6c0586
-netlify/functions/supabase-proxy.js  1c38e22b
+netlify/functions/supabase-proxy.js  3b9f36c1
 
+# netlify/functions/supabase-proxy.js moved 1c38e22b -> 3b9f36c1 on 16 Oct 2026, B1.1a-3c-3.
+#   after   3b9f36c1e6b00c28b5dffb0602222c8f07ead052a01d31df77d7ebd4d8e13e28
+#           57 gates - 1 of 11 modified - 25 insertions, 0 deletions
+#           993 -> 1018 rader, 48768 -> 50188 byte
+# NAMED BY THE LANE. TWO INDEPENDENT COMPUTATIONS AGREED (Charlottes shasum och kodningens
+# egen beraekning). CC rapporterade ingen sha, och ombads inte goera det.
+#
+# VAD LEVERANSEN GOER. portal.auth.login far samma spaerr som brand.auth.login fick i -3c-2:
+# hoegst fem foersoek per adress per femton minuter, raeknat i login_attempts. Fyra aendringar,
+# alla inuti portal-blocket: spaerrkontrollen foere tokenanropet, raekningen av ett misslyckat
+# foersoek inne i 401-grenen under taket, en kommentar oever 403-blocket som saeger varfoer
+# ingen rad skrivs daer, och en nollstaellning av identitetens rader efter en lyckad inloggning.
+#
+# STRATEGY RULADE ORDNINGEN 16 OKT: spaerren foere -3b. Skaelet staar: portal.auth.login aer en
+# oeppen svaghet i drift, medan -3b aer en ny funktion. Grindrad 34 beskrev exakt detta och
+# stod kvar namngiven men oloest sedan -3c-2 roerde bara varumaerkesvaegen. Ingen ny grindrad.
+#
+# INVARIANTEN GAELLER IGEN, TILL SKILLNAD FRAN -3d. Noll borttagningar, maett med
+# git diff | grep -cE "^-[^-]" som gav 0 och med en egen diff som gav 25 tillagda och 0
+# borttagna rader. Daerfoer haller argumentet som -3d maste avsta fran: ingen befintlig rad
+# kan ha aendrats, eftersom ingen befintlig rad togs bort.
+#
+# ALLA FYRA HUNKARNA LIGGER INNANFOER BLOCKET. Tillaeggen sitter vid gamla radnumren 539, 549,
+# 552 och 554, alltsa 6 + 9 + 3 + 7 = 25 rader. Portal-blocket boerjade pa 535 och slutade foere
+# 570. Ingenting hamnade utanfoer.
+#
+# BYTEIDENTISKT DAER DET SKA VARA DET, MAETT OCH INTE PASTAT. brand.auth.login-blocket har
+# md5 2f1c4b6a60ebe04d464d081201080ff3 foere och efter. loginAttemptState-hjaelparen har md5
+# 43e738419001f3305755c2a8dc86bdae foere och efter. Ingen av dem roerdes.
+#
+# ANKARRAEKNINGARNA, med haerledning. loginAttemptState 2 -> 3 (definitionen, varumaerkesvaegen,
+# portalvaegen). attempts.blocked 1 -> 2 (en per inloggningsvaeg). statusCode: 429 1 -> 2 (en per
+# vaeg). login_attempts 4 -> 6 (staedningen, raekningen, varumaerkesvaegens insert och delete, plus
+# portalvaegens tva nya). Sokvaegen till /auth/v1/user staar kvar pa 0 och far inte komma tillbaka.
+#
+# RAEKNINGARNA AER SAMTIDIGT BEVISET FOER ATT KOMMENTARFAELLAN UNDVEKS. En kommentar som citerat
+# nagon av de raeknade straengarna hade gjort talet foer hoegt. Fallan staelldes foer tredje gangen
+# och traeffade inte denna gang; de tva foersta gangerna var CC:s.
+#
+# CC:S METOD, OCH VARFOER DEN AER BAETTRE AEN FOERRA GANGEN. Redigeringarna gjordes pa en utskuren
+# del mellan blockets boerjan och nasta action, inte genom att matcha radtext. Det var noedvaendigt:
+# 401-raderna aer byte-identiska i de tva inloggningsvaegarna, vilket fick CC att avbryta sitt
+# foersta foersoek 15 okt. Den gangen vaegrade den gissa. Den har gangen loeste den tvetydigheten
+# med en avgraensning i stallet.
+#
+# 403-VAEGEN SKRIVER INGEN RAD, OCH DET AER ETT VAL. Loesenordet var korrekt, sa avslaget aer ett
+# behoerighetsavslag och inte ett inloggningsfel. Raeknades det skulle raeknaren bety tva olika
+# saker, och en legitim portalanvaendare utan aktiv rad skulle kunna spaerra sig sjaelv ute fran
+# en inloggning som aendoc aldrig lyckas. Speglar stoppblocket pa varumaerkesvaegen.
+#
+# INVARIANTEN FOER SJAELVA SPAERREN AER OFOERAENDRAD OCH AERVS FRAN -3c-2: raekningen sker pa den
+# inskickade adressen oavsett om ett konto finns. Raeknades bara befintliga konton vore en 429
+# ett uppraekningsorakel. Adressen nar aldrig tabellen, bara en sha256 av dess trimmade och
+# gemena form.
+#
+# DEPLOYKONTROLLEN KAN DENNA GANG GOERAS AV ROEKEN, TILL SKILLNAD FRAN -3d. Leveransen infoer en
+# ny observerbar skillnad: ett sjaette foersoek mot portalvaegen ger 429 daer gammal kod ger 401.
+# Deploy-hashen laeses aenda foerst, eftersom regeln fran 15 okt saeger att roeken aldrig far vara
+# det som bevisar deployen, och eftersom ett uteblivet 429 annars har tva moejliga orsaker.
+#
+# ROEKEN, TRE FALL, SPEGLAR -3c-2. Fem foersoek mot en adress som inte finns ger 401 och det
+# sjaette ger 429. Ett korrekt portalkonto, buyer-test@veyaflow.internal, ger 200 och aer alltsa
+# opaverkat. Och info@cloudandglow.com ger 403 utan att skriva nagon rad. Spaerren provas med en
+# obefintlig adress och aldrig med ett konto som behoevs, eftersom en spaerrad identitet aldrig
+# nar fram till loesenordsbeviljningen.
+#
+# VAD LEVERANSEN INTE GOER. Den aendrar ingenting i verifieringen av redan utstaellda tokens, och
+# den roer inte session_id-tourniqueten #186. Grindrad 35 staar kvar och staengs i -4.
 # netlify/functions/supabase-proxy.js moved 9a85a9cb -> 1c38e22b on 16 Oct 2026, B1.1a-3d.
 #   after   1c38e22b8a2fa434e37c357db2fcd2cfab03a6c35a8079cfc22c58de9e74718c
 #           57 gates · 1 of 11 modified · 111 insertions, 24 deletions

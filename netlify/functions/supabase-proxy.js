@@ -537,6 +537,12 @@ exports.handler = async (event) => {
       if (!email || !password) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Email and password required' }) };
       }
+      // The check sits BEFORE the token call, and the order is the whole point: placed
+      // after it, an attacker still burns Supabase's own auth quota on every attempt.
+      const attempts = await loginAttemptState(email);
+      if (attempts.blocked) {
+        return { statusCode: 429, headers, body: JSON.stringify({ error: 'Too many attempts. Try again later.' }) };
+      }
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: {
@@ -547,11 +553,30 @@ exports.handler = async (event) => {
       });
       const authData = await res.json();
       if (!res.ok || !authData.access_token) {
+        // Record the failure, but not once this identity has already reached the cap:
+        // a blocked identity must stop growing the attempts table. Best effort.
+        if (attempts.count < LOGIN_ATTEMPT_CAP) {
+          try {
+            await supabase('POST', 'login_attempts', { email_hash: attempts.hash });
+          } catch (e) {
+            console.error('[throttle] insert failed:', e.message);
+          }
+        }
         return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid email or password' }) };
       }
       const accounts = await supabase('GET', `retailer_accounts?contact_email=eq.${encodeURIComponent(email)}&active=eq.true&limit=1`);
+      // Nothing is recorded on this path: the password was correct, so this is an
+      // authorisation refusal and not a login failure. Counting it would make the
+      // counter mean two different things. Mirrors the stop-block on the brand path.
       if (!accounts.length) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No active retailer account for this email. Contact VeyaFlow admin.' }) };
+      }
+      // A successful login clears this identity's rows: a user who finally types it
+      // right must not stay blocked by their own earlier attempts. Best effort.
+      try {
+        await supabase('DELETE', `login_attempts?email_hash=eq.${attempts.hash}`);
+      } catch (e) {
+        console.error('[throttle] reset failed:', e.message);
       }
       return { statusCode: 200, headers, body: JSON.stringify({
         access_token: authData.access_token,
